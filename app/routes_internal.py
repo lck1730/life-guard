@@ -716,7 +716,18 @@ async def app_rollback(body: RollbackIn) -> dict:
         return {"ok": True, "commits": out.strip(),
                 "note": "把要回到的那一档的 commit 传进来（用短 hash 就行）。"}
     ref = body.commit.strip()
-    rc, out = _git(["checkout", ref, "--", "."], timeout=60)
+    # ⚠️ **用 `read-tree -u --reset`，不是 `checkout <ref> -- .`** ✗→✓ —— 2026-10-07 实测：
+    #   `checkout <ref> -- .` 只会把**那一档里有的文件**写回来 ✓，
+    #   而"那一档之后新加的文件"不在里面 ✓ → **它会原样留着** ✗ ✓
+    #   → 结果是"回退了，但坏掉的那个**新模块**还在" ✗ ——
+    #   对"改坏了能回去"这句承诺来说，那等于没退 ✓。
+    #   （而这个 SOUL 恰恰鼓励"加功能 = **新建一个文件**"✓ —— 撞上的概率不低 ✓。
+    #     实测：造一个新增文件 → 回退 → 文件还在 ✗。）
+    #
+    #   `read-tree -u --reset <ref>` = 让**工作区**与那一档完全一致 ✓
+    #   （多出来的文件会被删掉 ✓），但 **HEAD 不动** ✓
+    #   → 历史照旧列得出来 ✓，"再往前找一档"还能用 ✓。
+    rc, out = _git(["read-tree", "-u", "--reset", ref], timeout=60)
     if rc != 0:
         return {"ok": False, "error": f"回滚失败：{out[-600:]}"}
     err = _preflight()
