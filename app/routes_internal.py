@@ -381,6 +381,21 @@ def _run(args: list[str], timeout: int = 120) -> tuple[int, str]:
     return p.returncode, (p.stdout + p.stderr)
 
 
+def _git(args: list[str], timeout: int = 60) -> tuple[int, str]:
+    """跑一条 git 命令 —— **永远带上 `safe.directory`**（2026-10-07 修）。
+
+    为什么非带不可：这个仓库现在归 `lifeguard`（agent），
+    而**服务自己**跑在另一个用户下 -> git 认为"这不是我的仓库"，
+    每条命令都 `fatal: detected dubious ownership`。
+
+    实测出来的后果很阴：`snapshot` 好歹回了 `{"ok": false}`，
+    而 `restart` 那条路把这段错误**当成"存好了"**塞进 note 里，
+    然后**照常重启了** —— 也就是"没存就重启"，
+    恰恰是这张网最该拦住的场景。
+    """
+    return _git(["-c", f"safe.directory={APP_ROOT}", *args], timeout=timeout)
+
+
 # 重启**排队**，不是立刻。
 #
 # ## 为什么不能立刻
@@ -549,17 +564,24 @@ class SnapshotIn(BaseModel):
 @router.post("/app/snapshot", dependencies=[Depends(require_internal_token)])
 async def app_snapshot(body: SnapshotIn) -> dict:
     """**动手改代码之前先存一档。** 改坏了就靠它回去。"""
-    _run(["git", "add", "-A"], timeout=60)
-    rc, out = _run(["git", "commit", "-q", "-m", body.note or "agent 改动"], timeout=60)
-    _, head = _run(["git", "log", "--oneline", "-1"], timeout=30)
+    _git(["add", "-A"], timeout=60)
+    rc, out = _git(["commit", "-q", "-m", body.note or "agent 改动"], timeout=60)
+    _, head = _git(["log", "--oneline", "-1"], timeout=30)
     if rc != 0 and "nothing to commit" not in out:
         return {"ok": False, "error": out[-600:]}
     return {"ok": True, "commit": head.strip(),
             "note": "存好了。接下来放心改，改坏了用 rollback_app 回到这一档。"}
 
 
-def _autocommit(note: str) -> str | None:
-    """把当前改动存一档，返回 commit 短 hash（没东西可提交就是 None）。
+def _autocommit(note: str) -> tuple[str | None, str | None]:
+    """把当前改动存一档 —— **返回 `(commit, 出错原因)`** （2026-10-07 改）。
+
+    ⚠️ 原来它只返回一个字符串，而 git 失败时 `git log --oneline -1`
+    **也会失败** -> 返回的是**那段报错文字** -> 被当成"存好的 commit 号"
+    塞进重启的说明里 -> **"没存就重启"**。
+    而这恰恰是这张网最该拦住的事：那个 SOUL 敢说"放手改、改坏了能退回来"，
+    靠的就是"每次重启前都存了一档"。
+    
 
     **为什么必须自动做，而不是让它调 `snapshot_app`**：
     实测。它写完那个 ↻ 按钮，`git status` 里明明白白一个 ` M ui/app.js`
@@ -569,13 +591,16 @@ def _autocommit(note: str) -> str | None:
 
     接到"重启"这个动作上是最省事的位置：它每改完一轮代码总要重启一次才能生效。
     """
-    _run(["git", "add", "-A"], timeout=60)
+    _git(["add", "-A"], timeout=60)
     msg = (note or "").strip() or "agent 改动（没说明改了什么）"
-    _, out = _run(["git", "commit", "-q", "-m", msg], timeout=60)
-    if "nothing to commit" in out:
-        return None
-    _, head = _run(["git", "log", "--oneline", "-1"], timeout=30)
-    return head.strip() or None
+    rc, out = _git(["commit", "-q", "-m", msg], timeout=60)
+    if rc != 0 and "nothing to commit" not in out:
+        return None, " ".join(out.strip().split())[-300:]
+    _, head = _git(["log", "--oneline", "-1"], timeout=30)
+    h = head.strip()
+    # ⚠️ 还要再确认它**长得像个 commit** —— 上面那条失败路径就是这么漏过去的
+    #   （`git log` 的报错也是"一行文字"）。
+    return (h.split()[0] if h and not h.startswith("fatal") else None), None
 
 
 class RestartIn(BaseModel):
@@ -585,26 +610,39 @@ class RestartIn(BaseModel):
 @router.post("/app/restart", dependencies=[Depends(require_internal_token)])
 async def app_restart(body: RestartIn) -> dict:
     """**先存档，再自检，过了才重启。** 见文件头那段说明——这是承重墙。"""
-    commit = _autocommit(body.note)
+    commit, save_err = _autocommit(body.note)
     if commit:
         log.info("重启前自动存了一档：%s", commit)
+    elif save_err:
+        # **要说出来**：没存上就等于这张网这一轮是空的。
+        # （不拦着重启：真拦住的话，git 一出毛病整个服务就再也重启不了了，
+        #   而"它正在修的就是 git"这种情形完全可能。）
+        log.warning("重启前没存上档：%s", save_err)
 
     err = _preflight()
     if err:
         log.warning("agent 要重启，但自检没过，拒绝：%s", err[:200])
         return {"ok": False, "error": err,
                 "saved": commit,
+                "save_error": save_err,
                 "note": "**服务没重启，还在用老代码正常跑着**（所以你现在还能跟我说话）。"
-                        "改动已经自动存成一档了（就算没改对也没丢）。"
-                        "按上面的错误改掉，再调一次。"}
+                        + (f"改动已经自动存成一档了（`{commit}`），就算没改对也没丢。"
+                           if commit else
+                           (f"⚠️ **这一档没存上**：{save_err}"
+                            if save_err else "（这次没有代码改动要存。）"))
+                        + "按上面的错误改掉，再调一次。"}
 
     _request_restart()
     return {"ok": True,
             "saved": commit,
+            "save_error": save_err,
             "note": "自检通过，**已安排重启**：等这一轮把话说完就重启"
                     "（这样不会把你自己正在说的这句话掐掉）。"
                     "过一会儿再确认它活了就行。"
-                    + (f"这次改动已存为 `{commit}`。" if commit else "（这次没有代码改动要存。）")}
+                    + (f"这次改动已存为 `{commit}`。" if commit else
+                       (f"⚠️ **这一档没存上**（{save_err}）—— 重启前先把它修好，"
+                        "不然改坏了没有回头路。" if save_err
+                        else "（这次没有代码改动要存。）"))}
 
 
 # ── 壳的回头路 ────────────────────────────────────────────────────────
@@ -635,10 +673,10 @@ class ShellRestoreIn(BaseModel):
 async def shell_restore(body: ShellRestoreIn) -> dict:
     # 先把"现在这个（大概已经崩了的）状态"存一档。
     # 不是舍不得——是万一它其实改对了一半，用户还想找回来看看。
-    if _run(["git", "status", "--porcelain", "--", SHELL_PATH], timeout=30)[1].strip():
+    if _git(["status", "--porcelain", "--", SHELL_PATH], timeout=30)[1].strip():
         _autocommit("壳改崩的那一版（自动留档）")
 
-    _, out = _run(["git", "log", "--format=%h %ad %s", "--date=format:%m-%d %H:%M",
+    _, out = _git(["log", "--format=%h %ad %s", "--date=format:%m-%d %H:%M",
                    "-10", "--", SHELL_PATH], timeout=30)
     commits = [l for l in out.strip().splitlines() if l.strip()]
     if len(commits) <= body.steps:
@@ -647,7 +685,7 @@ async def shell_restore(body: ShellRestoreIn) -> dict:
                 "history": "\n".join(commits)}
     target_line = commits[body.steps]
     target = target_line.split()[0]
-    rc, err = _run(["git", "checkout", target, "--", SHELL_PATH], timeout=60)
+    rc, err = _git(["checkout", target, "--", SHELL_PATH], timeout=60)
     if rc != 0:
         return {"ok": False, "error": f"退回失败：{err[-400:]}"}
     log.warning("壳被退回 %s（%s）", target, target_line)
@@ -668,11 +706,11 @@ class RollbackIn(BaseModel):
 async def app_rollback(body: RollbackIn) -> dict:
     """回到某一档。**不传 commit 就先把它列出来**（免得瞎猜）。"""
     if not body.commit.strip():
-        _, out = _run(["git", "log", "--oneline", "-15"], timeout=30)
+        _, out = _git(["log", "--oneline", "-15"], timeout=30)
         return {"ok": True, "commits": out.strip(),
                 "note": "把要回到的那一档的 commit 传进来（用短 hash 就行）。"}
     ref = body.commit.strip()
-    rc, out = _run(["git", "checkout", ref, "--", "."], timeout=60)
+    rc, out = _git(["checkout", ref, "--", "."], timeout=60)
     if rc != 0:
         return {"ok": False, "error": f"回滚失败：{out[-600:]}"}
     err = _preflight()
