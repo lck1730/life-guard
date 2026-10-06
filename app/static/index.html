@@ -1,0 +1,3062 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<!-- interactive-widget：让键盘弹出时**收缩内容**而不是把页面顶上去。
+     不写这个的话，安卓 WebView 会把输入框推到看不见的地方。 -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
+<meta name="theme-color" content="#0f1115">
+<title>生活管家</title>
+<style>
+  :root, [data-theme="dark"] {
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b;
+    --text:#e6e8ee; --muted:#8b93a7; --line:#262b36;
+    --accent:#6ea8ff; --accent-bg:#1e3a5f; --on-accent:#07131f;
+    --agent:#9dd0aa; --danger:#ff6b6b;
+    /* 系统留白。**由网页自己做主**——原生壳只上报数字（window.__onInsets），
+       这里决定怎么用。这样调布局改网页就行，不用重装 App。
+       浏览器里（没有原生壳）退回 CSS 的 env()。 */
+    --inset-top: env(safe-area-inset-top, 0px);
+    --inset-bottom: env(safe-area-inset-bottom, 0px);
+    --kb: 0px;                    /* 仅浏览器下的键盘兜底，App 里原生已算进 inset-bottom */
+  }
+  [data-theme="light"] {
+    --bg:#f5f6fa; --panel:#ffffff; --panel2:#eef0f6;
+    --text:#14161c; --muted:#5a637a; --line:#dde1ea;
+    --accent:#2f6fd0; --accent-bg:#dce8fb; --on-accent:#ffffff;
+    --agent:#2f8a52; --danger:#c0392b;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; overscroll-behavior:none; }
+  body {
+    background:var(--bg); color:var(--text);
+    font:15px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  button { font:inherit; cursor:pointer; border:0; border-radius:10px; background:none; color:inherit; }
+  input,textarea { font:inherit; }
+
+  /* 每个界面都是固定铺满。用 dvh 而不是 vh：地址栏收起时不会留白 */
+  .screen { position:fixed; inset:0; height:100dvh; display:none; flex-direction:column; background:var(--bg); }
+  .screen.on { display:flex; }
+
+  /* ── 登录 ── */
+  #login { justify-content:center; align-items:center; padding:24px; }
+  #login .wrap { width:min(360px,100%); padding:26px 22px; background:var(--panel);
+                 border:1px solid var(--line); border-radius:18px; }
+  #login .logo { width:64px;height:64px;border-radius:50%;background:var(--accent-bg);
+                 display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
+                 font-size:26px;color:var(--accent); }
+  #login h1 { margin:0 0 4px; font-size:20px; text-align:center; }
+  #login .sub { margin:0 0 22px; color:var(--muted); font-size:13px; text-align:center; }
+  .field { width:100%; padding:13px 14px; margin-bottom:10px; background:var(--panel2);
+           border:1px solid var(--line); border-radius:12px; color:var(--text); font-size:16px; }
+  .field:focus { outline:none; border-color:var(--accent); }
+  .btn-primary { width:100%; padding:14px; background:var(--accent); color:var(--on-accent);
+                 font-weight:600; font-size:16px; margin-top:6px; border-radius:12px; }
+  .btn-primary:disabled { opacity:.45; }
+  .err { color:var(--danger); font-size:13px; min-height:18px; margin-bottom:6px; text-align:center; }
+
+  /* ── 聊天 ── */
+  header.top { background:var(--panel); border-bottom:1px solid var(--line);
+               /* ★ 左右内边距 **8px** ✓（原来 16px ✗）—— 2026-10-06 用户：
+                  "以 `<` 距离左侧的距离为基准……全都保持一致" ✓。
+                  设置页（`header.sub` ✓）一直是 8px ✓，这里也收成 8px ✓，
+                  两个顶栏的"边距"才是同一个数 ✓。
+                  左右都是 8px ✓ → **中间那块照旧居中** ✓（对称没破 ✓）。 */
+               padding:calc(var(--inset-top) + 12px) 8px 12px;
+               display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  /* 群名居中：左侧汉堡宽度靠一个等宽占位元素抵消，
+     否则 flex:1 会让标题在"剩余空间"里居中，视觉上是偏右的。 */
+  header.top .spacer { width:40px; flex-shrink:0; }
+  header.top .info { flex:1; min-width:0; text-align:center; }
+  header.top .gname { font-size:17px; font-weight:600; overflow:hidden;
+                      text-overflow:ellipsis; white-space:nowrap; }
+  header.top .status { display:flex; align-items:center; justify-content:center;
+                       gap:6px; font-size:12px; color:var(--muted); margin-top:2px; }
+  /* ⚠️ **必须显式盖回来** ✗ —— 上面那句是作者样式 ✓，
+     而 `[hidden]{display:none}` 只是浏览器默认样式 ✓ → 它赢不了 ✗。
+     少了这一条，"关掉待机"之后状态条**照样在**（只是里面没字 ✓）。
+     （同一个坑 `#qbar[hidden]` 那条注释里已经写过一次 ✓。） */
+  header.top .status[hidden] { display:none; }
+  /* 静息也是绿点——它一直在"窥屏"，用灰点会显得像离线 */
+  header.top .dot { width:7px;height:7px;border-radius:50%;background:var(--agent);flex-shrink:0; }
+  header.top .status.s-idle .dot { opacity:.6; }
+  header.top .status.s-thinking, header.top .status.s-typing { color:var(--agent); }
+  header.top .status.s-thinking .dot, header.top .status.s-typing .dot { background:var(--agent); }
+  header.top .status.s-lurking { color:var(--accent); }
+  header.top .status.s-lurking .dot { background:var(--accent); }
+  @keyframes pulse { 0%,100%{opacity:.35} 50%{opacity:1} }
+  header.top .status.s-thinking .dot, header.top .status.s-typing .dot { animation:pulse .7s infinite; }
+  .icon-btn { width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+              color:var(--muted); flex-shrink:0; font-size:20px; }
+  /* ☰ 往左挪一点点 ✓ —— 2026-10-06 用户："距离左边间距略微小一些，
+     **不要影响群昵称和关键状态的位置**" ✓。
+     ⚠️ **用 `transform`，不能用负 margin** ✗→✓ ——
+       负 margin 会**改变这个盒子的布局宽度** ✓ → 中间那块跟着偏 ✗
+       （上一轮那个 `margin-left:-8px` 就是这么把群名顶偏 4px 的 ✓，
+        用户一眼就看出来了 ✓）。
+       `transform` 只挪"画在哪儿"✓，**完全不参与布局** ✓
+       → 群名和状态条一个像素都不动 ✓，而 ☰ 自己往左 ✓。
+     这就是"要动一个东西、又不想动它的邻居"时的标准做法 ✓。 */
+  /* ── 三个图标对齐到同一个"离屏边的距离" ✓ ────────────────────────
+     用户 2026-10-06："以 `<` 距离左侧的距离为基准，刷新按钮距离右侧、
+     设置按钮距离左侧全都保持一致" ✓。
+
+     口径是**墨迹**（眼睛看到的那几笔 ✓），不是盒子 ✗ —— 盒子没人看得见 ✓。
+
+     基准 = 设置页那个 `<`：
+       内边距 8px ✓ + 盒子 40px、里面 SVG 22px 居中 → 里面让出 9px ✓
+       + 那笔 "<" 的墨迹在 24 格里从 8.5 开始（描边圆头再往外 1 ✓ = 7.5 ✓）
+       7.5 ÷ 24 × 22 = 6.875px
+       → **8 + 9 + 6.875 ≈ 23.9px** ✓ ← 这就是基准
+
+     ☰：墨迹从 24 格里的 6 开始（圆头 → 5 ✓）= 5 ÷ 24 × 22 = 4.58px
+       → 8 + 9 + 4.58 = 21.58 ✗ 比基准近 2.3px → **往右推 2.3px** ✓
+
+     ↻：用得是 Feather 那条 ✓，墨迹几乎顶满 24 格（右边 24 ✓），
+       而它画在 19px 的格子里 → 9.5px 的居中让位 + 0 = 9.5px
+       → 离右边 8 + 9.5 = 17.5 ✗ 比基准远 6.4px → **往左推 6.4px** ✓
+
+     ⚠️ **都用 `transform`，不用负 margin** ✗ —— 负 margin 会改布局宽度 ✓
+        → 中间那块跟着偏 ✗（上一轮那个 `-8px` 就是这么把群名顶偏 4px 的 ✓）。
+        `transform` 只挪"画在哪儿"✓，**不参与布局** ✓ → 群名和状态条一动不动 ✓。
+     ⚠️ 换了图标或改了尺寸，这三个数要**重算** ✓（算法就在上面 ✓）。 */
+  #openSettings { transform: translateX(2.3px); }     /* 墨迹 → 离左 23.9px ✓ */
+  #reloadBtn    { transform: translateX(-6.4px); }    /* 墨迹 → 离右 23.9px ✓ */
+
+  /* 返回箭头是 SVG（见 HTML），这里只管对齐和颜色 */
+  .icon-btn.back { color:var(--text); }
+  .icon-btn.back svg { display:block; }
+  /* 设置页右上角那个刷新 ✓ —— **和左边的返回箭头同一个大小、同一个颜色** ✓。
+     原来写的是一个 `↻` 文字字符 ✗，两个毛病：
+       · 字形大小和 SVG 对不上 ✓（20px 的字，视觉上比 22px 的描边小一号 ✓）
+       · `.icon-btn` 默认是 `--muted` ✗，比左边那个 `--text` 淡一档 ✓
+     两下一夹，一眼就看出左右不对称 ✓（用户 2026-10-06 指的就是这个 ✓）。 */
+  .icon-btn.plain { color:var(--text); }
+  .icon-btn.plain svg { display:block; }
+
+  #msgs { flex:1; min-height:0; overflow-y:auto; padding:14px; display:flex;
+          flex-direction:column; gap:10px; -webkit-overflow-scrolling:touch; }
+  .empty { margin:auto; color:var(--muted); font-size:14px; text-align:center; }
+  .row { display:flex; gap:8px; max-width:84%; }
+  .row.mine { align-self:flex-end; flex-direction:row-reverse; }
+  .row.agent { max-width:92%; }
+  .av { width:34px;height:34px;border-radius:50%;flex-shrink:0;background:var(--panel2);
+        color:var(--muted); display:flex;align-items:center;justify-content:center;
+        font-size:13px;font-weight:600; }
+  .row.agent .av { background:var(--accent-bg); color:var(--agent); }
+  .wrap2 { min-width:0; }
+  .who { font-size:12px; color:var(--muted); margin-bottom:3px; padding-left:4px; }
+  .row.agent .who { color:var(--agent); }
+  .row.mine .who { text-align:right; padding-right:4px; }
+  .bubble { padding:9px 13px; border-radius:14px; background:var(--panel2);
+            word-break:break-word; white-space:pre-wrap; }
+  .bubble .at { color:var(--accent); font-weight:600; }
+  .row.mine .bubble { background:var(--accent-bg); border-bottom-right-radius:4px; }
+  /* 系统提示：居中、灰、无头像无气泡。
+     **故障通报必须一眼看出不是管家在说话**——混在气泡里的话，用户会以为
+     那是它说的一句怪话，故障就被掩盖过去了。 */
+  .sysrow { align-self:center; max-width:86%; font-size:12.5px; color:var(--muted);
+            background:var(--panel2); border-radius:10px; padding:6px 12px;
+            text-align:center; line-height:1.55; }
+  .row.agent .bubble { background:var(--panel); border:1px solid var(--line);
+                       border-left:3px solid var(--agent); border-bottom-left-radius:4px; }
+  .row:not(.mine):not(.agent) .bubble { border-bottom-left-radius:4px; }
+  .time { font-size:11px; color:var(--muted); margin-top:2px; padding:0 4px; }
+  .row.mine .time { text-align:right; }
+
+  /* 输入区：底部留出 safe area + 键盘高度 */
+  #composer { border-top:1px solid var(--line); background:var(--panel); flex-shrink:0;
+              padding:10px 12px calc(10px + var(--inset-bottom) + var(--kb)); }
+  /* 微信的排布：[语音] [输入框] [表情] [+ 或 发送]
+     有内容时发送按钮**替换掉** + ——这样右边永远只有两个图标，
+     输入框不会被挤扁（之前四个图标并排，占位文字都折行了）。 */
+  /* ⚠️ **`align-items:center`，不是 `flex-end`** ✗→✓ —— 2026-10-06 用户：
+     "保持在底部区域的垂直居中" ✓。
+        输入框 `min-height:42px` ✓，而按钮原来 36px ✓ + `flex-end` ✗
+        → 按钮贴着**行的底边** ✓ → 它的中心比输入框的中心**低 3px** ✗
+        → 看着就是"没对齐" ✓（不量的话很难说清是哪儿不对 ✓）。
+        改成居中之后 ✓：行高 = 两者里高的那个（42px ✓），
+        按钮在**这一行**里居中 ✓ —— 输入框长到两三行时，按钮仍然居中 ✓
+        （用户要的就是这个 "垂直居中" ✓，不是"贴底" ✗）。 */
+  #composerRow { display:flex; align-items:center; gap:4px; }
+
+  /* 输入框上方的「正在引用」条。引用是输入状态的一部分，不是消息的一部分——
+     所以它在输入区，发完就消失。 */
+  #qbar { display:flex; align-items:center; gap:8px; background:var(--panel2);
+          border:1px solid var(--line); border-radius:10px; padding:6px 10px;
+          margin-bottom:8px; }
+  #qbar[hidden] { display:none; }   /* 上面写了 display:flex，得显式盖回来 */
+  #qbar .qbody { min-width:0; flex:1; }
+  #qbar .qwho { color:var(--accent); font-size:12px; margin-bottom:2px; }
+  #qbar .qtext { color:var(--muted); font-size:13px; white-space:nowrap;
+                 overflow:hidden; text-overflow:ellipsis; }
+  #qbar .qx { background:none; border:none; color:var(--muted); font-size:15px;
+              cursor:pointer; padding:2px 4px; line-height:1; }
+
+  /* 气泡里的引用块（微信是气泡顶部一块浅灰，左侧不描边，整体比正文小一号） */
+  .quote { display:block; background:rgba(127,127,127,.16); border-radius:8px;
+           padding:6px 9px; margin-bottom:7px; font-size:12.5px; line-height:1.45;
+           cursor:pointer; max-width:100%; }
+  .quote .qwho { color:var(--accent); font-weight:600; margin-bottom:2px; }
+  .quote .qtext { color:var(--muted); white-space:nowrap; overflow:hidden;
+                  text-overflow:ellipsis; }
+  /* 点了引用条跳到原消息时闪一下，否则用户不知道跳到哪了 */
+  .row.flash .bubble { animation:qflash 1.1s ease-out; }
+  @keyframes qflash { 0%,100% { box-shadow:none }
+                      25% { box-shadow:0 0 0 3px var(--accent); } }
+  #text { flex:1; min-width:0; padding:10px 13px; background:var(--panel2);
+          border:1px solid var(--line); border-radius:16px; color:var(--text);
+          font-size:16px; resize:none; max-height:120px; min-height:42px; line-height:1.4; }
+  #text:focus { outline:none; border-color:var(--accent); }
+  /* ★ 底部这三个（语音/文字、表情、＋）**大一点点** ✓ —— 2026-10-06 用户：
+     "大小略微大一些些" ✓ → 36 → **40px** ✓（+11% ✓，正好和顶栏那几个一样大 ✓）。
+     40 也刚好落在输入框的 42px 里 ✓ → 居中的时候上下各留 1px ✓，不挤 ✓。 */
+  /* 待发附件条 ✓ —— 缩略图横排、可横向滚动、右上角一个 ✕ 能删 ✓。 */
+  #pendbar { display:flex; gap:8px; overflow-x:auto; padding:2px 0 8px; }
+  /* ⚠️ **必须显式盖回来** ✗ —— 上面那句是作者样式 ✓，
+     而 `[hidden]{display:none}` 只是浏览器默认样式 ✓ → 它赢不了 ✗。
+     （同一个坑，这个页面上这是第三回了 ✓：`#qbar`、`header.top .status`、这里 ✓。） */
+  #pendbar[hidden] { display:none; }
+  #pendbar .pend { position:relative; flex:none; }
+  #pendbar .pend img { width:64px; height:64px; border-radius:10px;
+                       object-fit:cover; display:block; }
+  /* 非图片（以后的文件 ✓）：不给缩略图，给一块写着文件名的方块 ✓ */
+  #pendbar .pend .fchip { width:64px; height:64px; border-radius:10px;
+                          background:var(--panel2); color:var(--muted);
+                          display:flex; align-items:center; justify-content:center;
+                          font-size:11px; line-height:1.3; padding:4px;
+                          text-align:center; word-break:break-all; overflow:hidden; }
+  #pendbar .pend .px { position:absolute; top:-6px; right:-6px; width:20px; height:20px;
+                       border-radius:50%; background:rgba(0,0,0,.68); color:#fff;
+                       font-size:12px; line-height:1; display:flex;
+                       align-items:center; justify-content:center; }
+  /* 有待发附件 → **发送按钮也要在** ✓（哪怕一个字没打 ✓）；
+     但 `+` 继续留着 ✓（还能再加一张 ✓）——
+     所以这是**另一个** class ✓，不去动 `hasText` ✓
+     （那个管的是"有字才把 + 换成发送" ✓，两件事别混 ✓）。 */
+  body.hasPending #send { display:flex; }
+
+  #composerRow .icon-btn { width:44px; height:44px; }
+  /* ★ 「表情」和「＋」**再大一点点** ✓ —— 2026-10-06 用户："表情和➕还可以再大些" ✓。
+     ⚠️ **只有这两个** ✗ —— 左边那个"语音/键盘"开关按用户的话**不动** ✓，
+        所以这里单独给 id ✓，不去改那条通用的 `.icon-btn` ✓
+        （改了的话三个一起变大 ✓，那不是他说的 ✓）。 */
+  #pickSticker, #pickMedia { width:48px; height:48px; }
+  /* 发送按钮：**一个实心圆 + 一枚纸飞机** ✓ —— 2026-10-06 用户：
+     "输入文字后的 + 被替换成的发送按钮优化一下显示，也做成 svg，好看些" ✓。
+     原来里面是一个 `➤` 文字字符 ✗ —— 和别处那三个一样的问题：
+     字形大小、形状都随字体 ✗，放在一个规整的圆里就显得"不齐" ✓。
+     现在换成 SVG ✓，大小和旁边那几个图标同一个量级 ✓
+     （圆 40、里面 20 ✓ —— 实心圆本来就该比描边图标**小一点点** ✓，
+       一样大的话会显得比它们重 ✗）。 */
+  /* ★ **不要那个蓝圆了** ✗→✓ —— 2026-10-06 用户："不要蓝色圆圈，只要里面的纸飞机 svg" ✓。
+     底色去掉 ✓，只留一枚**实心**的纸飞机（`--accent` 蓝 ✓）——
+     "这是个动作"这件事由**颜色**来说就够了 ✓，不需要再垫一个圆 ✗。
+     盒子仍然 44px ✓ —— 和旁边那三个**同一个盒子** ✓，
+     所以它们在一条线上对齐 ✓（去掉圆之后，对齐就是盒子的事 ✓）。
+     为什么这里是**实心**、别的都是描边 ✗：它是这一行里唯一的**主操作** ✓，
+     实心在 20 出头的大小上也比描边清楚 ✓。 */
+  #send { display:none; width:44px;height:44px;background:none;
+          color:var(--accent); align-items:center;justify-content:center;
+          flex-shrink:0; }
+  #send svg { display:block; }
+  /* 有文字：显示发送、藏起 + */
+  body.hasText #send { display:flex; }
+  body.hasText #pickMedia { display:none; }
+
+  /* 麦克风/键盘图标互斥显示 */
+  #modeToggle .ico-kbd { display:none; }
+  body.voiceMode #modeToggle .ico-mic { display:none; }
+  body.voiceMode #modeToggle .ico-kbd { display:block; }
+
+  /* 语音模式：输入框换成"按住说话" */
+  #holdTalk { display:none; flex:1; height:44px; border-radius:12px;
+              background:var(--panel2); border:1px solid var(--line);
+              color:var(--text); font-size:15px; user-select:none;
+              -webkit-user-select:none; touch-action:none; }
+  #holdTalk.rec { background:var(--danger); border-color:var(--danger);
+                  color:#fff; font-weight:600; }
+  body.voiceMode #text { display:none; }
+  body.voiceMode #holdTalk { display:block; }
+  /* 语音模式下不显示发送（松手即发） */
+  body.voiceMode.hasText #send { display:none; }
+  body.voiceMode.hasText #pickMedia { display:flex; }
+
+  /* 图片气泡 / 语音气泡 */
+  .bubble.media { padding:4px; background:transparent !important; border:0 !important; }
+  .bubble.media img { display:block; max-width:210px; max-height:280px;
+                      border-radius:12px; object-fit:cover; }
+  .row.agent .bubble.media { border-left:0 !important; }
+  .vmsg { display:flex; align-items:center; gap:8px; min-width:90px; cursor:pointer; }
+  .vmsg .bars { color:var(--accent); font-size:16px; }
+  .vmsg .dur { font-size:12px; color:var(--muted); }
+  .vsub { font-size:12px; color:var(--muted); margin-top:6px;
+          border-top:1px dashed var(--line); padding-top:6px; }
+
+  /* 大图查看 */
+  .lightbox { position:fixed; inset:0; background:#000; display:none;
+              align-items:center; justify-content:center; z-index:80; }
+  .lightbox.on { display:flex; }
+  .lightbox img { max-width:100%; max-height:100%; object-fit:contain; }
+  /* 没有传过头像的人点开放大 → 显示一个**大号的字** ✓，
+     而不是"点了没反应" ✗（那会让人以为那段代码坏了 ✓）。 */
+  .lightbox .bigletter { width:46vmin; height:46vmin; border-radius:50%;
+                         background:var(--panel2); color:var(--muted);
+                         display:flex; align-items:center; justify-content:center;
+                         font-size:20vmin; font-weight:600; }
+  .lightbox .bigletter[hidden] { display:none; }
+
+  /* ── 左右滑 → 引用 ✓（2026-10-07 用户："左滑右滑可以引用，有那种动态感" ✓）──
+     提示钉在**行原来那一边的边缘**上不动 ✓，行滑开就把那块地方**让出来** ✓
+     —— "动态感"就是从这儿来的 ✓（东西是从底下被挪出来的 ✓，不是凭空冒出来 ✓）。
+     ⚠️ 用 `left:0` / `right:0` + 反向 translate 把它**钉住** ✗：
+        它是行的子节点 ✓ → 行一平移它也跟着走 ✓ → 不反向抵消就永远压在行底下 ✗
+        （行是不透明的 ✓，等于看不见 ✓）。 */
+  .row.swiping { position:relative; }
+  .row.swiping .swhint { position:absolute; top:50%; left:0; transform:translateY(-50%);
+                         display:flex; align-items:center; gap:4px;
+                         color:var(--accent); font-size:13px; line-height:1;
+                         white-space:nowrap; opacity:0; pointer-events:none; }
+
+  /* 头像上**不许选字** ✓ —— 长按头像的活儿是"@ 他" ✓，
+     让浏览器顺手把那个字选中了会显得很脏 ✓。 */
+  .av { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+
+  /* ⚠️ **横向不许滚** ✗ —— 滑动时提示会顶出行的边缘一点点 ✓，
+     不锁住的话列表会左右晃 ✓（那个比动画本身显眼得多 ✓）。 */
+  #msgs { overflow-x:hidden; }
+
+  /* @ 自动补全 */
+  #atMenu { position:absolute; left:12px; right:12px; bottom:100%;
+            margin-bottom:6px; background:var(--panel); border:1px solid var(--line);
+            border-radius:12px; overflow:hidden; display:none; max-height:190px; overflow-y:auto;
+            box-shadow:0 6px 24px rgba(0,0,0,.35); }
+  #atMenu.on { display:block; }
+  #atMenu .pick { display:flex; align-items:center; gap:10px; padding:12px 14px;
+                  border-bottom:1px solid var(--line); }
+  #atMenu .pick:last-child { border-bottom:0; }
+  #atMenu .pick .nm { flex:1; }
+  #atMenu .pick .hint { font-size:12px; color:var(--muted); }
+  #composer { position:relative; }
+
+  /* ── 设置 ── */
+  header.sub { background:var(--panel); border-bottom:1px solid var(--line);
+               padding:calc(var(--inset-top) + 10px) 8px 10px; display:flex; align-items:center; }
+  /* 和聊天页顶栏同样的做法：右侧放一个和返回键等宽的占位，
+     标题才能真正居中（否则是在"剩余空间"里居中，视觉偏左）。 */
+  header.sub .spacer { width:40px; flex-shrink:0; }
+  header.sub h2 { margin:0; font-size:17px; font-weight:600; flex:1; text-align:center; }
+  #settings .body { flex:1; min-height:0; overflow-y:auto;
+                    padding-bottom:calc(30px + var(--inset-bottom)); }
+
+  /* 设置页像抽屉一样从左侧滑入/滑出。
+     打开时**让聊天页留在下面**，滑入过程中能看到它——否则滑到一半
+     后面是空的，会显得很生硬。 */
+  #settings { z-index:10; }
+  @keyframes sheetIn  { from { transform:translateX(-100%); } to { transform:none; } }
+  @keyframes sheetOut { from { transform:none; } to { transform:translateX(-100%); } }
+  #settings.anim-in  { animation:sheetIn  .24s cubic-bezier(.22,1,.36,1); }
+  #settings.anim-out { animation:sheetOut .18s cubic-bezier(.4,0,1,1) forwards; }
+
+  /* ══════════════════════════════════════════════════════════════════
+     管家设置的三屏（`.ascreen`：列表 / 改资料 / 编一档状态）。
+
+     版式**照壳的「我的」** ✓ —— 通栏圆角分组 ✓、行间一条细线 ✓、
+     `›` 22px `--muted` ✓。用户 2026-10-06 明确要求"一定要参考我的里的样式" ✓。
+
+     ⚠️ **每个选择器都套了 `.ascreen`** ✗→✓ ——
+        群聊页里已经有 `.row`（消息行 ✓）和 `.av`（气泡头像 ✓）了，
+        而壳那边没有这两个名字 ✓，所以它敢直接叫 `.row` ✓。
+        整块照搬会**串味** ✗（消息行会长到 50px 高 ✓）。
+        加一层前缀 = **结构上**互不干扰 ✓，不是靠"记得别重名" ✓。
+     ══════════════════════════════════════════════════════════════════ */
+  .ascreen { z-index:20; }
+  #agentEdit { z-index:21; }      /* 一层压一层 ✓：列表 < 改资料 ✓ */
+  .ascreen.anim-in  { animation:sheetIn  .24s cubic-bezier(.22,1,.36,1); }
+  .ascreen.anim-out { animation:sheetOut .18s cubic-bezier(.4,0,1,1) forwards; }
+  .ascreen .abody { flex:1; overflow-y:auto; overscroll-behavior:contain;
+                    padding:calc(var(--inset-top) + 14px) 14px calc(var(--inset-bottom) + 24px); }
+
+  .ascreen .sec { color:var(--muted); font-size:13px; padding:16px 4px 6px; }
+  .ascreen .grp { background:var(--panel); border-radius:14px; overflow:hidden;
+                  margin-bottom:8px; }
+  .ascreen .row { display:flex; align-items:center; gap:10px; width:100%; margin:0;
+                  /* ⚠️ **`max-width:none` 是必须的** ✗→✓ —— 2026-10-06 用户截图：
+                     三行右边没对齐、「点击编辑」悬在半空 ✓，**灰细线也短一截** ✓。
+                     两个症状是**同一个原因** ✓：群聊页里本来就有一条
+                       `.row { display:flex; gap:8px; max-width:84%; }`   ← 消息气泡行 ✓
+                     我写了 `.ascreen .row` ✓ 但只盖住**我写出来的**那几条属性 ✗，
+                     `max-width:84%` 照样生效 ✓ → 行只有 84% 宽 ✓
+                     → 后缀靠不了右 ✓，而**那条 border-top 的长度就是行宽** ✓ → 线也短 ✓。
+                     **"加了作用域前缀"不等于隔离干净** ✓ —— 挡不住你没写的 ✓。 */
+                  max-width:none;
+                  min-height:50px; padding:0 16px; background:none; border:0;
+                  border-radius:12px; color:var(--text); font:inherit; text-align:left; }
+  .ascreen .row + .row { border-top:1px solid var(--line); }
+  .ascreen .row:active { background:#1d2129; }
+  .ascreen .row .rl { flex:1; min-width:0; font-size:16px; line-height:1.3; }
+  .ascreen .row .rv { color:var(--muted); font-size:16px; line-height:1.3;
+                      max-width:52%; overflow:hidden; text-overflow:ellipsis;
+                      white-space:nowrap; }
+  .ascreen .row .go { color:var(--muted); font-size:22px; line-height:1; padding-left:2px; }
+  /* 右边那句「点击编辑」：**是个动作** ✓，所以用强调色 ✓
+     （和「＋ 新建或加入空间」同一个道理 ✓）。 */
+  .ascreen .row .act { color:var(--accent); font-size:15px; }
+  .ascreen .row.plain:active { background:var(--panel); }   /* 不能点的行别给反馈 ✗ */
+
+  /* 资料块（点它 = 进"改管家资料"那一屏 ✓） */
+  .ascreen .prof { background:var(--panel); border-radius:14px; display:flex;
+                   align-items:center; gap:14px; padding:18px 16px 16px;
+                   margin-bottom:8px; }
+  .ascreen .prof:active { background:#1d2129; }
+  .ascreen .prof .av { width:58px; height:58px; border-radius:10px; overflow:hidden;
+                       flex:none; background:#232833; color:var(--muted);
+                       font-size:24px; display:flex; align-items:center;
+                       justify-content:center; background-size:cover;
+                       background-position:center; }
+  .ascreen .prof .who { min-width:0; }
+  .ascreen .prof .who .n { font-size:19px; font-weight:600; line-height:1.25; }
+  .ascreen .prof .go { color:var(--muted); font-size:22px; line-height:1; margin-left:auto; }
+
+  /* ── 改资料那一屏：**照抄壳的「我的」进头像** ✓ ────────────────
+     那几条（`.avcard` / `.bigav` / `.tip` 的数值）是 2026-10-06
+     用户量着截图来回调出来的 ✓，别再自己发明 ✗。 */
+  .ascreen .card { background:var(--panel); border:1px solid var(--line);
+                   border-radius:16px; padding:18px; margin-bottom:12px; }
+  .ascreen .card.avcard { padding:30px 18px !important; }   /* 上下同一个值 ✓ */
+  .ascreen label { display:block; color:var(--muted); font-size:12.5px; margin:12px 0 6px; }
+  .ascreen .bigav { display:flex; justify-content:center; align-items:center;
+                    width:100%; margin:0 auto; padding:0; }
+  .ascreen .bigav .av { width:150px; height:150px; font-size:56px; cursor:pointer;
+                        overflow:hidden; display:flex; align-items:center;
+                        justify-content:center; border-radius:50%;
+                        background:#232833; color:var(--muted);
+                        background-size:cover; background-position:center; }
+  .ascreen .bigav .av img { width:100%; height:100%; object-fit:cover; display:block; }
+  /* 提示语：**在"头像下沿"和"卡片下沿"之间居中** ✓ —— margin-top 要等于卡片的下内边距 ✓ */
+  .ascreen .tip { color:var(--muted); font-size:12.5px; text-align:center; margin-top:30px; }
+  .ascreen .err { color:var(--danger); font-size:13px; min-height:18px; margin-top:10px; }
+  .ascreen .swap { margin-top:14px; text-align:center; color:var(--muted); font-size:13px; }
+  .ascreen .swap b { color:var(--accent); font-weight:600; }
+  .ascreen .btn-save { display:block; width:100%; padding:14px; background:var(--accent);
+                       color:var(--on-accent); font-weight:600; font-size:16px;
+                       border-radius:12px; }
+  .ascreen .btn-save:disabled { opacity:.45; }
+
+  /* ── 编一档状态：**底部弹层 + 三块板** ✓ ────────────────────────────
+     用户 2026-10-06 第二次提的：从整屏**改回下方的半屏** ✓
+     （"其实可以按照之前的从下方弹出半屏" ✓），并且**板块化** ✓
+     （"板块化会美观些" ✓）。
+
+        待机显示   = 板①开关 + 板②状态区/添加 + 板③轮换间隔
+        思考中     =          板②
+        保持沉默   = 板①开关 + 板②
+
+     `.sblk` 用 `--panel2` ✓ —— 弹层本身是 `--panel` ✓，
+     两块同色就"没有层次" ✗，深浅差一档才看得出是**分开的两块** ✓。
+     `.sheet .panel` 自带 18px 内边距 ✓ → 板子天然内缩 ✓。 */
+  .sblk { background:var(--panel2); border-radius:14px; overflow:hidden;
+          margin-bottom:10px; }
+  .sblk .hrow { display:flex; align-items:center; gap:12px;
+                padding:14px 16px; min-height:52px; }
+  .sblk .hrow .t { flex:1; font-size:16px; }
+  /* 区域 = **刚好三行** ✓（用户 2026-10-06："可以刚好展示完整三条" ✓）。
+     ⚠️ 行高要**写死**，不能用 `min-height` 猜 ✗ ——
+        上一版写的就是 `min-height:52px` ✓，而里面那个输入框
+        （padding 11 + 15px 的字 ✓）实际把行撑到了 ~55px ✗
+        → 3 行要 165 ✓，而区域只有 156 ✗ → **第三条被切掉一半** ✓。
+        `box-sizing:border-box` 让分隔线那 1px 也算在 56 里 ✓，
+        所以三行正好 168 ✓，一个像素不多不少 ✓。 */
+  .slist2 { max-height:168px; overflow-y:auto; }
+  .srow2 { display:flex; align-items:center; gap:8px; padding:0 12px;
+           height:56px; box-sizing:border-box; }
+  .srow2 + .srow2 { border-top:1px solid var(--line); }
+  /* ⚠️ 输入框用 `--panel` ✓（**比板子浅一档** ✓）—— 和板子同色就"看不出是个框" ✗ */
+  .srow2 input { flex:1; min-width:0; background:var(--panel); border:0;
+                 border-radius:9px; padding:11px 12px; color:var(--text);
+                 font:inherit; font-size:15px; }
+  .srow2 input:focus { outline:none; box-shadow:0 0 0 1px var(--accent); }
+  .srow2 .del { color:var(--muted); font-size:19px; line-height:1; padding:6px 8px; }
+  .srow2 .del:active { color:var(--danger); }
+  /* 「＋ 添加一条」：**居中蓝字** ✓ —— 它是个动作，不是一行数据 ✓
+     它在**板②里面** ✓（用户："第二个板块是两部分，一个是最多显示三条……的区域，
+     另一个是添加一条" ✓）—— 所以上面隔一条细线 ✓ 而不是单独一块 ✗。 */
+  .sblk .addline2 { display:block; width:100%; text-align:center; color:var(--accent);
+                    font-size:16px; padding:15px 0; border-top:1px solid var(--line); }
+  /* 轮换间隔：**就地一个输入框** ✓ —— 用户 2026-10-06：
+     "编辑方式就是一个一个输入框，右边单位，点击直接编辑输入框，不用额外的界面" ✓。
+     （原来是点一下弹 `promptText` ✓ —— 为一个数字跳一趟界面太重 ✓。） */
+  .sblk .intvrow { display:flex; align-items:center; gap:10px; width:100%;
+                   padding:14px 16px; min-height:52px; text-align:left; }
+  .sblk .intvrow .t { flex:1; font-size:16px; }
+  .sblk .intvrow input { width:66px; text-align:center; background:var(--panel);
+                         border:0; border-radius:9px; padding:10px 6px;
+                         color:var(--text); font:inherit; font-size:16px; }
+  .sblk .intvrow input:focus { outline:none; box-shadow:0 0 0 1px var(--accent); }
+  .sblk .intvrow .u { color:var(--muted); font-size:16px; }
+
+  /* ── 性格：**直奔一个文本框** ✓（用户："不要给管家的话，直接一个文本框" ✓）
+     平时只露**前两行** ✓，点开才展开编辑 ✓。 */
+  .ascreen .pbox { padding:14px 16px; font-size:15px; line-height:1.5;
+                   color:var(--text); white-space:pre-wrap; word-break:break-word;
+                   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+                   overflow:hidden; min-height:22px; }
+  .ascreen .pbox.empty { color:var(--muted); }
+  .ascreen .pwrap { display:flex; flex-direction:column; }
+  .ascreen .ptext { width:100%; min-height:150px; background:var(--panel2); border:0;
+                    border-radius:12px; padding:13px 14px; color:var(--text);
+                    font:inherit; font-size:15px; line-height:1.5; resize:vertical; }
+  .ascreen .ptext:focus { outline:none; box-shadow:0 0 0 1px var(--accent); }
+  .ascreen .pfoot { display:flex; align-items:center; gap:12px; padding:10px 16px 14px; }
+  .ascreen .pfoot .cnt { flex:1; color:var(--muted); font-size:12.5px; }
+  .ascreen .pfoot button { color:var(--accent); font-size:15px; font-weight:600; }
+
+  .item { display:flex; align-items:center; padding:16px 20px; background:var(--panel);
+          border-bottom:1px solid var(--line); gap:12px; }
+  .item .k { flex:1; }
+  .item .v { color:var(--muted); font-size:14px; max-width:55%; overflow:hidden;
+             text-overflow:ellipsis; white-space:nowrap; }
+  /* `›` —— **大一档** ✓（用户 2026-10-06："有点小，不太美观"）。
+     ⚠️ 颜色从 `--line` 改成 `--muted` ✗→✓：
+        `--line` 是**描边色**（`#262b36`）✓，拿它画箭头本来就偏暗 ✗
+        —— 这也正是"不太美观"的一半原因 ✓。
+        `--muted` 是次级文字色 ✓，和外面那一列"值"同色 ✓，是这类箭头的常规画法 ✓。
+     `line-height:1` 是必须的 ✓：不然 22px 的行高会把行撑高 ✓
+     （这行是 `padding:16px 20px` 撑的 ✓，不该被字撑 ✓）。 */
+  .item .chev { color:var(--muted); font-size:22px; line-height:1; }
+
+  /* 退出登录：**居中、红字、没有箭头** —— 和「我的」那一页保持一致 ✓。
+     它不是一个"条目"（没有值、没有去处），是一个动作 ✓；
+     跟在一列同样排版的条目后面，会看着像"还能点进去看点什么" ✗。 */
+  .item[data-act="logout"] { justify-content:center; }
+  .item[data-act="logout"] .k { flex:0 0 auto; }
+  .danger { color:var(--danger) !important; }
+  .seg { display:flex; gap:0; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .seg button { padding:7px 14px; font-size:13px; color:var(--muted); background:var(--panel2); }
+  .seg button.on { background:var(--accent); color:var(--on-accent); font-weight:600; }
+
+  /* ── 弹层 ── */
+  .sheet { position:fixed; top:0; right:0; left:0; bottom:calc(var(--inset-bottom) + var(--kb)); background:rgba(0,0,0,.6); display:none;
+           align-items:flex-end; z-index:50; }
+  .sheet.on { display:flex; }
+  .sheet .panel { width:100%; background:var(--panel); border-radius:18px 18px 0 0;
+                  padding:18px 18px; max-height:100%; overflow-y:auto; }
+  .sheet h3 { margin:0 0 14px; font-size:16px; }
+
+  /* 「+」面板：微信那种横向网格 —— 圆角方块图标 + 下方小字 */
+  .plus-grid { display:flex; gap:16px; flex-wrap:wrap; }
+  .plus-item { display:flex; flex-direction:column; align-items:center; gap:8px;
+               width:68px; background:none; padding:0; }
+  .plus-item .ico { width:58px; height:58px; border-radius:16px; background:var(--panel2);
+                    display:flex; align-items:center; justify-content:center;
+                    color:var(--text); }
+  .plus-item .lbl { font-size:12px; color:var(--muted); }
+  .sheet .actions { display:flex; gap:10px; margin-top:16px; }
+  .sheet .actions button { flex:1; padding:13px; border-radius:12px; font-weight:600; }
+  .btn-ghost { background:var(--panel2); color:var(--text); }
+  .btn-solid { background:var(--accent); color:var(--on-accent); }
+  .toast { position:fixed; left:50%; bottom:90px; transform:translateX(-50%);
+           background:var(--panel2); border:1px solid var(--line); color:var(--text);
+           padding:10px 18px; border-radius:10px; font-size:14px; z-index:99;
+           opacity:0; transition:opacity .2s; pointer-events:none; }
+  .toast.on { opacity:1; }
+
+  /* 开机占位。**为什么要它**：以前登录页是静态 HTML 里"默认显示"的那一屏，
+     而"到底登录了没"要打一次 /auth/me 才知道——那几百毫秒里，**明明是已登录的
+     用户也会看到登录页一闪而过** ✗ 很影响体验。
+     现在开局什么都不显示，只有一个转圈；**确认完状态再决定进哪一屏**。 */
+  #boot { position:fixed; inset:0; display:grid; place-items:center;
+          background:var(--bg); z-index:200; }
+  #boot[hidden] { display:none; }
+  #boot i { width:26px; height:26px; border-radius:50%;
+            border:2.5px solid var(--line); border-top-color:var(--accent);
+            animation:bootspin .8s linear infinite; }
+  @keyframes bootspin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- 开机占位：确认登录状态之前只显示它（见样式里那段说明） -->
+<div id="boot" hidden><i></i></div>
+
+<!-- 登录 -->
+<div class="screen" id="login">
+  <div class="wrap">
+    <div class="logo">管</div>
+    <h1>生活管家</h1>
+    <p class="sub">和你的管家，还有重要的人</p>
+    <div class="err" id="loginErr"></div>
+    <input class="field" id="u" placeholder="用户名" autocomplete="username">
+    <input class="field" id="p" type="password" placeholder="密码" autocomplete="current-password">
+    <button class="btn-primary" id="doLogin">登录</button>
+  </div>
+</div>
+
+<!-- 聊天 -->
+<div class="screen" id="chat">
+  <header class="top">
+    <!-- ⚠️ **原来带一个 `margin-left:-8px`** ✗ —— 2026-10-06 用户指出的：
+         "群昵称和管家状态…似乎不算完全居中" ✓。
+         它把整个顶栏往左顶了 8px ✓，右边那个占位却还是 40px ✓，
+         于是中间那块**向左偏了 4px** ✓ —— 肉眼看得出来 ✓。
+         删掉 ✓：现在左 ☰ 40px、右占位 40px、两边内边距都是 16px ✓，
+         **居中由结构保证** ✓，不是靠"记得两边对称地写" ✓。
+         （颜色也补上 `plain` ✓ —— 和「<」那个返回箭头同一个 `--text` ✓，
+           原来用的是 `.icon-btn` 默认的 `--muted` ✓，淡一档 ✓。） -->
+    <!-- ☰ 用 **SVG** 而不是文字字符 ✗→✓ —— 2026-10-06：
+         文字字形的"墨迹"离盒子边多远是**字体决定的** ✓，
+         我没法算准 ✓，也就没法跟别的图标对齐 ✓。
+         SVG 的位置是**算得出来**的 ✓（下面那条 `translateX` 就是这么来的 ✓）。 -->
+    <div class="icon-btn plain" id="openSettings" aria-label="设置">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 6h12M6 12h12M6 18h12" />
+      </svg>
+    </div>
+    <div class="info">
+      <div class="gname" id="gname">—</div>
+      <div class="status" id="status"><span class="dot"></span><span id="statusText"></span></div>
+    </div>
+    <div class="spacer"></div>
+    <!-- ★ 右上角**空着** ✓ —— 2026-10-06 用户定的：那个刷新按钮搬去了「设置」的右上角 ✓。
+         这地方先留白 ✓（用户："聊天界面右上角先空着" ✓）。
+         `spacer` 留着 ✗ —— 它是用来把左边那个 ☰ 撑到贴边的 ✓，
+         删了群名会跑到最左边 ✓。 -->
+  </header>
+  <div id="msgs"></div>
+  <div id="composer">
+    <div id="atMenu"></div>
+    <!-- 引用条：长按气泡选了「引用」之后出现在这里，发完自动消失。
+         微信也是这个样子——引用是**输入状态**的一部分，不是消息的一部分。 -->
+    <!-- 待发附件：`+` 里选的图和文件先停在这儿 ✓，发出去之前一直留着 ✓ -->
+    <div id="pendbar" hidden></div>
+
+    <div id="qbar" hidden>
+      <div class="qbody">
+        <div class="qwho" id="qwho"></div>
+        <div class="qtext" id="qtext"></div>
+      </div>
+      <button class="qx" id="qclose" aria-label="取消引用">✕</button>
+    </div>
+    <div id="composerRow">
+      <!-- 语音/键盘切换：**图标要跟着模式变**（微信就是这样的）
+           键盘模式显示"麦克风"（点了切语音），语音模式显示"键盘"（点了切回来）。
+           两个 SVG 都在，靠 body.voiceMode 决定显示哪个。 -->
+      <button class="icon-btn" id="modeToggle" aria-label="切换语音/键盘">
+        <svg class="ico-mic" viewBox="0 0 24 24" width="26" height="26" fill="none"
+             stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2.5" width="6" height="11.5" rx="3"/>
+          <path d="M5 11.5a7 7 0 0 0 14 0M12 18.5v3"/>
+        </svg>
+        <svg class="ico-kbd" viewBox="0 0 24 24" width="26" height="26" fill="none"
+             stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2.5" y="6" width="19" height="12" rx="2.5"/>
+          <path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M6 14h12"/>
+        </svg>
+      </button>
+
+      <!-- 不放 placeholder：微信的输入框就是空的，提示文字反而占地方 -->
+      <textarea id="text" rows="1"></textarea>
+      <button id="holdTalk">按住 说话</button>
+
+      <!-- 表情包入口：位置先留着，内容后面内置。
+           微信的排版是 [语音] [输入] [表情] [+] ——按这个顺序排。 -->
+      <button class="icon-btn" id="pickSticker" aria-label="表情">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/>
+          <circle cx="9" cy="9.5" r=".6" fill="currentColor"/>
+          <circle cx="15" cy="9.5" r=".6" fill="currentColor"/>
+        </svg>
+      </button>
+
+      <button class="icon-btn" id="pickMedia" aria-label="更多">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>
+        </svg>
+      </button>
+      <button id="send" aria-label="发送">
+        <!-- 纸飞机：**线条型、机头朝右** ✓ —— 2026-10-06 用户："也是线条型的 svg，
+             然后左右方向" ✓（由"朝上"改成"横向朝右" ✓ —— 那才是"发送"的常规方向 ✓）。
+             形状就是刚才那个三角帆**顺时针转了 90°** ✓
+             （同一个造型 ✓，只是躺下来了 ✓）：
+               机头 (21.4,12) · 后上角 (3.6,3) · 尾槽 (8.4,12) · 后下角 (3.6,21) ✓
+             走描边、不填充 ✓ —— 和这一行里别的图标**同一种画法** ✓
+             （`stroke-width` 也用同一个 1.8 ✓，粗细才一致 ✓）。 -->
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+             stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.4 12 3.6 21 8.4 12 3.6 3z" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 隐藏的文件输入：拍照 / 相册分开两个，
+       capture="environment" 才会直接唤起后置相机而不是相册 -->
+  <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden>
+  <input type="file" id="fileGallery" accept="image/*" hidden>
+  <input type="file" id="fileAvatar" accept="image/*" hidden>
+
+  <!-- 图片大图查看 -->
+  <div class="lightbox" id="lightbox">
+    <img id="lightboxImg" alt="">
+    <div class="bigletter" id="lightboxTxt" hidden></div>
+  </div>
+</div>
+
+<!-- 管家设置：**三屏** ✓（列表 / 改资料 / 编一档状态），见 #settings 那套 -->
+<!-- ⚠️ 都不放返回箭头 ✓ —— 用户定的："也是不要<，然后手势可返回" ✓ -->
+<!-- ⚠️ 报给原生的屏名一律是 'settings' ✓（见 __goBack / openAgentSettings 的注释 ✓） -->
+<div class="screen ascreen" id="agent"><div class="abody" id="agentBody"></div></div>
+<div class="screen ascreen" id="agentEdit"><div class="abody" id="agentEditBody"></div></div>
+
+<!-- 设置 -->
+<div class="screen" id="settings">
+  <header class="sub">
+    <!-- 用 SVG 而不是文字字符 "<"：字体里的尖括号形状固定，模仿不出微信那种
+         细笔画 + 圆角端点 + 偏窄角度的味道。stroke 用 currentColor，跟随主题。 -->
+    <button class="icon-btn back" id="backChat" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 4.5 8.5 12 15 19.5" />
+      </svg>
+    </button>
+    <h2>设置</h2>
+    <!-- ★ 刷新按钮 —— 2026-10-06 从聊天页右上角**搬过来**的 ✓。
+         它**顶掉了原来那个 `.spacer`** ✓ —— 那个占位本来就是
+         "放一个和返回键等宽的东西、让标题真居中"用的 ✓，
+         现在右边真有一个 40px 的按钮 ✓，占位就是多余的 ✗
+         （留着标题会被挤偏左 ✓，正是它当初要解决的问题 ✓）。
+         用 SVG 而不是 `↻` 字符 ✓ —— 和左边的返回箭头同一套画法 ✓，
+         大小和颜色才对得上 ✓。
+         （`#reloadBtn` 这个 id **没改** ✗ —— 下面那段绑定原样能用 ✓。） -->
+    <button class="icon-btn plain" id="reloadBtn" aria-label="重新加载">
+      <!-- 用的是 Feather 那个 rotate-cw ✓（`viewBox 0 0 24 24` ✓）。
+           ⚠️ 别自己拼 ✗ —— 我上一版是算出来的弧 ✓，
+             末端和箭头**差一点点接上** ✗ → 看着就像画歪了 ✓
+             （用户原话："首尾几乎挨上了" ✓）。
+             这个版本的弧线末端**正好落在**箭头那个拐角上 ✓，是接住的 ✓。
+           `19` 而不是 22 ✓ —— 用户："刷新按钮稍微小一些" ✓
+           （22 的描边箭头视觉上比 22 的返回箭头重一档 ✓）。 -->
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10" />
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+      </svg>
+    </button>
+  </header>
+  <div class="body">
+    <!-- ★ **行序**（2026-10-06 用户定的）：
+           我的 · 群名称 · 群昵称 · 管家 · 邀请码 · 检查更新 · 退出登录 ✓
+         「组件」和「外观」**整个拿掉了** ✓ —— 用户说"后续我自有安排" ✓。
+         （外观那几个按钮是 `$$('[data-theme-set]')` 遍历出来的 ✓，
+           一个都没有就是什么都不做 ✓，不会报错 ✓。） -->
+
+    <!-- ★ 「我的」排第一 ✓ —— 它去的是**整个账号**那一页（壳）✓。
+         「群昵称」是**只在这个群里**生效的另一个东西 ✓ ——
+         两行早先都叫「我的」✗，一页上看不出哪个是哪个 ✓。 -->
+    <div class="item" data-act="shell"><span class="k">我的</span><span class="v" id="vMe"></span><span class="chev">›</span></div>
+    <div class="item" data-act="gname"><span class="k">群名称</span><span class="v" id="vGname"></span><span class="chev">›</span></div>
+    <div class="item" data-act="myprofile"><span class="k">群昵称</span><span class="v" id="vMy"></span><span class="chev">›</span></div>
+    <div class="item" data-act="agentprofile"><span class="k">管家</span><span class="v" id="vAname"></span><span class="chev">›</span></div>
+
+    <!-- ★ 「邀请码」右边直接写**码本身** ✓ —— 2026-10-06 用户定的。
+         原来写的是"复制邀请码" ✗：那是个**动作说明** ✓，
+         而人真正想看的、想抄给别人的，是**那串码** ✓。
+         点这一行**依旧**是复制 ✓（提示语也还是"邀请码已复制" ✓）。 -->
+    <div class="item" data-act="invite"><span class="k">邀请码</span><span class="v" id="vInvite"></span><span class="chev">›</span></div>
+
+    <!-- 手动查更新。自动检查是"开 App 时问一次"，但那个时机不由你定——
+         这一条让你随时能问，不用等。右边显示当前壳的版本号。 -->
+    <div class="item" data-act="update"><span class="k">检查更新</span><span class="v" id="vAppVer"></span><span class="chev">›</span></div>
+
+    <div class="item" data-act="logout"><span class="k danger">退出登录</span></div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet"><div class="panel" id="sheetPanel"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  // 壳的端口。**提到这儿是因为有两个用途** ✓（回壳 ✓、取壳那边的头像 ✓），
+  // 原来它写在 `backToShell` 里面，别处够不着 ✗。
+  const SHELL_PORT = 8730;
+  const $$ = s => [...document.querySelectorAll(s)];
+
+  // ── 给 agent 的扩展点 ──
+  //
+  // 这个 IIFE 把内部函数全关在里面了（`addMsg`、`show`、`enterApp` 外面都够不着）。
+  // 那是**故意的**——但那样一来，agent 写的 `ui/app.js` 就什么也做不了，只能干瞪眼。
+  //
+  // 所以这里开一个**很小、很明确**的口子：几个钩子 + 几个工具函数，挂在
+  // `window.LifeGuard` 上（见文件末尾）。不是通用插件系统，就是够它用。
+  //
+  // **钩子里的异常必须吞掉**：agent 写的代码报错，不能让整个界面跟着挂。
+  const _hooks = { ready: [], message: [] };
+  const _fire = (name, ...args) => {
+    for (const fn of _hooks[name]) {
+      try { fn(...args); }
+      catch (e) { console.error('[LifeGuard hook ' + name + ']', e); }
+    }
+  };
+  const _hook = name => fn => { if (typeof fn === 'function') _hooks[name].push(fn); };
+  // ★ **这里原本是 `let token = localStorage.getItem('lg_token')`。已经删掉了。**
+  //
+  // 令牌现在住在 **httpOnly Cookie** 里：浏览器自动带上，而**这段 JS 读不到它**
+  // ——这正是重点。页面上任何一段 JS 都摸不到凭证（包括 agent 写的
+  // `ui/app.js`），所以"让它能写前端"才敢做。
+  //
+  // 所以：这里没有 token 变量，请求也不用再加 Authorization 头。
+  // 判断"登录了没"不再是"本地有没有 token"，而是**打一次 /auth/me 看返不返 401**。
+  let me = null, group = null, members = [], curStatus = 'idle';
+  // ★ "刚才那一下是**长按**，不是点击" ✓ —— 2026-10-06 加。
+  //
+  // ⚠️ 为什么非要它 ✗：长按引用挂在 `touchstart` 上 ✓（`passive:true` ✓，
+  //   没 preventDefault ✓），所以**手指抬起来之后浏览器照样会发一个 click** ✗。
+  //   而头像上刚挂了"点一下进「我的」/进管家" ✓ →
+  //   **长按引用会顺带把人带出聊天页** ✗，而且看起来完全莫名其妙 ✓。
+  let pressFired = false;
+  let ws = null, streamEl = null, streamBuf = '';
+
+  // ── 系统留白 ──
+  //
+  // 原生壳只负责**上报数字**（状态栏多高、键盘多高），排版由这里决定。
+  // 这样调布局改这个文件就行，不用让用户重装 App。
+  // 浏览器里没有原生壳，CSS 的 env() 会兜住。
+  const isNative = !!(window.LifeGuardNative && window.LifeGuardNative.isNative && window.LifeGuardNative.isNative());
+
+  const applyInsets = (i) => {
+    if (!i || typeof i !== 'object') return;
+    // ★ 单位换算：原生报的是**物理像素**，CSS 用的是**逻辑像素**，
+    //   必须除以设备像素比。不换算的话顶部会空出近三倍的距离——
+    //   （同一个数字在原生 setPadding 里是对的，搬到 CSS 里就错了。）
+    const dpr = window.devicePixelRatio || 1;
+    const r = document.documentElement.style;
+    r.setProperty('--inset-top', ((i.top || 0) / dpr) + 'px');
+    // 原生报上来的 bottom 已经把键盘算进去了，所以 App 里不需要再额外加 --kb，
+    // 否则键盘弹出时会留出双倍空白。
+    r.setProperty('--inset-bottom', ((i.bottom || 0) / dpr) + 'px');
+    r.setProperty('--kb', '0px');
+    scrollDown();
+  };
+  window.__onInsets = applyInsets;
+
+  if (isNative) {
+    // 页面可能在原生首次派发之后才加载完，主动拉一次
+    try { applyInsets(JSON.parse(window.LifeGuardNative.insets())); } catch {}
+  } else if (window.visualViewport) {
+    // 浏览器里的键盘兜底
+    const onVV = () => {
+      const vv = window.visualViewport;
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      document.documentElement.style.setProperty('--kb', kb + 'px');
+      if (kb > 0) scrollDown();
+    };
+    window.visualViewport.addEventListener('resize', onVV);
+    window.visualViewport.addEventListener('scroll', onVV);
+  }
+
+  // 底部面板：键盘弹起时自动滚到聚焦输入框
+  const _panelEl = $('#sheetPanel');
+  if (_panelEl) {
+    new ResizeObserver(() => {
+      const f = document.activeElement;
+      if (f && _panelEl.contains(f) && (f.tagName === 'INPUT' || f.tagName === 'TEXTAREA')) {
+        f.scrollIntoView({ block: 'center' });
+      }
+    }).observe(_panelEl);
+    _panelEl.addEventListener('focusin', e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        setTimeout(() => e.target.scrollIntoView({ block: 'center' }), 500);
+      }
+    });
+  }
+
+  // ── 主题 ──
+  const applyTheme = (t) => {
+    document.documentElement.dataset.theme = t;
+    localStorage.setItem('lg_theme', t);
+    $$('[data-theme-set]').forEach(b => b.classList.toggle('on', b.dataset.themeSet === t));
+    const meta = document.querySelector('meta[name=theme-color]');
+    if (meta) meta.content = t === 'light' ? '#f5f6fa' : '#0f1115';
+    // 让原生同步状态栏图标的明暗，否则浅色主题下白图标会看不见
+    try { window.LifeGuardNative?.setLightStatusBar?.(t === 'light'); } catch {}
+  };
+  applyTheme(localStorage.getItem('lg_theme') || 'dark');
+  $$('[data-theme-set]').forEach(b => b.onclick = () => applyTheme(b.dataset.themeSet));
+
+  const explain = (data, status) => {
+    if (!data) return '请求失败 ' + status;
+    if (typeof data === 'string') return data;
+    const d = data.detail !== undefined ? data.detail : data;
+    if (typeof d === 'string') return d;
+    if (Array.isArray(d)) return d.map(i => {
+      if (typeof i === 'string') return i;
+      const f = (i.loc || []).filter(x => x !== 'body').join('.');
+      const label = { username:'用户名', password:'密码', current_password:'当前密码',
+                      new_password:'新密码', nickname:'昵称', name:'名称', content:'内容' }[f] || f;
+      return (label ? label + '：' : '') + (i.msg || '');
+    }).join('；');
+    return JSON.stringify(d);
+  };
+
+  const api = async (path, opts = {}) => {
+    const r = await fetch('/api' + path, {
+      ...opts,
+      credentials: 'same-origin',   // 带上 Cookie。同源本来就默认带，写明是为了别被将来改错
+      headers: { 'Content-Type': 'application/json',
+                 ...(opts.headers || {}) }
+    });
+    const text = await r.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (!r.ok) {
+      const err = new Error(explain(data, r.status));
+      err.status = r.status;   // 启动时要靠它分辨"没登录(401)"和"网络坏了"
+      throw err;
+    }
+    return data;
+  };
+
+  // ★ 开机那圈转：**延迟 200ms 才亮** ✗→✓ —— 2026-10-06。
+  //
+  //   它原来是**写死在 HTML 里**的 ✓ → 第一帧就在屏幕上 ✓ →
+  //   而这一趟加载往往一百多毫秒就完了 ✓ → 转圈**只闪了那么一下** ✓
+  //   —— 用户说的"从我的进来会闪一下"，多半就是它 ✓
+  //   （从「设置」回来不闪 ✓，因为那压根没换文档 ✓）。
+  //
+  //   现在：先藏着 ✓，200ms 还没好才亮 ✓ ——
+  //   **快的时候它根本不出现** ✓，慢的时候它照常兜住"别让人对着空白等" ✓。
+  let bootTimer = setTimeout(() => {
+    const b = $('#boot');
+    if (b) b.hidden = false;
+  }, 200);
+
+  const toast = (m) => {
+    const t = $('#toast'); t.textContent = m; t.classList.add('on');
+    clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 1800);
+  };
+  const show = id => {
+    // 第一屏出现的那一刻，才把开机占位收掉（否则会先闪一下空白/登录页）
+    const boot = $('#boot');
+    if (boot) boot.hidden = true;
+    if (bootTimer) { clearTimeout(bootTimer); bootTimer = null; }
+    $$('.screen').forEach(s => {
+      s.classList.remove('anim-in', 'anim-out');
+      s.classList.toggle('on', s.id === id);
+    });
+  };
+
+  // 告诉原生"我现在在哪个界面"，它据此决定返回键是"退回聊天"还是"退出应用"。
+  // 网页里的界面切换不会进 WebView 历史，原生光靠 canGoBack 判断不出来。
+  const tellNative = (name) => {
+    try { window.LifeGuardNative?.setScreen?.(name); } catch {}
+  };
+
+  // 设置页单独处理：进出带动画，且打开时保留聊天页垫在底下
+  const openSettings = () => {
+    const c = $('#chat'), s = $('#settings');
+    c.classList.add('on');
+    s.classList.remove('anim-out');
+    s.classList.add('on');
+    s.classList.remove('anim-in');
+    void s.offsetWidth;          // 强制重排，否则连续开关时动画不重放
+    s.classList.add('anim-in');
+    tellNative('settings');
+  };
+
+  const closeSettings = () => {
+    const s = $('#settings');
+    s.classList.remove('anim-in');
+    s.classList.add('anim-out');
+    const done = () => {
+      s.removeEventListener('animationend', done);
+      s.classList.remove('anim-out', 'on');
+    };
+    s.addEventListener('animationend', done);
+    tellNative('chat');
+    scrollDown();
+  };
+
+  // ══════════════════════════════════════════════════════════════════
+  // 管家设置 —— 三屏：列表 / 改资料 / 编一档状态
+  // ══════════════════════════════════════════════════════════════════
+  //
+  // ⚠️ **报给原生的屏名一律是 `'settings'`** ✗→✓ ——
+  //   `MainActivity.kt:582` 只认这一个字符串 ✓，
+  //   而且它**根本不看 `__goBack` 的返回值** ✗（我原来以为看 ✓）。
+  //   报一个新名字的后果是：**界面开着，第一次返回什么都不发生 ✗，
+  //   第二次直接退出 App** ✗ —— 而这三屏都是"没有返回箭头、全靠手势" ✗。
+
+  const mkel = (tag, cls, txt) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (txt != null) n.textContent = txt;
+    return n;
+  };
+  const KIND_LABEL = { idle: '待机显示', thinking: '思考中', silent: '保持沉默' };
+
+  // 服务端那份配置（`group.agent_status` 是个 JSON **字符串** ✓）。
+  const agentCfg = () => statusCfg || {
+    idle: { on: true, lines: ['正在窥屏…'], every: 600 },
+    thinking: { on: true, lines: ['正在思考…'] },
+    silent: { on: true, lines: ['打算继续窥屏…'] },
+  };
+
+  /** 改配置**只有一个出口** ✓ —— 整份发上去（服务端是整份替换 ✓）。 */
+  const commitCfg = (mutate) => {
+    const cfg = JSON.parse(JSON.stringify(agentCfg()));
+    mutate(cfg);
+    return patchGroup({ agent_status: cfg }, true);
+  };
+
+  /** 改群设置。`quiet` = 不弹「已保存」✓ —— 打字时防抖存的那一次次弹会烦死人 ✗。 */
+  const patchGroup = async (patch, quiet) => {
+    try {
+      const g = await api(`/groups/${group.id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+      if (g) group = g;                       // 服务端回的就是那一行 ✓，直接用 ✓
+      normalizeStatus();
+      renderHeader(); renderSettings();
+      if ($('#agent').classList.contains('on') && !promptEditing) renderAgent();
+      if (!quiet) toast('已保存');
+    } catch (e) { toast(e.message || '没存上'); }
+  };
+
+  // ── 三屏的进与出（一套写法 ✓）──────────────────────────────────
+  const pushScreen = (id) => {
+    const s = $('#' + id);
+    s.classList.remove('anim-out');
+    s.classList.add('on', 'anim-in');
+    void s.offsetWidth;                 // 强制重排，否则连续开关时动画不重放 ✓
+    tellNative('settings');             // ⚠️ 一律 'settings' ✓，见上面那段
+  };
+  const popScreen = (id) => {
+    const s = $('#' + id);
+    s.classList.remove('anim-in');
+    s.classList.add('anim-out');
+    const done = () => {
+      s.removeEventListener('animationend', done);
+      s.classList.remove('anim-out', 'on');
+    };
+    s.addEventListener('animationend', done);
+    tellNative('settings');
+  };
+
+  // ── 屏①：列表 ─────────────────────────────────────────────────────
+  const renderAgent = () => {
+    const m = $('#agentBody');
+    if (!m) return;
+    m.textContent = '';
+
+    // 资料块：**点它进"改管家资料"那一屏** ✓
+    //   （用户 2026-10-06："不要下面的点一下换头像，而是点击进去后
+    //     进入类似于我的进头像也一样" ✓）
+    const prof = mkel('div', 'prof');
+    const av = mkel('div', 'av', '管');
+    applyAgentAvatar(av);
+    prof.appendChild(av);
+    const who = mkel('div', 'who');
+    who.appendChild(mkel('div', 'n', agentName()));
+    prof.appendChild(who);
+    prof.appendChild(mkel('div', 'go', '›'));
+    prof.onclick = openAgentEdit;
+    m.appendChild(prof);
+
+    m.appendChild(mkel('div', 'sec', '状态显示'));
+    const g1 = mkel('div', 'grp');
+    ['idle', 'thinking', 'silent'].forEach((k) => {
+      const b = mkel('button', 'row');
+      b.appendChild(mkel('span', 'rl', KIND_LABEL[k]));
+      // 右边写的是**动作**「点击编辑」✓，不是那一档的当前值 ✗（用户定的 ✓）
+      b.appendChild(mkel('span', 'act', '点击编辑'));
+      b.onclick = () => openStateScreen(k);
+      g1.appendChild(b);
+    });
+    m.appendChild(g1);
+
+    m.appendChild(mkel('div', 'sec', '性格'));
+    const g2 = mkel('div', 'grp');
+    g2.appendChild(promptBlock());
+    m.appendChild(g2);
+  };
+
+  // ── 性格：**直奔一个文本框** ✓（用户："不要给管家的话，直接一个文本框" ✓）──
+  //
+  // 平时只露**前两行** ✓（`-webkit-line-clamp:2` ✓），点开才展开编辑 ✓。
+  let promptEditing = false;
+
+  const promptBlock = () => {
+    const wrap = mkel('div', 'pwrap');
+    const draw = () => {
+      wrap.textContent = '';
+      const cur = (group && group.agent_user_prompt) || '';
+      if (!promptEditing) {
+        const box = mkel('div', 'pbox' + (cur ? '' : ' empty'),
+                         cur || '描述一下管家的性格...');
+        box.onclick = () => { promptEditing = true; draw(); };
+        wrap.appendChild(box);
+        return;
+      }
+      const ta = mkel('textarea', 'ptext');
+      ta.value = cur;
+      ta.maxLength = 2000;
+      const foot = mkel('div', 'pfoot');
+      const cnt = mkel('span', 'cnt', cur.length + ' / 2000');
+      ta.oninput = () => { cnt.textContent = ta.value.length + ' / 2000'; };
+      const cancel = mkel('button', null, '取消');
+      cancel.style.color = 'var(--muted)';
+      cancel.onclick = () => { promptEditing = false; draw(); };
+      const save = mkel('button', null, '保存');
+      save.onclick = () => {
+        promptEditing = false;
+        draw();                       // 先收起再存 ✓，这样失败时也不会卡在编辑态 ✓
+        patchGroup({ agent_user_prompt: ta.value.trim() });
+      };
+      foot.appendChild(cnt);
+      foot.appendChild(cancel);
+      foot.appendChild(save);
+      wrap.appendChild(ta);
+      wrap.appendChild(foot);
+      setTimeout(() => ta.focus(), 60);
+    };
+    draw();
+    return wrap;
+  };
+
+  const openAgentSettings = () => {
+    promptEditing = false;
+    normalizeStatus();
+    renderAgent();
+    pushScreen('agent');
+  };
+  const closeAgentSettings = () => popScreen('agent');
+
+  // ── 屏②：改管家资料（头像 + 昵称，**一起保存** ✓）────────────────
+  //
+  // 版式**照壳「我的」进头像那一页** ✓（`卡片(大头像+点击头像替换)` +
+  // `卡片(昵称 + 保存)` + 卡片**外面**的「取消」✓）——
+  // 用户 2026-10-06 明确要求"类似于我的进头像也一样"、
+  // "在点击头像替换的下方、保存的上方再加一个昵称条" ✓、"底下还是取消" ✓。
+  let editFile = null;
+
+  const openAgentEdit = () => {
+    editFile = null;
+    renderAgentEdit();
+    pushScreen('agentEdit');
+  };
+  const closeAgentEdit = () => popScreen('agentEdit');
+
+  const renderAgentEdit = () => {
+    const m = $('#agentEditBody');
+    if (!m) return;
+    m.textContent = '';
+
+    // 卡片一：头像
+    const card = mkel('div', 'card avcard');
+    const f = mkel('input');
+    f.type = 'file';
+    f.accept = 'image/*';
+    f.style.display = 'none';           // 原生文件框太丑，藏起来 ✓
+    const big = mkel('div', 'bigav');
+    const av = mkel('div', 'av', '管');
+    applyAgentAvatar(av);
+    av.onclick = () => f.click();       // **头像本身就是那个按钮** ✓，不多放按钮 ✓
+    f.onchange = () => {
+      const file = f.files && f.files[0];
+      if (!file) return;
+      // 选完**先在本地显示出来** ✓ —— 不然用户点完"看不到变化" ✓，
+      // 会以为没选上、再点一次 ✓（压缩本来就要做 ✓，顺手画出来 ✓）。
+      shrinkToJpeg(file, 320).then(blob => {
+        editFile = new File([blob], 'a.jpg', { type: 'image/jpeg' });
+        const url = URL.createObjectURL(blob);
+        av.textContent = '';
+        av.style.backgroundImage = "url('" + url + "')";
+      }).catch(e => toast(e.message));
+    };
+    big.appendChild(av);
+    card.appendChild(f);
+    card.appendChild(big);
+    card.appendChild(mkel('div', 'tip', '点击头像替换'));
+    m.appendChild(card);
+
+    // 卡片二：昵称 + 保存
+    const card2 = mkel('div', 'card');
+    card2.appendChild(mkel('label', null, '昵称'));
+    const nm = mkel('input', 'field');
+    nm.value = agentName();
+    nm.maxLength = 32;
+    card2.appendChild(nm);
+    const err = mkel('div', 'err', '');
+    card2.appendChild(err);
+    const save = mkel('button', 'btn-save', '保存');
+    card2.appendChild(save);
+    m.appendChild(card2);
+
+    // 卡片**外面**的取消 ✓ —— 夹在卡片里会跑到「保存」上面去 ✗（壳那边栽过 ✓）
+    const back = mkel('div', 'swap');
+    back.appendChild(mkel('b', null, '取消'));
+    back.onclick = () => closeAgentEdit();
+    m.appendChild(back);
+
+    save.onclick = async () => {
+      save.disabled = true;
+      err.textContent = '';
+      try {
+        // ★ **最后一起保存** ✓（用户定的 ✓）：先传头像 ✓，再存昵称 ✓。
+        if (editFile) await uploadAgentAvatarFile(editFile);
+        const name = nm.value.trim();
+        if (name && name !== agentName()) {
+          const g = await api(`/groups/${group.id}`,
+                              { method: 'PATCH', body: JSON.stringify({ agent_name: name }) });
+          if (g) group = g;
+        }
+        editFile = null;
+        toast('已保存');
+        closeAgentEdit();
+        await refreshGroup();
+      } catch (e) {
+        err.textContent = e.message || '没存上';
+        save.disabled = false;
+      }
+    };
+  };
+
+  // ── 屏③：编一档状态（**底部半屏 + 三块板** ✓）────────────────────
+  //
+  // 用户 2026-10-06 第二次提的：从整屏**改回下方的半屏** ✓
+  // ——键盘那一套（`#sheetPanel` 上的 ResizeObserver + focusin 滚动 ✓）本来就是
+  //   挂在弹层上的 ✓，用弹层是**白拿** ✓；而且描述起来也更像"改一个小设置"✓。
+  //
+  // 三块板（"板块化会美观些" ✓）：
+  //     待机显示 = ① 开关 + ② 状态区/添加 + ③ 轮换间隔
+  //     思考中   = ②（**没有开关** ✓）
+  //     保持沉默 = ① + ②
+  //
+  // **这一屏没有保存按钮** ✓（版式里没有 ✓）→ 改动**自动存** ✓：
+  //   开关、删除、添加 → 立刻 ✓；打字 → **防抖 900ms** ✓
+  //   （一个请求一个字是灾难 ✗）；关掉弹层再兜一次 ✓（靠 `sheetCloseHook` ✓）。
+  let stKind = 'idle';
+  let stLines = [];
+  let stOn = true;
+  let stTimer = null;
+  let stEvery = 600;          // 草稿值（秒 ✓）
+  let stEveryTimer = null;
+
+  const stEveryMin = () => Math.round((stEvery || 600) / 60);
+
+  /** 存轮换间隔 ✓。和文字一样走防抖 ✓ —— 边打字边存等于一个字一次请求 ✗。 */
+  const flushEvery = () => {
+    if (stEveryTimer) { clearTimeout(stEveryTimer); stEveryTimer = null; }
+    if (stEvery < 60 || stEvery > 86400) return;
+    if (stEvery === ((agentCfg().idle || {}).every || 600)) return;   // 没变就别发 ✓
+    commitCfg(c => { c.idle = Object.assign({}, c.idle, { every: stEvery }); });
+  };
+  const touchEvery = (minutes) => {
+    stEvery = minutes * 60;
+    if (stEveryTimer) clearTimeout(stEveryTimer);
+    stEveryTimer = setTimeout(flushEvery, 900);
+  };
+
+  const flushState = () => {
+    if (stTimer) { clearTimeout(stTimer); stTimer = null; }
+    const clean = stLines.map(x => String(x || '').trim()).filter(Boolean);
+    // 全删空 → **不存** ✓。服务端会把空池子填回默认 ✓，
+    // 存进去等于"我就是要一条都不留"✗ —— 那不是这个意思 ✓。
+    if (!clean.length) return;
+    commitCfg((c) => {
+      c[stKind] = Object.assign({}, c[stKind], { lines: clean });
+      if (stKind !== 'thinking') c[stKind].on = stOn;
+    });
+  };
+  const touchState = () => {
+    if (stTimer) clearTimeout(stTimer);
+    stTimer = setTimeout(flushState, 900);
+  };
+
+  const openStateScreen = (kind) => {
+    stKind = kind;
+    const it = agentCfg()[kind] || {};
+    stLines = (it.lines || []).slice();
+    stOn = it.on !== false;
+    stEvery = (agentCfg().idle || {}).every || 600;
+    renderStateSheet();
+    openSheet();
+    // ★ 弹层一关就兜一次存 ✓ —— 这一屏没有保存按钮 ✓，
+    //   而"打完最后一个字直接滑走"是最常见的动作 ✓，不兜就丢字 ✓。
+    sheetCloseHook = () => { flushState(); flushEvery(); };
+  };
+
+  const renderStateSheet = () => {
+    const p = $('#sheetPanel');
+    if (!p) return;
+    p.textContent = '';
+    // ⚠️ 这里原来还有一个 `<h3>待机显示</h3>` ✗ —— 去掉 ✓。
+    //   板① 左边写的就是**这一档的名字** ✓（用户 2026-10-06 定的 ✓），
+    //   同一屏里同一个名字写两遍是重复 ✓。
+
+    // 板①：开关（思考中**没有** ✓）
+    if (stKind !== 'thinking') {
+      const b1 = mkel('div', 'sblk');
+      const r = mkel('div', 'hrow');
+      // 左边 = **这一档的名字** ✓（原来是"显示这条状态条" ✓，用户要换掉 ✓）
+      r.appendChild(mkel('span', 't', KIND_LABEL[stKind]));
+      const seg = mkel('span', 'seg');
+      const on = mkel('button', null, '开');
+      const off = mkel('button', null, '关');
+      const paint = () => { on.classList.toggle('on', stOn); off.classList.toggle('on', !stOn); };
+      on.onclick = () => { stOn = true; paint(); flushState(); };
+      off.onclick = () => { stOn = false; paint(); flushState(); };
+      seg.appendChild(on);
+      seg.appendChild(off);
+      paint();
+      r.appendChild(seg);
+      b1.appendChild(r);
+      p.appendChild(b1);
+    }
+
+    // 板②：状态区（**固定三行**，超出滚动）+ 添加一条
+    const b2 = mkel('div', 'sblk');
+    const list = mkel('div', 'slist2');
+    const draw = () => {
+      list.textContent = '';
+      stLines.forEach((s, i2) => {
+        const r = mkel('div', 'srow2');
+        const inp = mkel('input');
+        inp.value = s;
+        inp.maxLength = 40;
+        inp.placeholder = '写一句…';
+        inp.oninput = () => { stLines[i2] = inp.value; touchState(); };
+        inp.onblur = flushState;
+        const del = mkel('button', 'del', '✕');
+        del.onclick = () => {
+          if (stTimer) { clearTimeout(stTimer); stTimer = null; }
+          stLines.splice(i2, 1);
+          draw();
+          flushState();
+        };
+        r.appendChild(inp);
+        r.appendChild(del);
+        list.appendChild(r);
+      });
+    };
+    draw();
+    b2.appendChild(list);
+    const add = mkel('button', 'addline2', '＋ 添加一条');
+    add.onclick = () => {
+      if (stLines.length >= 20) { toast('最多 20 条'); return; }
+      if (stTimer) { clearTimeout(stTimer); stTimer = null; }
+      stLines.push('');
+      draw();
+      flushState();
+      const ins = list.querySelectorAll('input');
+      if (ins.length) {
+        ins[ins.length - 1].focus();
+        list.scrollTop = list.scrollHeight;   // 新加的那条要在视野里 ✓
+      }
+    };
+    b2.appendChild(add);
+    p.appendChild(b2);
+
+    // 板③：轮换间隔（**只有待机有** ✓）
+    //
+    // **就地一个输入框** ✓ —— 用户 2026-10-06："点击直接编辑输入框，不用额外的界面" ✓。
+    // 原来点一下会弹 `promptText` ✓ —— 为了一个数字跳一趟界面太重 ✓，
+    // 而且弹层换掉之后**回不来** ✗（得手动再点一次"点击编辑" ✓）。
+    if (stKind === 'idle') {
+      const b3 = mkel('div', 'sblk');
+      const r = mkel('div', 'intvrow');
+      r.appendChild(mkel('span', 't', '轮换间隔'));
+      const inp = mkel('input');
+      inp.type = 'number';
+      inp.min = '1';
+      inp.max = '1440';
+      inp.value = String(stEveryMin());
+      inp.oninput = () => {
+        const n = Math.round(Number(inp.value));
+        // 打到一半 / 越界 → **先什么都不做** ✓（不要一边打字一边报错 ✓，
+        // 也不要把一个半成的值写上去 ✗）。松手/失焦时下面那个兜底会兜住 ✓。
+        if (!n || n < 1 || n > 1440) return;
+        touchEvery(n);
+      };
+      inp.onblur = flushEvery;
+      r.appendChild(inp);
+      r.appendChild(mkel('span', 'u', '分钟'));
+      b3.appendChild(r);
+      p.appendChild(b3);
+    }
+    // 底部那几行小字解释**去掉了** ✓（用户 2026-10-06）——
+    // "重开 App 不会重置"那种话是**实现细节** ✓，说一次就够 ✓，
+    // 每次打开这块板都念一遍就成了噪音 ✓。
+  };
+
+  // ── 换管家头像 ────────────────────────────────────────────────────
+  //
+  // ⚠️ **必须先在手机上缩** ✗ —— 手机原图 3~8MB ✓，
+  //   而 `/api/groups/{id}/agent-avatar` 限 **2MB** ✗ → 不缩必然 413 ✗
+  //   （报错还是"图片不能超过 2MB"✓，用户只会觉得莫名其妙 ✓）。
+  // ⚠️ **在手机上缩，不在服务器上缩** ✗ —— 手机原图 3~8MB ✓，
+  //   传上去再缩等于白占一趟网络 ✓，而且服务端要为此引一个图像库 ✗
+  //   （壳的生存策略是"只用标准库"✓，照它那份写一份 ✓）。
+  const shrinkToJpeg = (file, max) => new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error('读不了这个文件'));
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('这不是一张能打开的图'));
+      img.onload = () => {
+        const s = Math.min(1, (max || 256) / Math.max(img.width, img.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(img.width * s));
+        cv.height = Math.max(1, Math.round(img.height * s));
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        cv.toBlob(b => b ? resolve(b) : reject(new Error('缩不了这张图')), 'image/jpeg', 0.85);
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+
+  const uploadAgentAvatarFile = async (file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch(`/api/groups/${group.id}/agent-avatar`,
+                          { method: 'POST', body: fd, credentials: 'same-origin' });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || ('上传失败 ' + r.status));
+    }
+    // ★ 缓存是**故意**的 ✓（一次开 App 只探一次 ✓）→ 换了图必须手动清 ✓，
+    //   否则整屏都还是旧那张 ✓，而用户只会说"换了没反应" ✗。
+    resetAgentAvatar();
+    repaintAgentAvatars();
+  };
+
+  /** 换完头像，**已经在屏幕上的**气泡也得跟着变 ✓ —— 它们不会自己更新 ✗。 */
+  const repaintAgentAvatars = () => {
+    document.querySelectorAll('#msgs .row.agent .av').forEach(applyAgentAvatar);
+  };
+
+  /** 原生返回键调这个。返回 true 表示"我处理了，别退出应用"。 */
+  //
+  // ⚠️ 顺序不能换 ✗ —— 弹层在最上 ✓，三屏是**一层压一层** ✓
+  //   （编状态 > 改资料 > 列表 > 群设置 ✓），得从上往下关 ✓。
+  window.__goBack = () => {
+    if ($('#sheet').classList.contains('on')) { closeSheet(); return; }
+    if ($('#agentEdit').classList.contains('on')) { closeAgentEdit(); return; }
+    if ($('#agent').classList.contains('on')) { closeAgentSettings(); return; }
+    if ($('#settings').classList.contains('on')) { closeSettings(); return; }
+  };
+
+  // ── 登录 ──
+  //
+  // ★ **这个页面不再有"登录"这回事** ✓ —— 2026-10-06。
+  //
+  //   登录页只有一个 ✓，住在壳上（`8730/login` ✓）。
+  //   服务端那条 `/auth/login` 也早就是 **410** 了 ✓（`routes_auth.py` 写着：
+  //   留着是为了给旧界面一句人话，**不再接受密码** ✓ —— 它是这次重构
+  //   要消灭的"第二条登录路径" ✗）。
+  //
+  //   但页面这边还留着一套输入框 + 按钮 ✗ → 真点到了就撞 410 ✓ →
+  //   看到"入口已经搬走了" ✓ —— 那是**一个死胡同** ✗，不是一条路 ✗。
+  //   所以：**按钮直接把人送到该去的地方** ✓。
+  //
+  //   （这个屏现在还留着，但只在**网络不通**时出现 ✓ —— 那时候往壳跳也跳不过去 ✓，
+  //    总得让人看见一句话 ✓。彻底删掉这个屏是后面的事，记在待办里 ✓。）
+  //
+  //   ⚠️ 名字**不能删** ✗：`tools/check-page.sh` 把 `doLogin` 列为关键标记 ✓，
+  //   它守的是"内联脚本没被某个字面量提前截断" ✓。
+  const doLogin = async () => { backToShell('login'); };
+  $('#doLogin').onclick = doLogin;
+  $('#p').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+  const enterApp = async () => {
+    // ★ **一趟拿齐。** 原来是 /auth/me → /groups → /members → /messages
+    //   **连着四趟**，每趟都要过 WireGuard —— 开 App 时那片"黑屏"就是它 ✗
+    //   现在一次往返搞定（服务端 /bootstrap 把四样一起给）。
+    // 注意路径：这个接口注册在 groups 那个 router 下（它要复用群那套查询），
+    // 前缀是 /api/groups —— 所以是 /api/groups/bootstrap，不是 /api/bootstrap ✗
+    const b = await api('/groups/bootstrap?limit=50');
+    me = b.me;
+    if (!b.group) {
+      // 账号一个空间都没有 ✓ → **回壳的「我的」** ✗→✓ —— 2026-10-06。
+      //
+      //   原来这里是 `show('login')` ✗（"要把登录页显示出来，不然一直转圈"✓）——
+      //   那是**只有一个页面**的时候的解法 ✓。
+      //   现在「我的」是个真地址 ✓，它就是"新建或加入空间"那一屏 ✓
+      //   （用户定的：**新用户初登录才定向到「我的」** ✓）。
+      //   画一个本页的登录页 ✗ 等于把人堵在一个进不去的地方 ✓。
+      backToShell();
+      return;
+    }
+    group = b.group;
+    members = b.members || [];
+    renderHeader();
+    $('#msgs').innerHTML = '';
+    // ★ **先让界面出来，再灌历史消息。**
+    //   200 条消息的渲染有实打实的耗时（实测那份数据 80KB），而这段时间里
+    //   用户看的是转圈 ✗ 先 show 再渲染，观感就变成"一下就进来了、消息跟着刷出来" ✓
+    show('chat'); tellNative('chat');
+    const first = b.messages || [];
+    // ⚠️ **必须包一层箭头函数。** 写成 `first.forEach(addMsg)` 的话，
+    //    forEach 会把 `(元素, 下标, 数组)` 三个参数一起传进去 ✗ ——
+    //    而下标正好落在 addMsg 的第二个参数 `prepend` 上 ✗
+    //    → 第 0 条 append、第 1 条往后全 prepend → **整个列表倒过来** ✗
+    //    （实测：开 App 看到 400 在最上面、355 在最下面。用户一眼就看出来了。）
+    first.forEach(m => addMsg(m));               // 首屏：最近 50 条
+    oldestId = first.length ? first[0].id : 0;   // 往回翻的游标
+    historyDone = first.length < 50;             // 不够 50 条 → 就这么多历史了
+    scrollDown(true);   // 首屏**强制**到底（之后图片撑开会自己再跟，见 scrollDown）
+    normalizeStatus(); renderSettings(); connectWS();
+    tailReady = true;   // 到这儿才允许"滚到顶往回加载"（否则开屏时会误触发）
+    _fire('ready');   // agent 的 ui/app.js 在这里接手（历史消息已经渲染完了）
+  };
+
+  const agentName = () => group?.agent_name || '管家';
+  // ⚠️ 这份**只是兜底** ✓ —— 正常情况下文案全来自服务端的配置 ✓
+  //   （`group.agent_status` ✓，形状与默认值定义在 `app/agent_status.py` ✓）。
+  //   留着它是因为两种边角：老服务端、以及 `typing` 这一档不在新配置里 ✓
+  //   —— 少了它，"正在输入"会变成一个**空的状态条** ✗。
+  const STATUS_TEXT = { idle:'正在窥屏…', thinking:'正在思考…', typing:'正在输入…', lurking:'打算继续窥屏…' };
+
+  const renderHeader = () => { $('#gname').textContent = group?.name || ''; setStatus(curStatus); };
+
+  // ★ 三档文案的分工（2026-10-06，见 app/agent_status.py 那段）：
+  //   · 思考中 / 不打算说话 → 服务端在**事件**里挑好一句发下来 ✓
+  //   · 待机 → **客户端按时钟轮换** ✓ —— 它是个钟，不是事件 ✓，
+  //     服务端不必每十分钟推一次消息 ✓
+  let statusCfg = null;
+  let idleTimer = null;
+
+  const normalizeStatus = () => {
+    // 服务端存的是 JSON **字符串** ✓（列是 TEXT ✓）。
+    try { statusCfg = group && group.agent_status ? JSON.parse(group.agent_status) : null; }
+    catch (e) { statusCfg = null; }         // 坏字符串 → 当没配置 ✓，别把状态条弄没 ✗
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    if (curStatus === 'idle') setStatus('idle');
+  };
+
+  /** 待机那一句 —— **从时钟直接算** ✓。 */
+  //
+  // ⚠️ 这么算的**好处**：重启 App **天然不重置** ✓ ——
+  //    它不是"从打开那一刻开始数"✗，它根本不数 ✓，它看钟 ✓。
+  //    `+ group.id` 是让不同群的换气点**错开** ✓
+  //    （不然所有群会在同一秒一起变 ✗，看着像系统在刷新 ✓）。
+  const idleLine = () => {
+    const it = (statusCfg && statusCfg.idle) || {};
+    const lines = it.lines || [];
+    if (!it.on || !lines.length) return null;
+    const every = Math.max(60, Number(it.every) || 600) * 1000;
+    // 相位 = 群号 + **rev** ✓。rev 每存一次 +1（服务端加的 ✓）
+    // → **改完点保存，屏幕上立刻换一条** ✓。
+    // 少了 rev 这一项，用户改完可能十分钟里看不到任何变化 ✗，
+    // 于是他会得出"保存没生效" ✓，然后反复点保存 ✓。
+    const phase = ((group && group.id) || 0) + (Number(statusCfg.rev) || 0);
+    const i = Math.floor(Date.now() / every + phase) % lines.length;
+    return lines[i];
+  };
+
+  /** 排下一次换气 ✓ —— 用完就重排 ✓（不是每秒轮询 ✗，空转是白烧电）。 */
+  const scheduleIdle = () => {
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    const it = (statusCfg && statusCfg.idle) || {};
+    if (!it.on || !(it.lines || []).length) return;
+    const every = Math.max(60, Number(it.every) || 600) * 1000;
+    const now = Date.now();
+    const wait = (Math.floor(now / every) + 1) * every - now;
+    idleTimer = setTimeout(() => {
+      if (curStatus === 'idle') setStatus('idle');
+      scheduleIdle();
+    }, wait + 50);
+  };
+
+  // 状态**只出现在顶栏**。早期版本还在消息列表里插一条"正在输入"，
+  // 结果和顶栏重复，还占消息流的位置。
+  const setStatus = (s, text) => {
+    curStatus = s;
+    const el = $('#status'), tx = $('#statusText');
+    let line = text;
+    if (!line) {
+      if (s === 'idle') line = idleLine();
+      else {
+        // 服务端没带文字（重连后补状态那条 ✓、老服务端 ✓）→ 自己从配置里随机挑 ✓
+        const k = s === 'lurking' ? 'silent' : s;
+        const it = (statusCfg && statusCfg[k]) || {};
+        const lines = (it.on && it.lines) || [];
+        line = lines.length ? lines[Math.floor(Math.random() * lines.length)]
+                            : (STATUS_TEXT[s] || null);
+      }
+    }
+    // ★ **这一档关掉 → 整条收起来** ✓（用户 2026-10-06 定的 ✓）：
+    //   待机显示关掉之后，屏幕上就只剩群名 ✓，而不是留一条空的 ✗。
+    if (!line) { el.hidden = true; return; }
+    el.hidden = false;
+    el.className = 'status s-' + s;
+    tx.textContent = agentName() + line;
+    if (s === 'idle') scheduleIdle();
+  };
+  let revertTimer = null;
+  const setStatusTimed = (s, text) => {
+    clearTimeout(revertTimer);
+    setStatus(s, text);
+    if (s === 'lurking') revertTimer = setTimeout(() => setStatus('idle'), 4000);
+  };
+
+  // ── 消息 ──
+  // ★ 只在"用户还在底部"时才自动跟到底。
+  //
+  // 踩过：`scrollDown()` 只在渲染完执行一次 ✗ —— 而图片是**异步加载**的，
+  // 加载完高度才撑开，那一次"滚到底"早就不是底部了 ✗
+  // 于是开 App 停在最旧的那一条上（用户原话：怎么是昨天 19 点的）。
+  //
+  // 所以：记住"他是不是还在底部" ✓ 图片一加载完就再跟一次 ✓
+  // 他要是自己往上翻了，就别打扰他 ✗
+  let stickBottom = true;
+  const scrollDown = (force) => {
+    const m = $('#msgs');
+    if (force) stickBottom = true;
+    if (stickBottom) m.scrollTop = m.scrollHeight;
+  };
+  const fmtTime = s => {
+    if (!s) return '';
+    const d = new Date(s * 1000);
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  };
+
+  // 把正文里的 @某人 高亮出来，让"我 @ 了谁"一眼可见
+  const renderContent = (el, text, isMine) => {
+    el.textContent = '';
+    const names = [...new Set(
+      members.filter(m => !m.is_agent).map(m => m.nickname).concat([agentName()])
+    )].filter(Boolean).sort((a,b) => b.length - a.length);
+    if (!text) return;
+    if (!names.length) { el.textContent = text; return; }
+    const re = new RegExp('@(' + names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')', 'g');
+    let last = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
+      const span = document.createElement('span');
+      span.className = 'at'; span.textContent = m[0];
+      el.appendChild(span);
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
+  };
+
+  // ── 管家的头像 ────────────────────────────────────────────────────
+  //
+  // `/ui/avatar.png` 是**它自己可以换的**（那个目录归它所有）。存在就用它、
+  // 不存在就退回名字首字——所以它随时换随时生效，写坏了也只是回到首字。
+  //
+  // ⚠️ **别再往这上面挂时间戳** ✗ —— 见下面那段（2026-10-06 的教训 ✓）：
+  //   防缓存的戳会把版本号带来的缓存**全部作废** ✓。
+  // 一次开 App 只探测一次（多个气泡共用一个 Promise），不是每个气泡都去问。
+  // ── 头像：两个来源，一个画法 ────────────────────────────────────
+  //
+  // ★ 壳那两个端口**共用一个主机** ✓ → cookie 是按主机共享的 ✓，
+  //   所以从 8741 这个页面直接去 8730 取图是通的 ✓
+  //   （实测 2026-10-06：带票 200 image/jpeg ✓，不带票 401 ✓）。
+  //
+  //   为什么**不搬文件 / 不写代理** ✗：那会让同一份头像存在两处 ✓
+  //   —— 这个项目今天已经为"同一份数据两处"栽过两次 ✓。
+  const SHELL_ORIGIN = location.protocol + '//' + location.hostname + ':' + SHELL_PORT;
+  const shellURL = (p) => {
+    if (!p) return '';
+    if (p.indexOf('http') === 0) return p;                  // 已经是绝对地址 ✓
+    return SHELL_ORIGIN + (p.charAt(0) === '/' ? p : '/' + p);
+  };
+
+  // 给一个头像盒子刷图 ✓。没有 / 取不到 → **退回昵称首字** ✓
+  //（留个空框比首字难看得多 ✓）。
+  const paintAvatar = (el, path, fallback) => {
+    if (!el) return;
+    const ch = String(fallback || '?').slice(0, 1);
+    el.style.backgroundImage = '';
+    el.textContent = ch;
+    if (!path) { el.dataset.av = ''; return; }
+    if (el.dataset.av === path) return;                     // 同一张，别重复探测 ✓
+    el.dataset.av = path;
+    const url = shellURL(path);
+    const probe = new Image();
+    probe.onload = () => {
+      el.textContent = '';
+      el.style.backgroundImage = "url('" + url + "')";
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+    };
+    probe.onerror = () => { el.dataset.av = ''; };          // 取不到就保持首字 ✓
+    probe.src = url;
+  };
+
+  // 管家的头像：**群自己那张优先** ✓（`group.agent_avatar` = `avatars/g7.png` ✓），
+  // 没配才退回服务端那张全局的 `/ui/avatar.png` ✓。
+  let agentAvatarUrl = null;      // null=还没探测；false=没有；字符串=可用
+  let agentAvatarProbe = null;
+
+  /** 换了头像之后调它 ✓ —— 否则整屏都还是旧的那张（缓存是故意的 ✓，见下）。 */
+  const resetAgentAvatar = () => { agentAvatarUrl = null; agentAvatarProbe = null; };
+
+  const applyAgentAvatar = (av) => {
+    if (!av) return;
+    const paint = () => {
+      if (!agentAvatarUrl) return;           // 没有就保持名字首字
+      av.textContent = '';
+      av.style.backgroundImage = "url('" + agentAvatarUrl + "')";
+      av.style.backgroundSize = 'cover';
+      av.style.backgroundPosition = 'center';
+    };
+    if (agentAvatarUrl !== null) { paint(); return; }
+    if (!agentAvatarProbe) {
+      // 群自己那张 → 没有就全局那张 ✓。两个都试过才算"没有" ✓。
+      const mine = (group && group.agent_avatar) ? ('/ui/' + group.agent_avatar) : '';
+      const cands = (mine ? [mine] : []).concat(['/ui/avatar.png']);
+      agentAvatarProbe = (async () => {
+        for (const c of cands) {
+          // ⚠️⚠️ **这里原来挂着一个 `?t=<当前毫秒>`** ✗✗ —— 2026-10-06 找到的：
+          //   那是"防缓存"用的 ✓，但它**每次都造出一个全新的 URL** ✓
+          //   → 浏览器认不出是同一条 ✓ → **每次都重新下载** ✗
+          //   → 管家的头像**每次都闪** ✓（用户的头像不闪 ✗，因为它走的是另一条路 ✓）。
+          //
+          //   而这句是**我加缓存之前**写的 ✗ —— 那会儿头像不带宽版本号 ✓，
+          //   只能靠时间戳绕过缓存 ✓；现在版本号已经写在 URL 里了 ✓
+          //   （`/ui/avatars/g3.jpg?v=1791288428` ✓），
+          //   时间戳就只剩坏处了 ✗。
+          //   **"防缓存"和"能缓存"是相反的** ✓ —— 两个一起写，后者永远赢不了 ✓。
+          const url = c;
+          const ok = await new Promise(res => {
+            const img = new Image();
+            img.onload = () => res(true);
+            img.onerror = () => res(false);
+            img.src = url;
+          });
+          if (ok) { agentAvatarUrl = url; return; }
+        }
+        agentAvatarUrl = false;
+      })();
+    }
+    agentAvatarProbe.then(paint);
+  };
+
+  // ── 引用 ──────────────────────────────────────────────────────────
+  //
+  // 引用是**输入状态**的一部分，不是消息的固有属性（微信也是这样）：
+  // 长按气泡 → 引用 → 输入框上方冒出一条 → 发完就没了。
+  let pendingQuote = null;
+  /** id → 消息对象。长按拿到的是 DOM 行，要引用得回头找那条消息的完整信息。 */
+  const _msgs = new Map();
+
+  const quoteWho = m => m.sender_type === 'agent' ? agentName() : (m.sender_nickname || '某人');
+  const quoteText = m => {
+    if (m.msg_type === 'image') return '[图片]';
+    if (m.msg_type === 'voice') return '[语音] ' + (m.content || '');
+    return (m.content || '').slice(0, 60);
+  };
+
+  const setQuote = m => {
+    pendingQuote = m;
+    $('#qwho').textContent = quoteWho(m);
+    $('#qtext').textContent = quoteText(m);
+    $('#qbar').hidden = false;
+    $('#text').focus();
+  };
+  const clearQuote = () => { pendingQuote = null; $('#qbar').hidden = true; };
+  /** agent 用：按消息 id 挂引用。找不到就返回 false，别悄悄什么都不做。 */
+  const quoteById = (id) => {
+    const m = _msgs.get(Number(id));
+    if (!m) return false;
+    setQuote(m);
+    return true;
+  };
+  $('#qclose').onclick = clearQuote;
+  /** 发消息时统一取这个，不用在两处各写一遍 */
+  const quoteField = () => (pendingQuote ? { reply_to: pendingQuote.id } : {});
+
+  /** 气泡里那块引用条 */
+  const buildQuoteEl = (q) => {
+    const el = document.createElement('div');
+    el.className = 'quote';
+    const who = document.createElement('div'); who.className = 'qwho';
+    who.textContent = quoteWho(q);
+    const tx = document.createElement('div'); tx.className = 'qtext';
+    tx.textContent = q.content || '';
+    el.append(who, tx);
+    el.onclick = (ev) => {
+      ev.stopPropagation();
+      const target = $('#msgs').querySelector(`[data-id="${q.id}"]`);
+      if (!target) { toast('那条消息不在当前列表里'); return; }
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      target.classList.add('flash');
+      setTimeout(() => target.classList.remove('flash'), 1200);
+    };
+    return el;
+  };
+
+  /** 渲染一条。
+   *
+   * `prepend` = 这是"往回翻"取到的更早的消息，要插到**最前面**，
+   * 而且**不能碰滚动位置**（否则你刚翻上去就被弹到底部 ✗）。
+   */
+  const addMsg = (m, prepend) => {
+    if ($('#msgs').querySelector(`[data-id="${m.id}"]`)) return;
+    if (!prepend) clearStream();
+    // 系统提示：目前只有"被点名了却没能回复"这种故障通告。
+    // 渲染成居中的灰字条，**和普通消息长得完全不一样**——就是怕它被当成
+    // 管家说的一句话，那样故障会被无声地消费掉（和那次提醒事故一个道理：
+    // 系统没做到却不吭声，用户只能自己发现）。
+    if (m.sender_type === 'system') {
+      const sys = document.createElement('div');
+      sys.className = 'sysrow';
+      sys.dataset.id = m.id;
+      sys.textContent = (m.content || '') + ' · ' + fmtTime(m.created_at);
+      if (prepend) $('#msgs').prepend(sys);
+      else { $('#msgs').appendChild(sys); scrollDown(); }
+      return;
+    }
+    const mine = m.sender_id !== null && m.sender_id === me.id;
+    const isAgent = m.sender_type === 'agent';
+    const row = document.createElement('div');
+    row.className = 'row' + (mine ? ' mine' : '') + (isAgent ? ' agent' : '');
+    row.dataset.id = m.id;
+    const av = document.createElement('div');
+    av.className = 'av';
+    // ★ 2026-10-06：**和「我的」用同一张图** ✓。
+    //   原来这里直接把 `m.sender_avatar`（壳那边的**相对**路径 ✓）
+    //   当 URL 用 ✗ → 在 8741 上必然 404 ✓ → 于是全群只有首字 ✗。
+    if (isAgent) {
+      av.textContent = '管';
+      applyAgentAvatar(av);
+      // 点管家头像 → 管家设置 ✓（2026-10-06 用户要的 ✓）
+      av.onclick = (ev) => {
+        ev.stopPropagation();
+        if (pressFired) return;         // 长按引用那一下 ✓，不是点头像 ✓
+        openAgentSettings();
+      };
+    } else {
+      paintAvatar(av, m.sender_avatar, m.sender_nickname || '?');
+      // 点头像分三种去向 ✓（用户 2026-10-07 定的）：
+      //   · 我自己的 → 回「我的」✓
+      //   · 群里的别人 → **把他的头像放大看** ✓（点周围空白退 ✓）
+      //   · 管家 → 管家设置 ✓（在上面那个分支里 ✓）
+      // ⚠️ `stopPropagation` 是必须的 ✓：消息行上还挂着长按 ✓，
+      //   不拦的话点一下会同时触发那一套 ✓。
+      av.onclick = (ev) => {
+        ev.stopPropagation();
+        if (pressFired) return;         // 长按那一下不算点击 ✓
+        if (mine) { backToShell(); return; }
+        openAvatarBig(m.sender_nickname, m.sender_avatar);
+      };
+    }
+    const w = document.createElement('div'); w.className = 'wrap2';
+    const who = document.createElement('div'); who.className = 'who';
+    who.textContent = isAgent ? agentName() : (m.sender_nickname || '');
+    const b = document.createElement('div'); b.className = 'bubble';
+    // 引用条放气泡**最上面**（微信就是这样），后面才是本条正文
+    if (m.quote) b.appendChild(buildQuoteEl(m.quote));
+    _msgs.set(m.id, m);          // 长按引用时要回头找这条消息的完整信息
+    if (m.msg_type === 'image' && m.media_path) {
+      b.classList.add('media');
+      const img = document.createElement('img');
+      img.src = '/media/' + m.media_path;
+      img.loading = 'lazy';
+      // 图片撑开高度会改变"底部"，所以在底部时跟着再滚一次（见 scrollDown 的说明）
+      img.onload = () => scrollDown();
+      img.onclick = () => openLightbox(img.src);
+      b.appendChild(img);
+    } else if (m.msg_type === 'voice') {
+      const v = document.createElement('div');
+      v.className = 'vmsg';
+      v.innerHTML = '<span class="bars">▮▮▮</span>';
+      const dur = document.createElement('span');
+      dur.className = 'dur';
+      dur.textContent = ((m.media_meta && m.media_meta.duration) || 0) + "''";
+      v.appendChild(dur);
+      // 点一下重放。用 <audio> 而不是自绘播放器——够用，且不引额外代码。
+      if (m.media_path) {
+        v.onclick = () => { try { new Audio('/media/' + m.media_path).play(); } catch {} };
+      }
+      b.appendChild(v);
+      if (m.content) {
+        const sub = document.createElement('div');
+        sub.className = 'vsub';
+        sub.textContent = m.content;   // 转写文字，让语音也能被"读到"
+        b.appendChild(sub);
+      } else if (m.media_meta && m.media_meta.transcript_failed) {
+        const sub = document.createElement('div');
+        sub.className = 'vsub';
+        sub.textContent = '（没听清）';
+        b.appendChild(sub);
+      }
+    } else {
+      renderContent(b, m.content || '[' + m.msg_type + ']', mine);
+    }
+    const t = document.createElement('div'); t.className = 'time'; t.textContent = fmtTime(m.created_at);
+    w.append(who, b, t); row.append(av, w);
+    if (prepend) $('#msgs').prepend(row);
+    else { $('#msgs').appendChild(row); scrollDown(); }
+    _fire('message', m, row);   // agent 的 ui/app.js 可以给这一条挂东西
+  };
+
+  // ── 往回翻历史 ─────────────────────────────────────────────────────
+  //
+  // 首屏只装**最近 50 条**。以前是 200 条、80KB ✗ —— 群里消息只会越来越多，
+  // "每次进去全量拉"这件事迟早会拖垮开屏（用户原话：总不能全部加载吧）。
+  //
+  // 滚到接近顶部时再往回取一批 ✓ 并把**滚动位置补回去**——否则你刚从底部
+  // 翻上来，下一秒就被弹回底部 ✗
+  let oldestId = 0, loadingOlder = false, historyDone = false, tailReady = false;
+
+  const loadOlder = async () => {
+    if (loadingOlder || historyDone || !oldestId || !tailReady) return;
+    loadingOlder = true;
+    const box = $('#msgs');
+    const beforeH = box.scrollHeight, beforeTop = box.scrollTop;
+    try {
+      const older = await api(`/groups/${group.id}/messages?before=${oldestId}&limit=50`);
+      if (!older.length) { historyDone = true; return; }
+      // **倒着 prepend**：每 prepend 一次都插在最前，所以要从新到旧反着来，
+      // 最终顺序才是正的。
+      for (let i = older.length - 1; i >= 0; i--) addMsg(older[i], true);
+      oldestId = older[0].id;
+      if (older.length < 50) historyDone = true;
+      // 把"新增的高度"补进滚动位置 —— 视觉上停在你原来那条消息上，不跳
+      box.scrollTop = beforeTop + (box.scrollHeight - beforeH);
+    } catch (e) {
+      console.warn('往回翻失败', e);   // 不烦用户：他还能再往上滚试一次
+    } finally {
+      loadingOlder = false;
+    }
+  };
+  $('#msgs').addEventListener('scroll', () => {
+    const b = $('#msgs');
+    // 离底部 80px 以内就算"还在底部" → 之后新消息/图片撑开高度时继续跟着
+    stickBottom = (b.scrollHeight - b.scrollTop - b.clientHeight) < 80;
+    if (b.scrollTop < 60) loadOlder();      // 滚到顶 → 往回翻历史
+  });
+
+  // ── 长按消息 → 引用 ────────────────────────────────────────────────
+  //
+  // 挂**事件委托**在 #msgs 上，而不是每条消息各挂一个：气泡是动态加的，
+  // 逐个挂就得在 addMsg 里挂、消息一多还要清理。
+  let pressTimer = null;
+  const PRESS_MS = 450;
+
+  const cancelPress = () => {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+  };
+
+  // ── 长按：**只在头像上做事** ✓ ────────────────────────────────────
+  //
+  // ★ 2026-10-07 改：气泡上的长按**不再拦** ✗ —— 让浏览器自己去做
+  //   "选中这段字" ✓，于是系统那套**自由复制**（选几个字、复制 ✓）就出来了 ✓。
+  //   原来那个"长按弹底部菜单"整个撤了 ✓（用户要的就是自由复制 ✓）。
+  //
+  //   头像上还留着长按 → @ 他 ✓（用户："长按头像依旧可以 @" ✓）：
+  //   头像上已经有**点击**了 ✓（自己→我的、别人→放大看 ✓），
+  //   长按是唯一能再挂一个动作的地方 ✓。
+  const onPressStart = (e) => {
+    const av = e.target.closest && e.target.closest('#msgs .av');
+    if (!av) return;                    // ← 不是头像就**什么都不做** ✓
+    const row = av.closest('.row[data-id]');
+    if (!row) return;
+    cancelPress();
+    pressFired = false;
+    pressTimer = setTimeout(() => {
+      pressTimer = null;
+      pressFired = true;
+      atFromRow(row);
+    }, PRESS_MS);
+  };
+
+  /** 长按头像 → 把这个人 @ 进输入框 ✓。 */
+  const atFromRow = (row) => {
+    const m = _msgs.get(Number(row.dataset.id));
+    if (!m) return;
+    const nm = m.sender_type === 'agent' ? agentName() : (m.sender_nickname || '');
+    if (!nm) return;
+    closeAtMenu();
+    insertMention(nm);
+    toast('已 @ ' + nm);
+  };
+
+  // ── 左右滑 → 引用 ✓ ───────────────────────────────────────────────
+  //
+  // ⚠️ **判据必须窄** ✗，不然会跟"上下滚列表"抢 ✓：
+  //   ① 横向位移要明显大于纵向（1.2 倍 ✓）—— 斜着划不算 ✓
+  //   ② 还得先超过 8px 才**认** ✓ —— 手指抖一下不算 ✓
+  //   ③ **认了之后才 `preventDefault`** ✓ —— 早了会把正常滚动卡死 ✓
+  //      （所以这一段单独挂一个 `passive:false` 的监听 ✓，
+  //        原来那个 `cancelPress` 的保持 passive ✓ 互不干涉 ✓）
+  const SW_MIN = 8;      // 超过它才开始判方向 ✓
+  const SW_PX  = 56;     // 拉过这么多 = 触发引用 ✓
+  const SW_MAX = 88;     // 阻尼：到这儿基本拉不动了 ✓（"到头了"的手感 ✓）
+  let sw = null;
+
+  const swEnd = (fire) => {
+    if (!sw) return;
+    const { row, hint, m } = sw;
+    sw = null;
+    row.style.transition = 'transform .18s cubic-bezier(.22,1,.36,1)';
+    row.style.transform = '';
+    if (hint) {
+      hint.style.transition = 'opacity .15s ease, transform .18s cubic-bezier(.22,1,.36,1)';
+      hint.style.opacity = '0';
+      const h = hint;
+      setTimeout(() => { if (h.parentNode) h.parentNode.removeChild(h); }, 240);
+    }
+    setTimeout(() => { row.style.transition = ''; row.classList.remove('swiping'); }, 240);
+    if (fire && m) {
+      // ★ **直接就引用到输入框** ✓ —— 用户 2026-10-07："不需要确认" ✓。
+      //   引用条一冒出来、输入框一聚焦，本身就是反馈 ✓ ——
+      //   再弹一句"已引用"是**多余的一层** ✗，而且它盖在输入框附近 ✓，
+      //   正好挡住刚出现的那条引用 ✓。
+      setQuote(m);
+    }
+  };
+
+  $('#msgs').addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    const row = e.target.closest && e.target.closest('.row[data-id]');
+    if (!row) return;
+    const p0 = e.touches[0];
+    sw = { row, m: _msgs.get(Number(row.dataset.id)),
+           x0: p0.clientX, y0: p0.clientY, d: 0, dir: 0, hint: null };
+  }, { passive: true });
+
+  $('#msgs').addEventListener('touchmove', (e) => {
+    if (!sw) return;
+    const p0 = e.touches[0];
+    const dx = p0.clientX - sw.x0;
+    const dy = p0.clientY - sw.y0;
+    if (!sw.dir) {
+      if (Math.abs(dx) < SW_MIN) return;                       // 还没认 ✓
+      if (Math.abs(dx) < Math.abs(dy) * 1.2) { sw = null; return; }  // 是在竖着滚 ✓，让开 ✓
+      sw.dir = dx > 0 ? 1 : -1;
+      sw.hint = document.createElement('div');
+      sw.hint.className = 'swhint';
+      sw.hint.textContent = '↩ 引用';
+      // 往右滑 → 行往右走 ✓，空出来的是**左边** ✓ → 提示钉在左边 ✓（反之亦然 ✓）
+      if (sw.dir > 0) sw.hint.style.left = '0';
+      else { sw.hint.style.left = 'auto'; sw.hint.style.right = '0'; }
+      sw.row.appendChild(sw.hint);
+      sw.row.classList.add('swiping');
+    }
+    e.preventDefault();                                        // ★ 认了之后**才**拦 ✓
+    const raw = Math.abs(dx);
+    const damp = raw <= SW_MAX ? raw : SW_MAX + (raw - SW_MAX) * 0.12;
+    sw.d = sw.dir * damp;
+    sw.row.style.transform = 'translateX(' + sw.d + 'px)';
+    sw.hint.style.opacity = Math.min(1, raw / SW_PX);
+    // 提示**反向抵消**行的位移 ✓ → 它看起来钉在原地不动 ✓，
+    // 行滑开就把那块地方让出来 ✓ —— 这就是那个"动态感" ✓。
+    sw.hint.style.transform = 'translate(' + (-sw.d) + 'px, -50%)';
+  }, { passive: false });
+
+  $('#msgs').addEventListener('touchstart', onPressStart, { passive: true });
+  // 手指一动就是在滚动，不是长按——**必须取消**，否则滑列表会到处误弹菜单
+  $('#msgs').addEventListener('touchmove', cancelPress, { passive: true });
+  $('#msgs').addEventListener('touchend', () => {
+    cancelPress();
+    if (sw) swEnd(Math.abs(sw.d) >= SW_PX);
+  });
+  $('#msgs').addEventListener('touchcancel', () => { cancelPress(); if (sw) swEnd(false); });
+  // 桌面浏览器调试用
+  $('#msgs').addEventListener('mousedown', onPressStart);
+  $('#msgs').addEventListener('mouseup', cancelPress);
+  $('#msgs').addEventListener('mouseleave', cancelPress);
+
+  const clearStream = () => { if (streamEl) { streamEl.closest('.row').remove(); streamEl = null; } streamBuf = ''; };
+  const appendStream = d => {
+    streamBuf += d || '';
+    if (!streamBuf.trim()) return;
+    if (!streamEl) {
+      const row = document.createElement('div');
+      row.className = 'row agent';
+      row.innerHTML = '<div class="av">管</div><div class="wrap2"><div class="who"></div><div class="bubble"></div></div>';
+      // 这一行原来**硬编码了「管」** ✗ —— 别的气泡都走 applyAgentAvatar ✓，
+      // 只有它没有 ✓ → 管家一开口，头像会从图**跳回**一个「管」字 ✗。
+      const sav = row.querySelector('.av');
+      applyAgentAvatar(sav);
+      sav.onclick = (ev) => {
+        ev.stopPropagation();
+        if (pressFired) return;
+        openAgentSettings();
+      };
+      row.querySelector('.who').textContent = agentName();
+      $('#msgs').appendChild(row);
+      streamEl = row.querySelector('.bubble');
+    }
+    streamEl.textContent = streamBuf; scrollDown();
+  };
+
+  // ── WebSocket ──
+  const connectWS = () => {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    // 令牌不再进 URL：同源握手会自动带上 Cookie。
+    // （早先放 URL 里还有第二个坏处——`?token=` 会进访问日志。）
+    ws = new WebSocket(`${proto}://${location.host}/ws`);
+    ws.onmessage = ev => {
+      if (ev.data === 'pong') return;
+      let pkt; try { pkt = JSON.parse(ev.data); } catch { return; }
+      const d = pkt.data || {};
+      // 连上/重连后：把真实状态捞回来，并补拉断线期间漏掉的消息。
+      // 退出重进、锁屏、网络抖动都会丢事件——不补的话顶栏会显示"窥屏"，
+      // 而服务器那边可能还在思考。
+      if (pkt.type === 'ready') {
+        const st = (d.agent_status || {})[String(group && group.id)];
+        if (st) setStatusTimed(st);        // 重连补状态：文字自己从配置挑 ✓
+        syncMissed();
+        return;
+      }
+      if (pkt.type === 'message') { if (d.group_id === group.id) addMsg(d); }
+      // ★ `d.text` 要带上 ✗→✓ —— 服务端**已经挑好了**那一句 ✓
+      //   （思考中/不打算说话是随机挑的 ✓）。丢了它就等于白挑 ✓。
+      else if (pkt.type === 'agent_status') { if (d.group_id === group.id) setStatusTimed(d.state, d.text); }
+      else if (pkt.type === 'agent_stream') {
+        if (d.group_id !== group.id) return;
+        if (d.done) { clearStream(); setStatus('idle'); } else appendStream(d.delta);
+      }
+      else if (pkt.type === 'group_update') { if (d.group_id === group.id) refreshGroup(); }
+      else if (pkt.type === 'unauthorized') logout();
+    };
+    ws.onclose = () => setTimeout(connectWS, 1500);
+  };
+
+  /** 补拉断线期间漏掉的消息。WebSocket 只保证在线投递，断了就是断了。 */
+  const syncMissed = async () => {
+    if (!group) return;
+    try {
+      const last = Math.max(0, ...$$('#msgs [data-id]').map(e => Number(e.dataset.id) || 0));
+      const msgs = await api(`/groups/${group.id}/messages?after=${last}&limit=200`);
+      // 同样要包一层：不包的话 forEach 会把下标传进来当 `prepend` ✗（见首屏那段的说明）
+      msgs.forEach(m => addMsg(m));
+    } catch {}
+  };
+
+  const refreshGroup = async () => {
+    try {
+      const gs = await api('/groups');
+      if (gs.length) {
+        // ⚠️ **不能取 `gs[0]`** ✗→✓ —— 2026-10-06 用户实测：
+        //   「在空间『测试』里把名字改了，它**自己变成了『测试2』**」✓。
+        //
+        //   真因：`/groups` 是 `ORDER BY id DESC` ✓（新的排前面 ✓），
+        //   而这个人**同时在两个空间里** ✓ → `gs[0]` 拿到的是**另一个空间** ✗
+        //   → 于是页面上显示的名字、以及接下来要改的那个，全是别人的 ✗。
+        //
+        //   为什么平时看不出来：进 App 走的是 `/bootstrap` ✓，
+        //   那条路按"**你从哪个空间进来的**"排 ✓（见 routes_groups.bootstrap ✓）
+        //   ——**只有保存后这一次刷新**会串 ✓。
+        //   两处口径不一致，是这个 bug 最难查的地方 ✓。
+        //
+        //   改法：**认住自己那个 id** ✓。列表怎么排都不影响 ✓。
+        group = gs.find(g => g.id === group.id) || gs[0];
+        members = await api(`/groups/${group.id}/members`);
+        // ★ 群一刷新就**重算状态配置** ✓ —— 唯一的入口 ✓。
+        //   少这一句的后果：在「管家」里存完，状态条要等下次进 App 才变 ✗。
+        if (typeof normalizeStatus === 'function') normalizeStatus();
+        renderHeader(); renderSettings();
+        // ⚠️ 正在写「性格」的时候**不要重画** ✗ —— renderAgent 会把 textarea
+        //    整个重建 ✓ → 刚打的字全没了 ✓（而且用户会觉得"打字打一半跳了一下" ✓）。
+        if ($('#agent').classList.contains('on') && !promptEditing) renderAgent();
+      }
+    } catch {}
+  };
+
+  // ── @ 自动补全 ──
+  //
+  // 设计改过一轮：早期是"点按钮 → 弹列表 → 选人 → 完成"，太重了。
+  // 现在就是**打字时打 @ 直接出候选项，选中即插入**——和微信一致。
+  // 想 @ 多个人就再打一次 @。发送时从正文里解析出 @ 了谁。
+  let atQueryStart = -1;
+
+  const closeAtMenu = () => { $('#atMenu').classList.remove('on'); atQueryStart = -1; };
+
+  const openAtMenu = (query) => {
+    const q = query.toLowerCase();
+    const cands = members.filter(m => !q || m.nickname.toLowerCase().includes(q));
+    const menu = $('#atMenu');
+    menu.innerHTML = '';
+    if (!cands.length) { closeAtMenu(); return; }
+    cands.forEach(m => {
+      const el = document.createElement('div');
+      el.className = 'pick';
+      el.innerHTML = `<div class="av"></div><div class="nm"></div>`;
+      // ★ 管家的头像也要用**它自己那张** ✗→✓ —— 2026-10-07 用户截图指出的：
+      //   "列表里显示的管家的昵称对了，头像没更新" ✓。
+      //   原来这里对管家写死了一个「管」字 ✗（和气泡里那个老毛病同一个 ✓），
+      //   而它自己的头像走的是 `group.agent_avatar` ✓ ——
+      //   所以这里必须调 `applyAgentAvatar` ✓，不是 paintAvatar ✗
+      //   （`paintAvatar` 画的是**用户**头像那套地址 ✓）。
+      //   顺带：members 接口里管家那一行的 avatar 是 null ✗（它不属于用户表 ✓），
+      //   所以确实只能从群那边取 ✓。
+      if (m.is_agent) { el.querySelector('.av').textContent = '管'; applyAgentAvatar(el.querySelector('.av')); }
+      else paintAvatar(el.querySelector('.av'), m.avatar, m.nickname || '?');
+      el.querySelector('.nm').textContent = m.nickname;
+      // ⚠️ 这里原来还有一句 `'@它 → 必回'` ✗ —— 2026-10-07 用户要去掉 ✓。
+      //   那句话是**我们替它许的诺** ✓（"必回" ✓）：它其实可以决定不接话 ✓，
+      //   而屏幕上写着"必回"就变成了对用户的承诺 ✓ ——
+      //   真不接的时候，用户会觉得是坏了 ✓。**不写比写错好** ✓。
+      //   （`hint` 那一格留着不填 ✓ —— 别人那几行本来就是空的 ✓，
+      //     CSS 里 `.hint` 的样式也还归别的弹层用 ✓。）
+      el.onmousedown = e => { e.preventDefault(); insertMention(m.nickname); };
+      el.ontouchstart = e => { e.preventDefault(); insertMention(m.nickname); };
+      menu.appendChild(el);
+    });
+    menu.classList.add('on');
+  };
+
+  const insertMention = (nickname) => {
+    const ta = $('#text');
+    const before = ta.value.slice(0, atQueryStart);
+    const after = ta.value.slice(ta.selectionStart);
+    ta.value = before + '@' + nickname + ' ' + after;
+    const pos = before.length + nickname.length + 2;
+    ta.setSelectionRange(pos, pos);
+    ta.focus();
+    closeAtMenu();
+    autoGrow(); syncSendBtn(ta.value);
+  };
+
+  /** agent 用：往输入框光标处插一段文字（比如 `@刘猪猪 `），并聚焦。
+   *  和上面的 insertMention 分开：那个依赖 `atQueryStart`（@ 菜单打开时才有的状态），
+   *  外部直接调会切错位置。 */
+  const insertText = (text) => {
+    const ta = $('#text');
+    const s = ta.selectionStart ?? ta.value.length;
+    const e = ta.selectionEnd ?? s;
+    ta.value = ta.value.slice(0, s) + text + ta.value.slice(e);
+    const pos = s + text.length;
+    ta.setSelectionRange(pos, pos);
+    ta.focus(); autoGrow(); syncSendBtn(ta.value);
+  };
+
+  /** 发送时从正文解析 @ 了谁——比单独维护一份名单更不容易错位。 */
+  const parseMentions = (text) => {
+    const out = new Set();
+    for (const m of members) {
+      const key = m.is_agent ? 'agent' : String(m.id);
+      if (text.includes('@' + m.nickname)) out.add(key);
+    }
+    return [...out];
+  };
+
+  $('#text').addEventListener('input', () => {
+    const ta = $('#text');
+    const caret = ta.selectionStart;
+    const upto = ta.value.slice(0, caret);
+    const at = upto.lastIndexOf('@');
+    // @ 之后不能有空格，否则说明这个 @ 已经写完了
+    if (at >= 0 && !/[\s]/.test(upto.slice(at + 1))) {
+      atQueryStart = at;
+      openAtMenu(upto.slice(at + 1));
+    } else {
+      closeAtMenu();
+    }
+    autoGrow();
+    syncSendBtn(ta.value);
+  });
+
+  /**
+   * 有内容 → 显示发送、藏起 +（照微信）。
+   * 这个状态挂在 body 上而不是按钮自己身上，是因为要同时控制两个元素
+   * （#send 和 #pickMedia）的显隐，挂在共同祖先最省事。
+   */
+  const syncSendBtn = (value) => {
+    document.body.classList.toggle('hasText', !!String(value || '').trim());
+  };
+
+  const send = async () => {
+    const ta = $('#text');
+    const t = ta.value.trim();
+    const items = pending.slice();          // 快照 ✓：发的过程里队列会变 ✓
+    if (!t && !items.length) return;
+    closeAtMenu();
+    ta.value = ''; ta.style.height = 'auto';
+    syncSendBtn('');
+    pending.length = 0; syncPending();      // 先清空 ✓；发失败再放回去 ✓
+    try {
+      // ★ **附件在前、文字在后** ✓ —— 就是"先选的先发" ✓（也符合直觉：
+      //   配文通常是在图之后补上的 ✓）。
+      let first = true;
+      for (const it of items) {
+        // ⚠️ **引用只跟着第一条** ✗ —— 不然每张图都会带一遍引用条 ✓，
+        //   发三张就冒出三条一模一样的引用 ✓。
+        const ok = await sendMedia(it.file, it.kind, it.meta, it.url, first);
+        URL.revokeObjectURL(it.url);
+        if (!ok) {
+          // 发失败：**把还没发出去的放回待发区** ✓（已经发出去的那几张不用放 ✓），
+          // 打字的内容也还给你 ✓ —— 不然用户得从头再选一遍 ✓。
+          items.slice(items.indexOf(it)).forEach(x => {
+            // ⚠️ **要重新造一个预览地址** ✗ —— 上面刚 `revokeObjectURL` 过它 ✓，
+            //   旧地址已经作废了 ✓（放回去的那张缩略图会变成裂图 ✓）。
+            //   `File` 本身还在 ✓，重新 create 一个就行 ✓。
+            pending.push(Object.assign({}, x, { url: URL.createObjectURL(x.file) }));
+          });
+          syncPending();
+          ta.value = t; syncSendBtn(t);
+          return;
+        }
+        first = false;
+      }
+      if (t) {
+        await api(`/groups/${group.id}/messages`, {
+          method:'POST',
+          body: JSON.stringify(Object.assign(
+            { msg_type:'text', content:t, mentions: parseMentions(t) },
+            items.length ? {} : quoteField()))     // 引用已经跟着第一张走了 ✓
+        });
+        clearQuote();
+      }
+    } catch (e) { toast(e.message); ta.value = t; syncSendBtn(t); }
+  };
+  $('#send').onclick = send;
+
+  // ── 图片 ──────────────────────────────────────────────────────────
+  //
+  // 上传要单独写一个：api() 固定发 Content-Type: application/json，
+  // 而文件上传得让浏览器自己带 multipart 边界，不能覆盖。
+  const uploadFile = async (file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch('/api/media/upload', {
+      method: 'POST',
+      credentials: 'same-origin',   // 走 Cookie
+      // 不要设 Content-Type —— 让浏览器自己带 multipart 边界
+      body: fd,
+    });
+    const text = await r.text();
+    let d = null;
+    try { d = text ? JSON.parse(text) : null; } catch { d = text; }
+    if (!r.ok) throw new Error(explain(d, r.status));
+    return d;
+  };
+
+  // ── 待发附件（选了先不发 ✓）──────────────────────────────────────
+  //
+  // 用户 2026-10-06：`+` 里选的图和文件**不该立刻发出去** ✗ ——
+  // 先停在输入框上方 ✓，还能接着打字 ✓，点一次「发送」一起走 ✓。
+  //
+  // ⚠️ 上传**推迟到发送那一刻** ✗→✓ —— 选完就传的话，
+  //    用户删掉的那张也白传了一趟 ✓（而这趟要过 WireGuard ✓，不便宜 ✓）。
+  //
+  // ⚠️ 语音**不走这条路** ✗ —— 「按住说话、松手就发」本来就是一个完整的动作 ✓，
+  //    中间插一层"待发"反而怪 ✓。
+  const pending = [];
+
+  const syncPending = () => {
+    const bar = $('#pendbar');
+    if (!bar) return;
+    bar.textContent = '';
+    pending.forEach((it, i) => {
+      const box = document.createElement('div');
+      box.className = 'pend';
+      if (it.kind === 'image') {
+        const im = document.createElement('img');
+        im.src = it.url;
+        box.appendChild(im);
+      } else {
+        const f = document.createElement('div');
+        f.className = 'fchip';
+        f.textContent = (it.file && it.file.name) || '文件';
+        box.appendChild(f);
+      }
+      const x = document.createElement('button');
+      x.className = 'px';
+      x.textContent = '✕';
+      x.onclick = () => removePending(i);
+      box.appendChild(x);
+      bar.appendChild(box);
+    });
+    bar.hidden = pending.length === 0;
+    document.body.classList.toggle('hasPending', pending.length > 0);
+  };
+
+  const addPending = (file, kind, meta) => {
+    if (!file || !group) return;
+    pending.push({ file, kind: kind || 'image', meta: meta || {},
+                   url: URL.createObjectURL(file) });
+    syncPending();
+    scrollDown();
+  };
+
+  const removePending = (i) => {
+    const it = pending[i];
+    if (!it) return;
+    URL.revokeObjectURL(it.url);
+    pending.splice(i, 1);
+    syncPending();
+  };
+
+  $('#fileCamera').addEventListener('change', e => { addPending(e.target.files[0], 'image'); e.target.value = ''; });
+  $('#fileGallery').addEventListener('change', e => { addPending(e.target.files[0], 'image'); e.target.value = ''; });
+  $('#fileAvatar').addEventListener('change', e => { uploadAvatar(e.target.files[0]); e.target.value = ''; });
+
+  $('#pickMedia').onclick = () => {
+    const p = $('#sheetPanel');
+    // 微信的排布：横向一排，圆角方块图标 + 下方小字。顺序也是 相册 在前、拍摄 在后。
+    p.innerHTML = `
+      <div class="plus-grid" style="margin-top:4px">
+        <button class="plus-item" id="pkGallery">
+          <span class="ico">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4.5" width="18" height="15" rx="2.5"/>
+              <circle cx="8.5" cy="9.5" r="1.4"/>
+              <path d="M3.5 16.5l4.6-4.3a1.6 1.6 0 0 1 2.2 0l3.2 3 2-1.8a1.6 1.6 0 0 1 2.2 0l3.3 3.1"/>
+            </svg>
+          </span>
+          <span class="lbl">相册</span>
+        </button>
+        <button class="plus-item" id="pkCamera">
+          <span class="ico">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 8h3l1.4-2h7.2L17 8h3a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 4 8z"/>
+              <circle cx="12" cy="13.2" r="3.2"/>
+            </svg>
+          </span>
+          <span class="lbl">拍摄</span>
+        </button>
+      </div>
+      <div class="actions"><button class="btn-ghost" id="pkCancel">取消</button></div>`;
+    // 拍照必须走原生：`<input capture>` 在 MIUI 上会被忽略，点开是相册。
+    p.querySelector('#pkCamera').onclick = () => {
+      closeSheet();
+      if (isNative && window.LifeGuardNative.takePhoto) window.LifeGuardNative.takePhoto();
+      else $('#fileCamera').click();          // 浏览器里退回原生 input
+    };
+    p.querySelector('#pkGallery').onclick = () => { closeSheet(); $('#fileGallery').click(); };
+    p.querySelector('#pkCancel').onclick = closeSheet;
+    openSheet();
+  };
+
+  // ── 表情包（占位）──────────────────────────────────────────────────
+  //
+  // 位置先留着。后面内置表情包时，只要往 STICKERS 里塞条目、
+  // 点选后走 **addPending** ✓（`sendImage` 已经没了 ✗ —— 2026-10-06 改成
+  // "选了先停在待发区、点发送才走" ✓）。表情包本质就是张图片 ✓，一样停在待发区 ✓。
+  const STICKERS = [];   // 例如 { name:'抱抱', path:'emoji/hug.webp' }
+
+  $('#pickSticker').onclick = () => {
+    const p = $('#sheetPanel');
+    if (!STICKERS.length) {
+      p.innerHTML = `<h3>表情</h3>
+        <div style="color:var(--muted);font-size:14px;line-height:1.7;padding:12px 0">
+          这里以后会放内置表情包。<br>入口先留着。</div>
+        <div class="actions"><button class="btn-solid" id="stOk">知道了</button></div>`;
+      p.querySelector('#stOk').onclick = closeSheet;
+      openSheet();
+      return;
+    }
+    // 有表情包之后的渲染（现在走不到）
+    p.innerHTML = '<h3>表情</h3><div id="stGrid" style="display:flex;flex-wrap:wrap;gap:10px"></div>';
+    STICKERS.forEach(s => {
+      const img = document.createElement('img');
+      img.src = '/media/' + s.path;
+      img.style.cssText = 'width:64px;height:64px;border-radius:10px;object-fit:cover;cursor:pointer';
+      img.onclick = async () => {
+        closeSheet();
+        try {
+          await api(`/groups/${group.id}/messages`, {
+            method: 'POST',
+            body: JSON.stringify({ msg_type: 'image', media_path: s.path,
+                                   media_meta: { sticker: true } }),
+          });
+        } catch (e) { toast(e.message); }
+      };
+      p.querySelector('#stGrid').appendChild(img);
+    });
+    openSheet();
+  };
+
+  const openLightbox = (src) => {
+    $('#lightboxTxt').hidden = true;
+    $('#lightboxImg').hidden = false;
+    $('#lightboxImg').src = src;
+    $('#lightbox').classList.add('on');
+  };
+
+  /** 看某个人的头像（放大）✓ —— 2026-10-07 用户："如果是群里其他人，
+      则是查看其头像放大，点击旁边空白退出查看" ✓。
+      没传过头像的人 → 给一个**大号的字** ✓，别让点按变成没反应 ✗。 */
+  const openAvatarBig = (name, path) => {
+    if (path) { openLightbox(shellURL(path)); return; }
+    $('#lightboxImg').hidden = true;
+    $('#lightboxImg').removeAttribute('src');
+    const tx = $('#lightboxTxt');
+    tx.textContent = String(name || '?').slice(0, 1);
+    tx.hidden = false;
+    $('#lightbox').classList.add('on');
+  };
+
+  // 点**周围空白**退出 ✓ —— 点图本身也一样退 ✓（一个头像而已 ✓，
+  // 不需要"点图放大、点空白退"那种二级交互 ✓）。
+  $('#lightbox').onclick = () => $('#lightbox').classList.remove('on');
+
+  // ── 语音（按住说话，照微信）──────────────────────────────────────
+  let recorder = null, chunks = [], recStart = 0, holding = false;
+
+  const setVoiceMode = (on) => {
+    document.body.classList.toggle('voiceMode', on);
+    localStorage.setItem('lg_voice', on ? '1' : '0');
+    closeAtMenu();
+  };
+
+  $('#modeToggle').onclick = () => setVoiceMode(!document.body.classList.contains('voiceMode'));
+  if (localStorage.getItem('lg_voice') === '1') setVoiceMode(true);
+
+  /** base64 → File，好复用同一条上传路径 */
+  const b64ToFile = (b64, mime, name) => {
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new File([arr], name, { type: mime });
+  };
+
+  // ── 先上屏、后上传（照微信）──────────────────────────────────────
+  //
+  // 之前是"传完才显示"，用户按住发完什么都看不到，要等上传+转写+广播全走完
+  // ——感知上就是"卡住了"。微信的做法是**立刻把本地内容画上去**，
+  // 后台慢慢传，传完再用服务器返回的正式消息替换掉。
+  const _temps = new Map();
+
+  const addTempBubble = (id, kind, url, meta, file) => {
+    const row = document.createElement('div');
+    row.className = 'row mine';
+    row.dataset.temp = id;
+    const av = document.createElement('div');
+    av.className = 'av';
+    // 自己发的那条（先上屏、后上传 ✓）—— 用**自己的头像** ✓，没有才退回首字 ✓
+    paintAvatar(av, me && me.avatar, (me && me.nickname) || '我');
+    av.onclick = (ev) => { ev.stopPropagation(); if (!pressFired) backToShell(); };
+    const w = document.createElement('div'); w.className = 'wrap2';
+    const b = document.createElement('div'); b.className = 'bubble';
+    if (kind === 'image') {
+      b.classList.add('media');
+      const img = document.createElement('img');
+      img.src = url;                       // 本地 blob，零延迟
+      img.onclick = () => openLightbox(url);
+      b.appendChild(img);
+    } else {
+      const v = document.createElement('div'); v.className = 'vmsg';
+      v.innerHTML = '<span class="bars">▮▮▮</span>';
+      const d = document.createElement('span'); d.className = 'dur';
+      d.textContent = ((meta && meta.duration) || 0) + "''";
+      v.appendChild(d);
+      b.appendChild(v);
+    }
+    const st = document.createElement('div'); st.className = 'vsub';
+    st.textContent = '发送中…';
+    b.appendChild(st);
+    w.appendChild(b); row.appendChild(av); row.appendChild(w);
+    $('#msgs').appendChild(row);
+    _temps.set(id, row);
+    return row;
+  };
+
+  const removeTempBubble = (id) => {
+    const row = _temps.get(id);
+    if (row) row.remove();
+    _temps.delete(id);
+  };
+
+  /** 发一条媒体 ✓。**返回 true/false** ✓ —— 调用方（`send` ✓）要靠它决定
+      要不要把剩下的待发项放回去 ✓。 */
+  const sendMedia = async (file, kind, meta, localUrl, useQuote = true) => {
+    const tempId = 'tmp' + Date.now() + Math.random().toString(36).slice(2, 6);
+    const url = localUrl || URL.createObjectURL(file);
+    addTempBubble(tempId, kind, url, meta, file);
+    scrollDown();
+    try {
+      const up = await uploadFile(file);
+      const msg = await api(`/groups/${group.id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify(Object.assign({
+          msg_type: kind,
+          media_path: up.path,
+          media_meta: { ...(meta || {}), size: up.size },
+        }, useQuote ? quoteField() : {})),
+      });
+      if (useQuote) clearQuote();
+      // 正式消息可能已经从 WebSocket 先到了
+      if (!$('#msgs').querySelector(`[data-id="${msg.id}"]`)) addMsg(msg);
+      return true;
+    } catch (e) {
+      toast(e.message);
+      return false;
+    } finally {
+      removeTempBubble(tempId);
+      if (!localUrl) URL.revokeObjectURL(url);
+    }
+  };
+
+  // 原生拍完照回调这里
+  window.__onPhoto = (b64, mime) => {
+    if (!b64) return;              // 用户取消了
+    // ★ 拍照也**先停在待发区** ✓ —— 和相册选图一致 ✓
+    //   （用户 2026-10-06："点击添加后，照片或文件只是停留在待发送状态" ✓）。
+    addPending(b64ToFile(b64, mime || 'image/jpeg', 'photo.jpg'), 'image');
+  };
+
+  // 原生录完音回调这里
+  window.__onVoice = (b64, mime, secs) => {
+    if (recCancelled) { recCancelled = false; return; }
+    if (!b64) { toast('录音失败'); return; }
+    sendMedia(b64ToFile(b64, mime || 'audio/mp4', 'voice.m4a'), 'voice', { duration: secs || 0 });
+  };
+
+  let recCancelled = false;
+
+  const startRec = async () => {
+    if (holding) return;
+
+    // App 里走原生录音。网页的 getUserMedia 在 http://局域网IP 下不可用——
+    // 那个 API 只在安全上下文（HTTPS / localhost）才存在。
+    if (isNative && window.LifeGuardNative.startRecord) {
+      holding = true; recCancelled = false;
+      const btn = $('#holdTalk');
+      btn.classList.add('rec'); btn.textContent = '松开 发送';
+      window.LifeGuardNative.startRecord();
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recorder = new MediaRecorder(stream);
+      chunks = [];
+      recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const secs = Math.max(1, Math.round((Date.now() - recStart) / 1000));
+        const type = recorder.mimeType || 'audio/webm';
+        const blob = new Blob(chunks, { type });
+        const btn = $('#holdTalk');
+        btn.classList.remove('rec'); btn.textContent = '按住 说话';
+        if (secs < 1) { toast('说话时间太短'); return; }
+        try {
+          toast('发送中…');
+          const up = await uploadFile(new File([blob], 'voice', { type }));
+          await api(`/groups/${group.id}/messages`, {
+            method: 'POST',
+            body: JSON.stringify({ msg_type: 'voice', media_path: up.path, media_meta: { duration: secs } }),
+          });
+        } catch (e) { toast(e.message); }
+      };
+      recorder.start();
+      recStart = Date.now();
+      holding = true;
+      const btn = $('#holdTalk');
+      btn.classList.add('rec'); btn.textContent = '松开 发送';
+    } catch (e) {
+      // 权限被拒 / 没有麦克风
+      toast('拿不到麦克风权限，检查系统设置');
+      console.warn(e);
+    }
+  };
+
+  const stopRec = (cancel) => {
+    if (!holding) return;
+    holding = false;
+
+    if (isNative && window.LifeGuardNative.stopRecord) {
+      recCancelled = !!cancel;
+      const btn = $('#holdTalk');
+      btn.classList.remove('rec'); btn.textContent = '按住 说话';
+      window.LifeGuardNative.stopRecord();
+      return;
+    }
+
+    if (!recorder) return;
+    if (cancel) { chunks = []; recorder.onstop = () => {}; }
+    try { recorder.stop(); } catch {}
+  };
+
+  const holdBtn = $('#holdTalk');
+  holdBtn.addEventListener('touchstart', e => { e.preventDefault(); startRec(); }, { passive: false });
+  holdBtn.addEventListener('touchend', e => { e.preventDefault(); stopRec(false); }, { passive: false });
+  holdBtn.addEventListener('touchcancel', () => stopRec(true));
+  // 桌面浏览器调试用
+  holdBtn.addEventListener('mousedown', startRec);
+  holdBtn.addEventListener('mouseup', () => stopRec(false));
+  holdBtn.addEventListener('mouseleave', () => stopRec(true));
+
+  $('#text').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey && !$('#atMenu').classList.contains('on')) {
+      e.preventDefault(); send();
+    }
+    if (e.key === 'Escape') closeAtMenu();
+  });
+  const autoGrow = () => { const t = $('#text'); t.style.height = 'auto'; t.style.height = Math.min(120, t.scrollHeight) + 'px'; };
+
+  // ── 设置 ──
+  const renderSettings = () => {
+    const eGname = $('#vGname'); if (eGname) eGname.textContent = group?.name || '';
+    const eAname = $('#vAname'); if (eAname) eAname.textContent = agentName();
+    const mine = members.find(m => !m.is_agent && m.id === me.id);
+    // 「群昵称」那一行：显示**在这个群里实际叫什么**（没设过就是昵称 ✓）。
+    // 原来这儿写的是 `me.username` ✗ —— 那是**登录用的账号名** ✓，
+    // 和"你在群里叫什么"是两回事 ✓（2026-10-06 用户指着截图问过 ✓）。
+    const eMy = $('#vMy');
+    if (eMy) eMy.textContent = (mine && mine.nickname) || (me && me.nickname) || '';
+    // 「我的」右边写昵称 —— 这一行点进去就是"我"那一页，
+    // 写着名字才像"我的"，写"回到壳"那是**实现细节**（用户不知道壳是什么）。
+    const eMe = $('#vMe');
+    if (eMe) eMe.textContent = (me && (me.nickname || me.username)) || '';
+    // 「邀请码」右边 = **码本身** ✓（点它是复制 ✓，见下面那个 act 分支 ✓）
+    const eInv = $('#vInvite');
+    if (eInv) eInv.textContent = (group && group.invite_code) || '';
+    const av = $('#vAppVer');
+    if (av) {
+      const v = (window.LifeGuardNative && LifeGuardNative.appVersion) ? LifeGuardNative.appVersion() : '';
+      av.textContent = v ? 'v' + v : '（浏览器）';
+    }
+  };
+
+  const uploadAvatar = async (file) => {
+    if (!file || !me) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await fetch('/api/auth/avatar', {
+        method: 'POST', body: fd, credentials: 'same-origin'
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.detail || '上传失败');
+      }
+      const data = await r.json();
+      if (data && data.avatar) {
+        me.avatar = data.avatar;
+        refreshGroup().then(() => toast('头像已更新'));
+      }
+    } catch (e) { toast(e.message || '头像上传失败'); }
+  };
+
+  const promptText = (title, value, hint, onOk) => {
+    const p = $('#sheetPanel');
+    p.innerHTML = `<h3></h3><input class="field" id="sInput">
+      <div class="hint" style="font-size:12px;color:var(--muted);margin-bottom:4px"></div>
+      <div class="actions"><button class="btn-ghost" id="sCancel">取消</button>
+      <button class="btn-solid" id="sOk">保存</button></div>`;
+    p.querySelector('h3').textContent = title;
+    const inp = p.querySelector('#sInput'); inp.value = value || '';
+    if (hint) p.querySelector('.hint').textContent = hint;
+    p.querySelector('#sCancel').onclick = closeSheet;
+    p.querySelector('#sOk').onclick = () => { const v = inp.value.trim(); if (v) { closeSheet(); onOk(v); } };
+    openSheet(); setTimeout(() => inp.focus(), 120);
+  };
+
+  // 复制到剪贴板。**不能用 navigator.clipboard** ✗ —— 它是安全上下文专有的 ✓，
+  // 而我们走的是 http（内网、隧道本身加密）✓，调它只会拿到 undefined ✓，
+  // 而且失败得很安静 ✓。所以用那个老办法：临时插一个 textarea 再选中复制 ✓。
+  const copyText = (s) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = s;
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select(); ta.setSelectionRange(0, s.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) { return false; }
+  };
+
+  const myProfileSheet = () => {
+    // 群昵称：**只在这一个群里生效** ✓ 和账号昵称是两回事 ✓
+    // （账号昵称在「我的」那一页改 ✓）。
+    const p = $('#sheetPanel');
+    const mine = members.find(m => !m.is_agent && m.id === me.id);
+    // 填**原始**群昵称 ✓ —— 不是"当前生效的名字" ✗。
+    // 用户按保存时如果填的是生效名，就等于把昵称固化在这儿了 ✓，
+    // 以后在「我的」里改昵称，这个群里就不跟着变了 ✗。
+    const nick = (mine && mine.group_nickname) || '';
+    p.innerHTML = '<h3>群昵称</h3>'
+                + '<div class="actions" style="display:block">'
+                + '<input class="field" id="pfNickInput" placeholder="留空 = 用你的昵称">'
+                + '<div style="color:var(--muted);font-size:12.5px;margin:8px 2px 0">'
+                + '只在这个群里显示，不影响你的账号昵称</div>'
+                + '<div class="actions" style="margin-top:14px">'
+                + '<button class="btn-solid" id="pfSaveNick">保存</button></div>'
+                + '</div>';
+    p.querySelector('#pfNickInput').value = nick;
+    p.querySelector('#pfSaveNick').onclick = async () => {
+      const v = p.querySelector('#pfNickInput').value.trim();
+      try {
+        await api(`/groups/${group.id}/me`, { method: 'PATCH',
+          body: JSON.stringify({ nickname: v }) });
+        if (mine) mine.nickname = v;
+        closeSheet();
+        renderSettings();
+        toast('已保存');
+      } catch (e) { toast(e.message); }
+    };
+    openSheet();
+  };
+
+
+  const saveGroup = patch =>
+    api(`/groups/${group.id}`, { method:'PATCH', body: JSON.stringify(patch) })
+      .then(refreshGroup).then(() => toast('已保存')).catch(e => toast(e.message));
+
+  $$('.item[data-act]').forEach(el => {
+    el.onclick = () => {
+      const act = el.dataset.act;
+      if (act === 'gname') promptText('群名称', group.name, '', v => saveGroup({ name: v }));
+      else if (act === 'invite') {
+        // 复制邀请码 ✓。没有 copyText 的时候（老 WebView）给一句人话 ✓，
+        // 别让它静默失败 ✗ —— 用户会以为"点了没反应" ✓。
+        const code = (group && group.invite_code) || '';
+        if (!code) { toast('这个群没有邀请码'); return; }
+        toast(copyText(code) ? '邀请码已复制' : '复制不了，手动记一下：' + code);
+      }
+      else if (act === 'agentprofile') {
+        // ★ 2026-10-06：打开**这一屏自己的**管家设置 ✓。
+        //   原来调的是 `window.openAgentPanel` ✗ —— 那个函数属于一个
+        //   **没部署上来的扩展** ✓（`ui/` 目录是空的 ✓），
+        //   于是这一行一直是"点不动的按钮"✗（还不报错 ✓）。
+        openAgentSettings();
+      }
+      else if (act === 'aname') promptText('管家昵称', agentName(), '改完它自己也会用这个名字', v => saveGroup({ agent_name: v }));
+      else if (act === 'myprofile') myProfileSheet();
+      else if (act === 'update') {
+        if (window.LifeGuardNative && LifeGuardNative.checkUpdate) LifeGuardNative.checkUpdate();
+        else toast('浏览器里没有这一项——回 App 里点');
+      }
+      else if (act === 'shell') backToShell();
+      else if (act === 'plugins') openComponents();
+      else if (act === 'logout') logout();
+    };
+  });
+
+  // ── 组件：管家自己做的小面板 ───────────────────────────────────────
+  //
+  // 它们跑在**沙箱 iframe** 里（`srcdoc` + `sandbox="allow-scripts"`，
+  // **故意不给 `allow-same-origin`**）。所以那是个**不透明源**：
+  //
+  //   · 读不到 localStorage / Cookie —— 拿不到你们的登录态
+  //   · 碰不到这个页面 —— 改不了界面
+  //   · 它写什么代码都只影响那一小块画布
+  //
+  // 代价是**它自己也没法来取数据**（跨源请求被拦）。所以数据是这一侧
+  // 取好了塞进去的——**数据流单向下发**，组件那边碰不到任何接口。
+  //
+  // 这就是"让它随便画"的前提：分界线不是"能不能写代码"，是"写的东西跑在哪个源里"。
+  // （这儿原来有一大段"服务选择：管家 / 对讲机 / 模型"的说明 ✗ ——
+  //   2026-10-06 那条路撤了 ✓：**路由归壳** ✓，这一页不再列服务 ✗。
+  //   注释留着比代码还危险 ✗ —— 下一个人（或者 agent）会照着它去改 ✗。）
+  // ── 回到「壳」────────────────────────────────────────────────────────────
+  //
+  // 新结构里**路由归壳** ✓ —— 这一页不再自己列服务 ✗。
+  //
+  // 为什么要专门说一句：2026-10-06 用户就被旧的那份服务表困住过 ✗ ——
+  // 表里有 8720（旧后端 ✓），点进去之后这一页没有回去的路 ✗，
+  // 只能退出 App 重进 ✓。**"能进来但出不去"是最讨厌的一类 bug** ✗：
+  // 用户会以为整个东西坏了 ✗。
+  //
+  // 端口写死 8730 ✓ —— 壳的地址是约定 ✓（和 APK 兜底页里那份名单一致 ✓）。
+  // 换个端口要两处一起改 ✗，这是这份约定的代价 ✓，但它换来的是
+  // "这一页不需要知道服务列表" ✓。
+  // ★★ 2026-10-06 改：**回壳不是"塞一个标记"，而是"去一个地址"** ✓。
+  //
+  //   以前这里要塞 `lg_back=chat|logout` ✗ —— 因为壳那边**只有一个页面** ✗，
+  //   而那个页面的默认行为是"把你送去群聊" ✗，所以得有个东西叫它"别跳" ✓。
+  //   那个标记要**跨三跳**才到得了壳 ✓（群聊页 → URL → 本机存储 → 重新加载 ✓），
+  //   **任何一跳丢了就被弹回群聊** ✗ —— 那天"进不去我的"就是这么来的 ✓，
+  //   而且我为它补了**两次** ✗（补不完的 ✓）。
+  //
+  //   现在壳那边有三个地址 ✓：
+  //     `/me`    「我的」—— 到了就画，永不自动跳走 ✓
+  //     `/login`  登录页 —— 到了就显示登录，而且**票由壳自己在那页清掉** ✓
+  //   回来就是**导航到其中一个** ✓ —— 没有标记 ✓，也就没有"标记丢了"这件事 ✓。
+  //
+  //   ⚠️ 用 `location.href` 而**不是** `setServer` ✓：
+  //      setServer 会把**这个带路径的地址存成"服务器地址"** ✗ →
+  //      下次开 App 直接加载 `/me` 或 `/login` ✓ → **落地规则被整个跳过** ✗。
+  //      地址只有一个（壳的根 ✓），换页就只是**普通导航** ✓。
+  const backToShell = (mode) => {
+    const base = location.protocol + '//' + location.hostname + ':' + SHELL_PORT;
+    // 'logout' / 'login' → 壳的登录页 ✓；其余（含不传）→ 壳的「我的」✓
+    const toLogin = (mode === 'logout' || mode === 'login');
+    location.href = base + (toLogin ? '/login' : '/me');
+  };
+  window.__backToShell = backToShell;
+
+  // 刷新按钮：**光有按钮没有处理函数**就是又一个死按钮 ✗ ——
+  // （这一课刚从"改了名漏了调用方"那儿学过一次 ✗）。
+  const _rb = $('#reloadBtn');
+  if (_rb) _rb.onclick = () => location.reload();
+
+  const openComponents = async () => {
+    const p = $('#sheetPanel');
+    p.innerHTML = '<h3>组件</h3><div id="cpList" style="color:var(--muted);font-size:14px">正在加载…</div>'
+                + '<div class="actions"><button class="btn-solid" id="cpClose">关闭</button></div>';
+    p.querySelector('#cpClose').onclick = closeSheet;
+    openSheet();
+    const box = p.querySelector('#cpList');
+    let list = [];
+    try { list = (await api(`/components?group_id=${group.id}`)).components || []; }
+    catch (e) { box.textContent = '加载失败：' + e.message; return; }
+    box.innerHTML = '';
+    if (!list.length) {
+      box.textContent = '还没有组件。跟管家说一句「给我做个记账面板」试试——它会写在这儿。';
+      return;
+    }
+    list.forEach(c => {
+      const it = document.createElement('div');
+      it.className = 'item';
+      const k = document.createElement('span'); k.className = 'k';
+      k.textContent = (c.icon || '🧩') + ' ' + c.title;   // textContent：不进 innerHTML
+      const chev = document.createElement('span'); chev.className = 'chev'; chev.textContent = '›';
+      it.append(k, chev);
+      it.onclick = () => openComponent(c.name, c.title);
+      box.appendChild(it);
+    });
+  };
+
+  const openComponent = async (name, title) => {
+    const p = $('#sheetPanel');
+    p.innerHTML = '<h3 id="cpTitle"></h3>'
+                + '<div id="cpWrap" style="height:58vh;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)"></div>'
+                + '<div class="actions"><button class="btn-solid" id="cpBack">返回</button></div>';
+    p.querySelector('#cpTitle').textContent = title;
+    p.querySelector('#cpBack').onclick = () => openComponents();
+    openSheet();
+    let d;
+    try { d = await api(`/components/${encodeURIComponent(name)}?group_id=${group.id}`); }
+    catch (e) { p.querySelector('#cpWrap').textContent = '打不开：' + e.message; return; }
+
+    // <base> 让组件里的相对路径（图、字体）能找到自己的目录；
+    // 数据先塞进去（它自己取不了）；下面那两个标签**必须拼出来，不能写成字面量**。
+    //
+    // 原因是 HTML 解析器不认识 JS 注释：本文件是个内联脚本，它在里面只要扫到
+    // 结束标签那几个字符就认为"脚本到此为止"——**后面整段 JS 会被当普通文本丢掉**。
+    // 2026-10-04 就是这么把 App 搞白屏的：我写了一条"千万别这么写"的注释，
+    // 注释里正好有那几个字，于是从那一行起登录、enterApp、LifeGuard 全没了，
+    // 用户看到的是"登录页在、按钮点了没反应"。
+    const S = '<' + 'script>', E = '<' + '/script>';
+    const inject = `<base href="/ui/components/${encodeURIComponent(name)}/">`
+                 + S + `window.__LG_DATA__=${JSON.stringify(d.data)};` + E;
+    const ifr = document.createElement('iframe');
+    ifr.setAttribute('sandbox', 'allow-scripts');   // ★ 没有 allow-same-origin
+    ifr.setAttribute('referrerpolicy', 'no-referrer');
+    ifr.style.cssText = 'width:100%;height:100%;border:0;background:transparent';
+    ifr.srcdoc = inject + (d.html || '');
+    const wrap = p.querySelector('#cpWrap');
+    wrap.innerHTML = '';
+    wrap.appendChild(ifr);
+  };
+
+  $('#openSettings').onclick = openSettings;
+  $('#backChat').onclick = closeSettings;
+
+  const logout = async () => {
+    if (ws) ws.close();
+    // **必须让服务器删 Cookie**：它是 httpOnly 的，JS 删不掉——
+    // 这正是 httpOnly 的意义。以前那句 `localStorage.removeItem('lg_token')`
+    // 现在什么也删不了（令牌已经不在那儿了）。
+    //
+    // ⚠️ **必须 await** ✗→✓ —— 2026-10-06 用户报"退出登录没用了，退不了"：
+    //    原来是发出去**不等**就往壳跳 ✓ → 页面卸载 → 这个请求被**掐断** ✗ →
+    //    cookie 压根没清 ✓。而壳那边又被"标记"逼着显示登录页 ✓ →
+    //    看着像退了 ✓，**一重开 App 又登录着** ✗。
+    //    （症状很有迷惑性：当场看是退了，事后看没退 ✓。）
+    try { await api('/auth/logout', { method: 'POST' }); } catch (e) {}
+    me = null; group = null; members = [];
+    $('#msgs').innerHTML = '';
+    closeSheet();
+    // ★ 退完**回壳**去 ✗→✓ —— 2026-10-06 用户指出的：
+    //   原来这里是 `show('login')` ✗，显示的是**本页那个旧登录界面** ✓，
+    //   而那个入口早就封了 ✓（点"登录"只会得到"入口已经搬到壳了" ✓）。
+    //   登录页现在住在壳上 ✓ —— 退完就该回到它那儿 ✓。
+    backToShell('logout');
+  };
+
+  /** 弹层关掉时要顺手做的事 ✓（"编状态"那一屏没有保存按钮 ✓，靠它兜一次 ✓）。 */
+  let sheetCloseHook = null;
+  const openSheet = () => { sheetCloseHook = null; $('#sheet').classList.add('on'); };
+  const closeSheet = () => {
+    $('#sheet').classList.remove('on');
+    const h = sheetCloseHook;
+    sheetCloseHook = null;
+    if (h) { try { h(); } catch (e) {} }
+  };
+  $('#sheet').onclick = e => { if (e.target.id === 'sheet') closeSheet(); };
+
+  // **启动就是"直接进去试试"。**
+  // 以前是 `if (token) …` —— 本地有令牌才进。现在本地什么都没有了，
+  // Cookie 是 httpOnly、JS 看不见，所以判断"登录了没"的唯一办法是
+  // **打一次 /auth/me**：成了就进，401 就退回登录页。
+  // ★ **不再"猜"登录状态，一律问服务器。**
+  //
+  // 走过一段弯路，记在这儿免得以后又绕回去：
+  //
+  // 原来这个页面开局就显示**登录页**，等 /auth/me 回来说"其实登录着呢"再跳走
+  // ——于是已登录的人每次都被闪一下 ✗。根子是"令牌在 httpOnly Cookie 里，
+  // 网页看不见，只能问"。
+  //
+  // 修法是**把开局那个"还没确定"的状态改成转圈**（见 #boot），而不是去猜。
+  // 中间还试过第三条路：让壳用原生 API 读一下 cookie、只告诉网页"有没有"。
+  // **做完了发现它买不到东西** ✗ —— 因为转圈一上，"闪"本来就已经没了；
+  // 而它唯一的收益是"没登录时少转半圈"，代价却是**读错了会把登录着的用户
+  // 踢到登录页** ✗（老 WebView 读 httpOnly 有返回 null 的已知坑）。
+  // **宁可多转半圈，不能把人踢出去。**
+  //
+  // （壳里那个 `hasSession()` 留着，但这种"读错的代价大于收益"的判断，
+  //   以后再用它之前得先重新算一遍。）
+  enterApp().catch(e => {
+    // ★ **没票就回壳的登录页** ✗→✓ —— 2026-10-06 用户实测：
+    //   登出之后开 App 进的是**本页自带那个旧登录界面** ✓，而它早就封了 ✗
+    //   （点"登录"只会得到"入口已经搬到壳了"✓）—— 一个**进不去的登录页** ✗。
+    //
+    //   按定的模型：**没有票 → 重定向到壳的登录页** ✓。
+    //   顺带它还能自愈一件事 ✓：壳的登录页会把"服务器地址"掰回壳的根 ✓
+    //   （老手机上存的是脏地址 ✓，见壳那边那段注释 ✓）。
+    if (e && e.status === 401) { backToShell('login'); return; }
+    // 不是 401（多半是网络不通）→ 就地报出来 ✓：
+    // 这时候往壳跳也跳不过去 ✓，总得让人看见一句话 ✓。
+    show('login');
+    if (e) $('#loginErr').textContent = e.message;
+  });
+
+  // ── 对外的口子：原生壳，以及 agent 写的 ui/app.js ──
+  //
+  // **为什么必须开这个口子**：上面的 IIFE 把 `addMsg`/`show`/`enterApp` 全关在里面，
+  // 外面一个都够不着。不给它这几个函数，agent 写的 ui/app.js 就只能干瞪眼——
+  // 而"让它能改这个界面"正是这个口子存在的理由。
+  //
+  // **只开小的、明确的**，别长成通用插件系统：它做一件事需要的最小集合就够了。
+  // 想加新的之前先问一句"真的缺这个吗"。
+  window.LifeGuard = {
+    // —— 原生壳用 ——
+    logout,
+    reload: () => location.reload(),
+
+    // —— agent 用：钩子（它在本文件之后加载，注册的回调稍后会被调用）——
+    onReady: _hook('ready'),              // 进了聊天页、历史消息都渲染完之后
+    onMessage: _hook('message'),          // 每渲染一条消息（历史消息也会挨个触发）
+
+    // —— agent 用：读 ——
+    me: () => me,
+    group: () => group,
+    members: () => members.slice(),
+    messages: () => [..._msgs.values()],
+    $, $$,
+
+    // —— agent 用：做 ——
+    insertText,                           // 往输入框插字（比如 `@刘猪猪 `）
+    quote: quoteById,                     // 按消息 id 挂引用条，返回是否找到
+    toast,
+  };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,416 @@
+"""SQLite 数据访问层。
+
+选型理由（见计划文件）：这个规模（2-10 人）SQLite 最合适——几乎零常驻内存、
+免运维。用 WAL 模式支持并发读写。
+
+所有时间戳统一用 UTC 秒（INTEGER），便于排序与增量同步。
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import time
+from typing import Any, Iterable, Sequence
+
+import aiosqlite
+
+from .config import settings
+
+log = logging.getLogger("lifeguard.db")
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT    NOT NULL UNIQUE,
+    password_hash TEXT    NOT NULL,
+    nickname      TEXT    NOT NULL,
+    avatar        TEXT,
+    created_at    INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS groups (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL,
+    owner_id    INTEGER NOT NULL REFERENCES users(id),
+    invite_code TEXT    NOT NULL UNIQUE,
+    created_at  INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS group_members (
+    group_id  INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    user_id   INTEGER NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
+    role      TEXT    NOT NULL DEFAULT 'member',
+    joined_at INTEGER NOT NULL,
+    PRIMARY KEY (group_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    sender_id   INTEGER,                 -- NULL 表示 agent
+    sender_type TEXT    NOT NULL,        -- 'user' | 'agent' | 'system'
+    msg_type    TEXT    NOT NULL,        -- 'text' | 'image' | 'voice'
+    content     TEXT,                    -- 文本内容 / 语音转写
+    media_path  TEXT,                    -- 相对 media_dir 的路径
+    media_meta  TEXT,                    -- JSON：时长、宽高、原始文件名等
+    mentions    TEXT,                    -- JSON 数组，如 ["agent","17"]
+    reply_to    INTEGER REFERENCES messages(id),
+    created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, id);
+
+-- ⚠️ **已停用（2026-10-03）。表留着，但没有任何代码读写它。**
+--
+-- 它曾经是"按群隔离的记忆"，存在的理由是 Hermes 内置的 MEMORY.md/USER.md 是
+-- Profile 级单文件、所有群共用一份、会把一个群的私事泄露到另一个群。
+--
+-- 那个理由已经不成立了：一个群 ⇄ 一个 profile 空间现在是**硬约束**
+-- （见 db.py 的 _ensure_profile_unique + app/spaces.py），Hermes 自己的记忆
+-- 天然按群隔离，而且是**活的**（有字符预算、有 curator 后台整理），
+-- 这张表是死的（只追加，不整理/不总结/不去重/不衰减）。
+-- 两套并存还会打架：实测模型会先写我们的表、再写内置记忆，同一件事两个地方。
+--
+-- 为什么不 DROP：里面的数据已经迁进各空间的 USER.md / MEMORY.md，
+-- 但 DROP 是不可逆的，而这张表躺在那里不占什么。确认没问题之后随时可以删。
+CREATE TABLE IF NOT EXISTS group_memory (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    content    TEXT    NOT NULL,
+    created_by INTEGER,                  -- 谁让记的（可空：agent 自己判断该记）
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gmemory_group ON group_memory(group_id, id DESC);
+
+-- ── 泛用的结构化记录（取代了专用的 ledger_entries）────────────────────
+--
+-- 形状是 `kind + fields(JSON)`：一张表承载所有"要能查、能算、能画图"的东西。
+-- 记账只是其中一个 kind（bookkeeping），以后加待办、纪念日、健康记录都不用改表。
+--
+-- 为什么要泛用而不是一任务一张表：**可视化层要能泛化**。按 (kind, fields) 渲染，
+-- 一套代码画所有类型；每种任务单独建表的话，每加一种就得给可视化写个特例。
+--
+-- 代价与对策：JSON 字段没有类型约束，写入会脏。所以配套一张 `record_kinds`
+-- 登记表——写入时按登记的 schema 校验（见 app/records.py）。**校验必须在我们这边做**，
+-- 让模型只负责填值。
+CREATE TABLE IF NOT EXISTS records (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    kind       TEXT    NOT NULL,
+    fields     TEXT    NOT NULL,          -- JSON 对象
+    created_by INTEGER,
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_records_group ON records(group_id, kind, id DESC);
+
+-- 改/删的留痕。**每改一次，先把「改之前」的样子存这儿。**
+--
+-- 为什么要留痕而不是直接覆盖：账目是"钱的事"，用户一定会问
+-- "这笔原来记的是多少"。覆盖了就永远答不上来。
+-- 而且这样才有"撤销"的余地——最上面的那条就是上一次的样子。
+CREATE TABLE IF NOT EXISTS record_history (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    record_id  INTEGER NOT NULL,
+    group_id   INTEGER NOT NULL,
+    action     TEXT    NOT NULL,          -- update / delete / restore
+    fields     TEXT    NOT NULL,          -- 改**之前**的那份 JSON
+    changed_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rechist_record ON record_history(record_id, id DESC);
+
+-- 类型登记：这个群有哪些 kind、各自的字段定义。
+--
+-- **约束：只能往宽长。** 新类型随便建（零摩擦），已有类型可以加字段，
+-- 但**不能改/删已有字段**——那会破坏历史数据、让可视化对不上。
+-- 这条不变量由 app/records.py 的 define_kind 强制。
+CREATE TABLE IF NOT EXISTS record_kinds (
+    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    kind       TEXT    NOT NULL,
+    schema     TEXT    NOT NULL,          -- JSON：{fields: {...}, summary: {...}}
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (group_id, kind)
+);
+
+-- 提醒。**放在我们这边，不用 Hermes 内部 cron。**
+--
+-- 原因是一次真实事故：agent 自己用 Hermes cron 建了个"每晚10点记账提醒"，
+-- 任务每晚真的跑、真的调工具、真的生成一段话——**然后输出被丢进虚空**，
+-- 因为那套 cron 的投递配置是 `deliver: origin` 而 `origin: null`，
+-- 而且它连错都不报（`last_status: ok`）。agent 因为记忆里写着"已设置定时任务"
+-- 就一直以为办妥了，用户则一直没收到。
+--
+-- 教训：提醒是**业务功能**，该由业务系统持有——可查、可取消、失败会出现在我们日志里。
+CREATE TABLE IF NOT EXISTS reminders (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id      INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    text          TEXT    NOT NULL,      -- 要提醒什么（给 agent 的指令，不是最终文案）
+    fire_at       INTEGER NOT NULL,      -- 下次触发时间（unix 秒）
+    repeat_daily  INTEGER NOT NULL DEFAULT 0,
+    enabled       INTEGER NOT NULL DEFAULT 1,
+    created_at    INTEGER NOT NULL,
+    last_fired_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(enabled, fire_at);
+
+-- 旧的账本表。数据已迁进 records(kind='bookkeeping')，代码不再读写它。
+-- 保留是因为 DROP 不可逆；确认没问题后随时可以删。
+CREATE TABLE IF NOT EXISTS ledger_entries (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    user_id    INTEGER,                  -- 谁花的/谁记的
+    amount     REAL    NOT NULL,         -- 正数=支出，负数=收入
+    category   TEXT,
+    note       TEXT,
+    spent_at   INTEGER NOT NULL,         -- 发生时间（可被 agent 指定为"昨天"等）
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ledger_group ON ledger_entries(group_id, spent_at DESC);
+
+-- 登录失败计数。存在的理由：密码是用户自设的短密码，一旦服务被暴露，
+-- 没有限流就是几秒钟的事。
+--
+-- **按用户名计数，不按 IP**：走 SSH 隧道时所有请求的源 IP 都是 127.0.0.1，
+-- 按 IP 限流等于没限。按用户名至少能挡住针对某个账号的爆破。
+CREATE TABLE IF NOT EXISTS login_attempts (
+    username     TEXT PRIMARY KEY,
+    fail_count   INTEGER NOT NULL DEFAULT 0,
+    window_start INTEGER NOT NULL DEFAULT 0,   -- 当前计数窗口起点
+    locked_until INTEGER NOT NULL DEFAULT 0    -- 锁定到期时间
+);
+
+-- `agent_state` 已删除（2026-10-04）。它装的是冷却时刻、当日发言预算、
+-- 提问回执窗口、沉默计数、活跃度档位——**判断闸撤掉之后这些全没了消费者**。
+-- 它从来没存过有价值的东西，所以是干净地删掉，不像 ledger_entries / group_memory
+-- 那样保留存档。见 _drop_retired_tables。
+"""
+
+
+_conn: aiosqlite.Connection | None = None
+
+
+async def get_conn() -> aiosqlite.Connection:
+    """取进程内共享连接。aiosqlite 串行化访问，这个规模足够。"""
+    global _conn
+    if _conn is None:
+        settings.ensure_dirs()
+        _conn = await aiosqlite.connect(settings.db_path)
+        _conn.row_factory = aiosqlite.Row
+        # WAL：读写并发；foreign_keys 默认关闭，必须显式开。
+        await _conn.execute("PRAGMA journal_mode=WAL")
+        await _conn.execute("PRAGMA foreign_keys=ON")
+        await _conn.execute("PRAGMA synchronous=NORMAL")
+        # **写冲突时等一会儿，而不是立刻报错。**
+        #
+        # WAL 允许并发读、但**写还是只能一个**。默认 busy_timeout=0，撞上在写的时候
+        # 直接抛 "database is locked"。
+        #
+        # 服务进程内部其实撞不到（单进程一个连接，aiosqlite 自己串行化）。但
+        # ① 我们现在有提醒和空闲两个后台循环在写，② 外部脚本（迁移、排查、测试）
+        # 会连同一个库——实测就这么撞过一次，报错信息还很不像"并发问题"。
+        # 设 5 秒之后，撞上就排队等，而不是莫名其妙地失败。
+        await _conn.execute("PRAGMA busy_timeout=5000")
+        await _conn.commit()
+    return _conn
+
+
+# 已存在的库需要补的列。SQLite 没有 ADD COLUMN IF NOT EXISTS，只能先查 PRAGMA。
+_MIGRATIONS: list[tuple[str, str, str]] = [
+    # 群属于哪个 Hermes Profile 目录（= 哪个"记忆空间"）。
+    #
+    # **一个群 ⇄ 一个空间，双向唯一，不能共用。** 不是"同 profile 的群共享记忆"——
+    # 共用会让 Hermes 的 MEMORY.md / USER.md（Profile 级单文件）把一边的私事
+    # 注入到另一边，实测发生过。唯一性由下面的 _ensure_profile_unique 兜。
+    ("groups", "profile", "TEXT NOT NULL DEFAULT 'couple'"),
+    # 管家在这个群里的显示名。可改（设置界面），留空则用全局默认。
+    ("groups", "agent_name", "TEXT"),
+    # 每个群里的独立昵称。可改，与账号名互不影响——
+    # 账号是登录凭证，昵称是群内显示名，两者刻意分开。
+    ("group_members", "nickname", "TEXT"),
+    # 这条消息 @ 了谁。JSON 数组，如 ["agent","17"]。
+    # 显式存而不是从正文解析——@ 逻辑要可靠，不能被文本格式影响。
+    ("messages", "mentions", "TEXT"),
+    # 记录被"删掉"的时间。**软删除**：行还在，只是查询默认不看它。
+    #
+    # 为什么账目不真删：那是一条**账**。用户说"这条记错了"，
+    # 我们要能改、能撤，但**不能让它无声地消失**——月底对账时少一笔、
+    # 又查不出为什么，比记错本身更糟。所以：软删 + 留痕（见 record_history）。
+    ("records", "deleted_at", "INTEGER"),
+    # 群管家沉默状态文字（不打算理你们时短暂显示的文字）。默认"不打算进你们喵"。
+    ("groups", "agent_silent_status", "TEXT"),
+    # 群管家待机状态池（JSON 数组，如 ["正在摸鱼…","正在发呆…"]）。
+    # 留空则用前端默认池。
+    ("groups", "agent_idle_pool", "TEXT"),
+    # 状态池轮换间隔（秒）。默认 600（10 分钟）。
+    ("groups", "agent_pool_interval", "INTEGER"),
+    # "正在思考"这一档的文案（我们说话后、它在想怎么说时显示）。
+    ("groups", "agent_thinking_status", "TEXT"),
+    # 群管家自己的头像。相对 ui_dir 的路径，如 "avatars/g7.png"。
+    # 留空就退回服务端的 /ui/avatar.png。
+    ("groups", "agent_avatar", "TEXT"),
+    # ★★ 管家状态条的三档文案 **整个存成一个 JSON** ✓ —— 2026-10-06 加。
+    #
+    # **为什么不像以前那样拆成好几列** ✗：那四列（idle_pool / pool_interval /
+    # silent_status / thinking_status）是**同一个东西的四块** ✓，
+    # 每加一个维度就要再加一列 ✓，而且"默认值/怎么兜底"会散在好几个函数里 ✗
+    # —— 那是"同一个信息两处"的温床 ✓（那天在群名和群列表上各栽过一次 ✓）。
+    #
+    # 形状与默认值**只定义在一个地方**：`app/agent_status.py` ✓。
+    ("groups", "agent_status", "TEXT"),
+    # ★ 「给管家的话」✓ —— 每个空间一段，每一轮自动注入 ✓（见 orchestrator/agent.py
+    # 的 `_group_persona` ✓）。用户自己写的、关于**他们是谁**的一段话 ✓。
+    ("groups", "agent_user_prompt", "TEXT"),
+]
+
+
+async def _apply_migrations(conn: aiosqlite.Connection) -> None:
+    for table, column, decl in _MIGRATIONS:
+        async with conn.execute(f"PRAGMA table_info({table})") as cur:
+            existing = {row[1] for row in await cur.fetchall()}
+        if existing and column not in existing:
+            await conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
+async def _migrate_agent_status(conn: aiosqlite.Connection) -> None:
+    """把旧的四个散列**并进**新的 `agent_status` ✓ —— 跑一次就完 ✓。
+
+    **幂等** ✓：已经有新配置的群直接跳过 ✓（所以脚本可以重跑、可以随启动跑 ✓）。
+
+    跑完那四列就是**死列**了 ✓ —— 代码里一个引用都不留 ✓
+    （"同一份数据两处 = 迟早走岔" ✓，2026-10-06 那天栽过两次 ✓）。
+    列本身留着不删 ✓：SQLite 删列要重建整张表 ✓，风险不值当 ✓。
+    """
+    from .agent_status import DEFAULT_CONFIG, dumps, normalize
+    try:
+        async with conn.execute(
+            """SELECT id, agent_status, agent_idle_pool, agent_pool_interval,
+                      agent_silent_status, agent_thinking_status FROM groups"""
+        ) as cur:
+            rows = await cur.fetchall()
+    except Exception:  # noqa: BLE001
+        return                          # 表还没建出来（全新库 ✓）→ 没什么可迁的 ✓
+
+    moved = 0
+    for r in rows:
+        gid, cur_json, pool, every, silent, thinking = r
+        if (cur_json or "").strip():
+            continue                    # 已经有新配置 ✓ → 一次都不碰 ✓
+        cfg = json.loads(json.dumps(DEFAULT_CONFIG))     # 深拷贝 ✓
+        if pool:
+            try:
+                lines = json.loads(pool)
+                if isinstance(lines, list) and lines:
+                    cfg["idle"]["lines"] = lines
+            except (ValueError, TypeError):
+                log.warning("群 %s 的旧待机池不是合法 JSON，按默认值走：%r", gid, str(pool)[:80])
+        if every:
+            cfg["idle"]["every"] = every
+        if silent:
+            cfg["silent"]["lines"] = [silent]
+        if thinking:
+            cfg["thinking"]["lines"] = [thinking]
+        await conn.execute("UPDATE groups SET agent_status = ? WHERE id = ?",
+                           (dumps(normalize(cfg)), gid))
+        moved += 1
+    if moved:
+        await conn.commit()
+        log.info("把 %d 个群的旧状态文案并进了新配置 ✓", moved)
+
+
+async def _ensure_profile_unique(conn: aiosqlite.Connection) -> None:
+    """兜住"一个群 ⇄ 一个记忆空间"这条硬约束。
+
+    放在数据层，是因为前面几层都可能被绕过（直接改库、以后加的新接口、
+    忘了校验的脚本）。唯一索引是最后一道，也是唯一一道**绕不过去**的。
+
+    **刻意不写进 SCHEMA。** SCHEMA 是每次启动 `executescript` 一把跑的，
+    万一历史数据已经违规（两个群共用一个空间），它会直接抛异常——
+    连服务都起不来，聊天也用不了。这里改成**报告而不致死**：
+    服务照常起来，但日志里把是哪几个群在共享点名列出来。
+
+    宁可是"能用但不安全 + 日志里吵"，也不要"干脆宕机"——后者会让人
+    为了恢复使用而急着乱改，反而更容易改错。
+    """
+    try:
+        await conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_profile ON groups(profile)"
+        )
+        await conn.commit()
+    except Exception:
+        log.error("⚠ groups.profile 有重复，唯一约束没能建立——记忆可能跨群泄露！")
+        async with conn.execute(
+            """SELECT profile, GROUP_CONCAT(name, ' / ') AS groups, COUNT(*) AS n
+               FROM groups GROUP BY profile HAVING n > 1"""
+        ) as cur:
+            for row in await cur.fetchall():
+                log.error("  空间 %r 被 %d 个群共用：%s", row[0], row[2], row[1])
+        log.error("  处置：给其中一个群换成它自己的空间（见 app/spaces.py 的操作指引）")
+
+
+# 退休的表：**直接 DROP**，不保留存档。
+#
+# 和 ledger_entries / group_memory 不一样——那两张里面有真实数据（账目、群记忆），
+# DROP 不可逆所以留着。这张从来只装编排层的临时状态（冷却时刻、发言计数…），
+# 没有任何值得留的东西，留着只会让人以为它还在起作用。
+_RETIRED_TABLES: list[tuple[str, str]] = [
+    ("agent_state", "判断闸撤掉后，它维护的冷却/预算/回执窗口全没了消费者"),
+]
+
+
+async def _drop_retired_tables(conn: aiosqlite.Connection) -> None:
+    for table, why in _RETIRED_TABLES:
+        async with conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+        ) as cur:
+            if not await cur.fetchone():
+                continue
+        await conn.execute(f"DROP TABLE {table}")
+        log.info("已删除退休的表 %s（%s）", table, why)
+
+
+async def init_db() -> None:
+    conn = await get_conn()
+    await conn.executescript(SCHEMA)
+    await _apply_migrations(conn)
+    await _migrate_agent_status(conn)
+    await _ensure_profile_unique(conn)
+    await _drop_retired_tables(conn)
+    await conn.commit()
+
+
+async def close_db() -> None:
+    global _conn
+    if _conn is not None:
+        await _conn.close()
+        _conn = None
+
+
+def now() -> int:
+    return int(time.time())
+
+
+async def fetch_one(sql: str, params: Sequence[Any] = ()) -> dict | None:
+    conn = await get_conn()
+    async with conn.execute(sql, params) as cur:
+        row = await cur.fetchone()
+        return dict(row) if row else None
+
+
+async def fetch_all(sql: str, params: Sequence[Any] = ()) -> list[dict]:
+    conn = await get_conn()
+    async with conn.execute(sql, params) as cur:
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def execute(sql: str, params: Sequence[Any] = ()) -> int:
+    """执行写操作，返回 lastrowid。"""
+    conn = await get_conn()
+    cur = await conn.execute(sql, params)
+    await conn.commit()
+    return cur.lastrowid or 0
+
+
+async def execute_many(sql: str, seq: Iterable[Sequence[Any]]) -> None:
+    conn = await get_conn()
+    await conn.executemany(sql, seq)
+    await conn.commit()
