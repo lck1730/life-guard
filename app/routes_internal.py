@@ -393,7 +393,13 @@ def _git(args: list[str], timeout: int = 60) -> tuple[int, str]:
     然后**照常重启了** —— 也就是"没存就重启"，
     恰恰是这张网最该拦住的场景。
     """
-    return _git(["-c", f"safe.directory={APP_ROOT}", *args], timeout=timeout)
+    # ⚠️ **这里是 `_run`，不是 `_git`** ✗→✓ —— 2026-10-07：
+    #   我加这个帮手时用一条正则替换"所有 `_run(["git", …`" ✓，
+    #   而**这一行本身**也长那样 ✗ → 它被替换成了它自己 ✓ →
+    #   **无限递归** ✗（`RecursionError`，接口回 500 ✓）。
+    #   静态检查一条都拦不住 ✗：语法对 ✓、名字都有定义 ✓、import 也都在 ✓
+    #   —— 只有真跑一遍才看得见 ✓。
+    return _run(["git", "-c", f"safe.directory={APP_ROOT}", *args], timeout=timeout)
 
 
 # 重启**排队**，不是立刻。
