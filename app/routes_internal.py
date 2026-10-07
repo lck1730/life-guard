@@ -1063,6 +1063,33 @@ async def components_note(body: ComponentSlugIn) -> dict:
         " WHERE group_id = ? AND slug = ? ORDER BY version ASC", (body.group_id, slug))
     if not rows:
         return {"ok": False, "error": "这个群还没有 " + slug + " 这个组件"}
+
+    # ★ **头部由服务端写** ✗→✓ —— 2026-10-07。
+    #
+    # 为什么不让它自己记："这是第几版、哪一版在跑、什么时候建的"是**事实** ✓，
+    # 而让它自己复述 = 让它**回忆** ✓ —— 它会记错自己做过几版 ✓
+    # （这个项目在别处吃过同类的亏 ✓：两套事实各记各的，迟早走岔 ✓）。
+    # 所以：**下面这几行是服务端给的** ✓，`note` 那部分才是它写的 ✓。
+    from datetime import datetime, timezone
+    def _d(ts):
+        if not ts:
+            return ""
+        return datetime.fromtimestamp(int(ts), timezone.utc).strftime("%Y-%m-%d %H:%M")
+    label = {"live": "正在用", "draft": "实验版", "archived": "旧版（被新版顶下来了）"}
+    head = [f"# {rows[-1]['title'] or slug}（`{slug}`）", ""]
+    for r in rows:
+        line = (f"- **v{r['version']}** · {label.get(r['state'], r['state'])}"
+                f" · 建于 {_d(r['created_at'])}")
+        if r["enabled_at"]:
+            line += f" · 启用 {_d(r['enabled_at'])}"
+        head.append(line)
+    head.append("")
+    head.append("（上面这几行是**系统记的**，不是谁的回忆 ✓；下面就都是那个组件自己的笔记 ✓。）")
+    body_note = next((r["note"] for r in reversed(rows) if r["note"]), "")
+    skeleton = ("## 用户要什么\n\n## 为什么长这样\n\n## 试过但没用的\n\n"
+                "## 数据依赖\n\n## 还没做的\n")
     return {"ok": True, "slug": slug, "versions": [dict(r) for r in rows],
+            "readable": "\n".join(head) + "\n\n" + (body_note or
+                "（这一版还没写笔记 ✓ —— 下次改动时按下面这几节补上 ✓）\n\n" + skeleton),
             "about": ("这是**这个组件自己的笔记**（像 README）✓，不是你在群里的第二套记忆 ✓。"
                       "群成员的偏好、聊过的事，那些归你的内置记忆 ✓。")}
