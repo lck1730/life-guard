@@ -51,6 +51,7 @@ from .routes_groups import router as groups_router
 from .routes_internal import restart_watcher
 from .routes_internal import router as internal_router
 from .routes_media import router as media_router
+from .routes_workshop import poke_loop
 from .routes_workshop import router as workshop_router
 
 logging.basicConfig(
@@ -76,6 +77,10 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(reminders.ticker_loop()),
         asyncio.create_task(idle.loop()),
         asyncio.create_task(restart_watcher()),
+        # ★ 工坊的「等子代理交付」✓（2026-10-07 深夜 ✓）——
+        #   子代理的结果**只有下一轮才看得到** ✓，而工坊的下一轮只有用户说话才会来 ✓
+        #   → 得有人替它开口 ✓。见 `routes_workshop.poke_loop` 那段 ✓。
+        asyncio.create_task(poke_loop()),
     ]
     try:
         yield

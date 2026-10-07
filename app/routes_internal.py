@@ -43,7 +43,7 @@ from .db import execute, fetch_all, fetch_one, now
 from .messages import create_message
 # ⚠️ 这里**只 import 函数**，而且放函数外用 ✓ —— routes_workshop 不 import 本模块 ✓，
 #    所以没有环 ✓。
-from .routes_workshop import push_workshop_status
+from .routes_workshop import push_workshop_status, start_waiting, stop_waiting
 
 log = logging.getLogger("lifeguard.internal")
 router = APIRouter(prefix="/api/internal/tools", tags=["internal"])
@@ -953,14 +953,17 @@ async def components_confirm(body: ComponentConfirmIn) -> dict:
     #      绝不因为一个对不上的任务号把"开工"这一步整个拦掉 ✗
     #      （组件做不出来比"票没绑上"严重得多 ✓）。
     task_id = body.task_id
+    wait_uid = None
     if task_id:
         row = await fetch_one(
-            "SELECT id FROM workshop_tasks WHERE id = ? AND group_id = ?",
+            "SELECT id, user_id FROM workshop_tasks WHERE id = ? AND group_id = ?",
             (int(task_id), body.group_id))
         if not row:
             log.warning("组件开工：任务号 %s 不属于群 %s，按没给处理",
                         task_id, body.group_id)
             task_id = None
+        else:
+            wait_uid = int(row["user_id"])
     await execute(
         "INSERT INTO component_tickets(token, group_id, slug, brief, handle,"
         " created_at, expires_at, task_id) VALUES(?,?,?,?,?,?,?,?)",
@@ -977,6 +980,12 @@ async def components_confirm(body: ComponentConfirmIn) -> dict:
     #    因为它没法从流里看出来 ✓（我们只取正文 ✓，不看工具事件 ✓）。
     #    而这一刻服务端**知道** ✓（就是子代理该上场的时候 ✓）。
     await push_workshop_status(body.group_id, "working", task_id)
+    # ★ **从这一刻起，得有人替它开口** ✗→✓（2026-10-07 深夜）——
+    #   子代理是异步的 ✓，结果**只有下一轮才看得到** ✓，而工坊的下一轮
+    #   只有用户说话才会来 ✓ → 不问的话"做好了"要等他开口 ✓（用户报的就是这个 ✓）。
+    #   见 `routes_workshop.poke_loop` ✓。
+    if task_id and wait_uid:
+        start_waiting(body.group_id, wait_uid, int(task_id))
     log.info("组件开工：群 %s 的 %s（票 %s…）", body.group_id, slug, token[:8])
     return {
         "ok": True, "token": token, "slug": slug, "handle": handle,
@@ -1087,6 +1096,10 @@ async def components_save(body: ComponentSaveIn) -> dict:
         handle.unlink(missing_ok=True)       # 认领完把暂存文件收掉 ✓（免得越攒越多 ✓）
     except OSError:
         pass
+    # ★ **落成了就别再问了** ✗→✓ —— 那个"等交付"的循环到这里就该停 ✓
+    #   （不然它会隔一阵继续问"交付了吗"✓，而东西早就落好了 ✓）。
+    if task_id:
+        stop_waiting(int(task_id))
     await push_workshop_status(group_id, "done", int(task_id) if task_id else None)
     await _say_system(group_id, "「" + want_title + "」做好了，去创意工坊看看。")
     log.info("组件落成：群 %s 的 %s v%s", group_id, slug, version)

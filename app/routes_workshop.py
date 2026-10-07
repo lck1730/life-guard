@@ -420,9 +420,95 @@ async def _touch(task_id: int) -> None:
                   (now(), int(task_id)))
 
 
+# ── 等子代理交付：**得有人给它一轮** ────────────────────────────────────
+#
+# ★ 2026-10-07 深夜，用户报的：「组件做好后**没有主动通知我**，我问了才给我说做好了」✓。
+#
+# ⚠️ 根因（读 Hermes 源码确认 ✓）：`delegate_task` 是**异步**的 ✗ ——
+#    子代理干完活，Hermes 把结果**投递给会话** ✓，而我们这个会话**没有推送通道** ✓
+#    （不是企微那种平台 ✓）→ 它只能**写进会话** ✓ ——
+#    **下一轮才看得到** ✗。而工坊的"下一轮"**只有用户说话才会来** ✗
+#    → 于是"做好了"要等他开口 ✓（**群聊没这个毛病** ✓：那边随时有人说话 ✓，
+#      而且提醒到点会自己唤起一轮 ✓，见 `reminders.py` ✓）。
+#
+# → 所以这里**替它开口** ✓：隔一阵问一句"交付了吗" ✓。
+#    · 交了就落成 + 报喜 ✓
+#    · 没交就让它回 `[SILENT]` ✓ —— 那一句**我们根本不落库** ✓，用户一个字都看不到 ✓。
+#
+# ⚠️ **间隔要退让**（30 秒起、慢慢放到两分钟 ✓）—— 固定 30 秒轮十分钟是二十次模型调用 ✓，
+#    而其中十九次什么都不会发生 ✓。
+_waiting: dict[tuple[int, int], dict] = {}
+
+_POKE_TEXT = (
+    "（系统提示：你刚才派出去写组件的那个小助手，**可能已经交付了** ✓。\n"
+    "看清楚再动：\n"
+    "  · **它已经交付了** → 把它落成（`component_save`），然后跟用户说一声做好了 ✓\n"
+    "  · **它还没交付** → **只回 `[SILENT]`** ✓，一个字都别说 ✗（这一句用户看不到 ✓））"
+)
+
+
+def start_waiting(group_id: int, user_id: int, task_id: int) -> None:
+    """记下"这条对话在等子代理交付" ✓（`components/confirm` 那一刻调 ✓）。"""
+    _waiting[(group_id, user_id)] = {"task_id": int(task_id),
+                                     "next_at": now() + 30,
+                                     "deadline": now() + 15 * 60,
+                                     "gap": 30}
+
+
+def stop_waiting(task_id: int) -> None:
+    """不用等了 ✓（组件落成了 ✓，或者这一轮已经被切走了 ✓）。"""
+    for k, v in list(_waiting.items()):
+        if v["task_id"] == int(task_id):
+            _waiting.pop(k, None)
+
+
+async def poke_loop() -> None:
+    """隔一阵去看看"等的那个交付了没有" ✓（见上面那段注释 ✓）。
+
+    ⚠️ **一轮都没在跑才问** ✓ —— 用户自己正在跟它说话的时候插一句，
+       就和"它手上还有活"撞上了 ✓（那一句会被 `_busy` 拦掉 ✓，白花钱 ✓）。
+    ⚠️ 过了截止时间就**放弃** ✓ —— 子代理可能早就死了 ✓（断了、被掐了 ✓），
+       一直问下去只会每两分钟烧一次模型调用 ✓。放弃时**留一行字**给用户 ✓
+       （项目铁律：失败要让人看得见 ✓）。
+    """
+    while True:
+        try:
+            await asyncio.sleep(10)
+            for (gid, uid), w in list(_waiting.items()):
+                if now() >= w["deadline"]:
+                    _waiting.pop((gid, uid), None)
+                    await _save(gid, uid, w["task_id"], "agent",
+                                "（那个做组件的助手好像没消息了——你可以再跟它说一句，"
+                                "让它接着做。）")
+                    await _push(uid, {"type": "ws_message", "data": {
+                        "id": None, "sender_type": "agent", "task_id": w["task_id"],
+                        "content": "（那个做组件的助手好像没消息了——你可以再跟它说一句，"
+                                   "让它接着做。）"}})
+                    continue
+                if now() < w["next_at"]:
+                    continue
+                if _busy(gid, uid):
+                    w["next_at"] = now() + 15          # 它在忙 ✓，等会儿再说 ✓
+                    continue
+                w["gap"] = min(120, int(w["gap"] * 1.6))   # 退让 ✓
+                w["next_at"] = now() + w["gap"]
+                # ★ **登记在跑** ✗→✓ —— 不然下一圈（10 秒后 ✓）又会来问一遍 ✓，
+                #   两轮叠上去 ✓（`_busy` 看的就是这张表 ✓）。
+                task = asyncio.create_task(
+                    _run_turn(gid, uid, w["task_id"], _POKE_TEXT, poke=True))
+                _running[(gid, uid)] = (w["task_id"], task)
+                task.add_done_callback(
+                    lambda t, k=(gid, uid): _running.pop(k, None)
+                    if _running.get(k, (None, None))[1] is t else None)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001
+            log.exception("工坊的「等交付」循环出错了")
+
+
 async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                     *, msg_type: str = "text", media_path: str | None = None,
-                    quote: dict | None = None) -> None:
+                    quote: dict | None = None, poke: bool = False) -> None:
     """跑一轮工坊对话 —— 后台任务 ✓（POST 立刻返回，正文走 WebSocket 推 ✓）。
 
     ★ 2026-10-07 深夜：**收下图片和引用** ✗→✓ —— 用户定的：工坊聊天要
@@ -477,9 +563,22 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                                   "data": {"group_id": group_id, "task_id": task_id,
                                            "state": "idle"}})
 
+        # ★ **"还没交付"就什么都不留** ✗→✓（见 `_waiting` 那段 ✓）——
+        #   这一轮是**系统替用户问的** ✓，它没话可说时回 `[SILENT]` ✓。
+        #   落库的话，用户会在对话里看到一堆「[SILENT]」✓（或"我知道了"这种废话 ✓）。
+        #   ⚠️ 判据是**整条恰好等于**它 ✗ —— 正文里提一句"我回了个 [SILENT]"（如果
+        #      它真这么写 ✓）不该被吃掉 ✓。
+        if poke and answer.strip() in ("[SILENT]", "SILENT", "【SILENT】"):
+            log.debug("工坊：等交付的那一轮还没结果，按静默处理 ✓")
+            return
         if not answer:
             # ⚠️ **失败必须让人看见** ✓ —— 项目铁律（`orchestrator/__init__.py` 那句）。
             #    静默失败在这个架构里格外坏 ✓：用户不知道是"它还在想"还是"它挂了" ✓。
+            #    ⚠️ 但**替用户问的那一轮失败**不写 ✓ —— 那会让对话里莫名冒出一句
+            #       "这一轮没跑通"✓，而用户什么都没做 ✓（下一圈会再问一次 ✓）。
+            if poke:
+                log.warning("工坊：等交付的那一轮没跑通（下一圈再问一次）")
+                return
             answer = "（这一轮没跑通——看一眼 App 管家那边，或者再说一遍。）"
         row = await _save(group_id, user_id, task_id, "agent", answer)
         await _touch(task_id)
