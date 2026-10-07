@@ -433,6 +433,40 @@
   #compView .cpbtn.ghost { background:var(--panel2); color:var(--muted);
                            border:1px solid var(--line); font-weight:500; font-size:14.5px; }
   #compView .cpbtn[disabled] { opacity:.5; }
+
+  /* ── 制作页（工坊里的对话）───────────────────────────────────────────
+     和群聊那屏**不是一套东西** ✓：这里是**你一个人对着它** ✓，
+     所以没有"该不该接话"那些东西 ✓ —— 只有消息、状态、输入框 ✓。 */
+  #makeView { z-index:24; }
+  #makeView .mkbody { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+                      padding:14px; display:flex; flex-direction:column; gap:10px; }
+  #makeView .mkrow { display:flex; max-width:88%; }
+  #makeView .mkrow.mine { align-self:flex-end; flex-direction:row-reverse; }
+  #makeView .mkbub { background:var(--panel); border-radius:14px; padding:9px 13px;
+                     white-space:pre-wrap; word-break:break-word; font-size:15px; }
+  #makeView .mkrow.mine .mkbub { background:var(--accent-bg); }
+  #makeView .mkrow.agent .mkbub { background:var(--panel2); }
+  /* 开场那句提示：淡淡的一行，不是消息 */
+  #makeView .mknote { color:var(--muted); font-size:13.5px; line-height:1.8;
+                      background:var(--panel); border:1px solid var(--line);
+                      border-radius:12px; padding:12px 14px; }
+  /* 状态条 —— App 管家那边同一套（转圈 + 一句话）✓ —— 用户点名的"交互性"就在这儿：
+     "它现在在干什么"必须看得见 ✓，尤其是**子代理在写**那一段（那是最长的一段）✓。 */
+  #makeView .mkst { flex:0 0 auto; display:flex; align-items:center; gap:9px;
+                    padding:0 16px 8px; font-size:13.5px; color:var(--muted); line-height:1.5; }
+  #makeView .mkst[hidden] { display:none; }
+  #makeView .mkst i { width:14px; height:14px; flex:0 0 14px; border-radius:50%;
+                      border:2px solid var(--line); border-top-color:var(--accent);
+                      animation:spin .8s linear infinite; }
+  #makeView .mkfoot { flex:0 0 auto; display:flex; align-items:flex-end; gap:8px;
+                      padding:10px 12px calc(10px + var(--inset-bottom));
+                      border-top:1px solid var(--line); background:var(--panel); }
+  #makeView textarea { flex:1; min-width:0; padding:10px 13px; background:var(--panel2);
+                       border:1px solid var(--line); border-radius:16px; color:var(--text);
+                       font:inherit; font-size:16px; resize:none; max-height:120px; line-height:1.4; }
+  #makeView textarea:focus { outline:none; border-color:var(--accent); }
+  #makeView .mksend { width:44px; height:44px; flex:0 0 auto; display:none;
+                      align-items:center; justify-content:center; color:var(--accent); }
   .ascreen .abody { flex:1; overflow-y:auto; overscroll-behavior:contain;
                     padding:calc(var(--inset-top) + 14px) 14px calc(var(--inset-bottom) + 24px); }
 
@@ -820,6 +854,34 @@
   </header>
   <div class="cpwrap" id="compWrap"></div>
   <div class="cpbar" id="compBar"></div>
+</div>
+
+<!-- ★ 制作页（2026-10-07）—— 工坊里的对话在这儿 ✓。
+     它是**一个任务自己的页** ✓：从「＋ 做一个新的」或组件页的「继续改」进来 ✓。 -->
+<div class="screen ascreen" id="makeView">
+  <header class="sub">
+    <button class="icon-btn back" id="makeBack" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 4.5 8.5 12 15 19.5" />
+      </svg>
+    </button>
+    <h2 id="makeTitle">做一个新的</h2>
+    <div class="spacer"></div>
+  </header>
+  <div class="mkbody" id="makeMsgs"></div>
+  <div class="mkst" id="makeStatus" hidden><i></i><span id="makeStatusText"></span></div>
+  <div class="mkfoot">
+    <textarea id="makeText" rows="1" placeholder="想做个什么？"></textarea>
+    <button class="mksend" id="makeSend" aria-label="发送">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+           stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21.4 12 3.6 21 8.4 12 3.6 3z"/>
+      </svg>
+    </button>
+  </div>
 </div>
 
 <!-- 设置 -->
@@ -1560,6 +1622,7 @@
     if ($('#sheet').classList.contains('on')) { closeSheet(); return; }
     // ★ 创意工坊那两屏（2026-10-07）—— **压在管家那三屏上面** ✓：
     //   组件页 > 工坊 > 编状态 > 改资料 > 管家列表 > 群设置 ✓。
+    if ($('#makeView').classList.contains('on')) { closeMake(); return; }
     if ($('#compView').classList.contains('on')) { closeComp(); return; }
     if ($('#workshop').classList.contains('on')) { closeWorkshop(); return; }
     if ($('#agentEdit').classList.contains('on')) { closeAgentEdit(); return; }
@@ -2233,6 +2296,28 @@
       else if (pkt.type === 'agent_stream') {
         if (d.group_id !== group.id) return;
         if (d.done) { clearStream(); setStatus('idle'); } else appendStream(d.delta);
+      }
+      // ★ 工坊那三个（2026-10-07）—— **只在制作页开着、而且是对的那个任务时**才理 ✓。
+      //   群聊页对这几个类型是**直接忽略**的 ✓（未知类型落空 ✓）——
+      //   所以工坊里说的话，群聊那边一个字都不会冒出来 ✓。
+      else if (pkt.type === 'ws_message') {
+        if (!$('#makeView').classList.contains('on')) return;
+        if (d.group_id !== group.id) return;
+        if ((d.slug || '') !== wsCur.slug) return;
+        if (d.sender_type === 'agent') { wsCur.streaming = null; setMakeStatus('idle'); }
+        addMakeMsg(d);
+      }
+      else if (pkt.type === 'ws_stream') {
+        if (!$('#makeView').classList.contains('on')) return;
+        if (d.group_id !== group.id || (d.slug || '') !== wsCur.slug) return;
+        if (!wsCur.streaming) wsCur.streaming = addMakeMsg({ sender_type: 'agent', content: '' });
+        wsCur.streaming.textContent += (d.delta || '');
+        const box = $('#makeMsgs'); box.scrollTop = box.scrollHeight;
+      }
+      else if (pkt.type === 'ws_status') {
+        if (!$('#makeView').classList.contains('on')) return;
+        if (d.group_id !== group.id) return;
+        setMakeStatus(d.state);
       }
       else if (pkt.type === 'group_update') { if (d.group_id === group.id) refreshGroup(); }
       else if (pkt.type === 'unauthorized') logout();
@@ -3172,8 +3257,103 @@
   };
 
   // 「＋ 做一个新的」—— 制作页在 P3 ✓。现在**说实话** ✓，不指着一个还没做的流程 ✗。
-  const startMaking = () => {
-    toast('做组件的对话入口还在做——接上之后在这里就能直接说');
+  const startMaking = () => openMake('', '');
+
+  // ── 制作页：工坊里的那段对话（2026-10-07）────────────────────────────
+  //
+  // ⚠️ **和群聊那段不是一套东西** ✗→✓：群聊是"群里好几个人在说话、它自己决定要不要插嘴" ✓，
+  //    那边有判断闸、缓冲合并、说话前复审 ✓；这里是**你一个人对着它** ✓ —— 那些一个都不要 ✓
+  //    （留着只会带来「它怎么又不理我」✓，App 管家那边已经得过这个结论 ✓）。
+  //
+  // 服务端那边同样是分开的：**另一个会话 id**（`…-diy-u<你>` ✓）
+  // + **另一个消息表**（`workshop_messages` ✓）→ 群聊一个字都不会多 ✓。
+  // 只有两个关键节点会往群里发系统消息（开工 / 做好 ✓）——那是服务端发的 ✓。
+  const wsCur = { slug: '', streaming: null, seen: {} };
+
+  const openMake = async (slug, title) => {
+    wsCur.slug = slug || '';
+    wsCur.streaming = null;
+    wsCur.seen = {};
+    $('#makeTitle').textContent = title || (slug ? slug : '做一个新的');
+    const box = $('#makeMsgs');
+    box.innerHTML = '';
+    const hint = document.createElement('div');
+    hint.className = 'mknote';
+    hint.textContent = slug
+      ? '说说你想怎么改。它会先问清「要看什么」，再动手。'
+      : '说说你想要什么。它会先问清「要看什么」——不用懂技术，说得越像聊天越好。';
+    box.appendChild(hint);
+    pushScreen('makeView');
+    // 拉历史（**只属于你自己** ✓ —— 工坊的会话是按人分的 ✓）
+    try {
+      const d = await api(`/workshop/${group.id}/chat?slug=${encodeURIComponent(wsCur.slug)}`);
+      (d.messages || []).forEach(m => addMakeMsg(m));
+    } catch (e) {
+      toast('读不到工坊的对话：' + e.message);
+    }
+    const ta = $('#makeText');
+    if (ta) { ta.value = ''; syncMakeSend(); }
+  };
+
+  const closeMake = () => {
+    popScreen('makeView');
+    // ⚠️ 退回工坊要重画一次 ✓ —— 说不定刚刚做好了一个 ✓（那它会出现在实验区 ✓）
+    if ($('#workshop').classList.contains('on')) renderWorkshop();
+  };
+
+  const addMakeMsg = (m) => {
+    if (m && m.id != null) {
+      if (wsCur.seen[m.id]) return;      // WS 推回来的 + 本地先画的那条，只算一次 ✓
+      wsCur.seen[m.id] = 1;
+    }
+    const box = $('#makeMsgs');
+    const row = document.createElement('div');
+    row.className = 'mkrow ' + (m.sender_type === 'user' ? 'mine' : 'agent');
+    const b = document.createElement('div');
+    b.className = 'mkbub';
+    b.textContent = m.content || '';     // textContent：不进 innerHTML ✓
+    row.appendChild(b);
+    box.appendChild(row);
+    box.scrollTop = box.scrollHeight;
+    return b;
+  };
+
+  const setMakeStatus = (state) => {
+    const el = $('#makeStatus');
+    if (!el) return;
+    const text = { thinking: '正在想…', working: '正在做（这一步它交给一个小助手去写，要等一会儿）',
+                   done: '做好了', idle: '' }[state] || '';
+    // ⚠️ 写那个 **`<span>`**，不是外层 ✗→✓ —— 外层里还有个转圈的 `<i>` ✓，
+    //    往外层写 textContent 会**把转圈一起抹掉** ✓（文字有了、圈没了 ✓，看着像卡住 ✓）。
+    $('#makeStatusText').textContent = text;
+    el.hidden = !text;
+    const box = $('#makeMsgs');
+    if (text) box.scrollTop = box.scrollHeight;
+  };
+
+  const sendMake = async () => {
+    const ta = $('#makeText');
+    const t = (ta.value || '').trim();
+    if (!t) return;
+    ta.value = ''; syncMakeSend();
+    try {
+      const d = await api(`/workshop/${group.id}/chat`, {
+        method: 'POST', body: JSON.stringify({ content: t, slug: wsCur.slug }),
+      });
+      addMakeMsg(d.message);              // 先画出来 ✓（WS 也会推一次，靠 id 去重 ✓）
+    } catch (e) {
+      toast('没发出去：' + e.message);
+      ta.value = t; syncMakeSend();
+    }
+  };
+
+  const syncMakeSend = () => {
+    const ta = $('#makeText');
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(120, ta.scrollHeight) + 'px';
+    const has = !!(ta.value || '').trim();
+    $('#makeSend').style.display = has ? 'flex' : 'none';
   };
 
   $('#openSettings').onclick = openSettings;
@@ -3181,6 +3361,10 @@
   $('#openWorkshop').onclick = openWorkshop;
   $('#backWorkshop').onclick = closeWorkshop;
   $('#compBack').onclick = closeComp;
+  $('#makeBack').onclick = closeMake;
+  $('#makeSend').onclick = sendMake;
+  $('#makeText').oninput = syncMakeSend;
+  $('#makeText').onkeydown = (ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); sendMake(); } };
   $('#backChat').onclick = closeSettings;
 
   const logout = async () => {
