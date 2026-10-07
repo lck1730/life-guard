@@ -166,6 +166,42 @@ CREATE TABLE IF NOT EXISTS ledger_entries (
 );
 CREATE INDEX IF NOT EXISTS idx_ledger_group ON ledger_entries(group_id, spent_at DESC);
 
+-- ── 创意工坊：用户做的组件 ──────────────────────────────────────────────
+--
+-- ★ **状态和版本在这里，不在文件里** ✗→✓ —— 2026-10-07 定的。
+--   文件（`var/components/g<群号>/<slug>/v<N>/`）只放**内容** ✓；
+--   "这一版是实验还是正式"由服务端持有 ✓。
+--
+--   为什么非这样不可：`meta.json` 是 **agent 自己填的** ✓。
+--   状态放那儿，它写一次 `"state":"live"` 就把组件直接送进正式区 ✓，
+--   而"用户在工坊里点确认才转正"当场失效 ✗。
+--
+-- 三态：`draft`（做完还没启用）/ `live`（正在用）/ `archived`（被新版顶下来的旧正式版）。
+-- ⚠️ 第三个不能省 ✗ —— 少了它，"旧的留着不删"这句话没地方放 ✓。
+--
+-- ⚠️ **部分唯一索引是最后一道，也是唯一一道绕不过的** ✓ ——
+--    "同一个组件只能有一个正式版"靠它 ✓，不靠代码里记得先 archive 旧的 ✓
+--    （和 `groups.profile` 那个唯一索引同一手法 ✓）。
+CREATE TABLE IF NOT EXISTS components (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    slug       TEXT    NOT NULL,          -- 英文短名，也是目录名（中文名会带来编码的麻烦）
+    version    INTEGER NOT NULL,          -- 第几版，**服务端自增**，不接受 agent 传
+    state      TEXT    NOT NULL,          -- draft | live | archived
+    title      TEXT,
+    icon       TEXT,
+    data_json  TEXT,                      -- meta.json 里那份 data 声明
+    note       TEXT,                      -- NOTE.md 的正文（头部由服务端拼）
+    created_at INTEGER NOT NULL,
+    enabled_at INTEGER,                   -- 什么时候转正的
+    enabled_by INTEGER,                   -- 谁点的（2-10 人的群里，这个信息有用）
+    UNIQUE(group_id, slug, version)
+);
+CREATE INDEX IF NOT EXISTS idx_components_group
+    ON components(group_id, state, id DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_components_one_live
+    ON components(group_id, slug) WHERE state = 'live';
+
 -- 登录失败计数。存在的理由：密码是用户自设的短密码，一旦服务被暴露，
 -- 没有限流就是几秒钟的事。
 --

@@ -10,11 +10,15 @@ import asyncio
 import json
 import hashlib
 import logging
+import re
+import shutil
 import time
 
 import httpx
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+from pydantic import BaseModel, Field
 
 import jwt
 from fastapi import (
@@ -422,7 +426,7 @@ async def components_list(
     group_id: int = Query(...), user: dict = Depends(current_user)
 ) -> dict:
     await require_member(group_id, user["id"])
-    return {"components": _scan_components(group_id)}
+    return {"components": await _scan_components(group_id)}
 
 
 def group_components_dir(group_id: int) -> Path:
@@ -435,67 +439,123 @@ def group_components_dir(group_id: int) -> Path:
     return settings.components_dir / f"g{int(group_id)}"
 
 
-def _scan_components(group_id: int) -> list[dict]:
-    out: list[dict] = []
-    base = group_components_dir(group_id)
-    if not base.is_dir():
-        return out
-    for d in sorted(base.iterdir()):
-        if not d.is_dir() or not (d / "index.html").exists():
-            continue
-        meta: dict = {}
-        mf = d / "meta.json"
-        if mf.exists():
-            try:
-                meta = json.loads(mf.read_text(encoding="utf-8"))
-            except Exception:  # noqa: BLE001
-                log.warning("组件 %s 的 meta.json 读不出来，用默认值", d.name)
-        out.append({"name": d.name,
-                    "title": str(meta.get("title") or d.name),
-                    "icon": str(meta.get("icon") or "🧩")})
-    return out
+def component_version_dir(group_id: int, slug: str, version: int) -> Path:
+    """一版组件住的地方：`g<群号>/<slug>/v<N>/`。
+
+    ⚠️ **一版一个目录** ✗→✓ —— "不满意再做一版、旧的留着不删"要有地方落 ✓。
+    覆盖同一个目录就没法回头看了 ✓。
+    """
+    return group_components_dir(group_id) / slug / f"v{int(version)}"
+
+
+async def _scan_components(group_id: int) -> list[dict]:
+    """这个群有哪些组件、各自到哪一步了 —— **以库为准** ✓。
+
+    ⚠️ **列表从库读，不从目录扫** ✗→✓ —— 状态（实验/正式/旧版）在库里 ✓
+    （见 `db.py` 那句"状态和版本在这里，不在文件里"✓），
+    扫目录只知道"有哪些文件夹" ✗，不知道哪个是正在用的 ✓。
+
+    每个 slug 回一条，带**它的正式版**和**它最新的实验版** ✓ ——
+    界面上那三个区就是从这两个字段分出来的 ✓：
+      · 有 `live`   → 正常使用区 ✓
+      · 有 `draft`  → 实验区 ✓（`live` 和 `draft` 同时有 = "改了还没启用" ✓）
+    """
+    rows = await fetch_all(
+        "SELECT slug, version, state, title, icon, created_at, enabled_at, enabled_by "
+        "FROM components WHERE group_id = ? ORDER BY slug ASC, version DESC",
+        (group_id,),
+    )
+    out: dict[str, dict] = {}
+    for r in rows:
+        slug = str(r["slug"])
+        it = out.setdefault(slug, {"slug": slug, "title": r["title"] or slug,
+                                   "icon": r["icon"] or "🧩",
+                                   "live": None, "draft": None, "versions": []})
+        it["versions"].append(int(r["version"]))
+        if r["state"] == "live" and it["live"] is None:
+            it["live"] = {"version": int(r["version"]), "at": r["enabled_at"],
+                          "by": r["enabled_by"]}
+            # 名字和图标**以正在用的那一版为准** ✓ —— 改版时可能改了名字 ✓
+            it["title"] = r["title"] or it["title"]
+            it["icon"] = r["icon"] or it["icon"]
+        elif r["state"] == "draft" and it["draft"] is None:
+            # 行是按版本**倒序**来的 ✓ → 第一条 draft 就是最新的 ✓
+            it["draft"] = {"version": int(r["version"]), "at": r["created_at"]}
+    return [out[k] for k in sorted(out)]
+
+
+#: 组件短名的形状。**只允许小写字母、数字、连字符** ✓ ——
+#: 中文名会带来 URL 编码、文件名编码两处麻烦 ✓，不值当 ✓。
+_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
+
+
+def valid_slug(name: str) -> bool:
+    return bool(name) and bool(_SLUG_RE.match(name))
+
+
+class ComponentEnableIn(BaseModel):
+    version: int = Field(ge=1)
+
+
+async def _pick_component_version(group_id: int, slug: str, version: int | None) -> dict | None:
+    """挑一版：给了版本号就用它 ✓，没给就**先用正在用的、没有再用最新的** ✓。
+
+    没给版本时的那条兜底很重要 ✗→✓ —— 一个刚做完、还没启用的组件（只有 draft ✓）
+    也应当能预览 ✓，否则"点开看看"这件事在启用之前根本做不到 ✓。
+    """
+    if version:
+        return await fetch_one(
+            "SELECT * FROM components WHERE group_id = ? AND slug = ? AND version = ?",
+            (group_id, slug, int(version)))
+    row = await fetch_one(
+        "SELECT * FROM components WHERE group_id = ? AND slug = ? AND state = 'live' "
+        "ORDER BY version DESC LIMIT 1", (group_id, slug))
+    if row:
+        return row
+    return await fetch_one(
+        "SELECT * FROM components WHERE group_id = ? AND slug = ? "
+        "ORDER BY version DESC LIMIT 1", (group_id, slug))
 
 
 @app.get("/api/components/{name}")
 async def component_render(
-    name: str, group_id: int = Query(...), user: dict = Depends(current_user)
+    name: str, group_id: int = Query(...), v: int | None = Query(None),
+    user: dict = Depends(current_user),
 ) -> dict:
     """把一个组件连同它要的数据一起交出去。
 
-    **路径穿越要挡住**：`name` 是 URL 里来的，`../` 一下就能读到别处去。
-    只允许单层目录名、且必须真的在**这个群自己的**目录底下。
+    **路径穿越要挡住**：`name` 是 URL 里来的。两道防护都在 ✓ ——
+    名字必须符合 slug 形状 ✓，目录必须真的在**这个群自己的**仓库底下 ✓。
     """
     await require_member(group_id, user["id"])
-    if not name or "/" in name or "\\" in name or name.startswith("."):
+    if not valid_slug(name):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
-    base = group_components_dir(group_id)
-    d = (base / name).resolve()
-    # ⚠️ `str.startswith` → `is_relative_to` ✗→✓ —— 2026-10-07：
-    #    前缀比较对 `/a/b` vs `/a/bc` 会**误判通过** ✗（`/a/bc/x` 确实"以 /a/b 开头"✓）。
-    #    现在因为"名字不许含 `/`"打不到 ✓，但这是**两道防护里的一道** ✓，
-    #    靠另一道恰好能兜住，不该是它继续这么写的理由 ✗。
-    #    （`routes_internal.py` 的 `/image` 是同一个写法 ✓ —— 一起改 ✓。）
-    if not d.is_relative_to(base.resolve()) or not d.is_dir():
+    row = await _pick_component_version(group_id, name, v)
+    if not row:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"没有 `{name}` 这个组件")
 
+    base = group_components_dir(group_id).resolve()
+    d = component_version_dir(group_id, name, int(row["version"])).resolve()
+    # ⚠️ `str.startswith` → `is_relative_to` ✗→✓ —— 2026-10-07：
+    #    前缀比较对 `/a/b` vs `/a/bc` 会**误判通过** ✗（`/a/bc/x` 确实"以 /a/b 开头"✓）。
+    #    现在因为"名字必须符合 slug"打不到 ✓，但这是**两道防护里的一道** ✓，
+    #    靠另一道恰好能兜住，不该是它继续这么写的理由 ✗。
+    #    （`routes_internal.py` 的 `/image` 是同一个写法 ✓ —— 一起改了 ✓。）
+    if not d.is_relative_to(base):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"没有 `{name}` 这个组件")
     html_file = d / "index.html"
     if not html_file.exists():
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"组件 `{name}` 没有 index.html")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"组件 `{name}` 这一版没有 index.html")
     try:
         html = html_file.read_text(encoding="utf-8", errors="replace")[:400_000]
     except OSError:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "组件读不出来")
 
-    meta: dict = {}
-    mf = d / "meta.json"
-    if mf.exists():
-        try:
-            meta = json.loads(mf.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001
-            pass
-
     data: dict = {}
-    spec = meta.get("data") or {}
+    try:
+        spec = json.loads(row["data_json"] or "{}") or {}
+    except Exception:  # noqa: BLE001
+        spec = {}
     if "records" in spec:
         spec_r = spec.get("records") or {}
         try:
@@ -508,11 +568,79 @@ async def component_render(
             log.exception("组件 %s 取数据失败", name)
             data["records"] = {"error": "数据没取到"}
 
-    return {"name": name,
-            "title": str(meta.get("title") or name),
-            "icon": str(meta.get("icon") or "🧩"),
+    return {"name": name, "version": int(row["version"]), "state": row["state"],
+            "title": str(row["title"] or name),
+            "icon": str(row["icon"] or "🧩"),
             "html": html,
             "data": data}
+
+
+@app.post("/api/components/{name}/enable")
+async def component_enable(
+    name: str, body: ComponentEnableIn, group_id: int = Query(...),
+    user: dict = Depends(current_user),
+) -> dict:
+    """**用户点"启用"** —— 把某一版转成"正在用"的那一版。
+
+    ⚠️ 这一步**只有用户能做** ✓（agent 没有这个工具 ✓）——
+        "做完先进实验区、用户点头才转正"这条产品逻辑就落在这儿 ✓。
+
+    ⚠️ **顺序不能反** ✗→✓：先把现在那个 live 降成 archived ✓，
+       再把目标版置成 live ✓。反过来的话，中间那一瞬间会**同时有两个 live** ✓，
+       撞上 `idx_components_one_live` 那条部分唯一索引 ✓ → 直接报错 ✓。
+       （那条索引是"同一个组件只能有一个正式版"的最后一道 ✓，
+        也是唯一一道绕不过的 ✓ —— 见 `db.py` 里那段注释 ✓。）
+        ⚠️ 两条语句之间理论上可能被别的请求插进来 ✓。单用户点按钮的场景下
+          撞不上 ✓；真撞上会**报错而不是写坏** ✓（正是那条索引的价值 ✓）。
+    """
+    await require_member(group_id, user["id"])
+    if not valid_slug(name):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
+    row = await fetch_one(
+        "SELECT id, version FROM components WHERE group_id = ? AND slug = ? AND version = ?",
+        (group_id, name, int(body.version)))
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"没有 `{name}` 的第 {body.version} 版")
+    await execute(
+        "UPDATE components SET state = 'archived' WHERE group_id = ? AND slug = ? AND state = 'live'",
+        (group_id, name))
+    await execute(
+        "UPDATE components SET state = 'live', enabled_at = ?, enabled_by = ? WHERE id = ?",
+        (now(), user["id"], row["id"]))
+    log.info("组件转正：群 %s 的 %s v%s（用户 %s）", group_id, name, body.version, user["id"])
+    return {"ok": True, "slug": name, "version": int(body.version)}
+
+
+@app.delete("/api/components/{name}")
+async def component_delete(
+    name: str, group_id: int = Query(...), v: int | None = Query(None),
+    user: dict = Depends(current_user),
+) -> dict:
+    """删掉实验版。
+
+    ⚠️ **正在用的那一版删不掉** ✗→✓ —— 要删得先（或者同时）把它降下来 ✓。
+       否则一次误点就让"正常使用区"里少一个东西 ✓，而且**没有任何提示** ✓。
+       给了 `v` 就是"明确要删这一版" ✓ —— 那时才允许删 live ✓。
+    """
+    await require_member(group_id, user["id"])
+    if not valid_slug(name):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
+    where = "group_id = ? AND slug = ?" + (" AND version = ?" if v else " AND state = 'draft'")
+    params = (group_id, name, int(v)) if v else (group_id, name)
+    rows = await fetch_all(f"SELECT version, state FROM components WHERE {where}", params)
+    if not rows:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "没有可删的版本")
+    if not v and any(r["state"] == "live" for r in rows):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "正在用的那一版不能就这么删；先启用别的版本，或者指定版本号")
+    for r in rows:
+        await execute("DELETE FROM components WHERE group_id = ? AND slug = ? AND version = ?",
+                      (group_id, name, int(r["version"])))
+        d = component_version_dir(group_id, name, int(r["version"]))
+        if d.is_relative_to(group_components_dir(group_id)) and d.is_dir():
+            shutil.rmtree(d, ignore_errors=True)
+    log.info("组件删除：群 %s 的 %s，%d 版", group_id, name, len(rows))
+    return {"ok": True, "deleted": [int(r["version"]) for r in rows]}
 
 
 @app.get("/preview")
