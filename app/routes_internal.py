@@ -39,7 +39,7 @@ from . import records as rec
 from . import reminders as rem
 from .auth import PREVIEW_SCOPE, make_token
 from .config import settings
-from .db import fetch_all, fetch_one, now
+from .db import execute, fetch_all, fetch_one, now
 from .messages import create_message
 
 log = logging.getLogger("lifeguard.internal")
