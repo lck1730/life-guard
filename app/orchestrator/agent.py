@@ -602,6 +602,7 @@ async def _stream_completion(
     deep: bool = False,
     system: str | None = None,
     session_id: str | None = None,
+    role: str | None = None,
 ) -> AsyncIterator[str]:
     """SSE 流式补全，逐段 yield 正文。
 
@@ -622,8 +623,24 @@ async def _stream_completion(
     if images:
         content = [{"type": "text", "text": text_part}] + images
 
+    # ★★ **按用途选模型：必须连 `provider` 一起给** ✗→✓（2026-10-07 深夜，
+    #   用户报的「diy 管家频繁报错，似乎和 dots 有关系，但我 diy 不是用的商汤吗」✓）。
+    #
+    #   ⚠️ **根因**：Hermes 那条 OpenAI 兼容面上，**单独给 `model` 会被它丢掉** ✗
+    #      （`api_server_openai_routes` 的 `direct_model_requests` 默认关 ✓）。
+    #      所以我们原来只能把"用途"写进 **profile 的 `model.default`** ✓ ——
+    #      可那是**一个 profile 一个值** ✗，而 diy 和群聊**住同一个 profile** ✗ →
+    #      diy 那一轮带的是 `chat` ✓ → 网关按 chat 路由 ✓ → **走了 dots** ✗ ✓
+    #      （dots 是那个写不出摘要、老报错的 ✓，用户说的"和 dots 有关系"就是这个 ✓）。
+    #
+    #   ★ 但读源码发现：`_request_agent_overrides` 里 `if provider:` ✓ 时会认 `model` ✓
+    #     （`if model and model != virtual_model and (provider or allow_bare_model)` ✓）。
+    #     → **带上 `provider: "custom"` + 用途名当 model** 就被认 ✓ ✓
+    #       （`custom` = 用 profile 里那套 base_url/api_key ✓，也就是我们自己的模型网关 ✓）。
+    #     ⚠️ **只在给了 `role` 时才这么做** ✗ —— 群聊那条路保持原样 ✓
+    #        （它本来就是 profile 默认 ✓，改它是没有收益的额外风险 ✓）。
     payload = {
-        "model": "hermes-agent",
+        "model": role if role else "hermes-agent",
         "stream": True,
         "messages": [
             {"role": "system",
@@ -642,6 +659,8 @@ async def _stream_completion(
             )
         },
     }
+    if role:
+        payload["provider"] = "custom"
     base_url, api_key = _endpoint_for(profile)
     headers = {
         "Authorization": f"Bearer {api_key}",

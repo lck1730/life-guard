@@ -907,6 +907,42 @@ class ComponentSlugIn(BaseModel):
     slug: str = Field(default="", max_length=32)
 
 
+#: 组件的图标**要么是一个 emoji，要么是一张内联的小图** ✓。
+#
+# ★ 2026-10-07 深夜用户提的：「创意工坊组件展览页的图标似乎只能是一种样式，
+#   没法用图片？我让 diy 助手换张木鱼图它说换不了」✓。
+#
+# ⚠️ **必须是"内联的 data URL"，不能是外部地址** ✗ —— 组件和它的图标
+#    全都在沙箱里 ✓（外面够不着 ✓，图也不能联网取 ✓）。
+#    而 agent 手里没有图片文件 ✓ —— 但它**能画 SVG** ✓：
+#    把 SVG 转成 `data:image/svg+xml;base64,…` 就是一张自带的图 ✓ ✓。
+#
+# ⚠️ **`<img>` 里的 SVG 不能执行脚本** ✓（浏览器的规矩 ✓），所以放它不新增口子 ✓；
+#    但**大小要卡死** ✗ —— 图标要塞进每一条列出它的接口里 ✓，
+#    一个几百 KB 的图标会把列表接口拖垮 ✓。
+_ICON_DATA_RE = re.compile(r"^data:image/(?:png|jpeg|jpg|webp|svg[+]xml);base64,", re.I)
+_ICON_MAX = 24 * 1024          # 24KB —— 一个图标够得不能再够了 ✓
+
+
+def _icon_of(raw: str) -> str:
+    """把 agent 给的图标**收拾成能直接用的样子** ✓（坏的一律退回 🧩 ✓）。
+
+    ⚠️ **坏的不抛** ✗→✓ —— 这是模型写的东西 ✓。一个图标写得不对，
+       不该让**整个组件**落不下来 ✓（那正是"小事拖垮大事"的形状 ✓）。
+    """
+    s = (raw or "").strip()
+    if not s:
+        return "🧩"
+    if s.startswith("data:"):
+        if _ICON_DATA_RE.match(s) and len(s) <= _ICON_MAX:
+            return s
+        log.warning("组件图标：data URL 不合法或过大（%d 字节），退回默认", len(s))
+        return "🧩"
+    # 不是 data URL → 当 emoji 用 ✓。**最多留 4 个字符** ✓
+    # （"👨👩👧" 这种组合 emoji 会长一点 ✓，再长就该是写错了 ✓）。
+    return s[:4] or "🧩"
+
+
 def _slug_ok(slug: str) -> bool:
     """和后端 `main.py` 里那条**同一个形状** ✓（小写字母、数字、连字符，≤32）✓。
 
@@ -1091,7 +1127,7 @@ async def components_save(body: ComponentSaveIn) -> dict:
         "INSERT INTO components(group_id, slug, version, state, title, icon,"
         " data_json, note, created_at, task_id, spot_json)"
         " VALUES(?,?,?,'draft',?,?,?,?,?,?,?)",
-        (group_id, slug, version, want_title, body.icon.strip() or "🧩",
+        (group_id, slug, version, want_title, _icon_of(body.icon),
          json.dumps(body.data or {}, ensure_ascii=False), body.note.strip(),
          int(time.time()), int(task_id) if task_id else None,
          json.dumps(body.spot or {}, ensure_ascii=False)))

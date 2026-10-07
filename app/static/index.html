@@ -161,7 +161,11 @@
      「只要是生活管家里聊天提到了某存在的组件，都标蓝色可跳转」✓）。
      ⚠️ 判据是**这个群里到底有没有这个组件** ✓ —— 不是"消息里有没有那种字样" ✗：
         没做出来的名字**不标** ✓（点了会 404 ✓，那比不标更糟 ✓）。 */
-  .bubble .clink { color:var(--accent); }
+  /* ⚠️ **不能限定在 `.bubble` 里** ✗→✓（用户报的：「主群里提示完成后组件名称
+     不是蓝色字体」✓）—— 那两条组件提示是**系统消息** ✓，住在 `.sysrow` 里 ✓，
+     而 `.sysrow` **不是气泡** ✗ → 写在 `.bubble .clink` 下**颜色根本不生效** ✓
+     （类加上了、点击也绑上了 ✓，就是**不变蓝** ✓ —— 所以看着像"没这个功能"✓）。 */
+  .clink { color:var(--accent); }
   .row.mine .bubble { background:var(--accent-bg); border-bottom-right-radius:4px; }
   /* 系统提示：居中、灰、无头像无气泡。
      **故障通报必须一眼看出不是管家在说话**——混在气泡里的话，用户会以为
@@ -619,6 +623,11 @@
   #wsNav .navrow .avs { display:flex; flex:0 0 auto; padding-right:6px; }
   /* 还没做出组件的那种：**同一个图标、淡一点** ✓（见 `navRow` 那段 ✓）。 */
   #wsNav .navrow .ico.off { opacity:.45; }
+  /* ★ 图标是**一张图**的时候 ✗→✓（2026-10-07 深夜 ✓）：铺满那个方块 ✓。
+     ⚠️ 用 `object-fit:cover` ✓ —— `contain` 会让方形的图四周留一圈缝 ✓，
+        在一列小方格里看着像"没对齐" ✓（那排图标就不再是一排了 ✓）。 */
+  .imgi img { width:100%; height:100%; object-fit:cover; border-radius:inherit;
+              display:block; }
   #wsNav .navrow .avs .av { width:26px; height:26px; border-radius:8px;
                             background:var(--panel2); color:var(--muted);
                             display:flex; align-items:center; justify-content:center;
@@ -940,9 +949,13 @@
          现在右边真有一个 40px 的按钮 ✓，占位就是多余的 ✗。
          ⚠️ 图标是 SVG（和 ☰ / ↻ 同一套画法 ✓）而不是文字或 emoji ✗ ——
             字形的墨迹位置算不准 ✓，就没法跟另外两个对齐 ✓。 -->
+    <!-- ★ 2026-10-07 深夜用户定的：「右上角的创意工坊按钮稍微大一点」✓。
+         ⚠️ **图标大一号，外面那个 40px 的方框不动** ✗ ——
+            左中右各 40px 是"群名居中"的保证 ✓（见 `header.top .spacer` 那段 ✓），
+            方框一变宽，标题就会被顶歪 ✓。 -->
     <div class="icon-btn plain" id="openWorkshop" aria-label="创意工坊">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-           stroke="currentColor" stroke-width="2"
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none"
+           stroke="currentColor" stroke-width="1.9"
            stroke-linecap="round" stroke-linejoin="round">
         <rect x="6" y="6" width="5" height="5" rx="1.4" />
         <rect x="13" y="6" width="5" height="5" rx="1.4" />
@@ -3640,7 +3653,7 @@
     // ⚠️ 这里原来有一颗「未固化」的小黄点 ✓ —— 2026-10-07 深夜跟着"固化"
     //    整套一起删了 ✓（用户定的："组件聊天没有所谓的固化和非固化概念了"✓）。
     ic.className = 'ico';
-    ic.textContent = c.icon || '🧩';
+    setIcon(ic, c.icon);
     const nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = c.title || c.slug;
@@ -3868,6 +3881,16 @@
     t.disabled = !wsCur.slug;
     t.onclick = () => {
       if (!wsCur.slug) return;
+      // ⚠️ **先把这一屏关掉再推组件页** ✗→✓（2026-10-07 深夜，用户报的
+      //    「点上上面居中的组件名称也无法直接跳转」✓）。
+      //    原因是一行 z-index ✗：`#wsChat` 是 **25** ✓、`#compView` 是 **23** ✓ ——
+      //    **直接推的话组件页被压在聊天底下** ✓，屏幕上什么都不变 ✓
+      //    （"点了没反应"里最难查的一种 ✓：代码执行了、接口也请求了 ✓）。
+      //    为什么不干脆把 compView 调高 ✗：从组件页那个图标**进聊天**时 ✓，
+      //    聊天必须**在组件页上面** ✓（那是反过来的方向 ✓）—— 一个固定值表达不了两边 ✓。
+      //    关掉再推是唯一两边都成立的做法 ✓：退回时落到导航屏 ✓
+      //    （和用户定的"组件界面返回落在导航"一致 ✓）。
+      closeWsChat();
       openComp(wsCur.slug, wsCur.title || wsCur.slug);
     };
   };
@@ -3972,6 +3995,29 @@
     box.appendChild(list);
   };
 
+  /**
+   * 画**组件的图标** ✓ —— 它可能是 emoji ✓，也可能是一张**内联的小图** ✓。
+   *
+   * ★ 2026-10-07 深夜用户提的：「组件展览页的图标似乎只能是一种样式，没法用图片？
+   *   我让 diy 助手换张木鱼图它说换不了」✓。
+   *   现在 `icon` 允许是 `data:image/...;base64,...` ✓（收拾和大小上限在后端 ✓，
+   *   见 `routes_internal._icon_of` ✓）—— agent 能画 SVG ✓，转成 data URL 就是一张自带图 ✓。
+   */
+  const setIcon = (el, icon) => {
+    const v = String(icon || '');
+    el.textContent = '';
+    if (v.startsWith('data:image/')) {
+      const im = document.createElement('img');
+      im.src = v;                      // ★ 内联的 ✓ —— 组件在沙箱里，图不能联网取 ✓
+      im.alt = '';
+      el.classList.add('imgi');
+      el.appendChild(im);
+    } else {
+      el.classList.remove('imgi');
+      el.textContent = v || '🧩';
+    }
+  };
+
   /** 把 diy 小助手的头像画到几个地方 ✓ —— 顶栏那颗、气泡旁边、设置屏里 ✓。 */
   const paintDiyAvatar = () => {
     const url = wsCur.assistant.avatar || '';
@@ -4045,7 +4091,9 @@
     //   现在统一是组件图标 ✓，只是**淡一点** ✓（半透明 ✓）——
     //   一眼仍能看出"它跟别的不一样" ✓，但不会以为是另一类 ✓。
     ic.className = 'ico' + (t.slug ? '' : ' off');
-    ic.textContent = '🧩';
+    // ⚠️ 没做出组件的那种**没有自己的图标** ✓ —— 给一个淡一点的默认 ✓
+    //    （`setIcon` 拿到空串会给 🧩 ✓，那正好 ✓）。
+    setIcon(ic, t.icon);
     const col = document.createElement('span');
     col.className = 'col';
     const nm = document.createElement('span');

@@ -200,12 +200,20 @@ async def _my_tasks(group_id: int, user_id: int) -> list[dict]:
         " ORDER BY t.updated_at DESC, t.id DESC",
         (group_id, user_id))
     # 每个 slug 现在的标题 —— 一次查完 ✓（对话一多，逐个查就是 N+1 ✓）
+    # ⚠️ 一次查完 ✓（对话一多，逐个查就是 N+1 ✓）——
+    #    **顺手把 icon 也带回来** ✓：导航那一行左边那个图标就是它 ✓，
+    #    而它可能是 emoji ✓、也可能是一张内联小图 ✓（见 `_icon_of` ✓）。
     titles: dict[str, str] = {}
+    icons: dict[str, str] = {}
     for v in await fetch_all(
-            "SELECT slug, (SELECT title FROM components x WHERE x.group_id = c.group_id"
-            "         AND x.slug = c.slug ORDER BY x.version DESC LIMIT 1) AS title"
+            "SELECT slug,"
+            "       (SELECT title FROM components x WHERE x.group_id = c.group_id"
+            "         AND x.slug = c.slug ORDER BY x.version DESC LIMIT 1) AS title,"
+            "       (SELECT icon FROM components x WHERE x.group_id = c.group_id"
+            "         AND x.slug = c.slug ORDER BY x.version DESC LIMIT 1) AS icon"
             "  FROM components c WHERE group_id = ? GROUP BY slug", (group_id,)):
         titles[str(v["slug"])] = str(v["title"] or "")
+        icons[str(v["slug"])] = str(v["icon"] or "")
     # ★ **每个组件有哪些人参与过**（2026-10-07 深夜 ✓）——
     #   也是**一次查完** ✓（见 `_participants` 那段 ✓）。
     who = await _participants_all(group_id)
@@ -230,6 +238,8 @@ async def _my_tasks(group_id: int, user_id: int) -> list[dict]:
                     #      导航上靠它才认得出来 ✓（不然是一排"还没起名" ✓）。
                     "title": str(r["title"] or (titles.get(slug) if slug else "")
                                  or r["my_title"] or ""),
+                    # 导航那一行左边的图标 ✓（没做出组件的那种是空的 ✓ → 前端给默认 ✓）
+                    "icon": icons.get(slug, "") if slug else "",
                     # ★ **谁参与过这个组件**（同一组件下的对话，不管是谁开的 ✓）——
                     #   导航上那一行右边就是这几个头像 ✓。
                     #   ⚠️ 按 **slug** 取，不按对话 ✓：这个组件的对话可能有好几条
@@ -592,6 +602,11 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                 group_id, text, images, profile,
                 system=system,
                 session_id=diy_session_id_for(group_id, user_id, task_id),
+                # ★ **工坊这条要用 diy 那一档模型** ✗→✓（2026-10-07 深夜 ✓）——
+                #   不写的话它跟着 profile 的默认走 ✓ = `chat` ✓ = **dots** ✗ ✓，
+                #   而 dots 是那个老报错的 ✓（用户报的"diy 怎么在用 dots"就是这个 ✓）。
+                #   见 `_stream_completion` 里那段（为什么非要连 provider 一起给 ✓）。
+                role="diy",
             ):
                 parts.append(piece)
                 # ⚠️ **空的片段不推** ✗→✓（2026-10-07 深夜，用户看着截图报的：
