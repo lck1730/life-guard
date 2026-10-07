@@ -353,6 +353,10 @@ async def _abort(group_id: int, user_id: int) -> int | None:
     if not task.done():
         task.cancel()
     await _void_tickets(task_id)
+    # ⚠️ **切走了就别再等了** ✗→✓ —— 那一轮连同子代理一起被掐了 ✓，
+    #    东西**永远不会来** ✓。不取消的话，poke 会一直问到一个字都没有 ✓，
+    #    最后留下一句"那个助手好像没消息了" ✓ —— 而**是我们自己掐的** ✓。
+    await stop_waiting(task_id)
     return task_id
 
 
@@ -447,19 +451,54 @@ _POKE_TEXT = (
 )
 
 
-def start_waiting(group_id: int, user_id: int, task_id: int) -> None:
-    """记下"这条对话在等子代理交付" ✓（`components/confirm` 那一刻调 ✓）。"""
+async def start_waiting(group_id: int, user_id: int, task_id: int) -> None:
+    """记下"这条对话在等子代理交付" ✓（`components/confirm` 那一刻调 ✓）。
+
+    ⚠️ **内存一份 + 库里一份** ✗→✓（2026-10-07 深夜，用户实测踩到的 ✓）：
+       他在 21:27 派了子代理 ✓、我 21:30 部署重启了一次 ✓ →
+       内存里那份登记**没了** ✓ → "做好了"再也没人替他问 ✓。
+       而**"他做组件的时候我正好在部署"是最常发生的一种** ✓（我改一次就重启一次 ✓）。
+       库里那份是给**启动时捡回来**用的 ✓（见 `restore_waiting` ✓）。
+    """
     _waiting[(group_id, user_id)] = {"task_id": int(task_id),
                                      "next_at": now() + 30,
                                      "deadline": now() + 15 * 60,
                                      "gap": 30}
+    await execute("UPDATE workshop_tasks SET awaiting = ? WHERE id = ?",
+                  (now(), int(task_id)))
 
 
-def stop_waiting(task_id: int) -> None:
+async def stop_waiting(task_id: int) -> None:
     """不用等了 ✓（组件落成了 ✓，或者这一轮已经被切走了 ✓）。"""
     for k, v in list(_waiting.items()):
         if v["task_id"] == int(task_id):
             _waiting.pop(k, None)
+    await execute("UPDATE workshop_tasks SET awaiting = NULL WHERE id = ?", (int(task_id),))
+
+
+async def restore_waiting() -> int:
+    """**启动时把还欠着的那些捡回来** ✓（见 `start_waiting` 那段 ✓）。
+
+    ⚠️ 只捡**还在期限内的** ✓ —— 三天前那条早已作废 ✓，
+       捡回来会立刻触发一次超时提示 ✓（用户早就忘了那回事 ✓）。
+    ⚠️ 启动时**没人正在跑** ✓（刚起来 ✓），所以直接从第一次问开始 ✓。
+    """
+    rows = await fetch_all(
+        "SELECT id, group_id, user_id, awaiting FROM workshop_tasks"
+        " WHERE awaiting IS NOT NULL AND awaiting > ?", (now() - 15 * 60,))
+    for r in rows:
+        _waiting[(int(r["group_id"]), int(r["user_id"]))] = {
+            "task_id": int(r["id"]), "next_at": now() + 20,
+            "deadline": int(r["awaiting"]) + 15 * 60, "gap": 30}
+    if rows:
+        log.info("工坊：捡回了 %d 条「还在等子代理」的对话 ✓", len(rows))
+    return len(rows)
+
+
+def _is_waiting(group_id: int, user_id: int, task_id: int) -> bool:
+    """这条对话**现在还等着子代理交付**吗 ✓（界面上的「组件制作中」就是它 ✓）。"""
+    w = _waiting.get((group_id, user_id))
+    return bool(w) and int(w["task_id"]) == int(task_id)
 
 
 async def poke_loop() -> None:
@@ -471,6 +510,11 @@ async def poke_loop() -> None:
        一直问下去只会每两分钟烧一次模型调用 ✓。放弃时**留一行字**给用户 ✓
        （项目铁律：失败要让人看得见 ✓）。
     """
+    # ★ 先捡回来 ✓ —— 上次是**正在做的时候被重启**的那些 ✓（见 `restore_waiting` ✓）。
+    try:
+        await restore_waiting()
+    except Exception:  # noqa: BLE001
+        log.exception("工坊：捡回「等交付」状态失败（不影响新任务）")
     while True:
         try:
             await asyncio.sleep(10)
@@ -566,9 +610,17 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                           group_id, user_id, task_id)
             answer = ""
         finally:
-            await _push(user_id, {"type": "ws_status",
-                                  "data": {"group_id": group_id, "task_id": task_id,
-                                           "state": "idle"}})
+            # ★ **在等子代理的时候，别把它按回 idle** ✗→✓（2026-10-07 深夜用户定的：
+            #   「只有做完了，它问到并向我反馈后，**组件制作中的提示才会消失**」✓）。
+            #
+            #   ⚠️ 不这么写的话：派完子代理，这一轮就结束了 ✓ → `finally` 推一句 idle ✓
+            #      → 屏幕上"组件制作中"**当场消失** ✗ ✓，而**子代理还要写十几分钟** ✓
+            #      —— 用户看到的是"它不干了" ✓，于是走开/以为卡住 ✓。
+            #   这一句是那件事的**唯一原因** ✓：状态是"事件"，而我们需要它是"状态" ✓。
+            if not _is_waiting(group_id, user_id, task_id):
+                await _push(user_id, {"type": "ws_status",
+                                      "data": {"group_id": group_id, "task_id": task_id,
+                                               "state": "idle"}})
 
         # ★ **"还没交付"就什么都不留** ✗→✓（见 `_waiting` 那段 ✓）——
         #   这一轮是**系统替用户问的** ✓，它没话可说时回 `[SILENT]` ✓。
@@ -811,6 +863,10 @@ async def task_open(group_id: int, task_id: int,
             "messages": rows,                 # 已经收拾好了 ✓（见上面那两行 ✓）
             "editing": editing,
             "assistant": await _assistant(group_id),
+            # ★ **进来的时候它是不是正在做** ✓ —— 状态得能**读**，不能只靠事件 ✗：
+            #   切走再切回来、退出重进、刷新，push 早就过去了 ✓
+            #   → 那三秒里屏幕上是空的 ✓（"组件制作中"看不见了 ✓，而它明明还在做 ✓）。
+            "making": _is_waiting(group_id, user["id"], int(task_id)),
             "busy": _busy(group_id, user["id"])}
 
 

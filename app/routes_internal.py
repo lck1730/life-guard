@@ -985,7 +985,7 @@ async def components_confirm(body: ComponentConfirmIn) -> dict:
     #   只有用户说话才会来 ✓ → 不问的话"做好了"要等他开口 ✓（用户报的就是这个 ✓）。
     #   见 `routes_workshop.poke_loop` ✓。
     if task_id and wait_uid:
-        start_waiting(body.group_id, wait_uid, int(task_id))
+        await start_waiting(body.group_id, wait_uid, int(task_id))
     log.info("组件开工：群 %s 的 %s（票 %s…）", body.group_id, slug, token[:8])
     return {
         "ok": True, "token": token, "slug": slug, "handle": handle,
@@ -1099,7 +1099,7 @@ async def components_save(body: ComponentSaveIn) -> dict:
     # ★ **落成了就别再问了** ✗→✓ —— 那个"等交付"的循环到这里就该停 ✓
     #   （不然它会隔一阵继续问"交付了吗"✓，而东西早就落好了 ✓）。
     if task_id:
-        stop_waiting(int(task_id))
+        await stop_waiting(int(task_id))
     await push_workshop_status(group_id, "done", int(task_id) if task_id else None)
     await _say_system(group_id, "「" + want_title + "」做好了，去创意工坊看看。")
     log.info("组件落成：群 %s 的 %s v%s", group_id, slug, version)
