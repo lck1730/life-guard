@@ -293,6 +293,20 @@ def session_id_for(group_id: int) -> str:
     return f"lifeguard-group-{group_id}"
 
 
+def diy_session_id_for(group_id: int, user_id: int) -> str:
+    """创意工坊那条会话 —— **每用户一条** ✓。
+
+    ⚠️ **不是"每群一条"** ✗→✓ —— 群里两个人同时进工坊会**抢同一条历史、互相串话** ✓。
+    带上 uid 之后各说各的 ✓（插件那边的 `_SESSION_RE` 是 `search` ✓，
+    `…-diy-u7` 照样解析出群号 ✓）。
+
+    ⚠️ **session key 不改** ✓ —— 见 `session_key_for` ✓：
+       共用它 = 记忆是同一份 ✓（它能想起主群聊里说过什么 ✓），
+       而**历史是分开的** ✓（那些来回不进群聊的会话 ✓）。
+    """
+    return f"lifeguard-group-{group_id}-diy-u{user_id}"
+
+
 def session_key_for(group_id: int) -> str:
     """长期记忆作用域。同一群共一份记忆；换群即天然隔离。"""
     return f"lifeguard:group:{group_id}"
@@ -562,6 +576,8 @@ async def _stream_completion(
     profile: str,
     *,
     deep: bool = False,
+    system: str | None = None,
+    session_id: str | None = None,
 ) -> AsyncIterator[str]:
     """SSE 流式补全，逐段 yield 正文。
 
@@ -569,6 +585,12 @@ async def _stream_completion(
     **提示词怎么拼由调用方决定**——因为除了正常发言，还有一次"复审"
     （见 `_reconsider`）要走同一条通道，而它的措辞完全是另一套。
     早先把 prompt 拼装焊死在这里，复审就只能另写一份发送逻辑，那必然会长歪。
+
+    ★ 2026-10-07 又开了两个口子（`system` / `session_id`）✓，给**创意工坊**用 ✓：
+      那边要的是**另一个人格**（"现在在做组件，按 skill 走"✓）
+      + **另一条会话**（`…-diy-u<uid>` ✓，历史分开 ✓）。
+      ⚠️ 但 **session key 不动** ✓ —— 那个是长期记忆的作用域 ✓，
+        共用它 = 它还记着这个群的事 ✓（用户要的"方便询问细节"就在这儿 ✓）。
     """
     # 有图片就发多模态内容：文字在前、图片跟在后面。
     # Hermes 的 API 接受 image_url（http(s) 或 data:），我们给的是内联 data URL。
@@ -580,7 +602,8 @@ async def _stream_completion(
         "model": "hermes-agent",
         "stream": True,
         "messages": [
-            {"role": "system", "content": await _group_persona(group_id)},
+            {"role": "system",
+             "content": system if system is not None else await _group_persona(group_id)},
             {"role": "user", "content": content},
         ],
         # 推理档位。**必须放在 `model_options` 里**——Hermes 只认这个键，
@@ -600,7 +623,7 @@ async def _stream_completion(
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         # 一个群一个会话：历史与人格延续
-        "X-Hermes-Session-Id": session_id_for(group_id),
+        "X-Hermes-Session-Id": session_id or session_id_for(group_id),
         # 长期记忆作用域：每群一份
         "X-Hermes-Session-Key": session_key_for(group_id),
     }
@@ -916,3 +939,76 @@ async def run_turn(
     # 以前这里还会 `gate.mark_spoke`——记冷却、当日预算、提问回执窗口。
     # 那套判断撤掉之后（见 gate.py 顶部），它维护的状态没有消费者了。
     await _idle_status(group_id)
+
+
+async def diy_persona(group_id: int, slug: str = "") -> str:
+    """创意工坊那一轮的**系统提示** ✓ —— 和群聊那份完全不同 ✓。
+
+    只放**配置**（现在是什么场合 ✓）和**流程**（这一步该干什么 ✓）；
+    规矩（说话方式、记忆铁律）在 SOUL.md 里 ✓，不搬过来 ✓。
+
+    ⚠️ 有两句是**因为踩过才写死的** ✗→✓：
+      · 「问体验，不问技术」✓ —— 普通用户不想听 HTML/CSS ✓（用户原话 ✓）。
+      · 「工坊过程别写进长期记忆」✓ —— 那个记忆只有 2200 字符 ✓，
+        几十轮「试了 A 不行」会把它挤爆 ✓（SOUL.md 说派子代理正是为了不让试错
+        占着上下文 ✓，而工坊的人格很容易把它请回来 ✓）。
+    """
+    rows = await fetch_all(
+        "SELECT slug, version, state, title FROM components WHERE group_id = ?"
+        " ORDER BY slug ASC, version DESC", (group_id,))
+    have: list[str] = []
+    seen: set[str] = set()
+    for r in rows:
+        s = str(r["slug"])
+        if s in seen:
+            continue
+        seen.add(s)
+        have.append(f"{r['title'] or s}（{s}，{'正在用' if r['state'] == 'live' else '实验版'}）")
+    existing = ("这个群已经有这些组件：" + "、".join(have) + "。\n"
+                "用户可以让你**改**其中的某一个（先调 component_list / component_note 看清楚）✓，"
+                "也可以做一个新的 ✓。\n") if have else "这个群还没有任何组件 ✓。\n"
+    focus = (f"⚠️ 用户这次是要动 **{slug}** 这个组件 ✓ —— "
+             f"先调 `component_note` 读它自己的笔记 ✓，别凭印象改 ✗。\n") if slug else ""
+
+    return (
+        "你现在在**创意工坊**里 ✓ —— 这是 App 里专门做组件的地方，"
+        "**只有你和他两个人** ✓（不是群聊；说话不用管「该不该接话」✓）。\n"
+        + focus + existing +
+        "\n## 你要做的事\n"
+        "把一个**需求**变成一块能看的组件。流程是固定的，按顺序走：\n"
+        "\n"
+        "**① 问清「要看什么」** —— 只问**体验** ✓，不问技术 ✗。\n"
+        "   该问的：他想看到什么、给谁看、多久看一次、最要紧的是哪个数。\n"
+        "   不该问的：用什么颜色、要不要图表库、HTML 怎么写 ✗（他不需要知道，也不关心）。\n"
+        "   一两轮问清就够 ✓ —— 别把它变成需求评审会 ✗。\n"
+        "\n"
+        "**② 复述一遍，等他点头** ✓ —— 用一句话说清「我打算给你做个什么样的东西」。\n"
+        "   ⚠️ **他没点头就别往下走** ✗。要改就回 ① 再问 ✓。\n"
+        "\n"
+        "**③ 调 `component_confirm(slug, brief)`** ✓ —— 这一步之后才算「开工」✓。\n"
+        "   它会给你一张票和一个暂存路径 ✓。同时群里会出现一条「开工了」的提示 ✓"
+        "（系统发的，不用你管）。\n"
+        "\n"
+        "**④ 用 `delegate_task` 派一个子代理去做** ✓ —— **一定要派** ✗，别自己动手写 ✗。\n"
+        "   为什么：写组件要读、改、试、再改 ✓ —— 那一串留在我们对话里，"
+        "以后每轮都占着地方 ✓，而且**你上一轮试错时的猜测，下一轮会被当成已经确认的事实** ✗。\n"
+        "   交代它的时候要把**要什么、数据哪来、写到哪个路径**说全 ✓ ——"
+        "它**看不到我们的对话** ✓，也不会自己猜 ✗。把 `brief` 和那个暂存路径原样给它 ✓。\n"
+        "\n"
+        "**⑤ 它回来说写好了 → 调 `component_save(token, ...)`** ✓ —— 填上标题、图标、"
+        "一句说明，还有你那本**笔记** ✓。\n"
+        "   ⚠️ 落成之后它在**实验区** ✓ —— **不是启用了** ✗。"
+        "要用户自己在工坊里点「开始使用」才算 ✓，所以**别说「已经启用了」** ✗。\n"
+        "\n"
+        "## 组件的形状（子代理要知道的，你转述）\n"
+        "**一个 HTML 文件，什么都不引** ✓（图、字体、库都不行 ✗）—— 它跑在沙箱里 ✓，"
+        "外面够不着，自己也发不了请求 ✓。要数据就在保存时声明一声 ✓，"
+        "我们取好了塞进 `window.__LG_DATA__` 给它 ✓。\n"
+        "现在能声明的只有 `records` ✓ ——比如 days 取 30、kind 取 bookkeeping ✓。"
+        "**要别的数据源得先找我们加** ✓，别声明一个取不到的 ✗（那会让组件一片空白 ✓）。\n"
+        "\n"
+        "## 两条别做\n"
+        "· **工坊里的过程不要写进长期记忆** ✗ —— 试错、来回、半成品，都不写 ✓。"
+        "那些归这个组件自己的笔记（`component_save` 时填 ✓）。\n"
+        "· **别在群里说这件事** ✗ —— 群里那两条提示是系统发的 ✓，你不用再重复 ✓。"
+    )

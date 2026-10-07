@@ -50,6 +50,8 @@ from .routes_groups import router as groups_router
 from .routes_internal import restart_watcher
 from .routes_internal import router as internal_router
 from .routes_media import router as media_router
+from .routes_workshop import push_workshop_status
+from .routes_workshop import router as workshop_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -103,6 +105,7 @@ app.include_router(auth_router)
 app.include_router(groups_router)
 app.include_router(media_router)
 app.include_router(internal_router)
+app.include_router(workshop_router)
 
 # 禁缓存的头。界面是"改服务器文件 = 用户重开 App 生效"的架构，
 # 一旦被 WebView 缓存住，改了不生效，用户会以为改动没做

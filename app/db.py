@@ -224,6 +224,27 @@ CREATE TABLE IF NOT EXISTS component_tickets (
     expires_at INTEGER NOT NULL
 );
 
+-- 创意工坊的对话。**和群聊消息是两张表** ✗→✓ —— 2026-10-07。
+--
+-- 为什么不给 `messages` 加一列 `channel` ✗：那张表的 `_SELECT` 是唯一列清单 ✓，
+-- 而 WHERE 有**五处** ✓ —— 加列就要改五处 ✓，**漏一处工坊的话就漏进群聊历史** ✗。
+-- 而"不进群聊"本来只要 `broadcast=False` 就够了 ✓（见 messages.py ✓）；
+-- 列只为"重连、翻历史不串"服务 ✓ —— 不值那个风险 ✓。
+--
+-- ⚠️ **按 `user_id` 分开** ✓ —— 工坊的会话是**每用户一条** ✓
+--    （两个人同时进工坊不会互相串话 ✓，见 `diy_session_id_for` ✓）。
+CREATE TABLE IF NOT EXISTS workshop_messages (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL,          -- 谁的工坊（会话也是按他分的）
+    slug        TEXT    NOT NULL DEFAULT '',-- 在做哪个组件；空 = 还没定名
+    sender_type TEXT    NOT NULL,          -- 'user' | 'agent'
+    content     TEXT    NOT NULL,
+    created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_workshop_msgs
+    ON workshop_messages(group_id, user_id, id);
+
 -- 登录失败计数。存在的理由：密码是用户自设的短密码，一旦服务被暴露，
 -- 没有限流就是几秒钟的事。
 --
@@ -317,6 +338,10 @@ _MIGRATIONS: list[tuple[str, str, str]] = [
     # ★ 「给管家的话」✓ —— 每个空间一段，每一轮自动注入 ✓（见 orchestrator/agent.py
     # 的 `_group_persona` ✓）。用户自己写的、关于**他们是谁**的一段话 ✓。
     ("groups", "agent_user_prompt", "TEXT"),
+    # ★ 创意工坊的总开关（2026-10-07）✓ —— 出问题能**一键关**，而且**不影响主群聊** ✓。
+    #   默认开 ✓（工坊已经部署了 ✓）。关掉之后：工坊那两屏还在 ✓，
+    #   但"做组件"的对话入口会说还没接上 ✓（比整片白屏好 ✓）。
+    ("groups", "workshop_enabled", "INTEGER NOT NULL DEFAULT 1"),
 ]
 
 
