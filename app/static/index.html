@@ -545,7 +545,11 @@
       每个组件的右侧标注头像」✓。
      ⚠️ 叠着排（后一个压前一个的边 ✓）而不是并排铺开 ✓ ——
         人一多（比如四个人都参与过 ✓）铺开会把名字挤没 ✓。 */
-  #wsNav .navrow .avs { display:flex; flex:0 0 auto; padding-right:2px; }
+  /* ⚠️ `flex:0 0 auto` = **别被挤** ✓ —— 名字再长，头像和 `›` 也保持原样 ✓
+     （名字那一格是 `flex:1` ✓，它先让 ✓）。 */
+  #wsNav .navrow .avs { display:flex; flex:0 0 auto; padding-right:6px; }
+  /* 还没做出组件的那种：**同一个图标、淡一点** ✓（见 `navRow` 那段 ✓）。 */
+  #wsNav .navrow .ico.off { opacity:.45; }
   #wsNav .navrow .avs .av { width:26px; height:26px; border-radius:8px;
                             background:var(--panel2); color:var(--muted);
                             display:flex; align-items:center; justify-content:center;
@@ -3830,17 +3834,25 @@
     const b = document.createElement('button');
     b.className = 'navrow';
     const ic = document.createElement('span');
-    ic.className = 'ico';
-    ic.textContent = t.slug ? '🧩' : '✨';
+    // ★ **同一个图标** ✗→✓（2026-10-07 深夜，用户问的：
+    //   「还没做什么是啥意思，**为啥没有其他组件的那个标志**」✓）——
+    //   原来没做出组件的那种用的是另一个 emoji（✨）✓，
+    //   于是它**看着像另一种东西** ✓，而不是"一个还没做好的组件" ✗。
+    //   现在统一是组件图标 ✓，只是**淡一点** ✓（半透明 ✓）——
+    //   一眼仍能看出"它跟别的不一样" ✓，但不会以为是另一类 ✓。
+    ic.className = 'ico' + (t.slug ? '' : ' off');
+    ic.textContent = '🧩';
     const col = document.createElement('span');
     col.className = 'col';
     const nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = t.title || (t.slug || '还没起名');
     col.appendChild(nm);
-    // ★ 这一行的第二行现在只说**两件事** ✓（"未固化"那句跟着整套去掉了 ✓）：
+    // ★ 这一行的第二行只说**两件事** ✓（"未固化"那句跟着整套去掉了 ✓）：
     //   ① 谁正在改它 ✓（用户定的：要在导航上标注 ✓）
-    //   ② 还没有人做过它（"还没起名" ✓）—— 说清它是个空壳 ✓
+    //   ② 它还没做出组件来 ✓ —— 这句话以前写的是"还没做什么" ✓，
+    //      ⚠️ 那三个字**说不清指的是什么** ✗（用户当场就问了 ✓）。
+    //      现在写全：**"还没做出组件"** ✓ —— 主语和结果都在里面 ✓。
     const busy = t.slug ? (wsCur.editing || {})[t.slug] : null;
     if (busy && busy.nickname) {
       const s = document.createElement('span');
@@ -3850,29 +3862,33 @@
     } else if (!t.slug) {
       const s = document.createElement('span');
       s.className = 'sub';
-      s.textContent = '还没做什么';
+      s.textContent = '还没做出组件';
       col.appendChild(s);
     }
     // ★ **参与过这个组件的人的头像** ✓（用户定的：导航上每个组件右边标头像 ✓）。
     //   ⚠️ 按 **slug** 取 ✓（`people` 是那个组件的参与者名单 ✓）——
     //      不是"这条对话是谁的"✓（那永远只有你一个 ✓，就标不出什么来了 ✓）。
-    const ppl = (t.people || []).slice(0, 4);
-    if (ppl.length) {
-      const avs = document.createElement('span');
-      avs.className = 'avs';
-      ppl.forEach(p => {
-        const a = document.createElement('span');
-        a.className = 'av';
-        a.title = p.nickname || '';
-        paintZhi(a, shellURL(p.avatar), p.nickname || '?');
-        avs.appendChild(a);
-      });
-      b.appendChild(avs);
-    }
+    //
+    //   ⚠️ **顺序** ✗→✓（2026-10-07 深夜，用户看着截图报的：
+    //      「头像应该在组件右侧，> 左边，右对齐」✓）——
+    //      原来那一段**在这行代码的上头**就 `appendChild` 了 ✓，
+    //      于是最终顺序变成了 `头像, 图标, 名字, ›` ✓ ——
+    //      头像跑到了**最左边** ✗（先 append 的先排 ✓）。
+    //      现在统一在这一个 `append` 里按顺序给 ✓（从左到右就是看见的顺序 ✓）。
+    const avs = document.createElement('span');
+    avs.className = 'avs';
+    (t.people || []).slice(0, 4).forEach(p => {
+      const a = document.createElement('span');
+      a.className = 'av';
+      a.title = p.nickname || '';
+      paintZhi(a, shellURL(p.avatar), p.nickname || '?');
+      avs.appendChild(a);
+    });
     const chev = document.createElement('span');
     chev.className = 'chev';
     chev.textContent = '›';
-    b.append(ic, col, chev);
+    // 名字那一格 `flex:1` ✓ → 头像和 `›` 自然被推到**右边** ✓（右对齐 ✓）。
+    b.append(ic, col, avs, chev);
     b.onclick = () => openTaskById(t.id);
     return b;
   };
