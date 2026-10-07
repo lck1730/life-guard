@@ -382,15 +382,28 @@
   .ascreen.anim-out { animation:sheetOut .18s cubic-bezier(.4,0,1,1) forwards; }
 
   /* ── 创意工坊 ────────────────────────────────────────────────────────
-     两屏：工坊本身（#workshop）+ 组件预览（#cpView，压在它上面）。
+     两屏：工坊本身（#workshop）+ 组件页（#compView，压在它上面）。
      ⚠️ z-index 要**比 .ascreen 的 20 高** ✗ —— 工坊是从群聊进的独立去处 ✓，
         和"管家"那三屏不是一层 ✓（但它进来的时候那三屏都是关着的 ✓，
-        高了只是保险 ✓）。 */
+        高了只是保险 ✓）。
+
+     ★ 2026-10-07 用户定的**三个区** ✓ —— 但**不并排塞在一屏里** ✗（那必然挤 ✓）：
+        工坊首页只做一件事：**列出来**（按区分组 ✓）；
+        "做"和"改"都进**这个组件自己的页**（#compView）✓ ——
+        于是"不同组件记忆独立"是**结构上**的 ✓，不是靠前端过滤 ✓。 */
   #workshop { z-index:22; }
-  #cpView   { z-index:23; }
+  #compView { z-index:23; }
+
+  /* 「＋ 做一个新的」—— 全宽、最显眼 ✓（它是这一屏的主行动 ✓） */
+  #workshop .wsnew { display:flex; align-items:center; justify-content:center; gap:9px;
+                     width:100%; border:1px dashed #35507a; background:#0e1c30;
+                     color:var(--accent); border-radius:14px; padding:15px;
+                     font:inherit; font-size:16px; font-weight:600; }
+  #workshop .wsnew:active { background:#16233a; }
+
   #workshop .wssec { font-size:12.5px; color:var(--muted); letter-spacing:.04em;
-                     margin:18px 2px 9px; }
-  #workshop .wssec:first-child { margin-top:6px; }
+                     margin:22px 2px 9px; display:flex; align-items:center; gap:8px; }
+  #workshop .wssec .n { color:#5d667a; }
   #workshop .wsgrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   #workshop .wscard { background:var(--panel); border:1px solid var(--line);
                       border-radius:14px; padding:13px 12px;
@@ -399,12 +412,27 @@
   #workshop .wscard .ico { font-size:21px; line-height:1; flex:0 0 auto; }
   #workshop .wscard .nm { font-size:14.5px; overflow:hidden;
                           text-overflow:ellipsis; white-space:nowrap; }
+  /* 实验区那张卡上的一句提示：「正在用的还是 v1」—— 一眼看出"改了还没启用" */
+  #workshop .wscard .hint { display:block; font-size:11.5px; color:var(--warn2,#d8b06a);
+                            margin-top:2px; }
   #workshop .wsempty { color:var(--muted); text-align:center;
-                       padding:52px 18px; line-height:1.9; font-size:14.5px; }
-  #cpView .cpwrap { flex:1; min-height:0; margin:0 14px 14px;
-                    border:1px solid var(--line); border-radius:14px;
-                    overflow:hidden; background:var(--bg); }
-  #cpView iframe { width:100%; height:100%; border:0; display:block; }
+                       padding:26px 18px; line-height:1.9; font-size:14px; }
+
+  /* ── 组件页：预览在上、信息与按钮在下 ✓ */
+  #compView .cpwrap { flex:1; min-height:0; margin:0 14px;
+                      border:1px solid var(--line); border-radius:14px;
+                      overflow:hidden; background:var(--bg); }
+  #compView iframe { width:100%; height:100%; border:0; display:block; }
+  #compView .cpbar { flex:0 0 auto; padding:13px 16px calc(var(--inset-bottom) + 16px); }
+  #compView .cpmeta { font-size:12.5px; color:var(--muted); margin-bottom:11px;
+                      line-height:1.6; }
+  #compView .cpbtn { width:100%; border:0; border-radius:12px; padding:14px;
+                     font:inherit; font-size:16px; font-weight:600; margin-top:9px; }
+  #compView .cpbtn.go { background:var(--accent); color:var(--on-accent); }
+  #compView .cpbtn.go:active { opacity:.85; }
+  #compView .cpbtn.ghost { background:var(--panel2); color:var(--muted);
+                           border:1px solid var(--line); font-weight:500; font-size:14.5px; }
+  #compView .cpbtn[disabled] { opacity:.5; }
   .ascreen .abody { flex:1; overflow-y:auto; overscroll-behavior:contain;
                     padding:calc(var(--inset-top) + 14px) 14px calc(var(--inset-bottom) + 24px); }
 
@@ -775,20 +803,23 @@
   <div class="abody" id="wsBody"></div>
 </div>
 
-<!-- 组件的整屏预览 —— 压在工坊上面 ✓（不是底部弹层 ✗：组件要尽量大 ✓）。 -->
-<div class="screen ascreen" id="cpView">
+<!-- ★ 组件页（2026-10-07）—— **一个组件自己的页** ✓：预览 + 这一版的信息 + 攒着的那版 + 按钮。
+     压在工坊上面 ✓（不是底部弹层 ✗：组件要尽量大 ✓）。
+     ⚠️ 以后"继续改"那个对话也进这一页 ✓ —— 于是"不同组件记忆独立"是结构上的 ✓。 -->
+<div class="screen ascreen" id="compView">
   <header class="sub">
-    <button class="icon-btn back" id="cpViewBack" aria-label="返回">
+    <button class="icon-btn back" id="compBack" aria-label="返回">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
            stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 4.5 8.5 12 15 19.5" />
       </svg>
     </button>
-    <h2 id="cpViewTitle">组件</h2>
+    <h2 id="compTitle">组件</h2>
     <div class="spacer"></div>
   </header>
-  <div class="cpwrap" id="cpViewWrap"></div>
+  <div class="cpwrap" id="compWrap"></div>
+  <div class="cpbar" id="compBar"></div>
 </div>
 
 <!-- 设置 -->
@@ -1528,8 +1559,8 @@
   window.__goBack = () => {
     if ($('#sheet').classList.contains('on')) { closeSheet(); return; }
     // ★ 创意工坊那两屏（2026-10-07）—— **压在管家那三屏上面** ✓：
-    //   组件预览 > 工坊 > 编状态 > 改资料 > 管家列表 > 群设置 ✓。
-    if ($('#cpView').classList.contains('on')) { closeComponent(); return; }
+    //   组件页 > 工坊 > 编状态 > 改资料 > 管家列表 > 群设置 ✓。
+    if ($('#compView').classList.contains('on')) { closeComp(); return; }
     if ($('#workshop').classList.contains('on')) { closeWorkshop(); return; }
     if ($('#agentEdit').classList.contains('on')) { closeAgentEdit(); return; }
     if ($('#agent').classList.contains('on')) { closeAgentSettings(); return; }
@@ -2983,6 +3014,16 @@
   // 从群聊右上角进 ✓。展示**这个群自己**的组件 —— 服务端按 `group_id` 分目录 ✓
   // （`/api/components?group_id=`），所以别的群的东西**根本不会出现在这儿** ✓；
   // 这一点**不靠前端过滤** ✓（过滤是能绕过的 ✗）。
+  // ── 创意工坊（2026-10-07）─────────────────────────────────────────
+  //
+  // 从群聊右上角进 ✓。展示**这个群自己**的组件 —— 服务端按 `group_id` 分开存 ✓
+  // （`/api/components?group_id=`），所以别的群的东西**根本不会出现在这儿** ✓；
+  // 这一点**不靠前端过滤** ✓（过滤是能绕过的 ✗）。
+  //
+  // ★ 用户定的**三个区** ✓，但**不并排塞在一屏里** ✗（那必然挤 ✓）：
+  //     这一屏只负责**列出来**（按区分组 ✓）；
+  //     "做"和"改"都进**那个组件自己的页**（`#compView`）✓ ——
+  //     于是"不同组件记忆独立"是**结构上**的 ✓，不是靠前端过滤 ✓。
   const openWorkshop = () => {
     pushScreen('workshop');
     // ⚠️ **先推屏、再画** ✗→✓ —— 画要发请求（几十毫秒 ✓）；
@@ -3002,49 +3043,75 @@
       return;
     }
     box.innerHTML = '';                       // 下面全部走 createElement，不进 innerHTML ✓
-    if (!list.length) {
-      const em = document.createElement('div');
-      em.className = 'wsempty';
-      // ⚠️ **别写"去群里说"** ✗→✓ —— 工坊的设计是**在这儿直接说** ✓：
-      //    它有自己的会话（`…-diy-u<uid>`）+ 自己的消息表 ✓，
-      //    群里**一个字都不会有** ✓（只有两个关键节点各发一条系统消息 ✓）。
-      //    那个对话入口还没接上（P3）✓ —— 所以这儿**只说实情** ✓，
-      //    不能指着一个还没做出来的流程说"去那边" ✗。
-      // ⚠️ `\n` 是**一个反斜杠** ✗ —— 写两个的话界面上会真显示 "\n" ✓（踩过 ✓）。
-      em.textContent = '尚未创建组件。\n工坊自己的对话入口还在做；接上之后就在这里直接说，不用回群里。';
-      em.style.whiteSpace = 'pre-line';       // 上面那个换行要真的生效
-      box.appendChild(em);
-      return;
-    }
-    const sec = document.createElement('div');
-    sec.className = 'wssec';
-    sec.textContent = '这个群的组件';
-    box.appendChild(sec);
-    const grid = document.createElement('div');
-    grid.className = 'wsgrid';
-    list.forEach(c => {
-      const it = document.createElement('div');
-      it.className = 'wscard';
-      const ico = document.createElement('span'); ico.className = 'ico';
-      ico.textContent = c.icon || '🧩';
-      const nm = document.createElement('span'); nm.className = 'nm';
-      nm.textContent = c.title || c.name;
-      it.append(ico, nm);
-      it.onclick = () => showComponent(c.name, c.title);
-      grid.appendChild(it);
-    });
-    box.appendChild(grid);
+
+    // ① 「＋ 做一个新的」—— **入口在工坊里面** ✓（用户 2026-10-07 定的 ✓，不回群聊 ✓）
+    const add = document.createElement('button');
+    add.className = 'wsnew';
+    add.textContent = '＋ 做一个新的';
+    add.onclick = () => startMaking();
+    box.appendChild(add);
+
+    // ② 分区。**有 live 的进"正常使用"，有 draft 的进"实验"** ✓ ——
+    //    两边都有（改了还没启用）就**两边都出现** ✓：那样才看得出"攒着一版没启" ✓。
+    const live = list.filter(c => c.live);
+    const draft = list.filter(c => c.draft);
+    const part = (title, items) => {
+      const sec = document.createElement('div');
+      sec.className = 'wssec';
+      sec.textContent = title;
+      const n = document.createElement('span');
+      n.className = 'n';
+      n.textContent = items.length ? items.length : '';
+      sec.appendChild(n);
+      box.appendChild(sec);
+      if (!items.length) {
+        const em = document.createElement('div');
+        em.className = 'wsempty';
+        em.textContent = title === '正常使用中' ? '还没有正式启用的组件。'
+                                               : '实验区是空的。';
+        box.appendChild(em);
+        return;
+      }
+      const grid = document.createElement('div');
+      grid.className = 'wsgrid';
+      items.forEach(c => grid.appendChild(wsCard(c, title)));
+      box.appendChild(grid);
+    };
+    part('正常使用中', live);
+    part('实验区', draft);
   };
 
-  // 组件的整屏预览
-  const showComponent = async (name, title) => {
-    $('#cpViewTitle').textContent = title || name;
-    const wrap = $('#cpViewWrap');
-    wrap.innerHTML = '';
-    pushScreen('cpView');
+  const wsCard = (c, which) => {
+    const it = document.createElement('div');
+    it.className = 'wscard';
+    const ico = document.createElement('span'); ico.className = 'ico';
+    ico.textContent = c.icon || '🧩';
+    const col = document.createElement('span');
+    col.style.minWidth = '0';
+    const nm = document.createElement('span'); nm.className = 'nm';
+    nm.textContent = c.title || c.slug;
+    col.appendChild(nm);
+    // 「改了还没启用」——这句话只在实验区那张卡上出现 ✓，而且**只说事实** ✓
+    if (which === '实验区' && c.live) {
+      const h = document.createElement('span'); h.className = 'hint';
+      h.textContent = '正在用的还是 v' + c.live.version + '，这版是 v' + c.draft.version;
+      col.appendChild(h);
+    }
+    it.append(ico, col);
+    it.onclick = () => openComp(c.slug, c.title);
+    return it;
+  };
+
+  // ── 组件页：一个组件自己的页 ✓ ──────────────────────────────────────
+  const openComp = async (slug, title) => {
+    $('#compTitle').textContent = title || slug;
+    const wrap = $('#compWrap'), bar = $('#compBar');
+    wrap.innerHTML = ''; bar.innerHTML = '';
+    pushScreen('compView');
     let d;
-    try { d = await api(`/components/${encodeURIComponent(name)}?group_id=${group.id}`); }
-    catch (e) { wrap.textContent = '打不开：' + e.message; return; }
+    try { d = await api(`/components/${encodeURIComponent(slug)}?group_id=${group.id}`); }
+    catch (e) { bar.textContent = '打不开：' + e.message; return; }
+    $('#compTitle').textContent = d.title || slug;
 
     // 数据先塞进去（**它自己取不了** —— 沙箱里没有 same-origin ✓）。
     // 下面那两个标签**必须拼出来，不能写成字面量** ✗：
@@ -3052,8 +3119,7 @@
     // 它只要扫到结束标签那几个字符就认为"脚本到此为止" ✓ ——
     // **后面整段 JS 会被当普通文本丢掉** ✓（2026-10-04 就是这么做白屏的 ✓）。
     //
-    // ⚠️ 这里**不再需要 `<base>`** ✗→✓ —— 组件搬到 `var/` 之后
-    //    `<base href="/ui/components/…">` 指向一个不存在的路径 ✓，
+    // ⚠️ 这里**不需要 `<base>`** ✗→✓ —— 组件在 `var/` 里 ✓，
     //    而规范本来就是"单文件、不引外部资源" ✓（2026-10-07）。
     const S = '<' + 'script>', E = '<' + '/script>';
     const inject = S + `window.__LG_DATA__=${JSON.stringify(d.data)};` + E;
@@ -3062,15 +3128,59 @@
     ifr.setAttribute('referrerpolicy', 'no-referrer');
     ifr.srcdoc = inject + (d.html || '');
     wrap.appendChild(ifr);
+
+    const meta = document.createElement('div');
+    meta.className = 'cpmeta';
+    meta.textContent = '正在看 v' + d.version +
+      (d.state === 'live' ? '（正在用的这一版）' : '（实验中的这一版）') +
+      (d.note ? '\n' + d.note : '');
+    meta.style.whiteSpace = 'pre-line';
+    bar.appendChild(meta);
+
+    // 实验中的那一版 → 给"开始使用" ✓。**这个动作只有用户能做** ✓
+    // （agent 没有这个工具 ✓）—— "做完先进实验区、用户点头才转正"就落在这个按钮上 ✓。
+    if (d.state !== 'live') {
+      const go = document.createElement('button');
+      go.className = 'cpbtn go';
+      go.textContent = '开始使用这一版';
+      go.onclick = () => enableComp(slug, d.version, go);
+      bar.appendChild(go);
+    }
+    // ⚠️ "继续改"还没做（P3 的制作页）✓ —— **不摆一个点不动的按钮** ✗：
+    //    这个项目为"像有人会调的假接口"删过一次东西 ✓，宁可先不放 ✓。
   };
 
-  const closeComponent = () => popScreen('cpView');
+  const enableComp = async (slug, version, btn) => {
+    btn.disabled = true;
+    try {
+      await api(`/components/${encodeURIComponent(slug)}/enable?group_id=${group.id}`,
+                { method: 'POST', body: JSON.stringify({ version: version }) });
+    } catch (e) {
+      btn.disabled = false;
+      toast('没切过去：' + e.message);
+      return;
+    }
+    toast('已经开始用了');
+    closeComp();          // 退回工坊 ✓ —— 回去时它会重画，也就是它换到"正常使用中"那一栏 ✓
+  };
+
+  const closeComp = () => {
+    popScreen('compView');
+    // ⚠️ **退回工坊要重画一次** ✗→✓ —— 不然刚才启用的那一版还挂在实验区 ✓，
+    //    用户会以为"点了没用" ✓（这就是那种"明明成功了却像失败"的毛病 ✓）。
+    if ($('#workshop').classList.contains('on')) renderWorkshop();
+  };
+
+  // 「＋ 做一个新的」—— 制作页在 P3 ✓。现在**说实话** ✓，不指着一个还没做的流程 ✗。
+  const startMaking = () => {
+    toast('做组件的对话入口还在做——接上之后在这里就能直接说');
+  };
 
   $('#openSettings').onclick = openSettings;
-  // ★ 创意工坊（2026-10-07）—— 三个按钮：进去 / 从工坊退 / 从组件预览退 ✓
+  // ★ 创意工坊（2026-10-07）—— 三个按钮：进去 / 从工坊退 / 从组件页退 ✓
   $('#openWorkshop').onclick = openWorkshop;
   $('#backWorkshop').onclick = closeWorkshop;
-  $('#cpViewBack').onclick = closeComponent;
+  $('#compBack').onclick = closeComp;
   $('#backChat').onclick = closeSettings;
 
   const logout = async () => {

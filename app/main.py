@@ -461,7 +461,7 @@ async def _scan_components(group_id: int) -> list[dict]:
       · 有 `draft`  → 实验区 ✓（`live` 和 `draft` 同时有 = "改了还没启用" ✓）
     """
     rows = await fetch_all(
-        "SELECT slug, version, state, title, icon, created_at, enabled_at, enabled_by "
+        "SELECT slug, version, state, title, icon, note, created_at, enabled_at, enabled_by "
         "FROM components WHERE group_id = ? ORDER BY slug ASC, version DESC",
         (group_id,),
     )
@@ -469,7 +469,7 @@ async def _scan_components(group_id: int) -> list[dict]:
     for r in rows:
         slug = str(r["slug"])
         it = out.setdefault(slug, {"slug": slug, "title": r["title"] or slug,
-                                   "icon": r["icon"] or "🧩",
+                                   "icon": r["icon"] or "🧩", "note": r["note"] or "",
                                    "live": None, "draft": None, "versions": []})
         it["versions"].append(int(r["version"]))
         if r["state"] == "live" and it["live"] is None:
@@ -571,6 +571,7 @@ async def component_render(
     return {"name": name, "version": int(row["version"]), "state": row["state"],
             "title": str(row["title"] or name),
             "icon": str(row["icon"] or "🧩"),
+            "note": str(row["note"] or ""),
             "html": html,
             "data": data}
 
