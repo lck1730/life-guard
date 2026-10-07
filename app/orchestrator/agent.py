@@ -965,18 +965,24 @@ async def diy_persona(group_id: int, task_id: int | None = None) -> str:
        和原来 `slug=""` 时的行为一致 ✓。
     """
     focus_slug = ""
+    my_title = ""
     if task_id:
         # ⚠️ **先看任务自己记的 `slug`** ✗→✓ —— 从「继续改」进来的那条对话，
         #    一上来就知道是冲着谁去的 ✓（组件那行要等 `component_save` 才出现 ✓，
         #    只看组件的话，**头几轮它不知道自己该去读谁的笔记** ✓）。
         #    后半个兜底是给迁移过来的老任务用的 ✓（那些 task 和 components 之间没链接 ✓）。
+        #
+        # ⚠️ 顺手把**用户开做时起的名字**也拿上 ✓（2026-10-07 晚上 ✓）——
+        #    那是他心里的名字 ✓，定名时该优先用它 ✓（见下 ✓）。
         row = await fetch_one(
-            "SELECT COALESCE(t.slug,"
-            "  (SELECT c.slug FROM components c WHERE c.task_id = t.id"
-            "    ORDER BY c.version DESC LIMIT 1)) AS slug"
+            "SELECT t.title AS my_title,"
+            "  COALESCE(t.slug,"
+            "    (SELECT c.slug FROM components c WHERE c.task_id = t.id"
+            "      ORDER BY c.version DESC LIMIT 1)) AS slug"
             "  FROM workshop_tasks t WHERE t.id = ? AND t.group_id = ?",
             (int(task_id), group_id))
         focus_slug = str((row or {}).get("slug") or "")
+        my_title = str((row or {}).get("my_title") or "")
 
     rows = await fetch_all(
         "SELECT slug, version, state, title FROM components WHERE group_id = ?"
@@ -994,16 +1000,31 @@ async def diy_persona(group_id: int, task_id: int | None = None) -> str:
                 "也可以做一个新的 ✓。\n") if have else "这个群还没有任何组件 ✓。\n"
     focus = (f"⚠️ 用户这次是要动 **{focus_slug}** 这个组件 ✓ —— "
              f"先调 `component_note` 读它自己的笔记 ✓，别凭印象改 ✗。\n") if focus_slug else ""
+    # ★ **他开做时先起过名字** ✓（2026-10-07 晚上 ✓）—— 那通常就是他心里叫它的名字 ✓。
+    #   落成时**以它为准**（服务端会强制的 ✓，见 `routes_internal.components_save` ✓），
+    #   所以这里说清，免得它觉得自己填的 title 没生效 ✓。
+    named = (f"⚠️ 他给这次要做的这个东西起的名字是「{my_title}」✓ —— "
+             f"`component_save` 填 `title` 时**优先用这个名字** ✓，"
+             f"别自作主张换一个 ✗（他要改自己会改 ✓）。\n") if my_title else ""
 
     return (
         "你现在在**创意工坊**里 ✓ —— 这是 App 里专门做组件的地方，"
         "**只有你和他两个人** ✓（不是群聊；说话不用管「该不该接话」✓）。\n"
-        + focus + existing +
+        + focus + named + existing +
         "\n## 你要做的事\n"
         "把一个**需求**变成一块能看的组件。流程是固定的，按顺序走：\n"
         "\n"
         "**① 问清「要看什么」** —— 只问**体验** ✓，不问技术 ✗。\n"
         "   该问的：他想看到什么、给谁看、多久看一次、最要紧的是哪个数。\n"
+        "   ★ **还有一件每次都要问的** ✗→✓（2026-10-07 用户定的 ✓）：\n"
+        "   **「它摆在外面那张界面上，你想让它长什么样」** ✓。\n"
+        "   外面那张界面（叫**组件容纳界面**）是群聊右上角点开的那个 ✓ ——\n"
+        "   所有组件都在那儿排着 ✓，像一张纸 ✓。默认长这样：**上面一个图标、\n"
+        "   下面一个名字**（跟手机桌面上的应用一样 ✓）。但**不只有这一种** ✓：\n"
+        "   可以占两格（想显眼一点 ✓）、可以换个底色 ✓。\n"
+        "   ⚠️ 问法要**说人话** ✗ —— 别问「你要几个格子」✓，问：\n"
+        "   「外面那张表上，它要不要比别的占得大一点？」「想给它配个什么颜色吗？」✓\n"
+        "   他要是说「随便 / 你看着办」→ 你自己定一个合理的 ✓，别追着问 ✗。\n"
         "   不该问的：用什么颜色、要不要图表库、HTML 怎么写 ✗（他不需要知道，也不关心）。\n"
         "\n"
         "   ★ **一次只问一个** ✗→✓（2026-10-07 用户点名：要一个一个问 ✓）。\n"
@@ -1033,7 +1054,8 @@ async def diy_persona(group_id: int, task_id: int | None = None) -> str:
         "它**看不到我们的对话** ✓，也不会自己猜 ✗。把 `brief` 和那个暂存路径原样给它 ✓。\n"
         "\n"
         "**⑤ 它回来说写好了 → 调 `component_save(token, ...)`** ✓ —— 填上标题、图标、"
-        "一句说明，还有你那本**笔记** ✓。\n"
+        "一句说明、`spot`（①里问出来的那个：外面摆多大、什么底色 ✓），"
+        "还有你那本**笔记** ✓。\n"
         "   ⚠️ 落成之后它是**未固化**的一版 ✓ —— **不是已经定下来了** ✗。"
         "要用户自己在工坊里点「保留」才算 ✓，所以**别说「已经保留/已经能用了」** ✗。\n"
         "\n"

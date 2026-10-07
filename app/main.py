@@ -469,6 +469,57 @@ def component_version_dir(group_id: int, slug: str, version: int) -> Path:
     return group_components_dir(group_id) / slug / f"v{int(version)}"
 
 
+#: 「容纳界面」里允许的展示种类 ✓。**先只有 `tile`**（上面图标、下面名字 ✓）。
+#:
+#: ⚠️ 用户 2026-10-07 说的是「可以传统的上面图标下面名称，**也可以其他**，不局限」✓ ——
+#:    所以这里是个**开放的口子**：agent 在保存时声明 `kind` ✓，
+#:    以后要加"活的小窗口"那种，是往这张表里加一项 ✓ + 前端加一个分支 ✓，
+#:    不用改数据模型 ✓（`spot_json` 本来就是自由 JSON ✓）。
+_SPOT_KINDS = ("tile",)
+
+
+def _spot_of(raw: Any) -> dict:
+    """把一版的展示声明**收拾成能直接用的形状** ✓。
+
+    ⚠️ **坏的一律当默认，绝不抛** ✗→✓ —— 这是模型写的东西 ✓（它可能写个
+       `"w": "大"` 或者干脆一段散文 ✓）。一个组件长得不对，不该让**整屏
+       容纳界面**打不开 ✓ —— 那正是"一个坏掉的东西拖垮整个页面"的形状 ✓。
+
+    形状：`{"kind": "tile", "w": 1, "h": 1, "tint": null}` ✓
+      · `w`/`h`：占几个格子 ✓（1..3 ✓ —— 不封顶的话它能声明一个占满整屏的 ✓，
+        "容纳界面"就没法容纳别的了 ✓）
+      · `tint`：可选底色 ✓（**只认 `#rrggbb`** ✓ —— 它会被写进样式里 ✓，
+        别的写法（`url(...)`、`expression(...)`）一律丢掉 ✓）
+    """
+    d: Any = {}
+    try:
+        d = json.loads(raw or "{}")
+    except Exception:  # noqa: BLE001
+        d = {}
+    if not isinstance(d, dict):
+        d = {}
+
+    def _n(v: Any, dv: int) -> int:
+        try:
+            return max(1, min(3, int(v)))
+        except (TypeError, ValueError):
+            return dv
+
+    kind = str(d.get("kind") or "tile")
+    tint = d.get("tint")
+    if not isinstance(tint, str) or not re.match(r"^#[0-9a-fA-F]{6}$", tint):
+        tint = None
+    return {"kind": kind if kind in _SPOT_KINDS else "tile",
+            "w": _n(d.get("w"), 1), "h": _n(d.get("h"), 1), "tint": tint}
+
+
+async def _spots_of(group_id: int) -> dict[str, int]:
+    """这个群每个组件**摆在哪个格子** ✓（没排过的就没有这一项 ✓）。"""
+    rows = await fetch_all(
+        "SELECT slug, pos FROM component_spots WHERE group_id = ?", (group_id,))
+    return {str(r["slug"]): int(r["pos"]) for r in rows}
+
+
 async def _scan_components(group_id: int) -> list[dict]:
     """这个群有哪些组件、各自到哪一步了 —— **以库为准** ✓。
 
@@ -482,27 +533,37 @@ async def _scan_components(group_id: int) -> list[dict]:
       · 有 `live` 也有 `draft` → "攒着一版还没保留" ✓
     """
     rows = await fetch_all(
-        "SELECT slug, version, state, title, icon, note, created_at, enabled_at, enabled_by "
+        "SELECT slug, version, state, title, icon, note, spot_json,"
+        "       created_at, enabled_at, enabled_by "
         "FROM components WHERE group_id = ? ORDER BY slug ASC, version DESC",
         (group_id,),
     )
+    spots = await _spots_of(group_id)
     out: dict[str, dict] = {}
     for r in rows:
         slug = str(r["slug"])
         it = out.setdefault(slug, {"slug": slug, "title": r["title"] or slug,
                                    "icon": r["icon"] or "🧩", "note": r["note"] or "",
+                                   "spot": _spot_of(r["spot_json"]),
+                                   "pos": spots.get(slug),
                                    "live": None, "draft": None, "versions": []})
         it["versions"].append(int(r["version"]))
         if r["state"] == "live" and it["live"] is None:
             it["live"] = {"version": int(r["version"]), "at": r["enabled_at"],
                           "by": r["enabled_by"]}
-            # 名字和图标**以正在用的那一版为准** ✓ —— 改版时可能改了名字 ✓
+            # 名字、图标、**展示样式**都以正在用的那一版为准 ✓ ——
+            # 改版时可能改了名字、也可能改了它长什么样 ✓
             it["title"] = r["title"] or it["title"]
             it["icon"] = r["icon"] or it["icon"]
+            it["spot"] = _spot_of(r["spot_json"])
         elif r["state"] == "draft" and it["draft"] is None:
             # 行是按版本**倒序**来的 ✓ → 第一条 draft 就是最新的 ✓
             it["draft"] = {"version": int(r["version"]), "at": r["created_at"]}
-    return [out[k] for k in sorted(out)]
+    # ⚠️ **排过版的按位置排** ✓ —— 没排过的（刚做完、还没被挪过 ✓）排在最后面 ✓
+    #    按 slug 排 ✓（稳定、可预期 ✓：同一个东西每次进来看都在同一个地方 ✓）。
+    #    这就是"容纳界面"里那个顺序 ✓（用户在调整模式里拖出来的 ✓）。
+    return sorted(out.values(),
+                  key=lambda x: ((x["pos"] if x["pos"] is not None else 10**6), x["slug"]))
 
 
 #: 组件短名的形状。**只允许小写字母、数字、连字符** ✓ ——
@@ -684,6 +745,41 @@ async def component_unkeep(
     return {"ok": True, "slug": name, "version": int(body.version)}
 
 
+class ComponentSpotsIn(BaseModel):
+    #: 组件短名的**完整顺序** ✓（一次全交过来 ✓，不是"谁挪到哪"✗）——
+    #: 增量式的话，两次请求之间插进一个新组件就会错位 ✓（而错位是**静默**的 ✓：
+    #: 顺序看着还是对的，只是有两个东西悄悄换了位 ✓）。全量提交没有这个窗口 ✓。
+    order: list[str] = Field(default_factory=list, max_length=200)
+
+
+@app.post("/api/components/spots")
+async def component_spots_save(
+    body: ComponentSpotsIn, group_id: int = Query(...),
+    user: dict = Depends(current_user),
+) -> dict:
+    """**保存"容纳界面"里的排版** ✓ —— 用户在调整模式里拖完、点完成时调它 ✓。
+
+    ⚠️ **不认识的 slug 一律丢掉** ✓，不报错 ✗ —— 客户端手里那份可能是几分钟前的 ✓
+       （期间某个组件被删了 ✓）。为一个已经不存在的名字把整次排版拒掉，
+       用户看到的是"我拖了半天，它说不行" ✓，而其实九成九是对的 ✓。
+    """
+    await require_member(group_id, user["id"])
+    real = await fetch_all("SELECT DISTINCT slug FROM components WHERE group_id = ?",
+                           (group_id,))
+    known = {str(r["slug"]) for r in real}
+    kept = [s for s in (str(x).strip().lower() for x in body.order) if s in known]
+    ts = now()
+    for i, slug in enumerate(kept):
+        await execute(
+            "INSERT INTO component_spots(group_id, slug, pos, updated_at) VALUES(?,?,?,?)"
+            " ON CONFLICT(group_id, slug) DO UPDATE SET pos = excluded.pos,"
+            " updated_at = excluded.updated_at",
+            (group_id, slug, i, ts))
+    log.info("组件排版：群 %s 存了 %d 个位置（用户 %s）", group_id, len(kept), user["id"])
+    return {"ok": True, "saved": len(kept),
+            "ignored": [s for s in body.order if str(s).strip().lower() not in known]}
+
+
 class ComponentRenameIn(BaseModel):
     #: 新名字 ✓。**只改显示名，不动 `slug`** ✗ —— slug 是目录名和 URL 的一部分 ✓，
     #: 改名会让磁盘上的目录、已经存过的路径全对不上 ✓（而且组件是**一个 HTML 文件**，
@@ -776,6 +872,13 @@ async def component_delete(
         d = component_version_dir(group_id, name, int(r["version"]))
         if d.is_relative_to(group_components_dir(group_id)) and d.is_dir():
             shutil.rmtree(d, ignore_errors=True)
+    # ⚠️ **排版也要一起收掉** ✗→✓ —— `component_spots` 里的 `slug` **不是外键** ✓
+    #    （一个 slug 在 `components` 里是好几十行 ✓，没有"那一行"可以指 ✓），
+    #    所以它不会跟着级联删 ✓。忘了这一步的后果：下次同一个 slug 被做出来时，
+    #    它会**接着用上一次的位置** ✓ —— 看着像"它自己跑到那儿去了" ✓。
+    if not v:
+        await execute("DELETE FROM component_spots WHERE group_id = ? AND slug = ?",
+                      (group_id, name))
     # ⚠️ 版本删光之后，那个 **slug 目录也要收掉** ✗→✓ ——
     #    不然仓库里会留一堆空壳 ✓（界面看不见 ✓，因为列表是从库读的 ✓，
     #    但下次同一个 slug 再做一版时，`mkdir(parents=True)` 会**默默复用它** ✓ ——

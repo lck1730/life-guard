@@ -188,7 +188,7 @@ async def _my_tasks(group_id: int, user_id: int) -> list[dict]:
     界面上显示「还没起名」✓。
     """
     rows = await fetch_all(
-        "SELECT t.id, t.created_at, t.updated_at,"
+        "SELECT t.id, t.created_at, t.updated_at, t.title AS my_title,"
         "       COALESCE(t.slug,"
         "         (SELECT c.slug FROM components c WHERE c.task_id = t.id"
         "           ORDER BY c.version DESC LIMIT 1)) AS slug,"
@@ -215,10 +215,12 @@ async def _my_tasks(group_id: int, user_id: int) -> list[dict]:
         info = vers.get(slug) or {}
         out.append({"id": int(r["id"]),
                     "slug": slug,
-                    # 名字优先用"这条对话自己做出来的那一版"的标题 ✓；
-                    # 还没做出来（从「继续改」进来的 ✓）就用**那个组件现有的标题** ✓ ——
-                    # 不然切换列表里会是一条没名字的东西 ✓，用户根本认不出是哪条 ✓。
-                    "title": str(r["title"] or info.get("title") or ""),
+                    # 名字的优先顺序 ✓（2026-10-07 晚上排过）：
+                    #   ① 这条对话**自己做出来的那一版**叫什么 ✓
+                    #   ② 它冲着去的那个组件**现在**叫什么 ✓（从「继续改」进来的 ✓）
+                    #   ③ **用户开做时起的那个名字** ✓ —— 还没做成组件时，
+                    #      导航上靠它才认得出来 ✓（不然是一排"还没起名" ✓）。
+                    "title": str(r["title"] or info.get("title") or r["my_title"] or ""),
                     "kept": bool(slug) and info.get("live") is not None,
                     "latest_version": info.get("latest") or None,
                     "live_version": info.get("live"),
@@ -391,6 +393,10 @@ async def tasks_list(group_id: int, user: dict = Depends(current_user)) -> dict:
 class TaskNewIn(BaseModel):
     #: 冲着哪个组件去的 ✓。空 = 做一个全新的 ✓（主行动：输入框 ＋ → 创意工坊 ✓）。
     slug: str = Field(default="", max_length=32)
+    #: ★ **用户给它起的名字** ✓（2026-10-07 晚上用户定的：点「新建组件」先提示命名 ✓）。
+    #: ⚠️ 允许为空 ✓ —— "他懒得想名字"是完全正常的 ✓，
+    #:    那种情况照旧由 agent 定名 ✓（别为了一个必填项把人挡在门外 ✓）。
+    title: str = Field(default="", max_length=40)
 
 
 @router.post("/{group_id}/tasks")
@@ -425,11 +431,13 @@ async def tasks_new(group_id: int, body: TaskNewIn | None = None,
                 + str(budget["limit"]) + " 个）：" + "；".join(held)
                 + "。**先保留一个，或者删掉一个** ✓ 再做新的 ✓。")
     ts = now()
+    got = (body.title if body else "").strip()[:40] if body else ""
     tid = await execute(
-        "INSERT INTO workshop_tasks(group_id, user_id, created_at, updated_at, slug)"
-        " VALUES(?,?,?,?,?)", (group_id, user["id"], ts, ts, want or None))
-    log.info("工坊新任务：群 %s 用户 %s 任务 %s（冲着 %s）",
-             group_id, user["id"], tid, want or "新组件")
+        "INSERT INTO workshop_tasks(group_id, user_id, created_at, updated_at, slug, title)"
+        " VALUES(?,?,?,?,?,?)",
+        (group_id, user["id"], ts, ts, want or None, got or None))
+    log.info("工坊新任务：群 %s 用户 %s 任务 %s（冲着 %s，叫 %r）",
+             group_id, user["id"], tid, want or "新组件", got)
     return {"ok": True, "task": await _task_payload(group_id, user["id"], tid),
             "messages": []}
 

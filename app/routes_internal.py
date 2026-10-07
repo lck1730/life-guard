@@ -895,6 +895,11 @@ class ComponentSaveIn(BaseModel):
     icon: str = Field(default="", max_length=8)
     note: str = Field(default="", max_length=8000)
     data: dict[str, Any] | None = None
+    #: ★ 它**在"组件容纳界面"里怎么展示** ✓（2026-10-07 晚上用户定的 ✓）：
+    #: 「每次组件创意时，都要问的一件事是如何在组件容纳界面展示」✓。
+    #: 形状 `{"kind":"tile","w":1,"h":1,"tint":"#22334d"}` ✓ ——
+    #: 收拾和兜底在 `main.py` 的 `_spot_of`（坏的一律当默认 ✓）。
+    spot: dict[str, Any] | None = None
 
 
 class ComponentSlugIn(BaseModel):
@@ -1036,12 +1041,27 @@ async def components_save(body: ComponentSaveIn) -> dict:
     #   组件页的「继续改」靠它回到**当初那条对话** ✓（见 `main.py` 的
     #   `_task_of_slug` ✓）。票上没有就留空 ✓（降级 ✓）。
     task_id = row["task_id"] if "task_id" in row.keys() else None
+    # ★ ★ **用户开做时起的名字优先** ✗→✓（2026-10-07 晚上）——
+    #   他在＋里点「新建组件」时**先起过一个名** ✓（那正是他心里的名字 ✓）。
+    #   这里要是直接用了 agent 填的那个，会出现"我明明叫它记账面板，它自己改成了记账" ✓ ——
+    #   而用户**没有任何办法解释** ✓（名字在两个地方各说各话 ✓）。
+    #   ⚠️ 只在**两处不一致**的时候才提一句 ✓，别每次都啰嗦 ✓。
+    want_title = body.title.strip() or slug
+    said = ""
+    if task_id:
+        t = await fetch_one("SELECT title FROM workshop_tasks WHERE id = ?", (int(task_id),))
+        mine = str((t or {}).get("title") or "").strip()
+        if mine and mine != want_title:
+            said = f"（用户开做时说它叫「{mine}」，所以用了**他起的那个** ✓）"
+            want_title = mine
     await execute(
         "INSERT INTO components(group_id, slug, version, state, title, icon,"
-        " data_json, note, created_at, task_id) VALUES(?,?,?,'draft',?,?,?,?,?,?)",
-        (group_id, slug, version, body.title.strip() or slug, body.icon.strip() or "🧩",
+        " data_json, note, created_at, task_id, spot_json)"
+        " VALUES(?,?,?,'draft',?,?,?,?,?,?,?)",
+        (group_id, slug, version, want_title, body.icon.strip() or "🧩",
          json.dumps(body.data or {}, ensure_ascii=False), body.note.strip(),
-         int(time.time()), int(task_id) if task_id else None))
+         int(time.time()), int(task_id) if task_id else None,
+         json.dumps(body.spot or {}, ensure_ascii=False)))
     # 对话**定名了** ✓ —— 把 slug 记到任务上 ✓（"＋做一个新的"那条从此知道自己是什么 ✓）。
     # ⚠️ 只在它**还是空的时候**写 ✓（`AND slug IS NULL` ✓）：
     #    从「继续改」开的对话一上来就写着别的 slug ✓，那是**它的目标** ✓，
@@ -1049,6 +1069,18 @@ async def components_save(body: ComponentSaveIn) -> dict:
     if task_id:
         await execute("UPDATE workshop_tasks SET slug = ? WHERE id = ? AND slug IS NULL",
                       (slug, int(task_id)))
+    # ★ **新组件排在容纳界面的最末尾** ✗→✓ —— `INSERT OR IGNORE` 的意思是
+    #   "**别再动已经排过的那个**" ✓：做第二版的时候不该把用户拖好的位置重置 ✓。
+    #   没这一步的话，新做的组件在容纳界面里会**排在所有排过版的后面** ✓，
+    #   看着像"它跑到最后去了" ✓（其实只是没有位置 ✓）。结果一样 ✓，
+    #   但有了位置之后，用户下次拖动时它才是个**能一起参与排序**的东西 ✓。
+    nxt = await fetch_one(
+        "SELECT COALESCE(MAX(pos), -1) + 1 AS p FROM component_spots WHERE group_id = ?",
+        (group_id,))
+    await execute(
+        "INSERT OR IGNORE INTO component_spots(group_id, slug, pos, updated_at)"
+        " VALUES(?,?,?,?)",
+        (group_id, slug, int((nxt or {}).get("p") or 0), int(time.time())))
     await execute("UPDATE component_tickets SET used_at = ? WHERE token = ?",
                   (int(time.time()), body.token))
     try:
@@ -1056,13 +1088,14 @@ async def components_save(body: ComponentSaveIn) -> dict:
     except OSError:
         pass
     await push_workshop_status(group_id, "done", int(task_id) if task_id else None)
-    await _say_system(group_id, "「" + (body.title.strip() or slug) + "」做好了，去创意工坊看看。")
+    await _say_system(group_id, "「" + want_title + "」做好了，去创意工坊看看。")
     log.info("组件落成：群 %s 的 %s v%s（未固化）", group_id, slug, version)
     return {"ok": True, "slug": slug, "version": version, "state": "draft",
+            "title": want_title,
             "note": ("已经做好了 ✓ —— 但它是**未固化的**一版 ✓，"
                      "要用户在创意工坊里点**保留**才算定下来 ✓。"
                      "你可以让他去看看，但**别说「已经保留/已经能用了」**"
-                     "（那不是你说了算的）。")}
+                     "（那不是你说了算的）。" + said)}
 
 
 @router.post("/components/list", dependencies=[Depends(require_internal_token)])
@@ -1105,8 +1138,9 @@ async def components_note(body: ComponentSlugIn) -> dict:
     if not _slug_ok(slug):
         return {"ok": False, "error": "短名不合法（小写字母、数字、连字符）"}
     rows = await fetch_all(
-        "SELECT version, state, title, note, created_at, enabled_at FROM components"
-        " WHERE group_id = ? AND slug = ? ORDER BY version ASC", (body.group_id, slug))
+        "SELECT version, state, title, note, spot_json, created_at, enabled_at"
+        " FROM components WHERE group_id = ? AND slug = ? ORDER BY version ASC",
+        (body.group_id, slug))
     if not rows:
         return {"ok": False, "error": "这个群还没有 " + slug + " 这个组件"}
 
@@ -1131,6 +1165,19 @@ async def components_note(body: ComponentSlugIn) -> dict:
             line += f" · 启用 {_d(r['enabled_at'])}"
         head.append(line)
     head.append("")
+    # ★ 它**现在在"组件容纳界面"里是怎么摆的** ✓ —— 也是**事实** ✓，
+    #   所以由服务端报 ✓（见上面那段理由 ✓）。改版时它得知道现在长什么样 ✓，
+    #   不然会把"用户拖过位置/上版声明过 tint"这些当成不存在 ✓。
+    sp = rows[-1]["spot_json"] if "spot_json" in rows[-1].keys() else None
+    try:
+        spd = json.loads(sp or "{}") or {}
+    except Exception:  # noqa: BLE001
+        spd = {}
+    if isinstance(spd, dict) and spd:
+        head.append("它在**组件容纳界面**里现在是这样摆的："
+                    + json.dumps(spd, ensure_ascii=False)
+                    + "（`w`/`h` 是占几个格子、`tint` 是底色 ✓。）")
+        head.append("")
     head.append("（上面这几行是**系统记的**，不是谁的回忆 ✓；下面就都是那个组件自己的笔记 ✓。）")
     body_note = next((r["note"] for r in reversed(rows) if r["note"]), "")
     skeleton = ("## 用户要什么\n\n## 为什么长这样\n\n## 试过但没用的\n\n"

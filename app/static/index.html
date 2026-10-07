@@ -405,23 +405,51 @@
                      font:inherit; font-size:16px; font-weight:600; }
   #workshop .wsnew:active { background:#16233a; }
 
-  #workshop .wsgrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  #workshop .wscard { background:var(--panel); border:1px solid var(--line);
-                      border-radius:14px; padding:13px 12px;
-                      display:flex; align-items:center; gap:9px; }
-  #workshop .wscard:active { background:var(--panel2); }
-  #workshop .wscard .ico { font-size:21px; line-height:1; flex:0 0 auto; }
-  #workshop .wscard .nm { font-size:14.5px; overflow:hidden;
-                          text-overflow:ellipsis; white-space:nowrap; }
-  /* 未固化那张卡上的一句事实：「攒着 v2 还没保留」 */
-  #workshop .wscard .hint { display:block; font-size:11.5px; color:var(--warn2,#d8b06a);
-                            margin-top:2px; }
-  /* ⚠️ 「空」这句**两处都在用** ✗：工坊列表里 ✓、导航屏里 ✓。
-     只写 `#workshop .wsempty` 的话，另一处会没有样式 ✓
-     （一行贴边的灰字 ✓，看着像没加载出来 ✓）。 */
-  #workshop .wsempty, #wsNav .wsempty { color:var(--muted); text-align:center;
-                                        padding:26px 18px; line-height:1.9;
-                                        font-size:14px; }
+  /* ★ 「组件容纳界面」= 一块**画布**（2026-10-07 晚上用户定的 ✓）——
+     用户的原话：「整个组件容纳界面就像一张纸」✓，
+     默认每个组件「上面是图标，下面是组件名称」✓（跟手机桌面上的应用一样 ✓），
+     但**不只有这一种** ✓ —— 组件自己可以声明占几格、什么底色 ✓（`spot` ✓）。
+
+     ⚠️ **格子是有固定高度的**（`grid-auto-rows` ✓）—— 不固定的话
+        "占两格"就没有意义了 ✓（行高会跟着内容自己涨 ✓，"大一点"看不出来 ✓）。
+     4 列：手机上每格约 78px 宽 ✓，放一个图标 + 两行字正好 ✓。 */
+  #workshop .canvas { display:grid; grid-template-columns:repeat(4, 1fr);
+                      grid-auto-rows:92px; gap:12px 10px; padding-top:6px; }
+  #workshop .cell { display:flex; flex-direction:column; align-items:center;
+                    justify-content:center; gap:7px; min-width:0;
+                    border-radius:18px; background:var(--panel2);
+                    border:1px solid transparent; padding:6px 4px;
+                    transition:transform .12s ease; }
+  #workshop .cell:active { transform:scale(.95); }
+  #workshop .cell .ico { font-size:29px; line-height:1; }
+  #workshop .cell .nm { font-size:12px; line-height:1.3; max-width:100%;
+                        text-align:center; overflow:hidden;
+                        display:-webkit-box; -webkit-line-clamp:2;
+                        -webkit-box-orient:vertical; word-break:break-word; }
+  /* 「未固化」那颗小黄点，挂在图标右上角 ✓（和导航那边同一套 ✓） */
+  #workshop .cell .dotic { position:relative; }
+  #workshop .cell .dotic::after { content:''; position:absolute; top:-3px; right:-4px;
+                                  width:11px; height:11px; border-radius:50%;
+                                  background:var(--warn2,#d8b06a);
+                                  border:2px solid var(--panel2); }
+
+  /* ── 调整模式（顶栏右上角那个按钮切的 ✓）────────────────────────────
+     用户定的：「这个界面的右上角是一个整体功能，点击后可以推动组件进行调整」✓。
+     ⚠️ 进了这个模式，**格子就不再是"点进去"的入口** ✓ ——
+        手指在那个位置是"按住拖着走" ✓，两种手势在同一个位置会打架 ✓。 */
+  /* ⚠️ `touch-action:none` **只在编辑态** ✓ —— 不写它的话，手指一动浏览器先拿去滚屏 ✓，
+     拖拽根本收不到几个 move 事件 ✓（表现是"拖不动，页面在滚动"✓）。
+     平时**绝对不能加** ✗：那一屏要能正常上下滚 ✓。 */
+  #workshop.editing .cell { border:1.5px dashed #35507a; touch-action:none; }
+  #workshop.editing .cell.drag { z-index:9; opacity:.92; transition:none;
+                                 box-shadow:0 10px 26px rgba(0,0,0,.45); }
+  #workshop.editing .cell.over { border-color:var(--accent); background:#16233a; }
+  #workshop .edithint { color:var(--muted); font-size:12.5px; text-align:center;
+                        padding:0 2px 10px; }
+  /* 「这个群还没有组件」那一句 ✓（只有容纳界面用得到 ✓ ——
+     导航屏永远有「新建组件」那一行 ✓，不会空 ✓）。 */
+  #workshop .wsempty { color:var(--muted); text-align:center;
+                       padding:26px 18px; line-height:1.9; font-size:14px; }
 
   /* ── 组件页：**纯预览**（2026-10-07 晚上改的）─────────────────────────
      ★ 用户定的：这一屏「不要有任何的提示和设置选项」✓，
@@ -484,34 +512,33 @@
 
   /* ── 导航屏（工坊的门口）─────────────────────────────────────────────
      ★ 2026-10-07 晚上用户定的形状 ✗→✓：＋ 进来**先是这一屏** ✓ ——
-       一个个图标 = 已经做过的组件（各自那条对话 ✓），外加一个「新建组件」✓。
-       点图标 → 组件管理屏（对话 + ⋯ ✓）。**这里是入口，不是对话本身** ✓。 */
-  #wsNav .navgrid { display:grid; grid-template-columns:repeat(4, 1fr);
-                    gap:18px 8px; padding-top:6px; }
-  #wsNav .navtile { display:flex; flex-direction:column; align-items:center; gap:8px;
-                    background:none; border:0; padding:0; color:var(--text);
-                    font:inherit; min-width:0; }
-  #wsNav .navtile:active .ic { transform:scale(.94); }
-  #wsNav .navtile .ic { width:60px; height:60px; border-radius:18px;
+       「导航界面就是比较规整了，**按照顺序**展示了所有组件聊天的入口，
+         点击后就是组件聊天界面，然后还有个新建组件」✓。
+     ⚠️ **是"规整的列表"，不是"图标网格"** ✗→✓ —— 我上一版做成了网格 ✓，
+        用户这一版说的是按顺序排 ✓。和右上角那个"容纳界面"**刻意不一样** ✓：
+        那个是给人看的（爱怎么摆怎么摆 ✓），这个是给人**用**的 ✓
+        （顺序稳定、一眼找到、名字看得全 ✓）。 */
+  #wsNav .navlist { display:flex; flex-direction:column; gap:2px; }
+  #wsNav .navrow { display:flex; align-items:center; gap:12px; width:100%;
+                   background:none; border:0; border-radius:12px;
+                   padding:13px 10px; color:var(--text); font:inherit;
+                   font-size:16px; text-align:left; }
+  #wsNav .navrow:active { background:var(--panel2); }
+  #wsNav .navrow .ico { width:38px; height:38px; flex:0 0 38px; border-radius:11px;
                         background:var(--panel2); display:flex; align-items:center;
-                        justify-content:center; font-size:29px; line-height:1;
-                        transition:transform .12s ease; }
-  /* 「新建」那颗**跟别的不一样** ✓ —— 虚线框、加号 ✓。
+                        justify-content:center; font-size:20px; line-height:1; }
+  #wsNav .navrow .col { flex:1; min-width:0; }
+  #wsNav .navrow .nm { display:block; overflow:hidden; text-overflow:ellipsis;
+                       white-space:nowrap; }
+  #wsNav .navrow .sub { display:block; font-size:11.5px; margin-top:2px;
+                        color:var(--warn2,#d8b06a); }
+  #wsNav .navrow .chev { color:var(--muted); font-size:22px; line-height:1; }
+  /* 「新建组件」那一行**跟别的不一样** ✓ —— 虚线框、加号、强调色 ✓。
      它是这一屏唯一"不是东西"的入口 ✓，长得一样就找不着了 ✓。 */
-  #wsNav .navtile.new .ic { background:none; border:1.5px dashed #35507a;
-                            color:var(--accent); font-size:30px; }
-  #wsNav .navtile .nm { font-size:12px; line-height:1.35; color:var(--text);
-                        max-width:100%; text-align:center; overflow:hidden;
-                        display:-webkit-box; -webkit-line-clamp:2;
-                        -webkit-box-orient:vertical; word-break:break-word; }
-  /* 「未固化」那个标识 —— 一颗小黄点挂在图标**右上角** ✓。
-     写成一整行字的话，那一格的标题会被挤下去 ✓，四列网格立刻参差不齐 ✓。 */
-  #wsNav .navtile .dot { position:relative; }
-  #wsNav .navtile .dot::after { content:''; position:absolute; top:-2px; right:-2px;
-                                width:11px; height:11px; border-radius:50%;
-                                background:var(--warn2,#d8b06a);
-                                border:2px solid var(--bg); }
-  #wsNav .navtile .nm .sub { display:block; color:var(--warn2,#d8b06a); font-size:10.5px; }
+  #wsNav .navrow.new { border:1.5px dashed #35507a; color:var(--accent); }
+  #wsNav .navrow.new .ico { background:none; border:1.5px dashed #35507a;
+                            color:var(--accent); font-size:22px; }
+  #wsNav .navlist .navrow.new { margin-bottom:10px; }
 
   /* 组件管理屏的标题：名字 + 「未固化」标识 ✓。
      ⚠️ 里面是**两个**元素 ✓，所以要自己摆平 —— `header.sub h2` 只管
@@ -708,6 +735,7 @@
              background:var(--panel2); border:1px solid var(--line); border-radius:12px;
              color:var(--text); font:inherit; font-size:16px; }
   .rninput:focus { outline:none; border-color:var(--accent); }
+  .rnhint { color:var(--muted); font-size:13px; line-height:1.7; margin:-6px 0 12px; }
 
   /* 「+」面板：微信那种横向网格 —— 圆角方块图标 + 下方小字 */
   .plus-grid { display:flex; gap:16px; flex-wrap:wrap; }
@@ -905,7 +933,19 @@
       </svg>
     </button>
     <h2>创意工坊</h2>
-    <div class="spacer"></div>
+    <!-- ★ 「整体功能」——用户定的：「这个界面的右上角是一个整体功能，
+         点击后可以推动组件进行调整」✓。点一下进调整模式，再点一下收工+存位置 ✓。
+         ⚠️ 它**顶掉的是 `.spacer`** ✓ —— 那个 40px 的占位本来就是为了标题居中 ✓，
+            这个图标正好同样宽 ✓，居中不受影响 ✓。 -->
+    <button class="icon-btn" id="wsArrange" aria-label="调整组件位置">
+      <svg viewBox="0 0 24 24" width="21" height="21" fill="none"
+           stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3.5v17M3.5 12h17"/>
+        <path d="M12 3.5 9.6 6M12 3.5 14.4 6M12 20.5 9.6 18M12 20.5 14.4 18"/>
+        <path d="M3.5 12 6 9.6M3.5 12 6 14.4M20.5 12 18 9.6M20.5 12 18 14.4"/>
+      </svg>
+    </button>
   </header>
   <div class="abody" id="wsBody"></div>
 </div>
@@ -3262,7 +3302,20 @@
     renderWorkshop();
   };
 
-  const closeWorkshop = () => popScreen('workshop');
+  const closeWorkshop = () => {
+    // ⚠️ 走的时候**退出调整模式** ✓ —— 不然下次进来还是那个状态 ✓，
+    //    而用户以为自己只是"退出去又进来" ✓（模式是个隐藏状态，最容易被忘 ✓）。
+    //    ⚠️ 连图标也要换回来 ✓ —— 只清模式不换图标的话，
+    //       下次进来那个按钮画着对勾、而屏幕**并没在调整模式** ✓
+    //       （点了它变成"进入调整"✓，用户会以为按钮反了 ✓）。
+    setArrange(false, false);
+    syncArrangeIcon();
+    popScreen('workshop');
+  };
+
+  //: 「容纳界面」里当前的顺序 ✓ —— 调整模式就是**在这个数组上拖** ✓，
+  //: 拖完一次性交给服务端 ✓（见 `saveArrangement` ✓）。
+  let wsCanvas = [];
 
   const renderWorkshop = async () => {
     const box = $('#wsBody');
@@ -3273,51 +3326,178 @@
       box.textContent = '打不开：' + e.message;
       return;
     }
-    box.innerHTML = '';                       // 下面全部走 createElement，不进 innerHTML ✓
+    wsCanvas = list;                          // 服务端已经按**排好的位置**给了 ✓
+    paintCanvas();
+  };
 
-    if (!list.length) {
+  const paintCanvas = () => {
+    const box = $('#wsBody');
+    box.innerHTML = '';                       // 下面全部走 createElement，不进 innerHTML ✓
+    if (!wsCanvas.length) {
       const em = document.createElement('div');
       em.className = 'wsempty';
       em.textContent = '这个群还没有组件。';
       box.appendChild(em);
-    } else {
-      const grid = document.createElement('div');
-      grid.className = 'wsgrid';
-      list.forEach(c => grid.appendChild(wsCard(c)));
-      box.appendChild(grid);
+      return;
     }
-    // ★ **一句提示都不放** ✗→✓ —— 2026-10-07 晚上用户定的：
+    if ($('#workshop').classList.contains('editing')) {
+      // ⚠️ 这一句**只在调整模式里出现** ✓ —— 它是**这个模式怎么使**的说明 ✓，
+      //    不是"这一屏的提示" ✓（用户要的是**平时**那一屏干干净净 ✓）。
+      //    少了它，"按住拖"这件事没人猜得到 ✓（大家只会去点一下 ✓）。
+      const hint = document.createElement('div');
+      hint.className = 'edithint';
+      hint.textContent = '按住一个拖到别处，就换位置了';
+      box.appendChild(hint);
+    }
+    const g = document.createElement('div');
+    g.className = 'canvas';
+    wsCanvas.forEach((c, i) => g.appendChild(canvasCell(c, i)));
+    box.appendChild(g);
+    // ★ **平时一句提示都不放** ✗→✓ —— 2026-10-07 晚上用户定的：
     //   「将群聊右上角点开的界面做成**纯粹的展示界面**，里面**不要有任何的提示
-    //     和设置选项**」✓。"未固化"那一行标识是**状态**，留着 ✓；
+    //     和设置选项**」✓。"未固化"那颗点是**状态**，留着 ✓；
     //   而"要去哪儿做新的""点保留才算数"那些话是**说明**，一律不放 ✓。
+    //   唯一的例外是**调整模式里那一句** ✓（见上 ✓）。
   };
 
-  const wsCard = (c) => {
-    const it = document.createElement('div');
-    it.className = 'wscard';
-    const ico = document.createElement('span'); ico.className = 'ico';
-    ico.textContent = c.icon || '🧩';
-    const col = document.createElement('span');
-    col.style.minWidth = '0';
-    const nm = document.createElement('span'); nm.className = 'nm';
+  /** 画布上的一格 —— **组件自己声明长什么样** ✓（`spot` ✓，见 main.py 的 `_spot_of` ✓）。 */
+  const canvasCell = (c, i) => {
+    const sp = c.spot || {};
+    const el = document.createElement('div');
+    el.className = 'cell';
+    el.dataset.i = String(i);
+    // ⚠️ **格子数要夹在 1..3** ✓ —— 服务端已经夹过一次了 ✓，
+    //    这里再夹一次是**防前端自己**：万一以后哪条路传进来一个 99 ✓，
+    //    那一格会占满整屏 ✓，而"排不下"是**看不出来**的（别的都不见了 ✓）。
+    el.style.gridColumn = 'span ' + Math.max(1, Math.min(3, +(sp.w || 1)));
+    el.style.gridRow = 'span ' + Math.max(1, Math.min(3, +(sp.h || 1)));
+    if (sp.tint) el.style.background = sp.tint;
+    const ic = document.createElement('span');
+    ic.className = 'ico' + (c.live ? '' : ' dotic');   // 未固化的那颗点 ✓
+    ic.textContent = c.icon || '🧩';
+    const nm = document.createElement('span');
+    nm.className = 'nm';
     nm.textContent = c.title || c.slug;
-    col.appendChild(nm);
-    // 「未固化」——**只说事实** ✓（用户 2026-10-07 定的：实验阶段要有特殊标识 ✓）。
-    // "没保留" 和 "改了还没保留" 是两件事，分开说 ✓ ——
-    // 后者（已经有 live、又攒了一版）得让他知道**现在用的是哪一版** ✓。
-    if (!c.live) {
-      const h = document.createElement('span'); h.className = 'hint';
-      h.textContent = '未固化';
-      col.appendChild(h);
-    } else if (c.draft) {
-      const h = document.createElement('span'); h.className = 'hint';
-      h.textContent = '在用的还是 v' + c.live.version + '，新做的 v' + c.draft.version + ' 还没保留';
-      col.appendChild(h);
-    }
-    it.append(ico, col);
-    it.onclick = () => openComp(c.slug, c.title);
-    return it;
+    el.append(ic, nm);
+    return el;
   };
+
+  // ── 调整模式：拖一下换位置 ✓ ────────────────────────────────────────
+  //
+  // 用户定的：「这个界面的右上角是一个整体功能，点击后可以推动组件进行调整」✓。
+  //
+  // ⚠️ **拖动用 Pointer 事件，不用 HTML5 那套** ✗ —— `dragstart/drop`
+  //    在触摸屏上基本不触发 ✓（这套界面全在手机上 ✓）。
+  //
+  // ⚠️ **拖的时候不重排，只高亮** ✗→✓ —— 一边拖一边重新渲染的话，
+  //    被手指按住的那个元素会被**销毁重建** ✓ → 指针捕获当场丢掉 ✓ →
+  //    拖着拖着就不动了 ✓。所以：拖动时只改 `transform` ✓，
+  //    松手那一刻才真的改数组 ✓（一次重排，干净 ✓）。
+  let wsDrag = null;
+
+  const setArrange = (on, save = true) => {
+    const w = $('#workshop');
+    const was = w.classList.contains('editing');
+    w.classList.toggle('editing', on);
+    if (was === on) return;
+    paintCanvas();
+    if (!on && save) saveArrangement();
+  };
+
+  /** 那个按钮的图标**跟着模式变** ✓ —— 移动十字 ↔ 对勾 ✓。
+   *  ⚠️ 不换的话，进了调整模式**看不出来进了** ✓（只多了一圈虚线 ✓），
+   *     而"我现在到底在哪个模式里"是这一屏唯一容易搞错的事 ✓。 */
+  const syncArrangeIcon = () => {
+    const editing = $('#workshop').classList.contains('editing');
+    $('#wsArrange').innerHTML = editing
+      ? '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"'
+      + ' stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<polyline points="5 12.5 10 17.5 19 7"/></svg>'
+      : '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"'
+      + ' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+      + '<path d="M12 3.5v17M3.5 12h17"/>'
+      + '<path d="M12 3.5 9.6 6M12 3.5 14.4 6M12 20.5 9.6 18M12 20.5 14.4 18"/>'
+      + '<path d="M3.5 12 6 9.6M3.5 12 6 14.4M20.5 12 18 9.6M20.5 12 18 14.4"/></svg>';
+  };
+
+  const saveArrangement = async () => {
+    try {
+      await api(`/components/spots?group_id=${group.id}`, {
+        method: 'POST',
+        body: JSON.stringify({ order: wsCanvas.map(c => c.slug) }),
+      });
+    } catch (e) {
+      // ⚠️ **存不上要说** ✓ —— 不说的话用户拖了半天、退出去再进来，
+      //    东西全回到原位 ✓，而那看起来像"它自己变回去了" ✓（像见鬼 ✓）。
+      toast('位置没存上：' + e.message);
+    }
+  };
+
+  const cellUnder = (x, y) => {
+    const el = document.elementFromPoint(x, y);
+    const cell = el && el.closest ? el.closest('#wsBody .cell') : null;
+    return cell && cell !== wsDrag?.el ? cell : null;
+  };
+
+  const endDrag = (commit) => {
+    const d = wsDrag;
+    wsDrag = null;
+    if (!d) return;
+    d.el.classList.remove('drag');
+    d.el.style.transform = '';
+    d.el.style.pointerEvents = '';           // ★ 拖的时候关掉它，见下面那段 ✓
+    document.querySelectorAll('#wsBody .cell.over').forEach(e => e.classList.remove('over'));
+    const to = d.over == null ? d.from : d.over;
+    if (commit && to !== d.from) {
+      const [item] = wsCanvas.splice(d.from, 1);
+      wsCanvas.splice(to, 0, item);
+      paintCanvas();
+    }
+  };
+
+  $('#wsBody').addEventListener('pointerdown', (ev) => {
+    if (!$('#workshop').classList.contains('editing')) return;
+    const cell = ev.target.closest('#wsBody .cell');
+    if (!cell) return;
+    ev.preventDefault();
+    wsDrag = { el: cell, from: Number(cell.dataset.i) || 0, over: null,
+               x0: ev.clientX, y0: ev.clientY };
+    cell.classList.add('drag');
+    // ★ **被拖的那一个要从"命中测试"里摘出去** ✗→✓ ——
+    //   不摘的话，`elementFromPoint` 在手指底下永远先撞到**它自己** ✓
+    //   （它就在手指那儿 ✓），于是"落在谁身上"永远是 null ✓ →
+    //   整个拖动看着能拖、松手却**什么都没发生** ✓（最难查的那种"没坏但没用"✓）。
+    cell.style.pointerEvents = 'none';
+    try { cell.setPointerCapture(ev.pointerId); } catch (e) { /* 没有捕获也能拖 ✓ */ }
+  });
+
+  $('#wsBody').addEventListener('pointermove', (ev) => {
+    if (!wsDrag) return;
+    const dx = ev.clientX - wsDrag.x0, dy = ev.clientY - wsDrag.y0;
+    wsDrag.el.style.transform = `translate(${dx}px, ${dy}px)`;
+    const under = cellUnder(ev.clientX, ev.clientY);
+    document.querySelectorAll('#wsBody .cell.over').forEach(e => {
+      if (e !== under) e.classList.remove('over');
+    });
+    if (under) {
+      under.classList.add('over');
+      wsDrag.over = Number(under.dataset.i);
+    }
+  });
+
+  const endHandler = () => endDrag(true);
+  $('#wsBody').addEventListener('pointerup', endHandler);
+  $('#wsBody').addEventListener('pointercancel', () => endDrag(false));
+  // ⚠️ 点一下格子（没拖）在**平时**要能进去 ✓、在调整模式里**什么都不该发生** ✓ ——
+  //    `pointerdown` 已经 `preventDefault` 了 ✓（调整模式下不会触发 click ✓），
+  //    所以这里只在"没在调整"的时候接 ✓。
+  $('#wsBody').addEventListener('click', (ev) => {
+    if ($('#workshop').classList.contains('editing')) return;
+    const cell = ev.target.closest('#wsBody .cell');
+    if (!cell) return;
+    const c = wsCanvas[Number(cell.dataset.i) || 0];
+    if (c) openComp(c.slug, c.title);
+  });
 
   // ── 组件页：一个组件自己的页 ✓ ──────────────────────────────────────
   const openComp = async (slug, title) => {
@@ -3439,10 +3619,14 @@
   // ── 导航屏（工坊的门口）──────────────────────────────────────────────
   //
   // ★ 2026-10-07 晚上用户定的：＋ 进来**先是这一屏** ✓ ——
-  //   「里面通过一个个图标展示了已经创建的组件对应的对话，然后中间有一个新建组件，
-  //     点击之前的组件就进去的组件管理界面」✓。
+  //   「也是有一个导航界面，导航界面就是比较规整了，**按照顺序**展示了所有组件聊天的
+  //     入口，点击后就是组件聊天界面，然后还有个新建组件」✓。
   //
-  // ⚠️ 图标底下是**我自己的**对话 ✓（不是"这个群所有组件"✗）——
+  // ⚠️ **是"规整"，不是"像个桌面"** ✗→✓ —— 我上一版做成了图标网格 ✓，
+  //   用户这一版说的是**按顺序一列一列排** ✓。跟右上角那个"容纳界面"**刻意不一样** ✓：
+  //   那个是给人看的（爱怎么摆怎么摆 ✓），这个是给人**用**的（一眼找到、顺序稳定 ✓）。
+  //
+  // ⚠️ 列的是**我自己的**对话 ✓（不是"这个群所有组件"✗）——
   //   组件是全群共有的 ✓，但**对话是个人的** ✓（`workshop_tasks.user_id` ✓）。
   //   别人做的东西在**群聊右上角**那一屏能看到、能预览 ✓，
   //   但你从那儿点进对话时，开的是**你自己**的那条 ✓（见 `openTaskForSlug` ✓）。
@@ -3471,57 +3655,66 @@
     }
     wsCur.tasks = d.tasks || [];
     box.innerHTML = '';                       // 下面全部走 createElement ✓
-    const grid = document.createElement('div');
-    grid.className = 'navgrid';
-    // ★ 「新建组件」**排在第一个** ✓ —— 用户说的是"中间有一个新建组件" ✓，
-    //   我把它放最前面（和 ＋ 的惯例一致、也最好找 ✓）。
-    //   ⚠️ 想挪到末尾或正中间：只改这一处位置 ✓（就是这一行 append 的顺序 ✓）。
-    grid.appendChild(navNewTile());
-    wsCur.tasks.forEach(t => grid.appendChild(navTile(t)));
-    box.appendChild(grid);
+    const list = document.createElement('div');
+    list.className = 'navlist';
+    list.appendChild(navNewRow());
+    wsCur.tasks.forEach(t => list.appendChild(navRow(t)));
+    box.appendChild(list);
   };
 
-  const navNewTile = () => {
+  const navNewRow = () => {
     const b = document.createElement('button');
-    b.className = 'navtile new';
+    b.className = 'navrow new';
     const ic = document.createElement('span');
-    ic.className = 'ic';
+    ic.className = 'ico';
     ic.textContent = '＋';
     const nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = '新建组件';
     b.append(ic, nm);
-    b.onclick = async () => {
-      // 服务端那边会先看"未固化 3 个"的额度 ✓ —— 满了就把原因 toast 出来 ✓
-      // （它那句写清了手上是哪几个、下一步能干什么 ✓，别拿别的字盖掉它 ✓）。
-      if (await wsNewTask('')) pushScreen('wsChat');
-    };
+    // ★ **先让他起个名字** ✗→✓（2026-10-07 晚上用户定的 ✓）：
+    //   「点击后会提示命名，后续也可以在右上角的组件管理界面重命名」✓。
+    //   ⚠️ 名字**不是白问的** ✓ —— 它会一路走到 `component_save` ✓
+    //      （用户起的名字优先于 agent 自己填的 ✓），也会出现在导航这一列上 ✓。
+    //      没有它的话，刚开的那些全是"还没起名" ✓（一排一模一样的行 ✓）。
+    b.onclick = () => openNameSheet({
+      heading: '它叫什么？',
+      initial: '',
+      cta: '开始做',
+      hint: '随便起一个你自己认得出的就行，以后随时能改。',
+      save: async (name) => {
+        // 服务端那边会先看"未固化 3 个"的额度 ✓ —— 满了就把原因 toast 出来 ✓
+        // （它那句写清了手上是哪几个、下一步能干什么 ✓，别拿别的字盖掉它 ✓）。
+        if (await wsNewTask('', name)) pushScreen('wsChat');
+      },
+    });
     return b;
   };
 
-  const navTile = (t) => {
+  const navRow = (t) => {
     const b = document.createElement('button');
-    b.className = 'navtile';
-    const wrap = document.createElement('span');
-    // ⚠️ 未固化的那颗**点**挂在图标上 ✓（`dot` 那个 class ✓）——
-    //    写成 name 底下一行字的话，四列网格立刻参差不齐 ✓。
-    //    ⚠️ **只在没固化的时候挂那个 class** ✗→✓ —— 别用 "hide" 那种修饰位 ✓：
-    //    那样"加没加对"就多了一个状态 ✓，而现在它只有"有/没有"两种 ✓。
-    wrap.className = t.kept ? '' : 'dot';
+    b.className = 'navrow';
     const ic = document.createElement('span');
-    ic.className = 'ic';
+    ic.className = 'ico';
     ic.textContent = t.slug ? '🧩' : '✨';
-    wrap.appendChild(ic);
+    const col = document.createElement('span');
+    col.className = 'col';
     const nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = t.title || (t.slug || '还没起名');
+    col.appendChild(nm);
+    // 「未固化」**写在这儿** ✓ —— 列表比图标网格宽得多 ✓，一行小字完全放得下 ✓，
+    // 不用再挤成一颗小点 ✓（那样还得让用户猜那颗点是什么意思 ✓）。
     if (!t.kept) {
       const s = document.createElement('span');
       s.className = 'sub';
       s.textContent = '未固化';
-      nm.appendChild(s);
+      col.appendChild(s);
     }
-    b.append(wrap, nm);
+    const chev = document.createElement('span');
+    chev.className = 'chev';
+    chev.textContent = '›';
+    b.append(ic, col, chev);
     b.onclick = () => openTaskById(t.id);
     return b;
   };
@@ -3566,10 +3759,11 @@
   };
 
   /** 开一条新的 ✓（只置状态，不推屏 ✓ —— 推屏由调用方决定 ✓）。返回成没成 ✓。 */
-  const wsNewTask = async (slug) => {
+  const wsNewTask = async (slug, title) => {
     try {
       const t = await api(`/workshop/${group.id}/tasks`, {
-        method: 'POST', body: JSON.stringify({ slug: slug || '' }),
+        method: 'POST',
+        body: JSON.stringify({ slug: slug || '', title: title || '' }),
       });
       showTask(t);
       await wsReloadTasks();
@@ -3851,17 +4045,32 @@
     };
   };
 
-  /** 重命名那个弹层 —— 一个输入框 + 取消/保存 ✓。 */
-  const openRenameSheet = (slug, current) => {
+  /**
+   * 一个"起名字"的弹层 ✓ —— **两处都在用** ✓：新建组件时问名字 ✓、⋯ 里的重命名 ✓。
+   *
+   * ⚠️ 抽成一个是因为**它俩一模一样** ✓（一个输入框、两个按钮 ✓）——
+   *    抄一份的话，将来"名字不能超过几个字""空名字怎么办"这类规矩
+   *    就会在两处各说各话 ✓（这个项目在别的地方吃过这个亏 ✓）。
+   *
+   * ⚠️ 输入框的值走 `.value` **不进 innerHTML** ✓ —— 那是用户打的字 ✓。
+   */
+  const openNameSheet = ({ heading, initial, cta, hint, save }) => {
     const p = $('#sheetPanel');
     p.innerHTML = '';
     const h = document.createElement('h3');
-    h.textContent = '重命名';
+    h.textContent = heading;
     p.appendChild(h);
+    if (hint) {
+      const d = document.createElement('div');
+      d.className = 'rnhint';
+      d.textContent = hint;
+      p.appendChild(d);
+    }
     const inp = document.createElement('input');
     inp.type = 'text';
     inp.maxLength = 40;
-    inp.value = current;                 // ⚠️ 走 `.value`，**不进 innerHTML** ✓
+    inp.value = initial || '';
+    inp.placeholder = '比如：记账面板';
     inp.className = 'rninput';
     p.appendChild(inp);
     const acts = document.createElement('div');
@@ -3870,35 +4079,48 @@
     cancel.className = 'btn-ghost';
     cancel.textContent = '取消';
     cancel.onclick = closeSheet;
-    const save = document.createElement('button');
-    save.className = 'btn-solid';
-    save.textContent = '保存';
-    save.onclick = async () => {
+    const go = document.createElement('button');
+    go.className = 'btn-solid';
+    go.textContent = cta || '保存';
+    const submit = async () => {
       const name = (inp.value || '').trim();
-      if (!name) { toast('名字不能是空的'); return; }
-      save.disabled = true;
+      if (!name) { toast('先起个名字'); inp.focus(); return; }
+      go.disabled = true;
       try {
-        await api(`/components/${encodeURIComponent(slug)}/rename?group_id=${group.id}`,
-                  { method: 'POST', body: JSON.stringify({ title: name }) });
+        await save(name);
       } catch (e) {
-        save.disabled = false;
-        toast('没改成功：' + e.message);
+        go.disabled = false;
+        toast('没成：' + e.message);
         return;
       }
       closeSheet();
-      // ★ 「重命名会同步所有地方」✓ —— 服务端把**每一版**的标题一起改了 ✓，
-      //   所以这里只要把**已经画出来的那一堆**重新拉一遍就行 ✓：
-      //   本屏的标题 ✓、导航上的图标名 ✓、右上角那一屏的卡片名 ✓、
-      //   以及 agent 下次 `component_list` 读到的名字 ✓（它读的就是同一个字段 ✓）。
+    };
+    go.onclick = submit;
+    inp.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); submit(); } };
+    acts.append(cancel, go);
+    p.appendChild(acts);
+    openSheet();
+    setTimeout(() => inp.focus(), 120);      // 省一次点击 ✓（和别的弹层一个做法 ✓）
+  };
+
+  /** ⋯ 里的重命名 ✓ —— 「重命名会同步所有地方」✓（用户 2026-10-07 晚上定的 ✓）。 */
+  const openRenameSheet = (slug, current) => openNameSheet({
+    heading: '重命名',
+    initial: current,
+    cta: '保存',
+    save: async (name) => {
+      await api(`/components/${encodeURIComponent(slug)}/rename?group_id=${group.id}`,
+                { method: 'POST', body: JSON.stringify({ title: name }) });
+      // ★ 服务端把**每一版**的标题一起改了 ✓，所以这里只要把**已经画出来的
+      //   那一堆**重新拉一遍就行 ✓：本屏的标题 ✓、导航那一列 ✓、
+      //   右上角那屏的格子名 ✓、以及 agent 下次 `component_list` 读到的名字 ✓
+      //   （它读的就是同一个字段 ✓）。
       await refreshCurrent();
       if ($('#wsNav').classList.contains('on')) renderWsNav();
       if ($('#workshop').classList.contains('on')) renderWorkshop();
       toast('改好了');
-    };
-    acts.append(cancel, save);
-    p.appendChild(acts);
-    openSheet();
-  };
+    },
+  });
 
   /** 删完之后回**导航屏** ✓ —— 用户定的："此时会自动退回导航界面" ✓。 */
   const backToNav = () => {
@@ -3913,6 +4135,12 @@
   //   导航屏退 / 组件页退 / 对话屏退 / 对话屏的 ⋯ ✓
   $('#openWorkshop').onclick = openWorkshop;
   $('#backWorkshop').onclick = closeWorkshop;
+  // ★ 容纳界面右上角那个**整体功能** ✓ —— 点一下进调整模式，再点一下收工并存位置 ✓
+  //   （图标在编辑态里换成对勾 ✓，见 `syncArrangeIcon` ✓）。
+  $('#wsArrange').onclick = () => {
+    setArrange(!$('#workshop').classList.contains('editing'));
+    syncArrangeIcon();
+  };
   $('#wsNavBack').onclick = closeWsNav;
   $('#compBack').onclick = closeComp;
   $('#wsBack').onclick = closeWsChat;

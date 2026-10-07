@@ -200,7 +200,31 @@ CREATE TABLE IF NOT EXISTS components (
     --   ⚠️ 允许为空 ✓ —— 迁移前的老组件补不出来 ✓，而且插件拿不到任务号时
     --   也要能照常落地 ✓。"链接断了"是**降级**（回到一条新对话），不是故障 ✓。
     task_id    INTEGER,
+    -- ★ 这一版**在"组件容纳界面"里怎么展示**（2026-10-07 晚上 ✓）——
+    --   用户定的：「每次组件创意时，都要问的一件事是如何在组件容纳界面展示，
+    --   可以传统的上面图标下面名称，也可以其他」✓。
+    --   形状：`{"kind":"tile","w":1,"h":1,"tint":"#22334d"}` ✓（见 main.py 的 _spot_of）
+    --   ⚠️ **它属于"这一版"** ✓ —— 是**组件设计的一部分** ✓（跟 icon 一样 ✓），
+    --      所以它随版本走 ✓；而"摆在哪个格子"是用户的事 ✓，在 `component_spots` ✓。
+    spot_json  TEXT,
     UNIQUE(group_id, slug, version)
+);
+
+-- ★ 组件在"容纳界面"里**摆在哪**（2026-10-07 晚上 ✓）。
+--
+-- 为什么**不在 `components` 上放一列** ✗→✓：`components` 是**按版本**的 ✓
+-- （一个 slug 好几行 ✓），而"放在第几个格子"是**这个东西**的属性 ✓ ——
+-- 放版本上的话，"改了一版"会把位置也带得乱跑 ✓，而且读的时候还得挑一行 ✓
+-- （写在哪一行？读哪一行？两处都能出岔 ✓）。
+--
+-- ⚠️ 它**不是外键** ✓ —— `slug` 在 `components` 里没有单行的对应（一 slug 多行 ✓）。
+--    删组件时**要记得一起删** ✓（`main.py` 的 `component_delete` ✓）。
+CREATE TABLE IF NOT EXISTS component_spots (
+    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    slug       TEXT    NOT NULL,
+    pos        INTEGER NOT NULL,          -- 第几个格子，小的在前
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (group_id, slug)
 );
 CREATE INDEX IF NOT EXISTS idx_components_group
     ON components(group_id, state, id DESC);
@@ -260,6 +284,14 @@ CREATE TABLE IF NOT EXISTS workshop_tasks (
     user_id    INTEGER NOT NULL,          -- 谁的对话（Hermes 会话也按它分）
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,          -- 最近动过：既排"上次那个"，也排切换列表
+    -- ★ 用户**开做时给它起的名字**（2026-10-07 晚上 ✓）—— 用户定的：
+    --   「点击后会提示命名，后续也可以在右上角的组件管理界面重命名」✓。
+    --   用处：① 导航那一列上有个说得出口的名字 ✓（不然是一串"还没起名"✓）
+    --        ② 传给 `diy_persona` ✓ —— 它定名前先知道用户想叫它什么 ✓
+    --        ③ `component_save` 落成时**以它为准** ✓（用户起的名字优先 ✓）
+    --   ⚠️ 组件真正落地之后，名字以 `components.title` 为准 ✓（那个是能改的、
+    --      而且改一处同步所有地方 ✓，见 `main.py` 的 `component_rename` ✓）。
+    title      TEXT,
     -- 这条对话是**冲着哪个组件**去的（可以还不知道 ✓）。
     --   · 从「继续改这个组件」开的，一上来就填上 ✓
     --   · "＋做一个新的"开的，等 agent 在 `component_save` 时定了名再填 ✓
@@ -394,6 +426,10 @@ _MIGRATIONS: list[tuple[str, str, str]] = [
     ("component_tickets", "task_id", "INTEGER"),
     # 这条对话冲着哪个组件去的（见 SCHEMA 里那段 ✓）。定名之前是空的 ✓。
     ("workshop_tasks", "slug", "TEXT"),
+    # 用户开做时给它起的名字（见 SCHEMA 里那段 ✓）。
+    ("workshop_tasks", "title", "TEXT"),
+    # 这一版在"容纳界面"里怎么展示（见 SCHEMA 里那段 ✓）。
+    ("components", "spot_json", "TEXT"),
 ]
 
 
