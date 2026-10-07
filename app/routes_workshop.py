@@ -65,6 +65,7 @@ from .messages import _quote
 from .orchestrator.agent import (
     _group_profile,
     _image_parts,
+    _looks_like_leaked_reasoning,
     _stream_completion,
     diy_session_id_for,
     diy_persona,
@@ -645,6 +646,34 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
         if poke and answer.strip() in ("[SILENT]", "SILENT", "【SILENT】"):
             log.debug("工坊：等交付的那一轮还没结果，按静默处理 ✓")
             return
+        # ★ **它只吐出了工具调用、没有一句人话** ✗→✓（2026-10-07 深夜，用户贴的
+        #   `<dots_function_call><invoke name="terminal">…` ✓）。
+        #   ⚠️ 群聊那边**早就有这道兜底** ✓（`_looks_like_leaked_reasoning` ✓），
+        #      而工坊**从来没接上** ✗ —— 于是这种"天书"会被原样当成回答存下来 ✓，
+        #      用户看到的就是一坨工具调用 ✓（正是他贴的那段 ✓）。
+        #   → 补一轮，让它**直接说话** ✓（和群聊同一句话 ✓，改一处两边一起变 ✓）。
+        if answer and _looks_like_leaked_reasoning(answer):
+            log.warning("工坊：这一轮只吐出了思考过程（用户看到的是天书），补一轮 ✓ "
+                        "group=%s task=%s", group_id, task_id)
+            try:
+                nudged = text + (
+                    "\n\n[系统] 你上一轮**只输出了思考过程，没有给用户一句能看的话**——"
+                    "用户那边收到的是一堆工具调用的文本。现在**直接说话**："
+                    "一两句给结论，别调工具，别复述过程。")
+                fixed: list[str] = []
+                async for piece in _stream_completion(
+                    group_id, nudged, images, profile,
+                    system=system,
+                    session_id=diy_session_id_for(group_id, user_id, task_id),
+                    role="diy",
+                ):
+                    fixed.append(piece)
+                got = "".join(fixed).strip()
+                if got and not _looks_like_leaked_reasoning(got):
+                    answer = got
+            except Exception:  # noqa: BLE001
+                log.debug("工坊：补的那一轮也没成，就用原来的", exc_info=True)
+
         if not answer:
             # ⚠️ **失败必须让人看见** ✓ —— 项目铁律（`orchestrator/__init__.py` 那句）。
             #    静默失败在这个架构里格外坏 ✓：用户不知道是"它还在想"还是"它挂了" ✓。

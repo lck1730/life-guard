@@ -421,7 +421,14 @@
        于是这一屏只剩一件事：**列出来** ✓（「未固化」那套 2026-10-07 深夜也去掉了 ✓）。
        "做"和"改"都在别处（＋ 进的对话屏 / 组件页 ✓）。 */
   #workshop { z-index:22; }
-  #compView { z-index:23; }
+  /* ⚠️ **`#compView` 要在 `#wsNav`（24）上面** ✗→✓（2026-10-07 深夜，用户报的：
+     「从组件聊天界面点上方组件名称跳转时，会直接到组件聊天导航页面，返回一下才是
+       组件界面」✓）。
+     原因：导航屏**还开着**（聊天就是从它进去的 ✓）—— 而组件的层级比它低 ✓ →
+     关掉聊天之后**露出的是导航** ✓，组件被压在底下 ✓ ✗。
+     一个固定值要同时满足两个方向 ✓：从导航进组件（要在它上面 ✓）、
+     从组件页那个图标进聊天（聊天要在组件上面 ✓，那是 25 一档 ✓）。 */
+  #compView { z-index:26; }
   #wsNav    { z-index:24; }
   #wsChat   { z-index:25; }
   /* ⚠️ **`#diySet` 原来没写 z-index** ✗→✓（2026-10-07 深夜，用户报的：
@@ -2186,9 +2193,10 @@
 
   const _escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  const renderContent = (el, text, isMine) => {
+  const renderContent = (el, text, isMine, noLink) => {
     el.textContent = '';
     if (!text) return;
+    if (noLink) { el.textContent = text; return; }   // ★ 这一条**不标蓝**：见下面那段 ✓
     const names = [...new Set(
       members.filter(m => !m.is_agent).map(m => m.nickname).concat([agentName()])
     )].filter(Boolean);
@@ -2201,6 +2209,9 @@
     //      短的先把长的吃掉一半 ✓（"记账面板"会变成[记账][面板]✓）。
     const alts = [];
     names.forEach(n => alts.push({ s: '@' + n, kind: 'at', name: n }));
+    // ★ **组件名可跳** ✓ —— 但调用方可以关掉（`noLink` ✓）：
+    //   「开始做…」那条里的名字**现在还不是个东西** ✓（改已有的组件时才存在 ✓），
+    //   标蓝点过去看到的是**老的**那一版 ✓ ✗ —— 用户定的：「做好后才标」✓。
     compIndex.forEach(c => alts.push({ s: c.name, kind: 'comp', slug: c.slug, name: c.name }));
     if (!alts.length) { el.textContent = text; return; }
     alts.sort((a, b) => b.s.length - a.s.length);
@@ -2394,7 +2405,8 @@
       //   （用户定的"提到存在的组件就标蓝"✓）。原来这里是 `textContent = 原文` ✗。
       const put = () => {
         sys.textContent = '';
-        renderContent(sys, m.content || '', false);
+        renderContent(sys, m.content || '', false,
+                      !!(m.media_meta && m.media_meta.no_link));
         const t = document.createElement('span');
         t.textContent = ' · ' + fmtTime(m.created_at);
         sys.appendChild(t);

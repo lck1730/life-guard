@@ -958,7 +958,7 @@ def _brief_name(task_title: str | None, slug: str) -> str:
     return (task_title or "").strip() or slug
 
 
-async def _say_system(group_id: int, text: str) -> None:
+async def _say_system(group_id: int, text: str, *, no_link: bool = False) -> None:
     """往**主群聊**放一条系统消息。
 
     ⚠️ **由服务端发，不靠 agent 记得** ✗→✓ —— 这是项目那条铁律：
@@ -969,7 +969,15 @@ async def _say_system(group_id: int, text: str) -> None:
     不是管家在说话 ✓。
     """
     await create_message(group_id=group_id, sender_id=None,
-                         sender_type="system", msg_type="text", content=text)
+                         sender_type="system", msg_type="text", content=text,
+                         # ★ 「开始做…」那条**不许标蓝可跳** ✗→✓（2026-10-07 深夜用户定的：
+                         #   「开始做组件的时候不用标蓝色可跳转，做好后才标」✓）。
+                         #   ⚠️ 为什么需要个标记 ✗：客户端是**按名字自动标蓝**的 ✓
+                         #      （提到真有的组件就连 ✓）—— 而改一个已有组件时（v2+ ✓），
+                         #      这个名字**真的存在** ✓ → 它会被标蓝 ✓ ✗，
+                         #      点过去看的是**老的**那一版 ✓（新的还没做出来 ✓）。
+                         #      所以"这一条我说的这个名字现在还不是个东西"要**说清楚** ✓。
+                         media_meta={"no_link": True} if no_link else None)
 
 
 @router.post("/components/confirm", dependencies=[Depends(require_internal_token)])
@@ -1035,7 +1043,8 @@ async def components_confirm(body: ComponentConfirmIn) -> dict:
     #      而他得知道这一版是在改旧的 ✓，不是从头做一个 ✓）。
     await _say_system(body.group_id,
                       "开始做「" + _brief_name(said_name, slug) + "」组件 v"
-                      + str(next_version) + "：" + body.brief.strip()[:30])
+                      + str(next_version) + "：" + body.brief.strip()[:30],
+                      no_link=True)
     # ⚠️ **"正在做"这个状态由服务端在准确的那一刹那推出** ✗→✓ ——
     #    因为它没法从流里看出来 ✓（我们只取正文 ✓，不看工具事件 ✓）。
     #    而这一刻服务端**知道** ✓（就是子代理该上场的时候 ✓）。
