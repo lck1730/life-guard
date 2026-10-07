@@ -640,6 +640,15 @@ async def component_delete(
         d = component_version_dir(group_id, name, int(r["version"]))
         if d.is_relative_to(group_components_dir(group_id)) and d.is_dir():
             shutil.rmtree(d, ignore_errors=True)
+    # ⚠️ 版本删光之后，那个 **slug 目录也要收掉** ✗→✓ ——
+    #    不然仓库里会留一堆空壳 ✓（界面看不见 ✓，因为列表是从库读的 ✓，
+    #    但下次同一个 slug 再做一版时，`mkdir(parents=True)` 会**默默复用它** ✓ ——
+    #    于是"删干净了没有"这件事就没法从目录上看出来 ✓）。
+    #    `rmdir` **只在空的时候才成功** ✓ —— 不用自己判空 ✓，也不会误删有内容的 ✓。
+    try:
+        (group_components_dir(group_id) / name).rmdir()
+    except OSError:
+        pass                                    # 还有别的版本在，那就该留着 ✓
     log.info("组件删除：群 %s 的 %s，%d 版", group_id, name, len(rows))
     return {"ok": True, "deleted": [int(r["version"]) for r in rows]}
 
