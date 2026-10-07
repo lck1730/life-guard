@@ -550,6 +550,13 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                 session_id=diy_session_id_for(group_id, user_id, task_id),
             ):
                 parts.append(piece)
+                # ⚠️ **空的片段不推** ✗→✓（2026-10-07 深夜，用户看着截图报的：
+                #    「思考的时候先返回了一个空消息占位干啥，没必要吧」✓）。
+                #    流的第一片经常是空串或者一个换行 ✓ —— 推下去之后，
+                #    前端会在**第一片**就把气泡开出来 ✓ → 屏幕上挂着一个空气泡 ✓，
+                #    要等下一片才有字 ✓（看着像坏了 ✓，而且**它确实是多余的** ✓）。
+                if not piece:
+                    continue
                 await _push(user_id, {"type": "ws_stream",
                                       "data": {"group_id": group_id,
                                                "task_id": task_id, "delta": piece}})

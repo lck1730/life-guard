@@ -2647,8 +2647,17 @@
         if (!$('#wsChat').classList.contains('on')) return;
         if (d.group_id !== group.id) return;
         if (Number(d.task_id) !== Number(wsCur.task)) return;
-        if (!wsCur.streaming) wsCur.streaming = addWsMsg({ sender_type: 'agent', content: '' });
-        wsCur.streaming.textContent += (d.delta || '');
+        // ⚠️ **第一片是空的就先别开气泡** ✗→✓（2026-10-07 深夜，用户报的：
+        //    「思考的时候先返回了一个空消息占位」✓）。
+        //    服务端那边也堵了（空片段不推 ✓），这里再堵一道 ✓ ——
+        //    因为"第一片"完全可能只是**一个换行** ✓（`''.trim()` 拦住它 ✓），
+        //    那种照样会开出一个看着像坏了的空气泡 ✓。
+        const piece = d.delta || '';
+        if (!wsCur.streaming) {
+          if (!piece.trim()) return;          // 还全是空白 ✓ → 等有字再开 ✓
+          wsCur.streaming = addWsMsg({ sender_type: 'agent', content: '' });
+        }
+        wsCur.streaming.textContent += piece;
         const box = $('#wsMsgs'); box.scrollTop = box.scrollHeight;
       }
       else if (pkt.type === 'ws_status') {
