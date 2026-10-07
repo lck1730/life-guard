@@ -777,8 +777,13 @@ async def image_path(body: ImageIn) -> dict:
 
     # 只允许访问媒体目录内的路径。media_path 是我们自己写进去的，但
     # 这道检查很便宜，而一旦被绕过就是任意文件读取。
+    #
+    # ⚠️ `str.startswith` → `is_relative_to` ✗→✓ —— 2026-10-07（做创意工坊时顺路修的）：
+    #    前缀比较对 `/a/b` vs `/a/bc` 会**误判通过** ✗（`/a/bc/x` 确实"以 /a/b 开头"✓）。
+    #    `main.py` 的组件渲染是同一个写法 ✓，一起改了 ✓ ——
+    #    同一个错在两处，改一处等于没改 ✗。
     full = (settings.media_dir / row["media_path"]).resolve()
-    if not str(full).startswith(str(settings.media_dir.resolve())):
+    if not full.is_relative_to(settings.media_dir.resolve()):
         log.error("media_path 越界：%r", row["media_path"])
         return {"ok": False, "error": "文件路径异常"}
     if not full.exists():

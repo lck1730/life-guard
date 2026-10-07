@@ -405,21 +405,39 @@ async def index(request: Request, ws: str | None = None) -> Response:
 #
 # ## 它是什么
 #
-# 就是文件：`ui/components/<名字>/index.html`，可选 `meta.json`：
+# ## 它放在哪（2026-10-07 改过）
+#
+# **每个群一份** ✓：`var/components/g<群号>/<名字>/index.html`，可选 `meta.json`：
 #     {"title": "记账面板", "icon": "💰", "data": {"records": {"kind": "bookkeeping", "days": 30}}}
-# agent 用普通文件工具就能写——不需要为它造一套新的工具接口。
+#
+# 原来是一个全局目录 ✗ —— 每个群看到的是同一批组件 ✓。搬到 `var/` 还有两个理由 ✓：
+#   · `ui/` 整个挂在 `/ui` 上**无鉴权** ✓ → 放那儿等于跨群可猜 ✗
+#   · `ui/**` 按 `SOUL-app-butler.md` 是**归 App 管家管**的 ✗
+#
+# ⚠️ 而 `var/components` 的权限是 **2750（组只读）** ✓ ——
+# **agent 写不进这个目录** ✓，所以"没确认过不许写"才是真的拦得住 ✓（见方案第七节 ✓）。
 
 @app.get("/api/components")
 async def components_list(
     group_id: int = Query(...), user: dict = Depends(current_user)
 ) -> dict:
     await require_member(group_id, user["id"])
-    return {"components": _scan_components()}
+    return {"components": _scan_components(group_id)}
 
 
-def _scan_components() -> list[dict]:
+def group_components_dir(group_id: int) -> Path:
+    """这个群的组件仓库：`var/components/g<群号>/`。
+
+    ⚠️ **按群分层是这次改动的核心** ✗→✓ —— 原来扫的是一个全局目录 ✓，
+    `group_id` 只拿去查成员 ✓ —— 于是**每个群看到的是同一批组件** ✗。
+    分层之后跨群隔离是**结构上**的 ✓，不靠"别人猜不到你的群号" ✓。
+    """
+    return settings.components_dir / f"g{int(group_id)}"
+
+
+def _scan_components(group_id: int) -> list[dict]:
     out: list[dict] = []
-    base = settings.components_dir
+    base = group_components_dir(group_id)
     if not base.is_dir():
         return out
     for d in sorted(base.iterdir()):
@@ -445,13 +463,19 @@ async def component_render(
     """把一个组件连同它要的数据一起交出去。
 
     **路径穿越要挡住**：`name` 是 URL 里来的，`../` 一下就能读到别处去。
-    只允许单层目录名、且必须真的在 components_dir 底下。
+    只允许单层目录名、且必须真的在**这个群自己的**目录底下。
     """
     await require_member(group_id, user["id"])
     if not name or "/" in name or "\\" in name or name.startswith("."):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
-    d = (settings.components_dir / name).resolve()
-    if not str(d).startswith(str(settings.components_dir.resolve())) or not d.is_dir():
+    base = group_components_dir(group_id)
+    d = (base / name).resolve()
+    # ⚠️ `str.startswith` → `is_relative_to` ✗→✓ —— 2026-10-07：
+    #    前缀比较对 `/a/b` vs `/a/bc` 会**误判通过** ✗（`/a/bc/x` 确实"以 /a/b 开头"✓）。
+    #    现在因为"名字不许含 `/`"打不到 ✓，但这是**两道防护里的一道** ✓，
+    #    靠另一道恰好能兜住，不该是它继续这么写的理由 ✗。
+    #    （`routes_internal.py` 的 `/image` 是同一个写法 ✓ —— 一起改 ✓。）
+    if not d.is_relative_to(base.resolve()) or not d.is_dir():
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"没有 `{name}` 这个组件")
 
     html_file = d / "index.html"

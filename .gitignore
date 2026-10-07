@@ -2,6 +2,10 @@ data/
 keys/
 releases/
 provision/
+# ★ 2026-10-07：`var/` 是**用户的东西**（创意工坊的组件、子代理的暂存文件）✗→✓ ——
+#   不排除的话它们会被这个仓库跟踪 ✓，而 App 管家那套"存档/回滚"会去提交它们 ✗
+#   （`routes_internal.py` 的自动提交是无差别的 ✓）。
+var/
 .env
 *.log
 __pycache__/

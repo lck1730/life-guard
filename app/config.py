@@ -56,9 +56,37 @@ class Settings(BaseSettings):
         return self.ui_dir / "avatar.png"
 
     @property
+    def var_dir(self) -> Path:
+        """**服务自己的可变数据** —— 不挂静态、不进 git。
+
+        ⚠️ 和 `ui_dir` 是**两回事** ✗→✓（2026-10-07 做「创意工坊」时分开的）：
+        `ui/` 整个挂在 `/ui` 上**没有鉴权** ✓，而且按 `SOUL-app-butler.md` 是
+        **归 App 管家管**的 ✓ —— 用户自己做的组件放那儿，等于**谁都能猜着取** ✗，
+        还等于让另一个 agent 有权改它们 ✗。
+        `var/` 不挂静态 ✓，只能走带 `require_member` 的接口读 ✓。
+        """
+        return self.data_dir.parent / "var"
+
+    @property
     def components_dir(self) -> Path:
-        """它写的可视化组件。每个子目录一个。"""
-        return self.ui_dir / "components"
+        """**每个群自己的**组件仓库：`var/components/g<群号>/<名字>/`。
+
+        ⚠️ 权限是 **2750（`lgchat:lgcode`，组只读）** ✓ —— 由 `deploy-chat.sh` 建 ✓。
+        **agent 写不进这里** ✓，这正是"没确认过不许写"能真拦的前提 ✓：
+        它手里有 `write_file`/bash ✓，只要这个目录它写得进 ✗，
+        工具里那些校验就一行都不会执行 ✓（详见方案第七节 ✓）。
+        """
+        return self.var_dir / "components"
+
+    @property
+    def staging_dir(self) -> Path:
+        """子代理写 HTML 的地方：`var/staging/`，权限 **2775（agent 可写）** ✓。
+
+        两段式写入的中间站 ✓：服务端在这儿发一个空文件 ✓ →
+        子代理把它填上 ✓（它认不出是哪个群 ✓，所以只能按给定路径写 ✓）→
+        主对话凭票认领 ✓（见方案第五节 ✓）。
+        """
+        return self.var_dir / "staging"
 
     # ── 发布物（APK）────────────────────────────────────────────────────
     #
@@ -248,6 +276,18 @@ class Settings(BaseSettings):
         # 界面层那块也要建出来——它是 agent 的"可写区"，
         # 不存在的话挂载 /ui 会直接起不来
         self.ui_dir.mkdir(parents=True, exist_ok=True)
+        # 组件那两个目录：**归 root 那份部署脚本建**（权限是 2750 / 2775，见 deploy-chat.sh）✓。
+        # ⚠️ 这里**只保证"在"**，而且建不出来也**不拦服务启动** ✗→✓ ——
+        #    这一句跑在 `lgchat` 名下 ✓，而 `/opt/lifeguard-chat` 是 `root:root 755` ✓，
+        #    所以 `var/` 它**根本建不出来** ✗（真抛出来就是"服务起不来"✓，
+        #    而症状会像"代码坏了"✗ —— 2026-10-07 差点这么干）。
+        #    建不出来只是组件功能不可用 ✓ —— 那要吼一声，但不能把整个服务带走 ✓。
+        for _d, _what in ((self.staging_dir, "暂存区"), (self.components_dir, "组件仓库")):
+            try:
+                _d.mkdir(exist_ok=True)          # 不加 parents：父目录该由部署建好
+            except OSError as _exc:
+                print(f"⚠️ 组件{_what}建不出来：{_d}（{_exc}）"
+                      f" —— 看看 deploy-chat.sh 有没有建 var/", flush=True)
         self.components_dir.mkdir(parents=True, exist_ok=True)
         # 前端脚本目录：**一个功能一个文件**（见 main.py 的 `/` 里那段说明）。
         # 先建出来，agent 加功能时直接往里写新文件就行——不用它自己 mkdir。
