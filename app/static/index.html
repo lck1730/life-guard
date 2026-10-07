@@ -746,8 +746,11 @@
   /* 工坊那个 ⋯ 菜单 —— 它住在 `.sheet .panel` 里 ✓，
      ⚠️ **不能借 `.ascreen .row` 那套** ✗（那一套是按 `.ascreen` 限定的 ✓，
         弹层不是 `.ascreen` ✓）—— 借了就是"点了没样式、像一行光字" ✓。 */
+  /* ⚠️ **居中** ✓（用户 2026-10-07 深夜看着截图定的 ✓）——
+     原来靠左 ✓，他说要居中 ✓。底下那个「取消」本来就是居中的 ✓，
+     于是这一列从上到下就齐了 ✓。 */
   .wsmenu { display:flex; flex-direction:column; }
-  .wsmenu button { width:100%; text-align:left; background:none; border:0;
+  .wsmenu button { width:100%; text-align:center; background:none; border:0;
                    border-bottom:1px solid var(--line); padding:15px 4px;
                    color:var(--text); font:inherit; font-size:15.5px; }
   .wsmenu button:last-child { border-bottom:0; }
@@ -4087,9 +4090,9 @@
     const t = wsCur.tasks.find(x => Number(x.id) === Number(wsCur.task));
     const p = $('#sheetPanel');
     p.innerHTML = '';
-    const h = document.createElement('h3');
-    h.textContent = (t && (t.title || t.slug)) || '还没起名';
-    p.appendChild(h);
+    // ⚠️ **顶上那个组件名去掉了** ✗→✓（用户 2026-10-07 深夜看着截图定的：
+    //    「组件名不显示」✓）。它就在顶栏上写着 ✓，这里再来一行是多余的 ✓ ——
+    //    而且它和下面那两行长得一样 ✓，看着像三个都能点的条目 ✗。
     const grp = document.createElement('div');
     grp.className = 'wsmenu';
     p.appendChild(grp);
@@ -4110,8 +4113,16 @@
       mk('重命名', () => openRenameSheet(t.slug, t.title || ''));
       // ★ 「删除组件等于删除对话」✓ —— 所以删的是**整块**（不传版本号 ✓），
       //   服务端会把文件、所有版本、这条对话一起收掉 ✓。
-      armDelete(mk('删除组件（连这条对话）', () => {}),
-                '删除组件（连这条对话）', async () => {
+      // ⚠️ **`danger=true` 那个参数原来漏了** ✗→✓（2026-10-07 深夜，用户看着截图
+      //    报的："删除组件红色字体" ✓）—— `mk()` 的第三个参数没传 ✓，
+      //    于是那一行**跟别的长得一模一样** ✓（红色根本就没设上 ✓）。
+      //    这类"样式没生效"从代码上很难一眼看出来 ✓（那行确实有一句
+      //    `if (danger) …红色` ✓，只是**没人给它 danger** ✓）。
+      //
+      // ⚠️ 标签**不带"（连这条对话）"了** ✓（用户："不要后面提示"✓）——
+      //    那句话改到**第一下点完之后的按钮上** ✓（"再点一下：会连对话一起删"✓）：
+      //    菜单里不占地方 ✓，而**该说清代价的那一刻**它还在 ✓。
+      armDelete(mk('删除组件', () => {}, true), '删除组件', async () => {
         await api(`/components/${encodeURIComponent(t.slug)}?group_id=${group.id}`,
                   { method: 'DELETE' });
         toast('删了');
@@ -4119,7 +4130,7 @@
         backToNav();
       });
     } else {
-      armDelete(mk('删掉这次对话', () => {}), '删掉这次对话', async () => {
+      armDelete(mk('删掉这次对话', () => {}, true), '删掉这次对话', async () => {
         await api(`/workshop/${group.id}/tasks/${wsCur.task}`, { method: 'DELETE' });
         toast('删了');
         closeSheet();
@@ -4161,7 +4172,10 @@
         return;
       }
       b.dataset.armed = '1';
-      b.textContent = '再点一下：连这条对话一起删';
+      // ⚠️ **代价写在这一刻** ✓ —— 菜单里那句"（连这条对话）"拿掉了 ✓（用户要的 ✓），
+      //    但"这一下会连对话一起删"这件事**必须在按下去之前说出来** ✓：
+      //    两下才删的全部意义就是**第二下之前他知道会付什么** ✓。
+      b.textContent = '再点一下：会连对话一起删';
       setTimeout(() => {
         if (b.isConnected && b.dataset.armed) {
           delete b.dataset.armed;
