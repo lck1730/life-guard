@@ -2342,8 +2342,15 @@
     const who = document.createElement('div'); who.className = 'who';
     who.textContent = isAgent ? agentName() : (m.sender_nickname || '');
     const b = document.createElement('div'); b.className = 'bubble';
-    // 引用条放气泡**最上面**（微信就是这样），后面才是本条正文
-    if (m.quote) b.appendChild(buildQuoteEl(m.quote));
+    // ⚠️ **引用条不能在正文之前挂** ✗→✓（2026-10-07 深夜，用户报的：
+    //    「虽然引用了吗，但是聊天界面看不出来」✓）。
+    //
+    //    原因只有一句：下面渲染正文的 `renderContent` **第一句就是
+    //    `el.textContent = ''`** ✓ —— 先挂上去的引用条会被它**一起擦掉** ✗。
+    //    数据一路都是对的（库里存着 ✓、接口返回着 ✓、`m.quote` 也有 ✓），
+    //    最后被**自己的下一句**抹掉了 ✓ —— 这种错最难查 ✓：每一层单看都没问题 ✓。
+    //    所以改成**正文画完再插到最前面** ✓（`insertBefore(…, firstChild)` ✓ =
+    //    "引用条在气泡最上面" ✓，效果一样 ✓）。
     _msgs.set(m.id, m);          // 长按引用时要回头找这条消息的完整信息
     if (m.msg_type === 'image' && m.media_path) {
       b.classList.add('media');
@@ -2381,6 +2388,8 @@
     } else {
       renderContent(b, m.content || '[' + m.msg_type + ']', mine);
     }
+    // ★ **正文画完了才挂引用条** ✓（见上面那段 ✓）—— 插到最前面 ✓。
+    if (m.quote) b.insertBefore(buildQuoteEl(m.quote), b.firstChild);
     const t = document.createElement('div'); t.className = 'time'; t.textContent = fmtTime(m.created_at);
     w.append(who, b, t); row.append(av, w);
     if (prepend) $('#msgs').prepend(row);
@@ -4206,7 +4215,6 @@
     }
     const b = document.createElement('div');
     b.className = 'mkbub';
-    if (m && m.quote) b.appendChild(buildWsQuoteEl(m.quote));
     if (m && m.msg_type === 'image' && m.media_path) {
       b.classList.add('media');
       const img = document.createElement('img');
@@ -4222,6 +4230,11 @@
     } else {
       fillBubble(b, (m && m.content) || '');   // ★ 渲染（粗体/代码/列表/问题标签 ✓），不进 innerHTML ✓
     }
+    // ⚠️ **引用条要在正文之后挂** ✗→✓ —— `fillBubble` 第一句就是
+    //    `el.textContent = ''` ✓，先挂上去的会被它一起擦掉 ✓
+    //    （群聊那边就是这么坏了很久的 ✓，见 `addMsg` 那段注释 ✓）。
+    //    插到最前面 = "引用条在气泡最上面" ✓，和微信一样 ✓。
+    if (m && m.quote) b.insertBefore(buildWsQuoteEl(m.quote), b.firstChild);
     wrap.appendChild(b);
     row.append(av, wrap);
     box.appendChild(row);
