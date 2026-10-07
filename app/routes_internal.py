@@ -1089,13 +1089,16 @@ async def components_save(body: ComponentSaveIn) -> dict:
         pass
     await push_workshop_status(group_id, "done", int(task_id) if task_id else None)
     await _say_system(group_id, "「" + want_title + "」做好了，去创意工坊看看。")
-    log.info("组件落成：群 %s 的 %s v%s（未固化）", group_id, slug, version)
+    log.info("组件落成：群 %s 的 %s v%s", group_id, slug, version)
     return {"ok": True, "slug": slug, "version": version, "state": "draft",
             "title": want_title,
-            "note": ("已经做好了 ✓ —— 但它是**未固化的**一版 ✓，"
-                     "要用户在创意工坊里点**保留**才算定下来 ✓。"
-                     "你可以让他去看看，但**别说「已经保留/已经能用了」**"
-                     "（那不是你说了算的）。" + said)}
+            # ⚠️ 这段话是**写给模型看的** ✓ —— 2026-10-07 深夜跟着"固化"整套改过 ✗→✓：
+            #    原来它写着"要用户点保留才算定下来" ✓，那会让它转头去跟用户说
+            #    「还没固化」✓ —— 而界面上**已经没有这个词了** ✗（用户会去找一个
+            #    不存在的东西 ✓）。现在只说事实：做好了、能用了 ✓。
+            "note": ("已经做好了 ✓ —— 他随时能在创意工坊里看到它、也能让你接着改 ✓。"
+                     "**别提「固化 / 保留 / 未固化」这些词** ✗（界面上没有这套概念了 ✓）。"
+                     + said)}
 
 
 @router.post("/components/list", dependencies=[Depends(require_internal_token)])
@@ -1155,7 +1158,10 @@ async def components_note(body: ComponentSlugIn) -> dict:
         if not ts:
             return ""
         return datetime.fromtimestamp(int(ts), timezone.utc).strftime("%Y-%m-%d %H:%M")
-    label = {"live": "已保留（用户点头定下来的那一版）", "draft": "未固化",
+    # ⚠️ 这里的说法**是给模型看的** ✓ —— 2026-10-07 深夜跟着"固化"整套改过 ✗→✓：
+    #    它自己得能读懂"第几版、哪一版最新" ✓，但**不能再拿"保留/未固化"那张嘴** ✗
+    #    （它会照抄过去跟用户说 ✓，而界面上那两个词已经没了 ✓）。
+    label = {"live": "现在用的那一版", "draft": "最新的一版",
              "archived": "旧版（被新版顶下来了）"}
     head = [f"# {rows[-1]['title'] or slug}（`{slug}`）", ""]
     for r in rows:

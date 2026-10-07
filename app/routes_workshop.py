@@ -547,6 +547,38 @@ async def tasks_new(group_id: int, body: TaskNewIn | None = None,
             "messages": []}
 
 
+class TaskTitleIn(BaseModel):
+    title: str = Field(min_length=1, max_length=40)
+
+
+@router.patch("/{group_id}/tasks/{task_id}/title")
+async def task_rename(group_id: int, task_id: int, body: TaskTitleIn,
+                      user: dict = Depends(current_user)) -> dict:
+    """给**还没做出组件**的那条对话改名 ✓。
+
+    ★ 2026-10-07 深夜补的 ✗→✓ —— 用户问的：「还没做出组件为啥连重命名都没有」✓。
+      原来改名只有一条路：`POST /components/{slug}/rename` ✓，而那条路**必须先有
+      一个组件** ✗（没有 slug 就没得改 ✓）→ 于是那一行连"重命名"都不给 ✓。
+
+      ⚠️ 可**用户开做的时候是起过名字的** ✓（存在 `workshop_tasks.title` ✓）——
+        那是一个真实的东西 ✓（它出现在导航上 ✓、会被 `component_save` 当成
+        组件的最终名字 ✓），凭什么不能改 ✗。
+
+    ⚠️ 组件真做出来之后，**改的是组件上的名字** ✓（`components.title` ✓，
+      见 `main.py` 的 `component_rename` ✓）—— 那是另一个接口 ✓。
+      前端按"有没有 slug"分岔 ✓（见 `openWsMenu` ✓）：两边都改同一件事的
+      **不同阶段** ✓，所以两处都得能改 ✓。
+    """
+    await require_member(group_id, user["id"])
+    await _assert_open(group_id)
+    row = await _own_task(group_id, user["id"], task_id)
+    await execute("UPDATE workshop_tasks SET title = ? WHERE id = ?",
+                  (body.title.strip(), int(row["id"])))
+    log.info("工坊对话改名：群 %s 任务 %s → %r（用户 %s）",
+             group_id, row["id"], body.title.strip(), user["id"])
+    return {"ok": True, "task": await _task_payload(group_id, user["id"], row["id"])}
+
+
 @router.post("/{group_id}/tasks/{task_id}/open")
 async def task_open(group_id: int, task_id: int,
                     user: dict = Depends(current_user)) -> dict:
@@ -633,7 +665,7 @@ async def task_say(group_id: int, task_id: int, body: TaskSayIn,
 @router.delete("/{group_id}/tasks/{task_id}")
 async def task_delete(group_id: int, task_id: int,
                       user: dict = Depends(current_user)) -> dict:
-    """删掉这条对话 ✓ —— 未固化的腾额度就靠它 ✓。
+    """删掉这条对话 ✓ —— 聊完不再需要的、或者开了没做的那种 ✓。
 
     ⚠️ 正在跑的那条不许删 ✓ —— 删掉行之后它还在后台推消息 ✓，
        而 `workshop_messages` 的外键会把它写进一个不存在的任务里 ✓（或者直接报错 ✓）。

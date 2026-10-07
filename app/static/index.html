@@ -4180,12 +4180,31 @@
         backToNav();
       }, true);
     } else {
+      // ★ **还没做出组件的也能改名** ✗→✓（2026-10-07 深夜，用户问的：
+      //   「还没做出组件为啥连重命名都没有」✓）。
+      //   ⚠️ 走的是**另一个接口** ✓：名字这时候住在**对话**上 ✓
+      //      （`workshop_tasks.title` ✓ —— 就是他开做时起的那个 ✓），
+      //      组件那行的名字要等它真的做出来才存在 ✓（`components.title` ✓）。
+      //      同名的两件事、分两个阶段 ✓，所以两个都要能改 ✓。
+      mk('重命名', () => openNameSheet({
+        heading: '重命名',
+        initial: (t && t.title) || '',
+        cta: '保存',
+        save: async (name) => {
+          const r = await api(`/workshop/${group.id}/tasks/${wsCur.task}/title`,
+                              { method: 'PATCH', body: JSON.stringify({ title: name }) });
+          wsCur.title = (r.task && r.task.title) || name;
+          setWsHead();
+          await wsReloadTasks();
+          if ($('#wsNav').classList.contains('on')) renderWsNav();
+          toast('改好了');
+        },
+      }));
       mk('删掉这次对话', async () => {
         closeSheet();
         const ok = await confirmBox({
           title: '删掉这次对话',
-          body: '这条对话和里面的来回都会没，撤不回来。'
-              + '（组件本身不受影响。）',
+          body: '这条对话和里面的来回都会没，撤不回来。',
           ok: '删除',
           danger: true,
         });
