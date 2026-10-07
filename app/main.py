@@ -684,37 +684,77 @@ async def component_unkeep(
     return {"ok": True, "slug": name, "version": int(body.version)}
 
 
+class ComponentRenameIn(BaseModel):
+    #: 新名字 ✓。**只改显示名，不动 `slug`** ✗ —— slug 是目录名和 URL 的一部分 ✓，
+    #: 改名会让磁盘上的目录、已经存过的路径全对不上 ✓（而且组件是**一个 HTML 文件**，
+    #: 里面可能自己写死了什么 ✓ —— 那更不该由一次改名去动 ✓）。
+    title: str = Field(min_length=1, max_length=40)
+
+
+@app.post("/api/components/{name}/rename")
+async def component_rename(
+    name: str, body: ComponentRenameIn, group_id: int = Query(...),
+    user: dict = Depends(current_user),
+) -> dict:
+    """**重命名** ✓ —— 用户 2026-10-07 晚上定的：「重命名会同步所有地方」✓。
+
+    ⚠️ **改的是 `components.title`，而且是这个 slug 的**每一版** ✓** ✗→✓ ——
+       名字是**这个东西**的名字 ✓，不是"第几版的名字" ✓。
+       只改最新那一版的话，界面上会**看人下菜** ✓：
+       列表取的是 live 那版的标题 ✓、笔记头部取的是最后一版 ✓、
+       某处兜底又用第一版 ✓ —— 于是同一个组件在不同地方叫不同名字 ✓。
+       一次全改是**唯一**能保证"同步所有地方"的做法 ✓。
+
+    ⚠️ 它**不需要谁"拥有"这个组件** ✓ —— 组件是**全群共有**的 ✓
+       （谁做的、谁改的，只在 `enabled_by` 那种地方留痕 ✓）。
+       两个人都能改名 ✓，这是对的 ✓。
+
+    ⚠️ **只改显示名，不动 `slug`** ✗ —— 见 `ComponentRenameIn` 那段 ✓。
+    """
+    await require_member(group_id, user["id"])
+    if not valid_slug(name):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
+    title = body.title.strip()
+    if not title:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "名字不能是空的")
+    n = await execute("UPDATE components SET title = ? WHERE group_id = ? AND slug = ?",
+                      (title, group_id, name))
+    if not n:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"没有 `{name}` 这个组件")
+    log.info("组件改名：群 %s 的 %s → %r（用户 %s，%d 版一起改）",
+             group_id, name, title, user["id"], n)
+    return {"ok": True, "slug": name, "title": title, "versions": int(n)}
+
+
 @app.delete("/api/components/{name}")
 async def component_delete(
     name: str, group_id: int = Query(...), v: int | None = Query(None),
     user: dict = Depends(current_user),
 ) -> dict:
-    """删掉一个组件的某一版（不传 `v` = 它的未固化版）。
+    """**不传 `v` = 删掉整个组件**（连它的对话 ✓）；传 `v` = 只删那一版。
 
-    ⚠️ **正在保留的那一版删不掉** ✗→✓ —— 要删得先（或者同时）把它降下来 ✓。
-       否则一次误点就让库里少一个东西 ✓，而且**没有任何提示** ✓。
-       给了 `v` 就是"明确要删这一版" ✓ —— 那时才允许删 live ✓。
-
-    ★ 2026-10-07：**删组件连对话一起删** ✗→✓ —— 用户定的：
-      「已经保留的组件也可以删除，**删除后这个对话也将不存在**」✓。
-      所以这里顺手把它名下的对话（`workshop_tasks` ✓）和那些气泡一并清掉 ✓。
+    ★ 2026-10-07 晚上改的语义 ✗→✓ —— 用户定的：「删除组件**等于删除对话**」✓。
+      所以"不传版本号"从我原来的"删掉未固化那几版"改成了**整块删** ✓：
+      `components` 全部版本 + 磁盘上的目录 + 它名下的 `workshop_tasks` 和气泡 ✓。
+      界面上那条路只有一处（组件管理页的 ⋯ ✓），而且是**两下才删** ✓。
 
       ⚠️ **按版本删的那条路不删对话** ✓ —— "删掉 v2 这一版"是**改组件** ✓，
-         不是"把这个东西连同它的来龙去脉一起抹掉"✓；而"删掉这个组件"
-         （不传 `v`、整个 slug 清空 ✓）才是后者 ✓。两者混起来的话，
+         不是"把这个东西连同它的来龙去脉一起抹掉"✓。两者混起来的话，
          用户删掉一个旧版本会连带丢掉整段对话 ✓ —— 那是个很难查的意外 ✓。
+
+    ⚠️ **整块删没有任何"先降下来"的保护** ✓（原来有 ✓ —— 那个时候"不传版本号"
+       删的是实验版 ✓，误删代价小 ✓）。现在它就是"把这个东西抹掉" ✓，
+       保护在**界面上**：两下才删 ✓，而且第一次点完之后按钮上写着
+       "再点一下：连它的对话一起删" ✓ —— **说清代价比拦一道更管用** ✓。
     """
     await require_member(group_id, user["id"])
     if not valid_slug(name):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
-    where = "group_id = ? AND slug = ?" + (" AND version = ?" if v else " AND state = 'draft'")
+    where = "group_id = ? AND slug = ?" + (" AND version = ?" if v else "")
     params = (group_id, name, int(v)) if v else (group_id, name)
     rows = await fetch_all(f"SELECT version, state FROM components WHERE {where}", params)
     if not rows:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "没有可删的版本")
-    if not v and any(r["state"] == "live" for r in rows):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                            "正在保留的那一版不能就这么删；先保留别的版本，或者指定版本号")
 
     # ★ 整块删（没给版本号）时，把挂在它名下的对话一起收掉 ✓。
     #   ⚠️ 在 DELETE 之前查 ✓ —— 查完就没人知道这些组件是哪条对话做的了 ✓。

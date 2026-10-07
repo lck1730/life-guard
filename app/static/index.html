@@ -395,6 +395,8 @@
        "做"和"改"都在别处（＋ 进的对话屏 / 组件页 ✓）。 */
   #workshop { z-index:22; }
   #compView { z-index:23; }
+  #wsNav    { z-index:24; }
+  #wsChat   { z-index:25; }
 
   /* 「＋ 做一个新的」—— 全宽、最显眼 ✓（它是这一屏的主行动 ✓） */
   #workshop .wsnew { display:flex; align-items:center; justify-content:center; gap:9px;
@@ -414,32 +416,24 @@
   /* 未固化那张卡上的一句事实：「攒着 v2 还没保留」 */
   #workshop .wscard .hint { display:block; font-size:11.5px; color:var(--warn2,#d8b06a);
                             margin-top:2px; }
-  /* ⚠️ 「空」这句**两处都在用** ✗：工坊列表里 ✓、切换对话的弹层里 ✓。
-     只写 `#workshop .wsempty` 的话，弹层里那句会没有样式 ✓
+  /* ⚠️ 「空」这句**两处都在用** ✗：工坊列表里 ✓、导航屏里 ✓。
+     只写 `#workshop .wsempty` 的话，另一处会没有样式 ✓
      （一行贴边的灰字 ✓，看着像没加载出来 ✓）。 */
-  #workshop .wsempty, .sheet .wsempty { color:var(--muted); text-align:center;
+  #workshop .wsempty, #wsNav .wsempty { color:var(--muted); text-align:center;
                                         padding:26px 18px; line-height:1.9;
                                         font-size:14px; }
-  /* 工坊首页那句"规矩" —— **说明放这儿，不占组件页的地方** ✓（用户 2026-10-07 定的 ✓）。
-     比 `.wsempty` 轻一档：它是常驻的一句话 ✓，不是在报错 ✓。 */
-  #workshop .wshelp { color:var(--muted); font-size:13px; line-height:1.75;
-                      padding:2px 4px 0; }
 
-  /* ── 组件页：预览在上、信息与按钮在下 ✓ */
+  /* ── 组件页：**纯预览**（2026-10-07 晚上改的）─────────────────────────
+     ★ 用户定的：这一屏「不要有任何的提示和设置选项」✓，
+       也**没有**保留/继续改/删除那几个按钮了 ✓（"界面就被压缩了"✓）——
+       那些全搬去了创意工坊的组件管理页 ✓。
+       只留**顶栏右上角一个图标** ✓，指向它在工坊里那条对话 ✓。 */
   #compView .cpwrap { flex:1; min-height:0; margin:0 14px;
                       border:1px solid var(--line); border-radius:14px;
                       overflow:hidden; background:var(--bg); }
   #compView iframe { width:100%; height:100%; border:0; display:block; }
-  #compView .cpbar { flex:0 0 auto; padding:13px 16px calc(var(--inset-bottom) + 16px); }
-  #compView .cpmeta { font-size:12.5px; color:var(--muted); margin-bottom:11px;
-                      line-height:1.6; }
-  #compView .cpbtn { width:100%; border:0; border-radius:12px; padding:14px;
-                     font:inherit; font-size:16px; font-weight:600; margin-top:9px; }
-  #compView .cpbtn.go { background:var(--accent); color:var(--on-accent); }
-  #compView .cpbtn.go:active { opacity:.85; }
-  #compView .cpbtn.ghost { background:var(--panel2); color:var(--muted);
-                           border:1px solid var(--line); font-weight:500; font-size:14.5px; }
-  #compView .cpbtn[disabled] { opacity:.5; }
+  /* 底下垫一点，免得预览框贴着屏底（没有按钮那一栏了 ✓，只能靠它 ✓） */
+  #compView .cpwrap { margin-bottom:calc(var(--inset-bottom) + 12px); }
 
   /* ── 对话屏（工坊里的那段对话）───────────────────────────────────────
      和群聊那屏**不是一套东西** ✓：这里是**你一个人对着它** ✓，
@@ -448,7 +442,6 @@
      ★ 2026-10-07：入口从**群聊右上角**挪到了**输入框的 ＋** ✓（和 相册/拍摄 并列 ✓），
        所以它现在是**从群聊直接进**的一屏 ✓（右上角那个还在 ✓，但那个只列组件 ✓）。
        顶栏多两样：**切换对话**（≡ ✓）和 **⋯**（保留/删除 ✓）。 */
-  #wsChat { z-index:24; }
   #wsChat .mkbody { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain;
                     padding:14px; display:flex; flex-direction:column; gap:10px; }
   #wsChat .mkrow { display:flex; max-width:88%; }
@@ -489,16 +482,44 @@
   #wsChat .mksend { width:44px; height:44px; flex:0 0 auto; display:none;
                     align-items:center; justify-content:center; color:var(--accent); }
 
-  /* 顶栏中间那块 —— **点它就是"切换对话"** ✓，所以它是个按钮，不是标题文字 ✓。
-     （放在标题位置而不是再加一个图标 ✓：右边多一个 40px 的图标，
-       居中就保不住了 ✓ —— 这个项目为"标题被顶歪"改过一次 ✓，别再来一次 ✓。）
-     名字长短不一，所以**必须能缩** ✓：群里做过的组件名可能是七八个字 ✓。 */
-  #wsChat .wstitle { flex:1; min-width:0; display:flex; align-items:center;
-                     justify-content:center; gap:7px; background:none; border:0;
-                     padding:0; color:var(--text); font:inherit;
-                     font-size:17px; font-weight:600; }
-  #wsChat .wstitle .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #wsChat .wstitle .cv { flex:0 0 auto; color:var(--muted); margin-top:1px; }
+  /* ── 导航屏（工坊的门口）─────────────────────────────────────────────
+     ★ 2026-10-07 晚上用户定的形状 ✗→✓：＋ 进来**先是这一屏** ✓ ——
+       一个个图标 = 已经做过的组件（各自那条对话 ✓），外加一个「新建组件」✓。
+       点图标 → 组件管理屏（对话 + ⋯ ✓）。**这里是入口，不是对话本身** ✓。 */
+  #wsNav .navgrid { display:grid; grid-template-columns:repeat(4, 1fr);
+                    gap:18px 8px; padding-top:6px; }
+  #wsNav .navtile { display:flex; flex-direction:column; align-items:center; gap:8px;
+                    background:none; border:0; padding:0; color:var(--text);
+                    font:inherit; min-width:0; }
+  #wsNav .navtile:active .ic { transform:scale(.94); }
+  #wsNav .navtile .ic { width:60px; height:60px; border-radius:18px;
+                        background:var(--panel2); display:flex; align-items:center;
+                        justify-content:center; font-size:29px; line-height:1;
+                        transition:transform .12s ease; }
+  /* 「新建」那颗**跟别的不一样** ✓ —— 虚线框、加号 ✓。
+     它是这一屏唯一"不是东西"的入口 ✓，长得一样就找不着了 ✓。 */
+  #wsNav .navtile.new .ic { background:none; border:1.5px dashed #35507a;
+                            color:var(--accent); font-size:30px; }
+  #wsNav .navtile .nm { font-size:12px; line-height:1.35; color:var(--text);
+                        max-width:100%; text-align:center; overflow:hidden;
+                        display:-webkit-box; -webkit-line-clamp:2;
+                        -webkit-box-orient:vertical; word-break:break-word; }
+  /* 「未固化」那个标识 —— 一颗小黄点挂在图标**右上角** ✓。
+     写成一整行字的话，那一格的标题会被挤下去 ✓，四列网格立刻参差不齐 ✓。 */
+  #wsNav .navtile .dot { position:relative; }
+  #wsNav .navtile .dot::after { content:''; position:absolute; top:-2px; right:-2px;
+                                width:11px; height:11px; border-radius:50%;
+                                background:var(--warn2,#d8b06a);
+                                border:2px solid var(--bg); }
+  #wsNav .navtile .nm .sub { display:block; color:var(--warn2,#d8b06a); font-size:10.5px; }
+
+  /* 组件管理屏的标题：名字 + 「未固化」标识 ✓。
+     ⚠️ 里面是**两个**元素 ✓，所以要自己摆平 —— `header.sub h2` 只管
+        "占满中间并居中" ✓，不负责里面怎么排 ✓。名字长短不一，**必须能缩** ✓
+        （群里做过的组件名可能是七八个字 ✓，撑不下就把右边的 ⋯ 顶出去 ✓）。 */
+  #wsChat .sub h2 { display:flex; align-items:center; justify-content:center;
+                    gap:7px; min-width:0; }
+  #wsChat .sub h2 .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   /* 「未固化」那个标识 —— 用户定的：**实验阶段的组件要有特殊标识** ✓，
      而且**同一件事在对话屏里也要看得见** ✓（"同步体现在聊天界面里的设置" ✓）。 */
   .wsbadge { flex:0 0 auto; font-size:11px; font-weight:600; letter-spacing:.03em;
@@ -673,26 +694,20 @@
                   padding:18px 18px; max-height:100%; overflow-y:auto; }
   .sheet h3 { margin:0 0 14px; font-size:16px; }
 
-  /* 工坊那两个弹层（切换对话 / ⋯ 菜单）—— 它们住在 `.sheet .panel` 里 ✓，
+  /* 工坊那个 ⋯ 菜单 —— 它住在 `.sheet .panel` 里 ✓，
      ⚠️ **不能借 `.ascreen .row` 那套** ✗（那一套是按 `.ascreen` 限定的 ✓，
         弹层不是 `.ascreen` ✓）—— 借了就是"点了没样式、像一行光字" ✓。 */
-  .wsplist { display:flex; flex-direction:column; gap:2px; }
-  .wsptask { display:flex; align-items:center; gap:8px; width:100%; text-align:left;
-             background:none; border:0; border-radius:10px; padding:12px 10px;
-             color:var(--text); font:inherit; font-size:15px; }
-  .wsptask:active { background:var(--panel2); }
-  /* 正在看的那条**要看得出来** ✓ —— 不然点开弹层会不知道自己在哪一条上 ✓。 */
-  .wsptask.on { background:var(--panel2); }
-  .wsptask .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
-                 white-space:nowrap; }
-  .wsptask .wsbadge, .wsptask .cur { flex:0 0 auto; }
-  .wsptask .cur { font-size:11.5px; color:var(--accent); }
   .wsmenu { display:flex; flex-direction:column; }
   .wsmenu button { width:100%; text-align:left; background:none; border:0;
                    border-bottom:1px solid var(--line); padding:15px 4px;
                    color:var(--text); font:inherit; font-size:15.5px; }
   .wsmenu button:last-child { border-bottom:0; }
   .wsmenu button:active { background:var(--panel2); }
+  /* 重命名那个输入框 —— 和群聊输入框同一套观感 ✓（16px 是**防 iOS 聚焦缩放**的 ✓） */
+  .rninput { width:100%; box-sizing:border-box; padding:12px 14px; margin-bottom:4px;
+             background:var(--panel2); border:1px solid var(--line); border-radius:12px;
+             color:var(--text); font:inherit; font-size:16px; }
+  .rninput:focus { outline:none; border-color:var(--accent); }
 
   /* 「+」面板：微信那种横向网格 —— 圆角方块图标 + 下方小字 */
   .plus-grid { display:flex; gap:16px; flex-wrap:wrap; }
@@ -895,9 +910,29 @@
   <div class="abody" id="wsBody"></div>
 </div>
 
-<!-- ★ 组件页（2026-10-07）—— **一个组件自己的页** ✓：预览 + 这一版的信息 + 攒着的那版 + 按钮。
-     压在工坊上面 ✓（不是底部弹层 ✗：组件要尽量大 ✓）。
-     ⚠️ 以后"继续改"那个对话也进这一页 ✓ —— 于是"不同组件记忆独立"是结构上的 ✓。 -->
+<!-- ★ 导航屏（2026-10-07 晚上）—— 创意工坊的门口 ✓。
+     ＋ 进来先是这一屏 ✓：一个个图标 = 已经做过的组件（各自那条对话 ✓），
+     外加一颗「新建组件」✓。点图标进**组件管理屏**（`#wsChat` ✓）。
+     ⚠️ **这一屏不是对话本身** ✗ —— 对话在它上面那一屏 ✓（见 `#wsChat` ✓）。 -->
+<div class="screen ascreen" id="wsNav">
+  <header class="sub">
+    <button class="icon-btn back" id="wsNavBack" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 4.5 8.5 12 15 19.5" />
+      </svg>
+    </button>
+    <h2>创意工坊</h2>
+    <div class="spacer"></div>
+  </header>
+  <div class="abody" id="wsNavBody"></div>
+</div>
+
+<!-- ★ 组件页（2026-10-07）—— **纯预览** ✓：只有组件本身 + 右上角一个图标。
+     ★ 2026-10-07 晚上：底下那三条按钮（保留 / 继续改 / 删除）**全搬走了** ✓ ——
+       用户定的：「不要有任何的提示和设置选项…这样界面就被压缩了」✓。
+       那些事现在只在创意工坊的组件管理页里做 ✓（顶栏 ⋯ 里 ✓）。 -->
 <div class="screen ascreen" id="compView">
   <header class="sub">
     <button class="icon-btn back" id="compBack" aria-label="返回">
@@ -908,10 +943,18 @@
       </svg>
     </button>
     <h2 id="compTitle">组件</h2>
-    <div class="spacer"></div>
+    <!-- ★ 唯一的一个入口 ✓ —— 去它在工坊里那条对话 ✓（改它、删它、改名都在那儿 ✓）。
+         ⚠️ 它**顶掉的是 `.spacer`** ✓ —— 那个占位本来就是为了让标题居中 ✓，
+            现在这个图标正好占同样的 40px ✓，居中不受影响 ✓。 -->
+    <button class="icon-btn" id="compChat" aria-label="和它对话">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.5 12c0 4-3.8 7.2-8.5 7.2a10 10 0 0 1-2.6-.34L4.2 20.4l1.3-3.6A6.9 6.9 0 0 1 3.5 12c0-4 3.8-7.2 8.5-7.2s8.5 3.2 8.5 7.2z"/>
+      </svg>
+    </button>
   </header>
   <div class="cpwrap" id="compWrap"></div>
-  <div class="cpbar" id="compBar"></div>
 </div>
 
 <!-- ★ 对话屏（2026-10-07）—— 工坊里的那段对话，**从输入框的 ＋ 进** ✓。
@@ -927,15 +970,10 @@
         <polyline points="15 4.5 8.5 12 15 19.5" />
       </svg>
     </button>
-    <button class="wstitle" id="wsPick" aria-label="切换对话">
-      <span class="nm" id="wsTitle">创意工坊</span>
+    <h2>
+      <span class="nm" id="wsTitle">组件</span>
       <span class="wsbadge" id="wsBadge" hidden>未固化</span>
-      <svg class="cv" viewBox="0 0 24 24" width="15" height="15" fill="none"
-           stroke="currentColor" stroke-width="2.2"
-           stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="5.5 9 12 15.5 18.5 9" />
-      </svg>
-    </button>
+    </h2>
     <button class="icon-btn" id="wsMore" aria-label="更多">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
         <circle cx="5.2" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/>
@@ -1695,10 +1733,11 @@
     if ($('#sheet').classList.contains('on')) { closeSheet(); return; }
     // ★ 创意工坊那两屏（2026-10-07）—— **压在管家那三屏上面** ✓：
     //   组件页 > 工坊 > 编状态 > 改资料 > 管家列表 > 群设置 ✓。
-    // ⚠️ **顺序是"从上往下"** ✓ —— 和 z-index 一致 ✓（`#wsChat` 24 > `#compView` 23
-    //    > `#workshop` 22 ✓）。它是"先关最上面那一屏"的意思 ✓，
+    // ⚠️ **顺序是"从上往下"** ✓ —— 和 z-index 一致 ✓（`#wsChat` 25 > `#wsNav` 24
+    //    > `#compView` 23 > `#workshop` 22 ✓）。它是"先关最上面那一屏"的意思 ✓，
     //    写反了的话按一下返回会**隔着两层关掉底下那层** ✓（用户看到的还是原来那一屏 ✓）。
     if ($('#wsChat').classList.contains('on')) { closeWsChat(); return; }
+    if ($('#wsNav').classList.contains('on')) { closeWsNav(); return; }
     if ($('#compView').classList.contains('on')) { closeComp(); return; }
     if ($('#workshop').classList.contains('on')) { closeWorkshop(); return; }
     if ($('#agentEdit').classList.contains('on')) { closeAgentEdit(); return; }
@@ -2739,8 +2778,8 @@
     p.querySelector('#pkGallery').onclick = () => { closeSheet(); $('#fileGallery').click(); };
     // ★ 创意工坊（2026-10-07）—— 用户定的入口：**放在聊天框的 ＋ 里** ✓，
     //   "目前是拍照和相册，加一个创意工坊入口" ✓。放**第一个**（它是最常用的 ✓）。
-    //   进去是**对话** ✓，默认停在**上次那条** ✓（服务端算的，不靠本地存储 ✓）。
-    p.querySelector('#pkWs').onclick = () => { closeSheet(); openWsChat(null); };
+    //   进去先是**导航界面** ✓（2026-10-07 晚上改的 ✓）—— 图标 + 新建组件 ✓。
+    p.querySelector('#pkWs').onclick = () => { closeSheet(); openWsNav(); };
     p.querySelector('#pkCancel').onclick = closeSheet;
     openSheet();
   };
@@ -3215,7 +3254,7 @@
   //     · **不分区了** ✓（"不需要分实验区和使用区，右上角点击进入就只是单纯地
   //       罗列组件" ✓ —— 理由他自己给了：都在沙箱里、组件之间本来就隔离 ✓）
   //     · 这一屏**只剩"列出来"** ✓：一行一个组件 ✓，未固化的挂个标识 ✓
-  //     · **"做"挪到了输入框的 ＋** ✓（见 `openWsChat` ✓）
+  //     · **"做"挪到了输入框的 ＋** ✓ —— 那里现在进的是**导航屏**（`openWsNav` ✓）
   const openWorkshop = () => {
     pushScreen('workshop');
     // ⚠️ **先推屏、再画** ✗→✓ —— 画要发请求（几十毫秒 ✓）；
@@ -3247,16 +3286,10 @@
       list.forEach(c => grid.appendChild(wsCard(c)));
       box.appendChild(grid);
     }
-
-    // ★ **说明放在这儿** ✗→✓ —— 用户 2026-10-07 定的：
-    //   「这些提示应该在工作区就和用户说明，不要在展示区占地方」✓。
-    //   所以：这一屏放一句"规矩" ✓，组件页只留预览和按钮 ✓。
-    const note = document.createElement('div');
-    note.className = 'wshelp';
-    note.textContent = '这是这个群做过的组件。要做新的、或者改一个，'
-                     + '去群聊输入框的「＋ → 创意工坊」。'
-                     + '刚做好的是「未固化」的，进那头点「保留」才算定下来。';
-    box.appendChild(note);
+    // ★ **一句提示都不放** ✗→✓ —— 2026-10-07 晚上用户定的：
+    //   「将群聊右上角点开的界面做成**纯粹的展示界面**，里面**不要有任何的提示
+    //     和设置选项**」✓。"未固化"那一行标识是**状态**，留着 ✓；
+    //   而"要去哪儿做新的""点保留才算数"那些话是**说明**，一律不放 ✓。
   };
 
   const wsCard = (c) => {
@@ -3289,12 +3322,12 @@
   // ── 组件页：一个组件自己的页 ✓ ──────────────────────────────────────
   const openComp = async (slug, title) => {
     $('#compTitle').textContent = title || slug;
-    const wrap = $('#compWrap'), bar = $('#compBar');
-    wrap.innerHTML = ''; bar.innerHTML = '';
+    const wrap = $('#compWrap');
+    wrap.innerHTML = '';
     pushScreen('compView');
     let d;
     try { d = await api(`/components/${encodeURIComponent(slug)}?group_id=${group.id}`); }
-    catch (e) { bar.textContent = '打不开：' + e.message; return; }
+    catch (e) { wrap.textContent = '打不开：' + e.message; return; }
     $('#compTitle').textContent = d.title || slug;
 
     // 数据先塞进去（**它自己取不了** —— 沙箱里没有 same-origin ✓）。
@@ -3313,98 +3346,23 @@
     ifr.srcdoc = inject + (d.html || '');
     wrap.appendChild(ifr);
 
-    // ⚠️ **这一页只放"这一版是什么"和几个按钮** ✗→✓ —— 2026-10-07 用户点名：
-    //    「做好的组件下面一堆提示，这些提示应该在工作区就和用户说明，
-    //      不要在展示区占地方」✓。
-    //    所以：**删掉那段说明性的文字** ✗（它搬去了工坊首页 ✓），
-    //    只留一行**事实** ✓（第几版、固化了没有 ✓）—— 那不是提示，是状态 ✓。
-    const meta = document.createElement('div');
-    meta.className = 'cpmeta';
-    meta.textContent = 'v' + d.version + (d.state === 'live' ? ' · 已保留' : ' · 未固化');
-    bar.appendChild(meta);
-
-    // ★ 「保留」/「取消保留」（2026-10-07 改名 ✓）—— 用户定的：
-    //   「只有保留下来的组件才会长期保留那份对话历史，是否保留是可以设置的」✓。
-    //   **这个动作只有用户能做** ✓（agent 没有这个工具 ✓）——
-    //   "它做出来的都是未固化的、你点头才算数"就落在这个按钮上 ✓。
-    const go = document.createElement('button');
-    go.className = 'cpbtn go';
-    if (d.state === 'live') {
-      go.textContent = '取消保留';
-      go.onclick = () => keepComp(slug, d.version, go, false);
-    } else {
-      go.textContent = '保留这一版';
-      go.onclick = () => keepComp(slug, d.version, go, true);
-    }
-    bar.appendChild(go);
-
-    // 「继续改」—— 进**对话屏**（那条对话 ✓）。
-    // ⚠️ **带进去的是 `task_id`，不是 slug** ✗→✓（2026-10-07）——
-    //    对话的钥匙是任务 ✓（见 routes_workshop.py 那段 ✓）。
-    //    服务端已经查过"那条对话是不是你自己的" ✓（别人做的那一版，
-    //    这里给的是 null ✓）→ 那种情况下开一条新的 ✓。
-    const again = document.createElement('button');
-    again.className = 'cpbtn ghost';
-    again.textContent = '继续改这个组件';
-    again.onclick = () => openWsChat(d.task_id, slug);
-    bar.appendChild(again);
-
-    // 删掉整个组件 ✓ —— 用户定的：「已经保留的组件也可以删除，删除后这个对话也将不存在」✓。
-    // ⚠️ **两下才删** ✓（这是在删东西 ✓，而且连对话一起没 ✓，撤不回来 ✓）。
-    const del = document.createElement('button');
-    del.className = 'cpbtn ghost';
-    del.textContent = '删掉这个组件';
-    del.style.color = '#e06a6a';
-    del.onclick = () => delComp(slug, d.title || slug, del);
-    bar.appendChild(del);
-  };
-
-  const keepComp = async (slug, version, btn, keep) => {
-    btn.disabled = true;
-    try {
-      await api(`/components/${encodeURIComponent(slug)}/${keep ? 'keep' : 'unkeep'}`
-                + `?group_id=${group.id}`,
-                { method: 'POST', body: JSON.stringify({ version: version }) });
-    } catch (e) {
-      btn.disabled = false;
-      toast((keep ? '没保留下来：' : '没取消掉：') + e.message);
-      return;
-    }
-    toast(keep ? '保留好了' : '取消保留了');
-    // ⚠️ **退回工坊**，回去时它会重画 ✓ —— 那张卡上的"未固化"标识跟着变 ✓
-    //    （不重画的话用户会以为"点了没用" ✓ —— 那种"明明成功了却像失败"的毛病 ✓）。
-    closeComp();
-  };
-
-  const delComp = async (slug, title, btn) => {
-    if (!btn.dataset.armed) {
-      btn.dataset.armed = '1';
-      btn.textContent = '再点一下：连它的对话一起删';
-      // 5 秒没再点就收回 ✓ —— 免得"一次手滑 + 很久之后又一次手滑"凑成一次删除 ✓。
-      setTimeout(() => {
-        if (btn.isConnected && btn.dataset.armed) {
-          delete btn.dataset.armed;
-          btn.textContent = '删掉这个组件';
-        }
-      }, 5000);
-      return;
-    }
-    btn.disabled = true;
-    try {
-      await api(`/components/${encodeURIComponent(slug)}?group_id=${group.id}`,
-                { method: 'DELETE' });
-    } catch (e) {
-      btn.disabled = false;
-      toast('没删掉：' + e.message);
-      return;
-    }
-    toast('删了');
-    closeComp();
+    // ★ 这一屏**到此为止** ✗→✓（2026-10-07 晚上用户定的）——
+    //   「里面不要有任何的提示和设置选项，也不要有什么取消保留，继续改组件
+    //     以及删除组件的功能，这样界面就被压缩了」✓。
+    //   所以底下那一栏**整个删掉了** ✓（连同那一行 "v2 · 未固化" 的事实行 ✓ ——
+    //   它也是"信息"，用户要的是压缩 ✓）。那些动作全在工坊里 ✓。
+    //
+    //   顶上那个图标 = **唯一**的去处 ✓ —— 进它在工坊里那条对话 ✓
+    //   （改它、删它、改名、保留，都在那儿 ✓）。
+    //   ⚠️ 它**带的是 slug，不是 task_id** ✓ —— 因为从这一屏进来时
+    //   "我有没有为它开过对话"这件事前端并不知道 ✓，
+    //   交给 `openTaskForSlug` 去查/去开 ✓（见下 ✓）。
+    $('#compChat').onclick = () => openTaskForSlug(slug, d.title || slug);
   };
 
   const closeComp = () => {
     popScreen('compView');
-    // ⚠️ **退回工坊要重画一次** ✗→✓ —— 不然刚才保留的那一版还挂着"未固化" ✓，
+    // ⚠️ **退回工坊要重画一次** ✗→✓ —— 不然刚才改过的东西还挂在旧样子上 ✓，
     //    用户会以为"点了没用" ✓（这就是那种"明明成功了却像失败"的毛病 ✓）。
     if ($('#workshop').classList.contains('on')) renderWorkshop();
   };
@@ -3478,55 +3436,136 @@
     setWsStatus(d.busy ? 'thinking' : 'idle');
   };
 
-  /**
-   * 进对话屏。`taskId=null` = 按服务端说的"上次那条" ✓；都没有就开一条新的 ✓。
-   *
-   * ⚠️ **`slug` 只用于「继续改」** ✓ —— 那条路要现开一条**冲着某个组件去**的对话 ✓。
-   *    ⚠️ 而且它**不吃"未固化 3 个"的额度** ✓（改造一个早就保留好的东西，
-   *       不该被"你手上有 3 个半成品"拦住 ✓ —— 服务端那边按 `slug` 判的 ✓）。
-   */
-  const openWsChat = async (taskId, slug, title) => {
-    if (slug) { wsCur.slug = slug; wsCur.title = title || ''; }
-    // ⚠️ **先推屏、再拉** ✗→✓ —— 拉要发请求（几十毫秒 ✓），
+  // ── 导航屏（工坊的门口）──────────────────────────────────────────────
+  //
+  // ★ 2026-10-07 晚上用户定的：＋ 进来**先是这一屏** ✓ ——
+  //   「里面通过一个个图标展示了已经创建的组件对应的对话，然后中间有一个新建组件，
+  //     点击之前的组件就进去的组件管理界面」✓。
+  //
+  // ⚠️ 图标底下是**我自己的**对话 ✓（不是"这个群所有组件"✗）——
+  //   组件是全群共有的 ✓，但**对话是个人的** ✓（`workshop_tasks.user_id` ✓）。
+  //   别人做的东西在**群聊右上角**那一屏能看到、能预览 ✓，
+  //   但你从那儿点进对话时，开的是**你自己**的那条 ✓（见 `openTaskForSlug` ✓）。
+  //
+  // ⚠️ **没起名的那种半成品也列出来** ✗→✓ —— 不然它就**看不见**了 ✓：
+  //   既没法接着做、也没法删 ✓，却**占着"未固化 3 个"里的一个** ✓
+  //   （用户会看到额度莫名其妙少了一个 ✓）。列出来标成"还没起名" ✓，诚实 ✓。
+
+  const openWsNav = async () => {
+    // ⚠️ **先推屏、再画** ✗→✓ —— 画要发请求（几十毫秒 ✓）；
     //    反过来的话那几十毫秒里这一屏是空的 ✓，看着像"点了没反应" ✓。
-    if (!$('#wsChat').classList.contains('on')) pushScreen('wsChat');
-    let d = null;
+    if (!$('#wsNav').classList.contains('on')) pushScreen('wsNav');
+    await renderWsNav();
+  };
+
+  const closeWsNav = () => popScreen('wsNav');
+
+  const renderWsNav = async () => {
+    const box = $('#wsNavBody');
+    let d;
     try {
       d = await api(`/workshop/${group.id}/tasks`);
     } catch (e) {
-      toast('打不开创意工坊：' + e.message);
+      box.textContent = '打不开：' + e.message;
       return;
     }
     wsCur.tasks = d.tasks || [];
-    // ⚠️ **三种进来的方式，选哪条要分清楚** ✗→✓：
-    //   · `taskId` 给了（组件页「继续改」且那条对话是我的 ✓）→ 就开它 ✓
-    //   · 给了 `slug`、没给 `taskId`（那个组件不是我做的 ✓，或者老数据没链接 ✓）
-    //     → 先找我**自己**为这个 slug 开过的对话 ✓（有就接着用 ✓，别每次新开一条 ✓），
-    //       没有才现开一条**冲着它去**的 ✓
-    //   · 什么都没给（输入框 ＋ 进来的 ✓）→ **上次那条** ✓（一条都没有才开新的 ✓）
-    let want = taskId != null ? taskId : null;
-    if (want == null) {
-      if (slug) {
-        const mine = wsCur.tasks.find(x => x.slug === slug);
-        want = mine ? mine.id : null;
-      } else {
-        want = d.current;
-      }
+    box.innerHTML = '';                       // 下面全部走 createElement ✓
+    const grid = document.createElement('div');
+    grid.className = 'navgrid';
+    // ★ 「新建组件」**排在第一个** ✓ —— 用户说的是"中间有一个新建组件" ✓，
+    //   我把它放最前面（和 ＋ 的惯例一致、也最好找 ✓）。
+    //   ⚠️ 想挪到末尾或正中间：只改这一处位置 ✓（就是这一行 append 的顺序 ✓）。
+    grid.appendChild(navNewTile());
+    wsCur.tasks.forEach(t => grid.appendChild(navTile(t)));
+    box.appendChild(grid);
+  };
+
+  const navNewTile = () => {
+    const b = document.createElement('button');
+    b.className = 'navtile new';
+    const ic = document.createElement('span');
+    ic.className = 'ic';
+    ic.textContent = '＋';
+    const nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = '新建组件';
+    b.append(ic, nm);
+    b.onclick = async () => {
+      // 服务端那边会先看"未固化 3 个"的额度 ✓ —— 满了就把原因 toast 出来 ✓
+      // （它那句写清了手上是哪几个、下一步能干什么 ✓，别拿别的字盖掉它 ✓）。
+      if (await wsNewTask('')) pushScreen('wsChat');
+    };
+    return b;
+  };
+
+  const navTile = (t) => {
+    const b = document.createElement('button');
+    b.className = 'navtile';
+    const wrap = document.createElement('span');
+    // ⚠️ 未固化的那颗**点**挂在图标上 ✓（`dot` 那个 class ✓）——
+    //    写成 name 底下一行字的话，四列网格立刻参差不齐 ✓。
+    //    ⚠️ **只在没固化的时候挂那个 class** ✗→✓ —— 别用 "hide" 那种修饰位 ✓：
+    //    那样"加没加对"就多了一个状态 ✓，而现在它只有"有/没有"两种 ✓。
+    wrap.className = t.kept ? '' : 'dot';
+    const ic = document.createElement('span');
+    ic.className = 'ic';
+    ic.textContent = t.slug ? '🧩' : '✨';
+    wrap.appendChild(ic);
+    const nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = t.title || (t.slug || '还没起名');
+    if (!t.kept) {
+      const s = document.createElement('span');
+      s.className = 'sub';
+      s.textContent = '未固化';
+      nm.appendChild(s);
     }
-    if (!want) {
-      // 没有可开的 → 开一条 ✓（**只有这里会自动开** ✓，别的时候都是用户点的 ✓）
-      if (!(await wsNewTask(slug))) return;
-      return;
-    }
+    b.append(wrap, nm);
+    b.onclick = () => openTaskById(t.id);
+    return b;
+  };
+
+  /** 进「一条对话」—— 导航里点图标走这里 ✓。 */
+  const openTaskById = async (tid) => {
+    if (!$('#wsChat').classList.contains('on')) pushScreen('wsChat');
     try {
-      const t = await api(`/workshop/${group.id}/tasks/${want}/open`, { method: 'POST' });
-      showTask(t);
+      const d = await api(`/workshop/${group.id}/tasks/${tid}/open`, { method: 'POST' });
+      showTask(d);
     } catch (e) {
       toast('这条对话打不开：' + e.message);
+      closeWsChat();
     }
   };
 
-  /** 开一条新的 ✓。返回它有没有开成 ✓（额度满了就是没有 ✓）。 */
+  /**
+   * 从**组件页那个图标**进来：找我**自己**为这个组件开过的对话 ✓；
+   * 没有就现开一条**冲着它去**的 ✓。
+   *
+   * ⚠️ **那条路不吃"未固化 3 个"的额度** ✓ —— 改造一个早就做好的组件，
+   *    不该被"你手上有 3 个半成品"拦住 ✓（服务端那边按 `slug` 判的 ✓）。
+   *
+   * ⚠️ **先把组件页关掉** ✗→✓ —— 用户定的是"每个组件界面左上角 < 用于返回
+   *    **导航界面**" ✓：所以从预览页那个图标进来之后，返回应该落到导航 ✓，
+   *    而不是落回**刚才那一页** ✓（那里可能刚刚被你删掉了 ✓ ——
+   *    回到一个已经不存在的组件的预览上，是最难解释的一种错 ✓）。
+   */
+  const openTaskForSlug = async (slug, title) => {
+    if ($('#compView').classList.contains('on')) closeComp();
+    // ⚠️ **把导航屏补上** ✗→✓ —— 从预览页那个图标进来的话，导航屏**没开着** ✓，
+    //    于是"左上角 < 回导航"就无处可回 ✓（按一下会一路退到群聊去 ✓，
+    //    和用户定的那句话说不上 ✓）。补上之后两条路的后退行为就一样了 ✓。
+    //    ⚠️ 它**不等** ✓：导航屏在底下先渲染着 ✓，等用户真退回来时它是现成的 ✓。
+    if (!$('#wsNav').classList.contains('on')) { pushScreen('wsNav'); renderWsNav(); }
+    await wsReloadTasks();
+    const mine = wsCur.tasks.find(x => x.slug === slug);
+    if (mine) { await openTaskById(mine.id); return; }
+    // ⚠️ 新开的那条**名字也是对的** ✓ —— 服务端在 `_my_tasks` 里会给它
+    //    兜上"那个组件现在的标题" ✓（不然顶上会写着个英文 slug ✓，很难认 ✓）。
+    if (await wsNewTask(slug)) pushScreen('wsChat');
+  };
+
+  /** 开一条新的 ✓（只置状态，不推屏 ✓ —— 推屏由调用方决定 ✓）。返回成没成 ✓。 */
   const wsNewTask = async (slug) => {
     try {
       const t = await api(`/workshop/${group.id}/tasks`, {
@@ -3547,74 +3586,28 @@
     try {
       const d = await api(`/workshop/${group.id}/tasks`);
       wsCur.tasks = d.tasks || [];
-    } catch (e) { /* 列表拉不到不影响正在看的这一条 ✓ */ }
+      return d;
+    } catch (e) { return null; }   // 拉不到不影响正在看的这一条 ✓
   };
 
+  /** 按照务器的当前值，把顶栏那两样刷一遍 ✓（保留/改名之后用 ✓）。 */
+  const refreshCurrent = async () => {
+    const d = await wsReloadTasks();
+    if (!d) return;
+    const t = wsCur.tasks.find(x => Number(x.id) === Number(wsCur.task));
+    if (!t) return;
+    wsCur.slug = t.slug || '';
+    wsCur.title = t.title || '';
+    wsCur.kept = !!t.kept;
+    setWsHead();
+  };
+
+  /** 返回**导航屏** ✓ —— 用户定的："每个组件界面左上角依旧是 < " ✓。 */
   const closeWsChat = () => {
     popScreen('wsChat');
-    // ⚠️ 退回工坊要重画一次 ✓ —— 说不定刚刚做好了一个 ✓（那张卡要出现 ✓）。
-    if ($('#workshop').classList.contains('on')) renderWorkshop();
-  };
-
-  /** 切换对话那个弹层 —— 我这些对话 + ＋ 新开一个 ✓。 */
-  const openWsPicker = () => {
-    const p = $('#sheetPanel');
-    p.innerHTML = '';
-    const h = document.createElement('h3');
-    h.textContent = '对话';
-    p.appendChild(h);
-    const list = document.createElement('div');
-    list.className = 'wsplist';
-    p.appendChild(list);
-    if (!wsCur.tasks.length) {
-      const em = document.createElement('div');
-      em.className = 'wsempty';
-      em.textContent = '还没有对话。';
-      list.appendChild(em);
-    }
-    wsCur.tasks.forEach(t => {
-      const row = document.createElement('button');
-      row.className = 'wsptask' + (Number(t.id) === Number(wsCur.task) ? ' on' : '');
-      const nm = document.createElement('span');
-      nm.className = 'nm';
-      nm.textContent = t.title || t.slug || '还没起名';
-      row.appendChild(nm);
-      if (!t.kept) {
-        const b = document.createElement('span');
-        b.className = 'wsbadge';
-        b.textContent = '未固化';
-        row.appendChild(b);
-      }
-      if (Number(t.id) === Number(wsCur.task)) {
-        const c = document.createElement('span');
-        c.className = 'cur';
-        c.textContent = '正在看';
-        row.appendChild(c);
-      }
-      row.onclick = async () => {
-        closeSheet();
-        if (Number(t.id) === Number(wsCur.task)) return;   // 点的就是当前这条 ✓，什么都不做 ✓
-        try {
-          const d = await api(`/workshop/${group.id}/tasks/${t.id}/open`, { method: 'POST' });
-          showTask(d);
-        } catch (e) { toast('切不过去：' + e.message); }
-      };
-      list.appendChild(row);
-    });
-    const add = document.createElement('button');
-    add.className = 'wsnew';
-    add.textContent = '＋ 开一条新的';
-    add.onclick = async () => { closeSheet(); await wsNewTask(''); };
-    p.appendChild(add);
-    const cancel = document.createElement('div');
-    cancel.className = 'actions';
-    const cbtn = document.createElement('button');
-    cbtn.className = 'btn-ghost';
-    cbtn.textContent = '取消';
-    cbtn.onclick = closeSheet;
-    cancel.appendChild(cbtn);
-    p.appendChild(cancel);
-    openSheet();
+    // ⚠️ 退回导航要重画一次 ✓ —— 说不定刚刚做好了一个、或者删掉了一个 ✓
+    //    （不重画的话那张图标还在 ✓ —— "明明删了却还在"是最伤信任的一种 ✓）。
+    if ($('#wsNav').classList.contains('on')) renderWsNav();
   };
 
   // ── 正文的渲染（2026-10-07）─────────────────────────────────────────
@@ -3737,13 +3730,22 @@
     $('#wsSend').style.display = has ? 'flex' : 'none';
   };
 
-  /** 顶栏那个 ⋯ —— 三件事：保留/取消保留、去看这个组件、删掉这次对话 ✓。 */
-  const openWsMenu = () => {
+  /**
+   * 顶栏那个 ⋯ —— 用户 2026-10-07 晚上定的两件事：**删除组件**、**重命名组件** ✓
+   *（"不仅可以删除组件，也可以重命名组件，重命名会同步所有地方"✓）。
+   * 另外两样（保留 / 取消保留）放在这儿，是因为**组件页现在是一屏纯预览** ✓ ——
+   * 那个动作得有个地方做 ✓，而这里就是"这个组件的事都在这儿"的地方 ✓。
+   *
+   * ⚠️ **没做出组件的那种对话，菜单里没有重命名** ✓ —— 名字是 agent 定名时给的 ✓
+   *（它得同时定 slug ✓，那是目录名 ✓）。那种对话只有"删掉这次对话"✓。
+   */
+  const openWsMenu = async () => {
+    await wsReloadTasks();
     const t = wsCur.tasks.find(x => Number(x.id) === Number(wsCur.task));
     const p = $('#sheetPanel');
     p.innerHTML = '';
     const h = document.createElement('h3');
-    h.textContent = (t && (t.title || t.slug)) || '这条对话';
+    h.textContent = (t && (t.title || t.slug)) || '还没起名';
     p.appendChild(h);
     const grp = document.createElement('div');
     grp.className = 'wsmenu';
@@ -3758,12 +3760,12 @@
       return b;
     };
 
-    // ★ 「未固化」这件事**在这一屏就能改** ✓ —— 用户定的：
-    //   "未保存的组件会有特殊的标识，这个同步体现在创意工坊聊天界面里的设置" ✓。
-    //   ⚠️ 改的是**最新做的那一版** ✓（不是"随便挑一版"✗）——
-    //     他在说"这个东西我认了" ✓，指的当然是刚看着它做出来的那一版 ✓。
     if (t && t.slug) {
       const latest = t.latest_version, live = t.live_version;
+      // ★ 「未固化」这件事**在这一屏就能改** ✓ —— 用户定的：
+      //   "未保存的组件会有特殊的标识，这个同步体现在创意工坊聊天界面里的设置" ✓。
+      //   ⚠️ 改的是**最新做的那一版** ✓（不是"随便挑一版"✗）——
+      //     他在说"这个东西我认了" ✓，指的当然是刚看着它做出来的那一版 ✓。
       if (latest && live !== latest) {
         mk('保留这一版（v' + latest + '）', async () => {
           closeSheet();
@@ -3771,8 +3773,7 @@
             await api(`/components/${encodeURIComponent(t.slug)}/keep?group_id=${group.id}`,
                       { method: 'POST', body: JSON.stringify({ version: latest }) });
           } catch (e) { toast('没保留下来：' + e.message); return; }
-          wsCur.kept = true; setWsHead();
-          await wsReloadTasks();
+          await refreshCurrent();
           toast('保留好了');
         });
       } else if (live) {
@@ -3782,22 +3783,29 @@
             await api(`/components/${encodeURIComponent(t.slug)}/unkeep?group_id=${group.id}`,
                       { method: 'POST', body: JSON.stringify({ version: live }) });
           } catch (e) { toast('没取消掉：' + e.message); return; }
-          wsCur.kept = false; setWsHead();
-          await wsReloadTasks();
+          await refreshCurrent();
           toast('取消保留了');
         });
       }
-      mk('看看这个组件', () => { closeSheet(); openComp(t.slug, t.title); });
-    }
-    mk('删掉这次对话', async () => {
-      closeSheet();
-      try {
+      mk('重命名', () => openRenameSheet(t.slug, t.title || ''));
+      // ★ 「删除组件等于删除对话」✓ —— 所以删的是**整块**（不传版本号 ✓），
+      //   服务端会把文件、所有版本、这条对话一起收掉 ✓。
+      armDelete(mk('删除组件（连这条对话）', () => {}),
+                '删除组件（连这条对话）', async () => {
+        await api(`/components/${encodeURIComponent(t.slug)}?group_id=${group.id}`,
+                  { method: 'DELETE' });
+        toast('删了');
+        closeSheet();
+        backToNav();
+      });
+    } else {
+      armDelete(mk('删掉这次对话', () => {}), '删掉这次对话', async () => {
         await api(`/workshop/${group.id}/tasks/${wsCur.task}`, { method: 'DELETE' });
-      } catch (e) { toast('没删掉：' + e.message); return; }
-      toast('删了');
-      wsCur.task = null;
-      await openWsChat();       // 回到"上次那条" ✓（一条都没有就自动开一条 ✓）
-    }, true);
+        toast('删了');
+        closeSheet();
+        backToNav();
+      });
+    }
 
     const cancel = document.createElement('div');
     cancel.className = 'actions';
@@ -3810,17 +3818,108 @@
     openSheet();
   };
 
+  /**
+   * **两下才删** ✓（删组件 = 连对话一起没 ✓，撤不回来 ✓）。
+   *
+   * ⚠️ 第二次点之前**把代价写在按钮上** ✓（"再点一下：连这条对话一起删"✓）——
+   *   不是拦一道 ✓，是**先说清** ✓。项目里那条老话：说清代价比拦一道管用 ✓。
+   */
+  const armDelete = (b, label, run) => {
+    // ⚠️ 拿到的是**那个按钮本身** ✓，不是"菜单里最后一个" ✗ ——
+    //    按位置找的那种写法，将来菜单里多一行就会删错东西 ✓，
+    //    而且它错得很安静 ✓（按钮还是会变红、还是会问"再点一下"✓ —— 只是删的是别的 ✓）。
+    if (!b) { run().catch(() => {}); return; }
+    b.onclick = () => {
+      if (b.dataset.armed) {
+        b.disabled = true;
+        b.textContent = '正在删…';
+        run().catch(e => {
+          toast('没删掉：' + e.message);
+          b.disabled = false;
+          b.textContent = label;
+        });
+        return;
+      }
+      b.dataset.armed = '1';
+      b.textContent = '再点一下：连这条对话一起删';
+      setTimeout(() => {
+        if (b.isConnected && b.dataset.armed) {
+          delete b.dataset.armed;
+          b.textContent = label;
+        }
+      }, 5000);
+    };
+  };
+
+  /** 重命名那个弹层 —— 一个输入框 + 取消/保存 ✓。 */
+  const openRenameSheet = (slug, current) => {
+    const p = $('#sheetPanel');
+    p.innerHTML = '';
+    const h = document.createElement('h3');
+    h.textContent = '重命名';
+    p.appendChild(h);
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.maxLength = 40;
+    inp.value = current;                 // ⚠️ 走 `.value`，**不进 innerHTML** ✓
+    inp.className = 'rninput';
+    p.appendChild(inp);
+    const acts = document.createElement('div');
+    acts.className = 'actions';
+    const cancel = document.createElement('button');
+    cancel.className = 'btn-ghost';
+    cancel.textContent = '取消';
+    cancel.onclick = closeSheet;
+    const save = document.createElement('button');
+    save.className = 'btn-solid';
+    save.textContent = '保存';
+    save.onclick = async () => {
+      const name = (inp.value || '').trim();
+      if (!name) { toast('名字不能是空的'); return; }
+      save.disabled = true;
+      try {
+        await api(`/components/${encodeURIComponent(slug)}/rename?group_id=${group.id}`,
+                  { method: 'POST', body: JSON.stringify({ title: name }) });
+      } catch (e) {
+        save.disabled = false;
+        toast('没改成功：' + e.message);
+        return;
+      }
+      closeSheet();
+      // ★ 「重命名会同步所有地方」✓ —— 服务端把**每一版**的标题一起改了 ✓，
+      //   所以这里只要把**已经画出来的那一堆**重新拉一遍就行 ✓：
+      //   本屏的标题 ✓、导航上的图标名 ✓、右上角那一屏的卡片名 ✓、
+      //   以及 agent 下次 `component_list` 读到的名字 ✓（它读的就是同一个字段 ✓）。
+      await refreshCurrent();
+      if ($('#wsNav').classList.contains('on')) renderWsNav();
+      if ($('#workshop').classList.contains('on')) renderWorkshop();
+      toast('改好了');
+    };
+    acts.append(cancel, save);
+    p.appendChild(acts);
+    openSheet();
+  };
+
+  /** 删完之后回**导航屏** ✓ —— 用户定的："此时会自动退回导航界面" ✓。 */
+  const backToNav = () => {
+    wsCur.task = null;
+    if ($('#wsChat').classList.contains('on')) popScreen('wsChat');
+    if (!$('#wsNav').classList.contains('on')) pushScreen('wsNav');
+    renderWsNav();
+  };
+
   $('#openSettings').onclick = openSettings;
-  // ★ 创意工坊（2026-10-07）—— 四个入口：右上角列组件 / 从各屏退 / 对话屏那三个按钮 ✓
+  // ★ 创意工坊（2026-10-07）—— 六个入口：右上角列组件 / ＋ 里进工坊 /
+  //   导航屏退 / 组件页退 / 对话屏退 / 对话屏的 ⋯ ✓
   $('#openWorkshop').onclick = openWorkshop;
   $('#backWorkshop').onclick = closeWorkshop;
+  $('#wsNavBack').onclick = closeWsNav;
   $('#compBack').onclick = closeComp;
   $('#wsBack').onclick = closeWsChat;
-  // ⚠️ 两个弹层都**先刷一次列表** ✗→✓ —— 菜单上"保留这一版（v几）"那几个字
+  // ⚠️ ⋯ **自己会先刷一次列表** ✗→✓ —— 菜单上"保留这一版（v几）"那几个字
   //    是从列表里算出来的 ✓：刚做完一个组件、还没刷的话，它会显示**上一版**的号 ✓
   //    （"我明明刚做完 v3，它说我保留的是 v2" ✓ —— 那是很难说得清的一种错 ✓）。
-  $('#wsPick').onclick = async () => { await wsReloadTasks(); openWsPicker(); };
-  $('#wsMore').onclick = async () => { await wsReloadTasks(); openWsMenu(); };
+  $('#wsMore').onclick = openWsMenu;
   $('#wsSend').onclick = sendWs;
   $('#wsText').oninput = syncWsSend;
   $('#wsText').onkeydown = (ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); sendWs(); } };
