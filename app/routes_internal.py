@@ -882,6 +882,10 @@ class ComponentConfirmIn(BaseModel):
     group_id: int
     slug: str = Field(min_length=1, max_length=32)
     brief: str = Field(min_length=1, max_length=2000)
+    #: ★ 是哪条对话派出去的（2026-10-07 ✓）。**允许为空** ✓ ——
+    #: 插件解析不出任务号时照样能开工 ✓，只是"切换时作废票"那一环落空 ✓
+    #: （见 `routes_workshop.py` 的 `_void_tickets` ✓）。降级，不是故障 ✓。
+    task_id: int | None = None
 
 
 class ComponentSaveIn(BaseModel):
@@ -938,22 +942,36 @@ async def components_confirm(body: ComponentConfirmIn) -> dict:
     token = secrets.token_hex(16)
     handle = str(settings.staging_dir / (token + ".html"))
     ts = int(time.time())
+    # ★ 票记住**是哪条对话派出去的** ✗→✓（2026-10-07）——
+    #   用户切走的时候按它作废 ✓（见 `routes_workshop.py` 的 `_void_tickets` ✓）。
+    #   ⚠️ 只认**这个群里**的任务 ✓；认不出来就当没给 ✓（降级 ✓）——
+    #      绝不因为一个对不上的任务号把"开工"这一步整个拦掉 ✗
+    #      （组件做不出来比"票没绑上"严重得多 ✓）。
+    task_id = body.task_id
+    if task_id:
+        row = await fetch_one(
+            "SELECT id FROM workshop_tasks WHERE id = ? AND group_id = ?",
+            (int(task_id), body.group_id))
+        if not row:
+            log.warning("组件开工：任务号 %s 不属于群 %s，按没给处理",
+                        task_id, body.group_id)
+            task_id = None
     await execute(
-        "INSERT INTO component_tickets(token, group_id, slug, brief, handle, created_at, expires_at)"
-        " VALUES(?,?,?,?,?,?,?)",
+        "INSERT INTO component_tickets(token, group_id, slug, brief, handle,"
+        " created_at, expires_at, task_id) VALUES(?,?,?,?,?,?,?,?)",
         # ⚠️ **2 小时，不是 30 分钟** ✗→✓ —— 用户 2026-10-07 指出的：
         #    「派票 30 分钟过期，但子代理未必 30 分钟交差」✓ —— 对 ✓。
         #    写一个组件要读、改、试、再改 ✓，慢起来十几二十分钟很正常 ✓；
         #    过期了它只会看到一句「重新确认一次」✓ —— 那一轮就白干了 ✗。
         #    票是**一次性**的 ✓（用掉就作废 ✓），所以放宽时限不多出风险 ✓。
-        (token, body.group_id, slug, body.brief.strip(), handle, ts, ts + 7200))
+        (token, body.group_id, slug, body.brief.strip(), handle, ts, ts + 7200, task_id))
     # 干活之前先把话说出去 —— **这是"开工"那一条** ✓
     await _say_system(body.group_id,
                       "要做一个组件：" + body.brief.strip()[:40] + "（细节已确认，开工了）")
     # ⚠️ **"正在做"这个状态由服务端在准确的那一刹那推出** ✗→✓ ——
     #    因为它没法从流里看出来 ✓（我们只取正文 ✓，不看工具事件 ✓）。
     #    而这一刻服务端**知道** ✓（就是子代理该上场的时候 ✓）。
-    await push_workshop_status(body.group_id, "working")
+    await push_workshop_status(body.group_id, "working", task_id)
     log.info("组件开工：群 %s 的 %s（票 %s…）", body.group_id, slug, token[:8])
     return {
         "ok": True, "token": token, "slug": slug, "handle": handle,
@@ -973,7 +991,17 @@ async def components_save(body: ComponentSaveIn) -> dict:
     if row["used_at"]:
         return {"ok": False, "error": "这张票**已经用过了**。要再做一版，得重新走一遍确认。"}
     if int(row["expires_at"]) < int(time.time()):
-        return {"ok": False, "error": "这张票过期了（30 分钟）。重新确认一次细节再做。"}
+        # ⚠️ 两种"过期"到这儿的说法**要分开** ✗→✓（2026-10-07）：
+        #    ① 真的放了两小时（`ts + 7200` ✓）
+        #    ② **用户切走了，我们主动作废的** ✓（`_void_tickets` 把 expires_at 写成 0 ✓）
+        #    对②说"过期了"会让它以为是慢了、又去重试一遍 ✗ ——
+        #    而真相是**这一轮已经被掐了** ✓，该照实说 ✓。
+        if int(row["expires_at"]) <= 0:
+            return {"ok": False,
+                    "error": ("这一轮**已经被掐掉了** —— 用户中途切到别的对话上去了 ✓，"
+                              "那次切换会作废这条线上所有的票 ✓。"
+                              "**别重试** ✗，等他下次开口再走一遍流程 ✓。")}
+        return {"ok": False, "error": "这张票过期了（两小时）。重新确认一次细节再做。"}
     group_id = int(row["group_id"])          # ★ 群号**从票反查** ✓，不从会话推 ✓
     slug = str(row["slug"])
     handle = Path(str(row["handle"] or ""))
@@ -1004,24 +1032,37 @@ async def components_save(body: ComponentSaveIn) -> dict:
         (d / "index.html").write_text(html, encoding="utf-8")
     except OSError as exc:
         return {"ok": False, "error": "写不进组件仓库：" + str(exc)}
+    # ★ 记下**是哪条对话做出来的** ✗→✓（2026-10-07）——
+    #   组件页的「继续改」靠它回到**当初那条对话** ✓（见 `main.py` 的
+    #   `_task_of_slug` ✓）。票上没有就留空 ✓（降级 ✓）。
+    task_id = row["task_id"] if "task_id" in row.keys() else None
     await execute(
-        "INSERT INTO components(group_id, slug, version, state, title, icon, data_json, note, created_at)"
-        " VALUES(?,?,?,'draft',?,?,?,?,?)",
+        "INSERT INTO components(group_id, slug, version, state, title, icon,"
+        " data_json, note, created_at, task_id) VALUES(?,?,?,'draft',?,?,?,?,?,?)",
         (group_id, slug, version, body.title.strip() or slug, body.icon.strip() or "🧩",
-         json.dumps(body.data or {}, ensure_ascii=False), body.note.strip(), int(time.time())))
+         json.dumps(body.data or {}, ensure_ascii=False), body.note.strip(),
+         int(time.time()), int(task_id) if task_id else None))
+    # 对话**定名了** ✓ —— 把 slug 记到任务上 ✓（"＋做一个新的"那条从此知道自己是什么 ✓）。
+    # ⚠️ 只在它**还是空的时候**写 ✓（`AND slug IS NULL` ✓）：
+    #    从「继续改」开的对话一上来就写着别的 slug ✓，那是**它的目标** ✓，
+    #    不该被这一次的落成覆盖掉 ✓（真改错了名，也还有组件表那条链接兜着 ✓）。
+    if task_id:
+        await execute("UPDATE workshop_tasks SET slug = ? WHERE id = ? AND slug IS NULL",
+                      (slug, int(task_id)))
     await execute("UPDATE component_tickets SET used_at = ? WHERE token = ?",
                   (int(time.time()), body.token))
     try:
         handle.unlink(missing_ok=True)       # 认领完把暂存文件收掉 ✓（免得越攒越多 ✓）
     except OSError:
         pass
-    await push_workshop_status(group_id, "done")
+    await push_workshop_status(group_id, "done", int(task_id) if task_id else None)
     await _say_system(group_id, "「" + (body.title.strip() or slug) + "」做好了，去创意工坊看看。")
-    log.info("组件落成：群 %s 的 %s v%s（draft）", group_id, slug, version)
+    log.info("组件落成：群 %s 的 %s v%s（未固化）", group_id, slug, version)
     return {"ok": True, "slug": slug, "version": version, "state": "draft",
-            "note": ("已经放进**实验区**了 ✓ —— 等用户在创意工坊里点"
-                     "**开始使用**才会转正 ✓。"
-                     "你可以让他去看看，但**别说「已经启用了」**（那不是你说了算的）。")}
+            "note": ("已经做好了 ✓ —— 但它是**未固化的**一版 ✓，"
+                     "要用户在创意工坊里点**保留**才算定下来 ✓。"
+                     "你可以让他去看看，但**别说「已经保留/已经能用了」**"
+                     "（那不是你说了算的）。")}
 
 
 @router.post("/components/list", dependencies=[Depends(require_internal_token)])
@@ -1080,7 +1121,8 @@ async def components_note(body: ComponentSlugIn) -> dict:
         if not ts:
             return ""
         return datetime.fromtimestamp(int(ts), timezone.utc).strftime("%Y-%m-%d %H:%M")
-    label = {"live": "正在用", "draft": "实验版", "archived": "旧版（被新版顶下来了）"}
+    label = {"live": "已保留（用户点头定下来的那一版）", "draft": "未固化",
+             "archived": "旧版（被新版顶下来了）"}
     head = [f"# {rows[-1]['title'] or slug}（`{slug}`）", ""]
     for r in rows:
         line = (f"- **v{r['version']}** · {label.get(r['state'], r['state'])}"

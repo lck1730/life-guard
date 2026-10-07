@@ -50,7 +50,6 @@ from .routes_groups import router as groups_router
 from .routes_internal import restart_watcher
 from .routes_internal import router as internal_router
 from .routes_media import router as media_router
-from .routes_workshop import push_workshop_status
 from .routes_workshop import router as workshop_router
 
 logging.basicConfig(
@@ -477,10 +476,10 @@ async def _scan_components(group_id: int) -> list[dict]:
     （见 `db.py` 那句"状态和版本在这里，不在文件里"✓），
     扫目录只知道"有哪些文件夹" ✗，不知道哪个是正在用的 ✓。
 
-    每个 slug 回一条，带**它的正式版**和**它最新的实验版** ✓ ——
-    界面上那三个区就是从这两个字段分出来的 ✓：
-      · 有 `live`   → 正常使用区 ✓
-      · 有 `draft`  → 实验区 ✓（`live` 和 `draft` 同时有 = "改了还没启用" ✓）
+    每个 slug 回一条，带**它保留的那一版**和**它最新的那一版** ✓ ——
+    界面上就靠这两个字段说清状态 ✓（2026-10-07 起**不再分区** ✓，只挂标识 ✓）：
+      · 没有 `live`     → 未固化 ✓
+      · 有 `live` 也有 `draft` → "攒着一版还没保留" ✓
     """
     rows = await fetch_all(
         "SELECT slug, version, state, title, icon, note, created_at, enabled_at, enabled_by "
@@ -590,23 +589,45 @@ async def component_render(
             log.exception("组件 %s 取数据失败", name)
             data["records"] = {"error": "数据没取到"}
 
+    # ★ 这一版是**哪条对话**做出来的（2026-10-07 ✓）—— 「继续改」靠它回到
+    #   当初那条对话 ✓（不然每次点"继续改"都是一条全新的、什么都不记得的对话 ✓）。
+    #
+    # ⚠️ **只在自己那条上返回** ✗→✓ —— 组件是全群共有的 ✓，但**对话是个人的** ✓。
+    #    别人做的那一版，`task_id` 指向的是**他的**对话 ✓ ——
+    #    照原样返回的话，前端会拿它去 `open` ✓，而那个接口按 `user_id` 查 ✓，
+    #    结果是个 404 ✓（用户看到"打不开"✗，而这本来该走"开条新的"✓）。
+    #    所以这里就查清楚 ✓：不是我的，返回 None ✓，前端去开一条新的 ✓。
+    task_id = row["task_id"] if "task_id" in row.keys() else None
+    mine = None
+    if task_id:
+        own = await fetch_one(
+            "SELECT id FROM workshop_tasks WHERE id = ? AND group_id = ? AND user_id = ?",
+            (int(task_id), group_id, user["id"]))
+        mine = int(own["id"]) if own else None
     return {"name": name, "version": int(row["version"]), "state": row["state"],
             "title": str(row["title"] or name),
             "icon": str(row["icon"] or "🧩"),
             "note": str(row["note"] or ""),
+            "task_id": mine,
             "html": html,
             "data": data}
 
 
-@app.post("/api/components/{name}/enable")
+@app.post("/api/components/{name}/keep")
 async def component_enable(
     name: str, body: ComponentEnableIn, group_id: int = Query(...),
     user: dict = Depends(current_user),
 ) -> dict:
-    """**用户点"启用"** —— 把某一版转成"正在用"的那一版。
+    """**用户点"保留"** —— 把某一版固化成"这个组件就是它"的那一版。
+
+    ★ 2026-10-07 改名 ✗→✓：原来叫「开始使用 / 启用」✓，而用户重新定的说法是
+      **「保留」** ✓（"只有保留下来的组件才会长期保留那份对话历史" ✓）。
+      库里的 `state='live'` 一个字没改 ✓ —— 改的是**界面上怎么叫它** ✓，
+      以及不再分"实验区 / 正常使用区"两栏了 ✓（用户：组件都在沙箱里、互相隔离，
+      分不分没意义 ✓）。
 
     ⚠️ 这一步**只有用户能做** ✓（agent 没有这个工具 ✓）——
-        "做完先进实验区、用户点头才转正"这条产品逻辑就落在这儿 ✓。
+        "它做出来之后是**未固化**的、用户点头才算数"这条产品逻辑就落在这儿 ✓。
 
     ⚠️ **顺序不能反** ✗→✓：先把现在那个 live 降成 archived ✓，
        再把目标版置成 live ✓。反过来的话，中间那一瞬间会**同时有两个 live** ✓，
@@ -630,7 +651,36 @@ async def component_enable(
     await execute(
         "UPDATE components SET state = 'live', enabled_at = ?, enabled_by = ? WHERE id = ?",
         (now(), user["id"], row["id"]))
-    log.info("组件转正：群 %s 的 %s v%s（用户 %s）", group_id, name, body.version, user["id"])
+    log.info("组件保留：群 %s 的 %s v%s（用户 %s）", group_id, name, body.version, user["id"])
+    return {"ok": True, "slug": name, "version": int(body.version)}
+
+
+@app.post("/api/components/{name}/unkeep")
+async def component_unkeep(
+    name: str, body: ComponentEnableIn, group_id: int = Query(...),
+    user: dict = Depends(current_user),
+) -> dict:
+    """**取消保留** ✓ —— 把它退回"未固化"✓（用户 2026-10-07 定的："是否保留是可以设置的" ✓）。
+
+    ⚠️ **退回去要占额度** ✓（`_unfixed_budget` 数的是"没有任何 live 版本的 slug" ✓）——
+       这是对的 ✓：取消保留 = "这个东西我还不打算长期留着" ✓，
+       那它就该和别的半成品一起算在那 3 个里 ✓。
+    ⚠️ **只降 `live` 那一版** ✓（`WHERE state='live'` ✓）——
+       给了版本号也不是"把这一版降下来"✗：`archived` 的旧版退成 `draft`
+       会让"攒着的那一版"变成两版 ✓，界面就说不清哪个是"最新做的那版"了 ✓。
+    """
+    await require_member(group_id, user["id"])
+    if not valid_slug(name):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
+    n = await execute(
+        "UPDATE components SET state = 'draft', enabled_at = NULL, enabled_by = NULL"
+        " WHERE group_id = ? AND slug = ? AND version = ? AND state = 'live'",
+        (group_id, name, int(body.version)))
+    if not n:
+        raise HTTPException(status.HTTP_404_NOT_FOUND,
+                            f"`{name}` 的第 {body.version} 版不是正在保留的那一版")
+    log.info("组件取消保留：群 %s 的 %s v%s（用户 %s）",
+             group_id, name, body.version, user["id"])
     return {"ok": True, "slug": name, "version": int(body.version)}
 
 
@@ -639,11 +689,20 @@ async def component_delete(
     name: str, group_id: int = Query(...), v: int | None = Query(None),
     user: dict = Depends(current_user),
 ) -> dict:
-    """删掉实验版。
+    """删掉一个组件的某一版（不传 `v` = 它的未固化版）。
 
-    ⚠️ **正在用的那一版删不掉** ✗→✓ —— 要删得先（或者同时）把它降下来 ✓。
-       否则一次误点就让"正常使用区"里少一个东西 ✓，而且**没有任何提示** ✓。
+    ⚠️ **正在保留的那一版删不掉** ✗→✓ —— 要删得先（或者同时）把它降下来 ✓。
+       否则一次误点就让库里少一个东西 ✓，而且**没有任何提示** ✓。
        给了 `v` 就是"明确要删这一版" ✓ —— 那时才允许删 live ✓。
+
+    ★ 2026-10-07：**删组件连对话一起删** ✗→✓ —— 用户定的：
+      「已经保留的组件也可以删除，**删除后这个对话也将不存在**」✓。
+      所以这里顺手把它名下的对话（`workshop_tasks` ✓）和那些气泡一并清掉 ✓。
+
+      ⚠️ **按版本删的那条路不删对话** ✓ —— "删掉 v2 这一版"是**改组件** ✓，
+         不是"把这个东西连同它的来龙去脉一起抹掉"✓；而"删掉这个组件"
+         （不传 `v`、整个 slug 清空 ✓）才是后者 ✓。两者混起来的话，
+         用户删掉一个旧版本会连带丢掉整段对话 ✓ —— 那是个很难查的意外 ✓。
     """
     await require_member(group_id, user["id"])
     if not valid_slug(name):
@@ -655,7 +714,22 @@ async def component_delete(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "没有可删的版本")
     if not v and any(r["state"] == "live" for r in rows):
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                            "正在用的那一版不能就这么删；先启用别的版本，或者指定版本号")
+                            "正在保留的那一版不能就这么删；先保留别的版本，或者指定版本号")
+
+    # ★ 整块删（没给版本号）时，把挂在它名下的对话一起收掉 ✓。
+    #   ⚠️ 在 DELETE 之前查 ✓ —— 查完就没人知道这些组件是哪条对话做的了 ✓。
+    wiped: list[int] = []
+    if not v:
+        tids = await fetch_all(
+            "SELECT DISTINCT task_id FROM components"
+            " WHERE group_id = ? AND slug = ? AND task_id IS NOT NULL",
+            (group_id, name))
+        for t in tids:
+            tid = int(t["task_id"])
+            await execute("DELETE FROM workshop_messages WHERE task_id = ?", (tid,))
+            await execute("DELETE FROM workshop_tasks WHERE id = ?", (tid,))
+            wiped.append(tid)
+
     for r in rows:
         await execute("DELETE FROM components WHERE group_id = ? AND slug = ? AND version = ?",
                       (group_id, name, int(r["version"])))
@@ -671,8 +745,10 @@ async def component_delete(
         (group_components_dir(group_id) / name).rmdir()
     except OSError:
         pass                                    # 还有别的版本在，那就该留着 ✓
-    log.info("组件删除：群 %s 的 %s，%d 版", group_id, name, len(rows))
-    return {"ok": True, "deleted": [int(r["version"]) for r in rows]}
+    log.info("组件删除：群 %s 的 %s，%d 版（连对话 %s 条）",
+             group_id, name, len(rows), len(wiped))
+    return {"ok": True, "deleted": [int(r["version"]) for r in rows],
+            "tasks_deleted": wiped}
 
 
 @app.get("/preview")

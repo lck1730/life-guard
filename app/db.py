@@ -195,6 +195,11 @@ CREATE TABLE IF NOT EXISTS components (
     created_at INTEGER NOT NULL,
     enabled_at INTEGER,                   -- 什么时候转正的
     enabled_by INTEGER,                   -- 谁点的（2-10 人的群里，这个信息有用）
+    -- ★ 是**哪个任务**做出来的（2026-10-07 ✓）。
+    --   用途只有一个："继续改这个组件"要回到**当初那条对话** ✓。
+    --   ⚠️ 允许为空 ✓ —— 迁移前的老组件补不出来 ✓，而且插件拿不到任务号时
+    --   也要能照常落地 ✓。"链接断了"是**降级**（回到一条新对话），不是故障 ✓。
+    task_id    INTEGER,
     UNIQUE(group_id, slug, version)
 );
 CREATE INDEX IF NOT EXISTS idx_components_group
@@ -221,7 +226,11 @@ CREATE TABLE IF NOT EXISTS component_tickets (
     handle     TEXT,                      -- 暂存文件的绝对路径（子代理往那儿写）
     created_at INTEGER NOT NULL,
     used_at    INTEGER,                   -- 用过一次就填上，**再用就拒**
-    expires_at INTEGER NOT NULL
+    expires_at INTEGER NOT NULL,
+    -- ★ 是哪条对话派出去的这张票（2026-10-07 ✓）。
+    --   用途只有一个：**用户切走的时候按它作废** ✓ —— "切换 = 终止"里
+    --   唯一能由我们持久保证的一半 ✓（见 `routes_workshop.py` 那段 ✓）。
+    task_id    INTEGER
 );
 
 -- 创意工坊的对话。**和群聊消息是两张表** ✗→✓ —— 2026-10-07。
@@ -233,14 +242,45 @@ CREATE TABLE IF NOT EXISTS component_tickets (
 --
 -- ⚠️ **按 `user_id` 分开** ✓ —— 工坊的会话是**每用户一条** ✓
 --    （两个人同时进工坊不会互相串话 ✓，见 `diy_session_id_for` ✓）。
+--
+-- ★ 2026-10-07：**钥匙从 `slug` 换成了 `task_id`** ✗→✓。
+--
+--   为什么换：`slug` 要到流程第 ③ 步（用户确认）才由 agent 定下来 ✓，
+--   而"＋做一个新的"在那之前就得有身份 ✗ —— 于是两次"新的"slug 都是空 ✓，
+--   两条对话**在界面上也混在一起** ✗；更糟的是 Hermes 那边的会话是按人分的 ✗，
+--   同一个人做 A 再做 B，**它脑子里是同一段上下文** ✗。
+--
+--   ⚠️ `slug` **是死列了，但留着不删** ✓ —— 和 `groups` 那四列同一个理由
+--      （见 `_migrate_agent_status` 那段 ✓）：SQLite 删列要重建整张表 ✓，
+--      风险不值当 ✓。而且它还有最后一个用处：**迁移时按它把老消息分堆** ✓。
+--      代码里从此一个引用都不留 ✓（"同一份数据两处 = 迟早走岔" ✓）。
+CREATE TABLE IF NOT EXISTS workshop_tasks (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL,          -- 谁的对话（Hermes 会话也按它分）
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,          -- 最近动过：既排"上次那个"，也排切换列表
+    -- 这条对话是**冲着哪个组件**去的（可以还不知道 ✓）。
+    --   · 从「继续改这个组件」开的，一上来就填上 ✓
+    --   · "＋做一个新的"开的，等 agent 在 `component_save` 时定了名再填 ✓
+    -- ⚠️ 它**不是** `components` 的外键 ✓ —— 定名之前那个 slug 还不存在任何行 ✓。
+    --    它的用处是两件事：① `diy_persona` 从第一轮就知道"这次是动它" ✓
+    --    ② 计"未固化"额度时**分得清**"冲着已有组件来的"和"全新的半成品" ✓
+    --       —— 不然改一个已保留的组件会白占一个名额 ✓（那是用户最烦的那种拦 ✓）。
+    slug       TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_workshop_tasks
+    ON workshop_tasks(group_id, user_id, updated_at DESC);
+
 CREATE TABLE IF NOT EXISTS workshop_messages (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     user_id     INTEGER NOT NULL,          -- 谁的工坊（会话也是按他分的）
-    slug        TEXT    NOT NULL DEFAULT '',-- 在做哪个组件；空 = 还没定名
+    slug        TEXT    NOT NULL DEFAULT '',-- ★ 死列（见上面那段）；迁移用完就不读了
     sender_type TEXT    NOT NULL,          -- 'user' | 'agent'
     content     TEXT    NOT NULL,
-    created_at  INTEGER NOT NULL
+    created_at  INTEGER NOT NULL,
+    task_id     INTEGER                    -- 属于哪条对话（迁移前的老行是 NULL）
 );
 CREATE INDEX IF NOT EXISTS idx_workshop_msgs
     ON workshop_messages(group_id, user_id, id);
@@ -342,6 +382,18 @@ _MIGRATIONS: list[tuple[str, str, str]] = [
     #   默认开 ✓（工坊已经部署了 ✓）。关掉之后：工坊那两屏还在 ✓，
     #   但"做组件"的对话入口会说还没接上 ✓（比整片白屏好 ✓）。
     ("groups", "workshop_enabled", "INTEGER NOT NULL DEFAULT 1"),
+    # ★ 三处 `task_id`（2026-10-07 ✓）—— "对话挂到任务上"那次改动 ✓。
+    #
+    # ⚠️ **新库靠 SCHEMA、老库靠这里，两处都要有** ✗ —— 只写一处就是
+    #    "新装的没事、在用的崩" ✓（这个项目最烦那种：测试环境永远碰不到 ✓）。
+    #
+    # ⚠️ 顺序上必须**先有 `workshop_tasks` 这张表** ✓ —— 但这里只是加列 ✓，
+    #    真正回填在 `_migrate_workshop_tasks`（跑在 `_apply_migrations` 之后 ✓）。
+    ("workshop_messages", "task_id", "INTEGER"),
+    ("components", "task_id", "INTEGER"),
+    ("component_tickets", "task_id", "INTEGER"),
+    # 这条对话冲着哪个组件去的（见 SCHEMA 里那段 ✓）。定名之前是空的 ✓。
+    ("workshop_tasks", "slug", "TEXT"),
 ]
 
 
@@ -397,6 +449,51 @@ async def _migrate_agent_status(conn: aiosqlite.Connection) -> None:
     if moved:
         await conn.commit()
         log.info("把 %d 个群的旧状态文案并进了新配置 ✓", moved)
+
+
+async def _migrate_workshop_tasks(conn: aiosqlite.Connection) -> None:
+    """把老的工坊消息**按 `(群, 用户, slug)` 分堆**，每堆补一条任务 ✓ —— 跑一次完 ✓。
+
+    为什么按这个分：老数据的钥匙就是 `slug` ✓（在组件维度上是分得开的 ✓），
+    而**同一个人"＋做一个新的"两次**那两条（slug 都空 ✓）在库里已经分不开了 ✗ ——
+    那两条会被合并成**一条**任务 ✓。这是这次迁移**唯一补不回来的东西** ✓，
+    所以在这里写明白 ✓，别当作"迁完了、跟原来一样" ✓。
+
+    **幂等** ✓：只看 `task_id IS NULL` 的行 ✓ —— 跑过的堆不会再动 ✓。
+    所以它随启动跑也无所谓 ✓（和新库上什么事都不做是一个效果 ✓）。
+
+    跑完 `slug` 就是**死列**了 ✓ —— 代码里一个引用都不留 ✓（列本身留着不删 ✓，
+    和 `groups` 那四列同一个理由 ✓：SQLite 删列要重建整张表 ✓，风险不值当 ✓）。
+    """
+    try:
+        async with conn.execute(
+            "SELECT group_id, user_id, COALESCE(slug, '') AS s,"
+            "       MIN(created_at), MAX(created_at)"
+            "  FROM workshop_messages WHERE task_id IS NULL"
+            " GROUP BY group_id, user_id, COALESCE(slug, '')"
+            " ORDER BY MIN(id)"
+        ) as cur:
+            piles = await cur.fetchall()
+    except Exception:  # noqa: BLE001
+        return                          # 表还没建出来（全新库 ✓）→ 没什么可迁的 ✓
+
+    # ⚠️ 任务上的 `slug` **一并填上** ✓ —— 迁移过来的任务本来就是冲着
+    #    某一个组件去的 ✓（不然它们会全部算进"没做成的半成品" ✓，
+    #    凭空占掉那 3 个名额里的几个 ✓ —— 用户会看到额度莫名其妙没了 ✓）。
+    #    slug 是空的那种（老数据里"＋做一个新的"之后说的话 ✓）留空 ✓，那是对的 ✓。
+    for gid, uid, slug, t0, t1 in piles:
+        ins = await conn.execute(
+            "INSERT INTO workshop_tasks(group_id, user_id, created_at, updated_at, slug)"
+            " VALUES(?,?,?,?,?)",
+            (gid, uid, int(t0 or now()), int(t1 or t0 or now()), slug or None))
+        await conn.execute(
+            "UPDATE workshop_messages SET task_id = ?"
+            " WHERE task_id IS NULL AND group_id = ? AND user_id = ?"
+            "   AND COALESCE(slug, '') = ?",
+            (ins.lastrowid, gid, uid, slug))
+    if piles:
+        await conn.commit()
+        log.info("把 %d 堆老的工坊消息补成了任务 ✓", len(piles))
 
 
 async def _ensure_profile_unique(conn: aiosqlite.Connection) -> None:
@@ -455,6 +552,9 @@ async def init_db() -> None:
     await conn.executescript(SCHEMA)
     await _apply_migrations(conn)
     await _migrate_agent_status(conn)
+    # ⚠️ **必须在 `_apply_migrations` 之后** ✗ —— 它要读 `task_id` 那一列 ✓
+    #    （老库那一列是刚加上去的 ✓，新库在 SCHEMA 里就有 ✓）。
+    await _migrate_workshop_tasks(conn)
     await _ensure_profile_unique(conn)
     await _drop_retired_tables(conn)
     await conn.commit()

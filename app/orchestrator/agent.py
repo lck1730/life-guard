@@ -293,18 +293,23 @@ def session_id_for(group_id: int) -> str:
     return f"lifeguard-group-{group_id}"
 
 
-def diy_session_id_for(group_id: int, user_id: int) -> str:
-    """创意工坊那条会话 —— **每用户一条** ✓。
+def diy_session_id_for(group_id: int, user_id: int, task_id: int) -> str:
+    """创意工坊那条会话 —— **一条任务一条** ✓。
 
-    ⚠️ **不是"每群一条"** ✗→✓ —— 群里两个人同时进工坊会**抢同一条历史、互相串话** ✓。
-    带上 uid 之后各说各的 ✓（插件那边的 `_SESSION_RE` 是 `search` ✓，
-    `…-diy-u7` 照样解析出群号 ✓）。
+    ⚠️ **每用户一条** 是不够的 ✗→✓（2026-10-07 改）。原来只带 uid，
+    于是**同一个人的两条对话在 Hermes 那边是同一条历史** ✗ ——
+    界面上看着隔开了 ✓（`workshop_messages` 按任务分 ✓），但它脑子里是混的 ✓：
+    做 A 时说过的话，在做 B 的时候还在上下文里 ✓。
+
+    带上任务号之后**真的分开了** ✓。插件那边的 `_SESSION_RE` 是 `search` ✓，
+    `…-diy-u2-t7` 照样解析出群号 ✓（任务号另有一个正则 ✓，见插件 ✓）。
 
     ⚠️ **session key 不改** ✓ —— 见 `session_key_for` ✓：
-       共用它 = 记忆是同一份 ✓（它能想起主群聊里说过什么 ✓），
-       而**历史是分开的** ✓（那些来回不进群聊的会话 ✓）。
+       共用它 = **记忆**是同一份 ✓（它能想起主群聊里说过什么 ✓ ——
+       用户点名的"同一份 profiles 是对的"就在这儿 ✓），
+       而**历史是按任务分开的** ✓。
     """
-    return f"lifeguard-group-{group_id}-diy-u{user_id}"
+    return f"lifeguard-group-{group_id}-diy-u{user_id}-t{int(task_id)}"
 
 
 def session_key_for(group_id: int) -> str:
@@ -941,7 +946,7 @@ async def run_turn(
     await _idle_status(group_id)
 
 
-async def diy_persona(group_id: int, slug: str = "") -> str:
+async def diy_persona(group_id: int, task_id: int | None = None) -> str:
     """创意工坊那一轮的**系统提示** ✓ —— 和群聊那份完全不同 ✓。
 
     只放**配置**（现在是什么场合 ✓）和**流程**（这一步该干什么 ✓）；
@@ -952,7 +957,27 @@ async def diy_persona(group_id: int, slug: str = "") -> str:
       · 「工坊过程别写进长期记忆」✓ —— 那个记忆只有 2200 字符 ✓，
         几十轮「试了 A 不行」会把它挤爆 ✓（SOUL.md 说派子代理正是为了不让试错
         占着上下文 ✓，而工坊的人格很容易把它请回来 ✓）。
+
+    ⚠️ **参数从 slug 换成了 task_id** ✗→✓（2026-10-07 ✓）：
+       一条对话在**做出组件之前**是**没有 slug 的** ✓（slug 要到第 ③ 步才定 ✓），
+       所以"这次是在动哪个组件"只能**从任务反查** ✓。
+       查得到就点明它 ✓，查不到（这次是新做的 ✓）就不说 ✓ ——
+       和原来 `slug=""` 时的行为一致 ✓。
     """
+    focus_slug = ""
+    if task_id:
+        # ⚠️ **先看任务自己记的 `slug`** ✗→✓ —— 从「继续改」进来的那条对话，
+        #    一上来就知道是冲着谁去的 ✓（组件那行要等 `component_save` 才出现 ✓，
+        #    只看组件的话，**头几轮它不知道自己该去读谁的笔记** ✓）。
+        #    后半个兜底是给迁移过来的老任务用的 ✓（那些 task 和 components 之间没链接 ✓）。
+        row = await fetch_one(
+            "SELECT COALESCE(t.slug,"
+            "  (SELECT c.slug FROM components c WHERE c.task_id = t.id"
+            "    ORDER BY c.version DESC LIMIT 1)) AS slug"
+            "  FROM workshop_tasks t WHERE t.id = ? AND t.group_id = ?",
+            (int(task_id), group_id))
+        focus_slug = str((row or {}).get("slug") or "")
+
     rows = await fetch_all(
         "SELECT slug, version, state, title FROM components WHERE group_id = ?"
         " ORDER BY slug ASC, version DESC", (group_id,))
@@ -963,12 +988,12 @@ async def diy_persona(group_id: int, slug: str = "") -> str:
         if s in seen:
             continue
         seen.add(s)
-        have.append(f"{r['title'] or s}（{s}，{'正在用' if r['state'] == 'live' else '实验版'}）")
+        have.append(f"{r['title'] or s}（{s}，{'已保留' if r['state'] == 'live' else '未固化'}）")
     existing = ("这个群已经有这些组件：" + "、".join(have) + "。\n"
                 "用户可以让你**改**其中的某一个（先调 component_list / component_note 看清楚）✓，"
                 "也可以做一个新的 ✓。\n") if have else "这个群还没有任何组件 ✓。\n"
-    focus = (f"⚠️ 用户这次是要动 **{slug}** 这个组件 ✓ —— "
-             f"先调 `component_note` 读它自己的笔记 ✓，别凭印象改 ✗。\n") if slug else ""
+    focus = (f"⚠️ 用户这次是要动 **{focus_slug}** 这个组件 ✓ —— "
+             f"先调 `component_note` 读它自己的笔记 ✓，别凭印象改 ✗。\n") if focus_slug else ""
 
     return (
         "你现在在**创意工坊**里 ✓ —— 这是 App 里专门做组件的地方，"
@@ -1009,8 +1034,8 @@ async def diy_persona(group_id: int, slug: str = "") -> str:
         "\n"
         "**⑤ 它回来说写好了 → 调 `component_save(token, ...)`** ✓ —— 填上标题、图标、"
         "一句说明，还有你那本**笔记** ✓。\n"
-        "   ⚠️ 落成之后它在**实验区** ✓ —— **不是启用了** ✗。"
-        "要用户自己在工坊里点「开始使用」才算 ✓，所以**别说「已经启用了」** ✗。\n"
+        "   ⚠️ 落成之后它是**未固化**的一版 ✓ —— **不是已经定下来了** ✗。"
+        "要用户自己在工坊里点「保留」才算 ✓，所以**别说「已经保留/已经能用了」** ✗。\n"
         "\n"
         "## 组件的形状（子代理要知道的，你转述）\n"
         "**一个 HTML 文件，什么都不引** ✓（图、字体、库都不行 ✗）—— 它跑在沙箱里 ✓，"
