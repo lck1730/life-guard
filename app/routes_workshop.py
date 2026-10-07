@@ -53,10 +53,11 @@ import logging
 import re
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 
 from .auth import current_user, require_member
+from .config import settings
 from .db import execute, fetch_all, fetch_one, now
 from .hub import hub
 from .orchestrator.agent import (
@@ -161,12 +162,9 @@ async def _own_task(group_id: int, user_id: int, task_id: int) -> dict:
     return dict(row)
 
 
-async def _kept_slugs(group_id: int) -> set[str]:
-    """这个群里**已经保留**的组件短名 ✓（有 live 版就算 ✓）。"""
-    rows = await fetch_all(
-        "SELECT DISTINCT slug FROM components WHERE group_id = ? AND state = 'live'",
-        (group_id,))
-    return {str(r["slug"]) for r in rows}
+# ⚠️ 这里原来有个 `_kept_slugs`（"这个群哪些组件已经保留"✓）——
+#    2026-10-07 深夜**跟着"固化"整套一起删了** ✓（用户定的 ✓）。
+#    留着它没用，而且会**误导**：以后谁看到它，会以为"保留"还是个概念 ✓。
 
 
 async def _task_payload(group_id: int, user_id: int, task_id: int) -> dict | None:
@@ -198,21 +196,19 @@ async def _my_tasks(group_id: int, user_id: int) -> list[dict]:
         " WHERE t.group_id = ? AND t.user_id = ?"
         " ORDER BY t.updated_at DESC, t.id DESC",
         (group_id, user_id))
-    # 每个 slug 的版本情况 —— 一次查完 ✓（对话一多，逐个查就是 N+1 ✓）
-    vers: dict[str, dict] = {}
+    # 每个 slug 现在的标题 —— 一次查完 ✓（对话一多，逐个查就是 N+1 ✓）
+    titles: dict[str, str] = {}
     for v in await fetch_all(
-            "SELECT slug, MAX(version) AS latest,"
-            "       MAX(CASE WHEN state = 'live' THEN version END) AS live_v,"
-            "       (SELECT title FROM components x WHERE x.group_id = c.group_id"
+            "SELECT slug, (SELECT title FROM components x WHERE x.group_id = c.group_id"
             "         AND x.slug = c.slug ORDER BY x.version DESC LIMIT 1) AS title"
             "  FROM components c WHERE group_id = ? GROUP BY slug", (group_id,)):
-        vers[str(v["slug"])] = {"latest": int(v["latest"] or 0),
-                                "live": int(v["live_v"]) if v["live_v"] else None,
-                                "title": str(v["title"] or "")}
+        titles[str(v["slug"])] = str(v["title"] or "")
+    # ★ **每个组件有哪些人参与过**（2026-10-07 深夜 ✓）——
+    #   也是**一次查完** ✓（见 `_participants` 那段 ✓）。
+    who = await _participants_all(group_id)
     out: list[dict] = []
     for r in rows:
         slug = str(r["slug"] or "")
-        info = vers.get(slug) or {}
         out.append({"id": int(r["id"]),
                     "slug": slug,
                     # 名字的优先顺序 ✓（2026-10-07 晚上排过）：
@@ -220,44 +216,94 @@ async def _my_tasks(group_id: int, user_id: int) -> list[dict]:
                     #   ② 它冲着去的那个组件**现在**叫什么 ✓（从「继续改」进来的 ✓）
                     #   ③ **用户开做时起的那个名字** ✓ —— 还没做成组件时，
                     #      导航上靠它才认得出来 ✓（不然是一排"还没起名" ✓）。
-                    "title": str(r["title"] or info.get("title") or r["my_title"] or ""),
-                    "kept": bool(slug) and info.get("live") is not None,
-                    "latest_version": info.get("latest") or None,
-                    "live_version": info.get("live"),
+                    "title": str(r["title"] or titles.get(slug) or r["my_title"] or ""),
+                    # ★ **谁参与过这个组件**（同一组件下的对话，不管是谁开的 ✓）——
+                    #   导航上那一行右边就是这几个头像 ✓。
+                    #   ⚠️ 按 **slug** 取，不按对话 ✓：这个组件的对话可能有好几条
+                    #      （一人一条 ✓），而"参与构建的人"是整个组件的事 ✓。
+                    "people": who.get(slug, []),
+                    "busy": _busy_task(group_id, int(r["id"])),
                     "created_at": int(r["created_at"]),
                     "updated_at": int(r["updated_at"])})
     return out
 
 
-async def _unfixed_budget(group_id: int, user_id: int) -> dict:
-    """「未固化」还有几个名额 ✓ —— 用户 2026-10-07 定的上限是 **3** ✓，**按群算** ✓。
+async def _participants_all(group_id: int) -> dict[str, list[dict]]:
+    """这个群里**每个组件分别有哪些人参与过** ✓ —— 一次查完 ✓。
 
-       未固化数 = 这个群里「没有任何已保留版本的 slug 数」
-                + 「本群所有还没做出组件的对话数」
-
-    ⚠️ **按群算**（不是按人 ✓）—— 组件库本来就是群共有的 ✓，
-       没固化的东西也按群数 ✓（用户 2026-10-07 确认 ✓）。
-    ⚠️ 第二项是**跨用户**的 ✓（不筛 user ✓）——
-       否则两个人各占三个、群里就有六个半成品 ✓，和"按群算"自相矛盾 ✓。
-    ⚠️ **改一个已保留的组件、出新版不占额度** ✓ —— 两条路都堵上了 ✓：
-       · 组件那条：那个 slug 已经有 live 了 ✓，不在第一项里 ✓
-       · 对话那条：`t.slug` 非空 = **冲着已有组件去的** ✓，也不进第二项 ✓
-         （2026-10-07 补的 ✓ —— 少了这半条，"手上有 3 个半成品"的时候
-          **连改一个早就保留好的组件都会被拦** ✗，而那是用户最烦的那种拦 ✓）
+    ⚠️ **判据是"有没有为它开过对话"** ✗→✓ —— 不是"有没有落成过一版" ✓。
+       一个人跟你聊了半天、最后那版没落成 ✓ —— 他也是**参与过** ✓，
+       把他漏掉的话，界面上会显示"这个组件只有一个人做的" ✓，
+       而另一个人明明出了力 ✓（这种错很难被当成错，只会让人觉得"记错了" ✓）。
     """
-    kept = await _kept_slugs(group_id)
-    slugs = await fetch_all(
-        "SELECT DISTINCT slug FROM components WHERE group_id = ?", (group_id,))
-    unfixed_slugs = [str(r["slug"]) for r in slugs if str(r["slug"]) not in kept]
-    unnamed = await fetch_one(
-        "SELECT COUNT(*) AS n FROM workshop_tasks t"
-        " WHERE t.group_id = ? AND t.slug IS NULL AND NOT EXISTS"
-        "   (SELECT 1 FROM components c WHERE c.task_id = t.id)",
+    rows = await fetch_all(
+        "SELECT DISTINCT t.slug, t.user_id,"
+        "       COALESCE(gm.nickname, u.nickname) AS nickname, u.avatar"
+        "  FROM workshop_tasks t"
+        "  JOIN users u ON u.id = t.user_id"
+        "  LEFT JOIN group_members gm ON gm.group_id = t.group_id"
+        "       AND gm.user_id = t.user_id"
+        " WHERE t.group_id = ? AND t.slug IS NOT NULL",
         (group_id,))
-    n_unnamed = int((unnamed or {}).get("n") or 0)
-    used = len(unfixed_slugs) + n_unnamed
-    return {"used": used, "limit": 3, "left": max(0, 3 - used),
-            "slugs": unfixed_slugs, "unnamed": n_unnamed}
+    out: dict[str, list[dict]] = {}
+    for r in rows:
+        out.setdefault(str(r["slug"]), []).append(
+            {"user_id": int(r["user_id"]), "nickname": str(r["nickname"] or ""),
+             "avatar": str(r["avatar"] or "")})
+    for v in out.values():
+        v.sort(key=lambda x: x["user_id"])
+    return out
+
+
+def _busy_task(group_id: int, task_id: int) -> bool:
+    """这一轮是不是**正在跑** ✓（内存里那张表，见 `_running` ✓）。"""
+    for (gid, _uid), (tid, task) in _running.items():
+        if gid == group_id and tid == task_id and not task.done():
+            return True
+    return False
+
+
+async def _editing_map(group_id: int) -> dict[str, dict]:
+    """**哪个组件正被人改着** ✓ —— 键是 slug，值是那个人 ✓。
+
+    ⚠️ 这是**内存里的**（`_running`）不是库里的 ✗ —— 也**只能是内存里的** ✓：
+       "正在改"就是"这个进程里有一条流还开着" ✓，服务一重启它当然就没了 ✓
+       （那时候流也断了 ✓）。写进库里反而会留下**永远不会消的**"某某正在改" ✓。
+    """
+    out: dict[str, dict] = {}
+    live = [(k, v) for k, v in _running.items()
+            if k[0] == group_id and not v[1].done()]
+    if not live:
+        return out
+    ids = [v[0] for _, v in live]
+    q = ",".join("?" * len(ids))
+    rows = await fetch_all(
+        f"SELECT t.id, t.user_id, COALESCE(t.slug, '') AS slug,"
+        f"       COALESCE(gm.nickname, u.nickname) AS nickname"
+        f"  FROM workshop_tasks t"
+        f"  JOIN users u ON u.id = t.user_id"
+        f"  LEFT JOIN group_members gm ON gm.group_id = t.group_id"
+        f"       AND gm.user_id = t.user_id"
+        f" WHERE t.id IN ({q})", tuple(ids))
+    for r in rows:
+        slug = str(r["slug"] or "")
+        if slug:
+            out[slug] = {"user_id": int(r["user_id"]),
+                         "nickname": str(r["nickname"] or "")}
+    return out
+
+
+async def _assistant(group_id: int) -> dict:
+    """这个群的 **diy 小助手**叫什么、头像是什么 ✓。
+
+    ⚠️ 和群管家**分开** ✓（见 `db.py` 那两列 ✓）：
+       群聊里说话的是**管家** ✓，做组件时陪着聊的是 **diy 小助手** ✓。
+    """
+    row = await fetch_one(
+        "SELECT diy_name, diy_avatar FROM groups WHERE id = ?", (group_id,))
+    name = str((row or {}).get("diy_name") or "").strip() or "diy 小助手"
+    rel = str((row or {}).get("diy_avatar") or "").strip()
+    return {"name": name, "avatar": ("/ui/" + rel) if rel else ""}
 
 
 # ── 终止 ────────────────────────────────────────────────────────────────
@@ -360,6 +406,76 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str) -> Non
         await _push(user_id, {"type": "ws_message", "data": row})
 
 
+# ── diy 小助手（头像 + 昵称）────────────────────────────────────────────
+#
+# ★ 2026-10-07 深夜用户定的：agent 在工坊里叫 **diy 小助手** ✓，
+#   它的头像和昵称从**导航界面右上角**进去设置 ✓，**每个组件里通用** ✓
+#   （就是这个群一份 ✓，不是每条对话一份 ✓）。
+#
+# ⚠️ **和群管家是两套** ✗ —— 群里说话的那个管家叫别的名字 ✓、头像是另一张 ✓。
+#    共用一个的话，改这边会顺手改掉群聊里的 ✓ —— 而用户完全没料到 ✓。
+
+_DIY_EXTS = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
+_DIY_MAX = 2 * 1024 * 1024
+
+
+class DiyAssistantIn(BaseModel):
+    name: str = Field(min_length=1, max_length=24)
+
+
+@router.get("/{group_id}/assistant")
+async def assistant_get(group_id: int, user: dict = Depends(current_user)) -> dict:
+    """这个小助手叫什么、头像是什么 ✓。"""
+    await require_member(group_id, user["id"])
+    await _assert_open(group_id)
+    return await _assistant(group_id)
+
+
+@router.patch("/{group_id}/assistant")
+async def assistant_patch(group_id: int, body: DiyAssistantIn,
+                          user: dict = Depends(current_user)) -> dict:
+    """改昵称 ✓ —— **空名字不许** ✗（界面上得有个称呼 ✓）。"""
+    await require_member(group_id, user["id"])
+    await _assert_open(group_id)
+    await execute("UPDATE groups SET diy_name = ? WHERE id = ?",
+                  (body.name.strip(), group_id))
+    log.info("diy 小助手改名：群 %s → %r（用户 %s）", group_id, body.name.strip(), user["id"])
+    return await _assistant(group_id)
+
+
+@router.post("/{group_id}/assistant-avatar")
+async def assistant_avatar(group_id: int, file: UploadFile = File(...),
+                           user: dict = Depends(current_user)) -> dict:
+    """上传小助手的头像 ✓ —— 抄群管家那一套（同一棵树、同样的大小限制 ✓）。
+
+    ⚠️ 文件名带 `diy-` 前缀 ✓ —— 和管家那张（`avatars/g<群>.png` ✓）**放在同一个目录** ✓。
+       不加前缀的话，两个上传接口会**互相覆盖** ✓ ——
+       改管家头像会把小助手的换掉 ✓，而两边看起来都"上传成功了" ✓。
+    """
+    await require_member(group_id, user["id"])
+    await _assert_open(group_id)
+    ctype = file.content_type or ""
+    if ctype not in _DIY_EXTS:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "只支持 png/jpg/webp")
+    data = await file.read()
+    if len(data) > _DIY_MAX:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "图片不能超过 2MB")
+    if ctype == "image/jpeg" and not data.startswith(b"\xff\xd8"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "不是有效的 JPEG")
+
+    d = settings.ui_dir / "avatars"
+    d.mkdir(parents=True, exist_ok=True)
+    ext = _DIY_EXTS[ctype]
+    d.joinpath(f"diy-g{group_id}.png").unlink(missing_ok=True)
+    d.joinpath(f"diy-g{group_id}{ext}").write_bytes(data)
+    # 版本号写进存的那串里 ✓ —— 和管家那张同一个理由（见 routes_groups 那段 ✓）：
+    # 没有它浏览器会一直用旧的 ✓（换头像看着"没生效" ✓）。
+    rel = f"avatars/diy-g{group_id}{ext}?v={int(now())}"
+    await execute("UPDATE groups SET diy_avatar = ? WHERE id = ?", (rel, group_id))
+    log.info("diy 小助手换头像：群 %s（用户 %s）", group_id, user["id"])
+    return await _assistant(group_id)
+
+
 class TaskSayIn(BaseModel):
     content: str = Field(min_length=1, max_length=4000)
 
@@ -376,7 +492,7 @@ async def _assert_open(group_id: int) -> None:
 
 @router.get("/{group_id}/tasks")
 async def tasks_list(group_id: int, user: dict = Depends(current_user)) -> dict:
-    """我这些对话 ✓ + 默认该打开哪一条（**最近动过的那个** ✓）。
+    """我这些对话 ✓ + 默认该打开哪一条（**最近动过的那个** ✓）+ 助手信息 ✓。
 
     ⚠️ **"上次那个"由服务端算** ✗→✓ —— 不放 localStorage ✓：
        壳里的存储会被清 ✓、换手机就没了 ✓，而这件事**本来就该跟着人走** ✓。
@@ -386,7 +502,12 @@ async def tasks_list(group_id: int, user: dict = Depends(current_user)) -> dict:
     items = await _my_tasks(group_id, user["id"])
     return {"tasks": items,
             "current": items[0]["id"] if items else None,
-            "budget": await _unfixed_budget(group_id, user["id"]),
+            # ★ 导航那一屏右上角要画**小助手的头像** ✓（点进去是它的设置 ✓）——
+            #   顺手带上，省一次往返 ✓。
+            "assistant": await _assistant(group_id),
+            # ★ **哪个组件正被人改着** ✓（用户定的：「如果有个组件某个用户正在创建
+            #   和修改，需要在导航界面标注上」✓）。键是 slug ✓。
+            "editing": await _editing_map(group_id),
             "busy": _busy(group_id, user["id"])}
 
 
@@ -402,34 +523,18 @@ class TaskNewIn(BaseModel):
 @router.post("/{group_id}/tasks")
 async def tasks_new(group_id: int, body: TaskNewIn | None = None,
                     user: dict = Depends(current_user)) -> dict:
-    """开一条新的对话 ✓ —— 「未固化最多 3 个」就拦在这儿 ✓。
+    """开一条新的对话 ✓。
 
-    ⚠️ **从「继续改」进来的（带了 slug）不走额度** ✓ —— 那是动一个**已经保留好**的
-       组件 ✓，没在库里多出任何东西 ✓。额度管的是"半成品堆着不收拾" ✓，
-       不该顺手把"改进已有的东西"也一起拦住 ✗。
-       （只有那个 slug **已经保留过**才免额度 ✓ —— 拿一个不存在的 slug 来是绕不过的 ✓，
-        它照样算一条半成品 ✓。）
+    ★ 2026-10-07 深夜：**这里原来有一道"未固化最多 3 个"的闸，撤了** ✗→✓ ——
+      用户定了「组件聊天没有所谓的固化和非固化概念了，**只要新建了组件，
+      就会进入一个对话**，无论是否真正创建了组件」✓。
+      概念没了，那道闸就没法表达了 ✓（"未固化几个"这句话本身已经不成立 ✓）。
     """
     await require_member(group_id, user["id"])
     await _assert_open(group_id)
     want = (body.slug if body else "").strip().lower()
     if want and not _SLUG_OK.match(want):
         want = ""                       # 形状不对就当没给 ✓（不拦，当"做一个新的" ✓）
-    continuing = bool(want) and want in await _kept_slugs(group_id)
-
-    if not continuing:
-        budget = await _unfixed_budget(group_id, user["id"])
-        if budget["used"] >= budget["limit"]:
-            held = []
-            if budget["slugs"]:
-                held.append("、".join(budget["slugs"]))
-            if budget["unnamed"]:
-                held.append(f"{budget['unnamed']} 条还没做成组件的对话")
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                "已经有 " + str(budget["used"]) + " 个没固化的了（上限 "
-                + str(budget["limit"]) + " 个）：" + "；".join(held)
-                + "。**先保留一个，或者删掉一个** ✓ 再做新的 ✓。")
     ts = now()
     got = (body.title if body else "").strip()[:40] if body else ""
     tid = await execute(
@@ -465,9 +570,18 @@ async def task_open(group_id: int, task_id: int,
     rows = await fetch_all(
         "SELECT id, sender_type, content, created_at FROM workshop_messages"
         " WHERE task_id = ? ORDER BY id ASC LIMIT 200", (int(task_id),))
+    # ★ **有人正在改这个组件吗** ✓（用户定的：「此时其他用户进入时会被提示」✓）——
+    #   ⚠️ 只提示**别人** ✓：自己那条正在跑是**正常状态** ✓
+    #      （界面上那个转圈就是它 ✓），再弹一句"你正在改"只会让人莫名其妙 ✓。
+    slug = str(row.get("slug") or "")
+    editing = (await _editing_map(group_id)).get(slug) if slug else None
+    if editing and int(editing["user_id"]) == int(user["id"]):
+        editing = None
     return {"ok": True, "task_id": int(task_id),
             "task": await _task_payload(group_id, user["id"], task_id),
             "messages": [dict(r) for r in rows],
+            "editing": editing,
+            "assistant": await _assistant(group_id),
             "busy": _busy(group_id, user["id"])}
 
 

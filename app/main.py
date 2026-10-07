@@ -521,21 +521,19 @@ async def _spots_of(group_id: int) -> dict[str, int]:
 
 
 async def _scan_components(group_id: int) -> list[dict]:
-    """这个群有哪些组件、各自到哪一步了 —— **以库为准** ✓。
+    """这个群有哪些组件 —— **以库为准** ✓。
 
-    ⚠️ **列表从库读，不从目录扫** ✗→✓ —— 状态（实验/正式/旧版）在库里 ✓
-    （见 `db.py` 那句"状态和版本在这里，不在文件里"✓），
-    扫目录只知道"有哪些文件夹" ✗，不知道哪个是正在用的 ✓。
+    ⚠️ **列表从库读，不从目录扫** ✗→✓ —— 组件是什么样在库里 ✓，
+       扫目录只知道"有哪些文件夹" ✗（那是**实现细节** ✓，不该拿它当账本 ✓）。
 
-    每个 slug 回一条，带**它保留的那一版**和**它最新的那一版** ✓ ——
-    界面上就靠这两个字段说清状态 ✓（2026-10-07 起**不再分区** ✓，只挂标识 ✓）：
-      · 没有 `live`     → 未固化 ✓
-      · 有 `live` 也有 `draft` → "攒着一版还没保留" ✓
+    ★ 2026-10-07 深夜：**"哪一版是保留的 / 哪一版是攒着的"整套去掉了** ✗→✓ ——
+      用户定了「组件聊天没有所谓的固化和非固化概念了」✓。
+      所以每个 slug 回的就是**最新的那一版**长什么样 ✓
+      （名字、图标、怎么摆 ✓）—— 界面上不再有任何"状态"要表达 ✓。
     """
     rows = await fetch_all(
-        "SELECT slug, version, state, title, icon, note, spot_json,"
-        "       created_at, enabled_at, enabled_by "
-        "FROM components WHERE group_id = ? ORDER BY slug ASC, version DESC",
+        "SELECT slug, version, state, title, icon, note, spot_json, created_at"
+        " FROM components WHERE group_id = ? ORDER BY slug ASC, version DESC",
         (group_id,),
     )
     spots = await _spots_of(group_id)
@@ -545,20 +543,9 @@ async def _scan_components(group_id: int) -> list[dict]:
         it = out.setdefault(slug, {"slug": slug, "title": r["title"] or slug,
                                    "icon": r["icon"] or "🧩", "note": r["note"] or "",
                                    "spot": _spot_of(r["spot_json"]),
-                                   "pos": spots.get(slug),
-                                   "live": None, "draft": None, "versions": []})
+                                   "pos": spots.get(slug), "versions": []})
+        # 行是按版本**倒序**来的 ✓ → 第一条就是最新的 ✓（`setdefault` 那次就落定了 ✓）
         it["versions"].append(int(r["version"]))
-        if r["state"] == "live" and it["live"] is None:
-            it["live"] = {"version": int(r["version"]), "at": r["enabled_at"],
-                          "by": r["enabled_by"]}
-            # 名字、图标、**展示样式**都以正在用的那一版为准 ✓ ——
-            # 改版时可能改了名字、也可能改了它长什么样 ✓
-            it["title"] = r["title"] or it["title"]
-            it["icon"] = r["icon"] or it["icon"]
-            it["spot"] = _spot_of(r["spot_json"])
-        elif r["state"] == "draft" and it["draft"] is None:
-            # 行是按版本**倒序**来的 ✓ → 第一条 draft 就是最新的 ✓
-            it["draft"] = {"version": int(r["version"]), "at": r["created_at"]}
     # ⚠️ **排过版的按位置排** ✓ —— 没排过的（刚做完、还没被挪过 ✓）排在最后面 ✓
     #    按 slug 排 ✓（稳定、可预期 ✓：同一个东西每次进来看都在同一个地方 ✓）。
     #    这就是"容纳界面"里那个顺序 ✓（用户在调整模式里拖出来的 ✓）。
@@ -575,25 +562,19 @@ def valid_slug(name: str) -> bool:
     return bool(name) and bool(_SLUG_RE.match(name))
 
 
-class ComponentEnableIn(BaseModel):
-    version: int = Field(ge=1)
-
-
 async def _pick_component_version(group_id: int, slug: str, version: int | None) -> dict | None:
-    """挑一版：给了版本号就用它 ✓，没给就**先用正在用的、没有再用最新的** ✓。
+    """挑一版：给了版本号就用它 ✓，没给就是**最新的那一版** ✓。
 
-    没给版本时的那条兜底很重要 ✗→✓ —— 一个刚做完、还没启用的组件（只有 draft ✓）
-    也应当能预览 ✓，否则"点开看看"这件事在启用之前根本做不到 ✓。
+    ★ 2026-10-07 深夜：原来这里**先找 `state='live'` 那一版** ✗→✓ ——
+      那是"保留/正在用"还在的时候的规矩 ✓。那套一撤 ✓，这个优先顺序就没意义了 ✓，
+      而且**有害** ✗：库里还留着几个老的 live ✓ ——
+      于是"点开看看"会看到**几个月前被保留过的那一版** ✓，
+      而不是他刚做完的那一版 ✓（而界面上没有任何东西能解释这件事 ✓）。
     """
     if version:
         return await fetch_one(
             "SELECT * FROM components WHERE group_id = ? AND slug = ? AND version = ?",
             (group_id, slug, int(version)))
-    row = await fetch_one(
-        "SELECT * FROM components WHERE group_id = ? AND slug = ? AND state = 'live' "
-        "ORDER BY version DESC LIMIT 1", (group_id, slug))
-    if row:
-        return row
     return await fetch_one(
         "SELECT * FROM components WHERE group_id = ? AND slug = ? "
         "ORDER BY version DESC LIMIT 1", (group_id, slug))
@@ -674,75 +655,13 @@ async def component_render(
             "data": data}
 
 
-@app.post("/api/components/{name}/keep")
-async def component_enable(
-    name: str, body: ComponentEnableIn, group_id: int = Query(...),
-    user: dict = Depends(current_user),
-) -> dict:
-    """**用户点"保留"** —— 把某一版固化成"这个组件就是它"的那一版。
+# ⚠️ 这里原来有两个接口：`/keep`（保留某一版 ✓）和 `/unkeep`（取消保留 ✓）。
+#    **2026-10-07 深夜整个删掉了** ✗→✓ —— 用户定了「组件聊天没有所谓的固化和
+#    非固化概念了」✓。概念没了，两个接口就没有语义可言 ✓。
+#    ⚠️ `components.state` 那一列**留着不动** ✓ —— 它现在只服务内部
+#    （哪一版最新 ✓、旧版怎么排 ✓），界面上一个字都不提 ✓。
+#    库里那几个老的 `state='live'` 也不用去洗 ✓ —— 没人再读它了 ✓。
 
-    ★ 2026-10-07 改名 ✗→✓：原来叫「开始使用 / 启用」✓，而用户重新定的说法是
-      **「保留」** ✓（"只有保留下来的组件才会长期保留那份对话历史" ✓）。
-      库里的 `state='live'` 一个字没改 ✓ —— 改的是**界面上怎么叫它** ✓，
-      以及不再分"实验区 / 正常使用区"两栏了 ✓（用户：组件都在沙箱里、互相隔离，
-      分不分没意义 ✓）。
-
-    ⚠️ 这一步**只有用户能做** ✓（agent 没有这个工具 ✓）——
-        "它做出来之后是**未固化**的、用户点头才算数"这条产品逻辑就落在这儿 ✓。
-
-    ⚠️ **顺序不能反** ✗→✓：先把现在那个 live 降成 archived ✓，
-       再把目标版置成 live ✓。反过来的话，中间那一瞬间会**同时有两个 live** ✓，
-       撞上 `idx_components_one_live` 那条部分唯一索引 ✓ → 直接报错 ✓。
-       （那条索引是"同一个组件只能有一个正式版"的最后一道 ✓，
-        也是唯一一道绕不过的 ✓ —— 见 `db.py` 里那段注释 ✓。）
-        ⚠️ 两条语句之间理论上可能被别的请求插进来 ✓。单用户点按钮的场景下
-          撞不上 ✓；真撞上会**报错而不是写坏** ✓（正是那条索引的价值 ✓）。
-    """
-    await require_member(group_id, user["id"])
-    if not valid_slug(name):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
-    row = await fetch_one(
-        "SELECT id, version FROM components WHERE group_id = ? AND slug = ? AND version = ?",
-        (group_id, name, int(body.version)))
-    if not row:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"没有 `{name}` 的第 {body.version} 版")
-    await execute(
-        "UPDATE components SET state = 'archived' WHERE group_id = ? AND slug = ? AND state = 'live'",
-        (group_id, name))
-    await execute(
-        "UPDATE components SET state = 'live', enabled_at = ?, enabled_by = ? WHERE id = ?",
-        (now(), user["id"], row["id"]))
-    log.info("组件保留：群 %s 的 %s v%s（用户 %s）", group_id, name, body.version, user["id"])
-    return {"ok": True, "slug": name, "version": int(body.version)}
-
-
-@app.post("/api/components/{name}/unkeep")
-async def component_unkeep(
-    name: str, body: ComponentEnableIn, group_id: int = Query(...),
-    user: dict = Depends(current_user),
-) -> dict:
-    """**取消保留** ✓ —— 把它退回"未固化"✓（用户 2026-10-07 定的："是否保留是可以设置的" ✓）。
-
-    ⚠️ **退回去要占额度** ✓（`_unfixed_budget` 数的是"没有任何 live 版本的 slug" ✓）——
-       这是对的 ✓：取消保留 = "这个东西我还不打算长期留着" ✓，
-       那它就该和别的半成品一起算在那 3 个里 ✓。
-    ⚠️ **只降 `live` 那一版** ✓（`WHERE state='live'` ✓）——
-       给了版本号也不是"把这一版降下来"✗：`archived` 的旧版退成 `draft`
-       会让"攒着的那一版"变成两版 ✓，界面就说不清哪个是"最新做的那版"了 ✓。
-    """
-    await require_member(group_id, user["id"])
-    if not valid_slug(name):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
-    n = await execute(
-        "UPDATE components SET state = 'draft', enabled_at = NULL, enabled_by = NULL"
-        " WHERE group_id = ? AND slug = ? AND version = ? AND state = 'live'",
-        (group_id, name, int(body.version)))
-    if not n:
-        raise HTTPException(status.HTTP_404_NOT_FOUND,
-                            f"`{name}` 的第 {body.version} 版不是正在保留的那一版")
-    log.info("组件取消保留：群 %s 的 %s v%s（用户 %s）",
-             group_id, name, body.version, user["id"])
-    return {"ok": True, "slug": name, "version": int(body.version)}
 
 
 class ComponentSpotsIn(BaseModel):

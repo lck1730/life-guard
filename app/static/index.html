@@ -391,7 +391,7 @@
      ★ 2026-10-07：**分区整个废掉了** ✗→✓（用户定的："不需要分实验区和
        使用区，右上角点击进入就只是单纯地罗列组件" ✓）。理由他自己给了 ✓：
        组件都在沙箱里、文件之间本来就隔离 ✓，分不分没有实际区别 ✓。
-       于是这一屏只剩两件事：**列出来** ✓ + 未固化的挂个标识 ✓。
+       于是这一屏只剩一件事：**列出来** ✓（「未固化」那套 2026-10-07 深夜也去掉了 ✓）。
        "做"和"改"都在别处（＋ 进的对话屏 / 组件页 ✓）。 */
   #workshop { z-index:22; }
   #compView { z-index:23; }
@@ -426,12 +426,8 @@
                         text-align:center; overflow:hidden;
                         display:-webkit-box; -webkit-line-clamp:2;
                         -webkit-box-orient:vertical; word-break:break-word; }
-  /* 「未固化」那颗小黄点，挂在图标右上角 ✓（和导航那边同一套 ✓） */
-  #workshop .cell .dotic { position:relative; }
-  #workshop .cell .dotic::after { content:''; position:absolute; top:-3px; right:-4px;
-                                  width:11px; height:11px; border-radius:50%;
-                                  background:var(--warn2,#d8b06a);
-                                  border:2px solid var(--panel2); }
+  /* ⚠️ 这里原来有一条「未固化」的小黄点 ✓ —— 2026-10-07 深夜跟着"固化"整套
+     一起删了 ✓（用户定的：组件聊天没有所谓的固化和非固化概念了 ✓）。 */
 
   /* ── 调整模式（顶栏右上角那个按钮切的 ✓）────────────────────────────
      用户定的：「这个界面的右上角是一个整体功能，点击后可以推动组件进行调整」✓。
@@ -472,8 +468,19 @@
        顶栏多两样：**切换对话**（≡ ✓）和 **⋯**（保留/删除 ✓）。 */
   #wsChat .mkbody { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain;
                     padding:14px; display:flex; flex-direction:column; gap:10px; }
-  #wsChat .mkrow { display:flex; max-width:88%; }
+  /* ★ 气泡旁边**带头像**（2026-10-07 深夜 ✓）—— 用户定的：
+     「组件聊天界面也需要有用户区别」✓。左边是小助手、右边是你 ✓
+     （和群聊那套一个朝向 ✓，不用重新学 ✓）。
+     ⚠️ 名字**只写在小助手那边** ✓ —— 你的名字你自己知道 ✓，
+        而它叫什么**是能改的** ✓（改了要立刻看得见 ✓）。 */
+  #wsChat .mkrow { display:flex; gap:8px; max-width:90%; align-items:flex-start; }
   #wsChat .mkrow.mine { align-self:flex-end; flex-direction:row-reverse; }
+  #wsChat .mkrow .av { width:34px; height:34px; flex:0 0 34px; border-radius:10px;
+                       background:var(--panel2); color:var(--muted);
+                       display:flex; align-items:center; justify-content:center;
+                       font-size:14px; background-size:cover; background-position:center; }
+  #wsChat .mkrow .wrap2 { min-width:0; }
+  #wsChat .mkrow .who { font-size:11.5px; color:var(--muted); margin:0 3px 3px; }
   #wsChat .mkbub { background:var(--panel); border-radius:14px; padding:9px 13px;
                    white-space:pre-wrap; word-break:break-word; font-size:15px; }
   #wsChat .mkrow.mine .mkbub { background:var(--accent-bg); }
@@ -533,6 +540,24 @@
   #wsNav .navrow .sub { display:block; font-size:11.5px; margin-top:2px;
                         color:var(--warn2,#d8b06a); }
   #wsNav .navrow .chev { color:var(--muted); font-size:22px; line-height:1; }
+  /* ★ 参与过这个组件的人的头像（2026-10-07 深夜 ✓）—— 用户定的：
+     「对于每个组件，需要标注其由群里哪些用户参与构建，在导航界面，
+      每个组件的右侧标注头像」✓。
+     ⚠️ 叠着排（后一个压前一个的边 ✓）而不是并排铺开 ✓ ——
+        人一多（比如四个人都参与过 ✓）铺开会把名字挤没 ✓。 */
+  #wsNav .navrow .avs { display:flex; flex:0 0 auto; padding-right:2px; }
+  #wsNav .navrow .avs .av { width:26px; height:26px; border-radius:8px;
+                            background:var(--panel2); color:var(--muted);
+                            display:flex; align-items:center; justify-content:center;
+                            font-size:11.5px; border:2px solid var(--bg);
+                            background-size:cover; background-position:center; }
+  #wsNav .navrow .avs .av + .av { margin-left:-9px; }
+  /* diy 小助手在导航右上角那个头像 ✓ */
+  #wsNav .icon-btn .diyav { width:30px; height:30px; border-radius:50%;
+                            background:var(--panel2); color:var(--muted);
+                            display:flex; align-items:center; justify-content:center;
+                            font-size:13px; background-size:cover;
+                            background-position:center; }
   /* 「新建组件」那一行**跟别的不一样** ✓ —— 虚线框、加号、强调色 ✓。
      它是这一屏唯一"不是东西"的入口 ✓，长得一样就找不着了 ✓。 */
   #wsNav .navrow.new { border:1.5px dashed #35507a; color:var(--accent); }
@@ -540,18 +565,15 @@
                             color:var(--accent); font-size:22px; }
   #wsNav .navlist .navrow.new { margin-bottom:10px; }
 
-  /* 组件管理屏的标题：名字 + 「未固化」标识 ✓。
+  /* 组件管理屏的标题：就是那个组件的名字 ✓。
      ⚠️ 里面是**两个**元素 ✓，所以要自己摆平 —— `header.sub h2` 只管
         "占满中间并居中" ✓，不负责里面怎么排 ✓。名字长短不一，**必须能缩** ✓
         （群里做过的组件名可能是七八个字 ✓，撑不下就把右边的 ⋯ 顶出去 ✓）。 */
   #wsChat .sub h2 { display:flex; align-items:center; justify-content:center;
                     gap:7px; min-width:0; }
   #wsChat .sub h2 .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  /* 「未固化」那个标识 —— 用户定的：**实验阶段的组件要有特殊标识** ✓，
-     而且**同一件事在对话屏里也要看得见** ✓（"同步体现在聊天界面里的设置" ✓）。 */
-  .wsbadge { flex:0 0 auto; font-size:11px; font-weight:600; letter-spacing:.03em;
-             padding:2px 7px; border-radius:999px; color:var(--warn2,#d8b06a);
-             border:1px solid #4a3c22; background:#221a0e; }
+  /* ⚠️ 这里原来有一条「未固化」的小牌子样式 ✓ —— 2026-10-07 深夜跟着"固化"
+     整套一起删了 ✓（用户定的：组件聊天没有所谓的固化和非固化概念了 ✓）。 */
   .ascreen .abody { flex:1; overflow-y:auto; overscroll-behavior:contain;
                     padding:calc(var(--inset-top) + 14px) 14px calc(var(--inset-bottom) + 24px); }
 
@@ -737,6 +759,18 @@
   .rninput:focus { outline:none; border-color:var(--accent); }
   .rnhint { color:var(--muted); font-size:13px; line-height:1.7; margin:-6px 0 12px; }
 
+  /* ── diy 小助手的设置屏 ✓ ── */
+  #diySet .diyhead { display:flex; flex-direction:column; align-items:center;
+                     gap:12px; padding:22px 0 8px; }
+  #diySet .diyav2 { width:82px; height:82px; border-radius:50%;
+                    background:var(--panel2); color:var(--muted);
+                    display:flex; align-items:center; justify-content:center;
+                    font-size:30px; background-size:cover; background-position:center; }
+  #diySet .diychange { color:var(--accent); font-size:14px; }
+  #diySet .diyname { font-size:17px; font-weight:600; }
+  #diySet .diyhint { color:var(--muted); font-size:13px; line-height:1.75;
+                     padding:10px 4px 0; }
+
   /* 「+」面板：微信那种横向网格 —— 圆角方块图标 + 下方小字 */
   .plus-grid { display:flex; gap:16px; flex-wrap:wrap; }
   .plus-item { display:flex; flex-direction:column; align-items:center; gap:8px;
@@ -905,6 +939,7 @@
   <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden>
   <input type="file" id="fileGallery" accept="image/*" hidden>
   <input type="file" id="fileAvatar" accept="image/*" hidden>
+  <input type="file" id="fileDiy" accept="image/*" hidden>
 
   <!-- 图片大图查看 -->
   <div class="lightbox" id="lightbox">
@@ -964,9 +999,33 @@
       </svg>
     </button>
     <h2>创意工坊</h2>
-    <div class="spacer"></div>
+    <!-- ★ 「diy 小助手」的入口 ✓ —— 用户定的：「agent 叫 diy 小助手，
+         这个小助手的信息可以在导航界面右上角进入，右上角展示头像，
+         点击进去后可以设置头像，昵称…」✓。
+         ⚠️ 它**顶掉的是 `.spacer`** ✓（那个 40px 占位本来就为了标题居中 ✓）——
+            头像做成 30px + 两侧留白，正好还是 40px 宽 ✓，居中不受影响 ✓。 -->
+    <button class="icon-btn" id="wsDiy" aria-label="diy 小助手">
+      <span class="diyav" id="wsDiyAv">助</span>
+    </button>
   </header>
   <div class="abody" id="wsNavBody"></div>
+</div>
+
+<!-- ★ diy 小助手的设置 ✓（2026-10-07 深夜）—— 从导航屏右上角那个头像进来 ✓。
+     用户定的：「可以设置头像，昵称和一些其他规则，**暂时只有头像和昵称**」✓。 -->
+<div class="screen ascreen" id="diySet">
+  <header class="sub">
+    <button class="icon-btn back" id="diyBack" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 4.5 8.5 12 15 19.5" />
+      </svg>
+    </button>
+    <h2>diy 小助手</h2>
+    <div class="spacer"></div>
+  </header>
+  <div class="abody" id="diyBody"></div>
 </div>
 
 <!-- ★ 组件页（2026-10-07）—— **纯预览** ✓：只有组件本身 + 右上角一个图标。
@@ -1010,10 +1069,7 @@
         <polyline points="15 4.5 8.5 12 15 19.5" />
       </svg>
     </button>
-    <h2>
-      <span class="nm" id="wsTitle">组件</span>
-      <span class="wsbadge" id="wsBadge" hidden>未固化</span>
-    </h2>
+    <h2><span class="nm" id="wsTitle">组件</span></h2>
     <button class="icon-btn" id="wsMore" aria-label="更多">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
         <circle cx="5.2" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/>
@@ -1777,6 +1833,9 @@
     //    > `#compView` 23 > `#workshop` 22 ✓）。它是"先关最上面那一屏"的意思 ✓，
     //    写反了的话按一下返回会**隔着两层关掉底下那层** ✓（用户看到的还是原来那一屏 ✓）。
     if ($('#wsChat').classList.contains('on')) { closeWsChat(); return; }
+    // ⚠️ `#diySet` 在 `#wsNav` **上面** ✓（它俩的 z-index 一样是 24 ✓，
+    //    谁后推谁在上 ✓ —— 但它只可能从导航进去 ✓，所以放在前面判 ✓）。
+    if ($('#diySet').classList.contains('on')) { closeDiySet(); return; }
     if ($('#wsNav').classList.contains('on')) { closeWsNav(); return; }
     if ($('#compView').classList.contains('on')) { closeComp(); return; }
     if ($('#workshop').classList.contains('on')) { closeWorkshop(); return; }
@@ -2770,6 +2829,7 @@
   $('#fileCamera').addEventListener('change', e => { addPending(e.target.files[0], 'image'); e.target.value = ''; });
   $('#fileGallery').addEventListener('change', e => { addPending(e.target.files[0], 'image'); e.target.value = ''; });
   $('#fileAvatar').addEventListener('change', e => { uploadAvatar(e.target.files[0]); e.target.value = ''; });
+  $('#fileDiy').addEventListener('change', e => { uploadDiyAvatar(e.target.files[0]); e.target.value = ''; });
 
   $('#pickMedia').onclick = () => {
     const p = $('#sheetPanel');
@@ -3373,7 +3433,9 @@
     el.style.gridRow = 'span ' + Math.max(1, Math.min(3, +(sp.h || 1)));
     if (sp.tint) el.style.background = sp.tint;
     const ic = document.createElement('span');
-    ic.className = 'ico' + (c.live ? '' : ' dotic');   // 未固化的那颗点 ✓
+    // ⚠️ 这里原来有一颗「未固化」的小黄点 ✓ —— 2026-10-07 深夜跟着"固化"
+    //    整套一起删了 ✓（用户定的："组件聊天没有所谓的固化和非固化概念了"✓）。
+    ic.className = 'ico';
     ic.textContent = c.icon || '🧩';
     const nm = document.createElement('span');
     nm.className = 'nm';
@@ -3568,7 +3630,11 @@
   //: ⚠️ **`seen` 只在同一条对话里有效** ✗ —— 换对话时要清 ✓（不然两条对话里
   //:    恰好 id 相同的那种情况会被误判成"画过了" ✓ —— 虽然理论上不会撞 ✓，
   //:    但清一下是零成本的 ✓，而"以为画过了所以没画"是最难查的一类毛病 ✓）。
-  const wsCur = { task: null, slug: '', title: '', kept: false,
+  //: ⚠️ `kept`（固化了没有）**2026-10-07 深夜删掉了** ✗→✓ —— 用户定了
+  //:    「组件聊天没有所谓的固化和非固化概念了」✓。前端一个字都不再提它 ✓。
+  //: `assistant` = diy 小助手的名字和头像 ✓（气泡上要用 ✓）。
+  const wsCur = { task: null, slug: '', title: '',
+                  assistant: { name: 'diy 小助手', avatar: '' },
                   streaming: null, seen: {}, tasks: [] };
 
   const setWsHead = () => {
@@ -3576,18 +3642,16 @@
     t.textContent = wsCur.task
       ? (wsCur.slug ? (wsCur.title || wsCur.slug) : '做一个新的')
       : '创意工坊';
-    // ★ 「未固化」标识 **在对话屏里也看得见** ✓ —— 用户定的那两句是同一件事：
-    //   "未保存的组件会有特殊的标识" + "这个同步体现在创意工坊聊天界面里" ✓。
-    $('#wsBadge').hidden = !(wsCur.task && (!wsCur.slug || !wsCur.kept));
+    // 这里原来挂过一枚「未固化」的小牌子 ✓ —— 跟着"固化"整套一起去掉了 ✓（见上 ✓）。
   };
 
-  /** 落地一条对话的全部界面状态（历史 + 标题 + 标识）✓。 */
+  /** 落地一条对话的全部界面状态（历史 + 标题 + 谁在改）✓。 */
   const showTask = (d) => {
     wsCur.task = Number(d.task_id ?? d.id ?? (d.task && d.task.id)) || null;
     const t = (d.task && d.task) || d;
     wsCur.slug = t.slug || '';
     wsCur.title = t.title || '';
-    wsCur.kept = !!t.kept;
+    if (d.assistant) wsCur.assistant = d.assistant;
     wsCur.streaming = null;
     wsCur.seen = {};
     setWsHead();
@@ -3614,6 +3678,14 @@
     //    （比如切回来的时候那一轮还没掐利索 ✓）。不显示的话就是**一片安静** ✓，
     //    用户会以为"它不理我" ✓ —— 而它其实正在写 ✓。
     setWsStatus(d.busy ? 'thinking' : 'idle');
+    // ★ **别人正在改它** ✗→✓（2026-10-07 深夜用户定的 ✓）：
+    //   「如果有个组件某个用户正在创建和修改…**此时其他用户进入时会被提示**」✓。
+    //   ⚠️ 服务端**只报别人** ✓（自己那条正在跑是正常状态 ✓，
+    //      界面上那个转圈就是它 ✓ —— 再弹一句只会让人莫名其妙 ✓）。
+    if (d.editing && d.editing.nickname) {
+      toast('⚠️ ' + d.editing.nickname + ' 正在改这个组件 —— '
+            + '你这边改的不会丢，但两个人同时动它容易撞上');
+    }
   };
 
   // ── 导航屏（工坊的门口）──────────────────────────────────────────────
@@ -3631,9 +3703,9 @@
   //   别人做的东西在**群聊右上角**那一屏能看到、能预览 ✓，
   //   但你从那儿点进对话时，开的是**你自己**的那条 ✓（见 `openTaskForSlug` ✓）。
   //
-  // ⚠️ **没起名的那种半成品也列出来** ✗→✓ —— 不然它就**看不见**了 ✓：
-  //   既没法接着做、也没法删 ✓，却**占着"未固化 3 个"里的一个** ✓
-  //   （用户会看到额度莫名其妙少了一个 ✓）。列出来标成"还没起名" ✓，诚实 ✓。
+  // ⚠️ **还没做出组件的那种也列出来** ✗→✓ —— 不然它就**看不见**了 ✓：
+  //   既没法接着做、也没法删 ✓（那条对话就成了一个谁都够不着的孤儿 ✓）。
+  //   列出来标成"还没做什么" ✓，诚实 ✓。
 
   const openWsNav = async () => {
     // ⚠️ **先推屏、再画** ✗→✓ —— 画要发请求（几十毫秒 ✓）；
@@ -3654,12 +3726,47 @@
       return;
     }
     wsCur.tasks = d.tasks || [];
+    if (d.assistant) wsCur.assistant = d.assistant;
+    wsCur.editing = d.editing || {};
+    paintDiyAvatar();                         // 顶栏右上角那颗头像 ✓
     box.innerHTML = '';                       // 下面全部走 createElement ✓
     const list = document.createElement('div');
     list.className = 'navlist';
     list.appendChild(navNewRow());
     wsCur.tasks.forEach(t => list.appendChild(navRow(t)));
     box.appendChild(list);
+  };
+
+  /** 把 diy 小助手的头像画到几个地方 ✓ —— 顶栏那颗、气泡旁边、设置屏里 ✓。 */
+  const paintDiyAvatar = () => {
+    const url = wsCur.assistant.avatar || '';
+    const ch = (wsCur.assistant.name || '助').slice(0, 1);
+    [$('#wsDiyAv'), $('#diyAv')].forEach(el => {
+      if (el) paintZhi(el, url, ch);
+    });
+  };
+
+  /**
+   * 按**一个已经拼好的 URL** 画头像 ✓（`/ui/...` 那种 ✓）。
+   *
+   * ⚠️ **不能用群聊那个 `paintAvatar`** ✗ —— 它会把相对路径拼到**壳**的域名上 ✓
+   *    （用户的头像住在壳那边 ✓）。而小助手的头像住在这个服务自己的
+   *    `/ui/` 下 ✓ —— 拼错了就是**取不到、只剩一个首字** ✓，
+   *    而"头像没显示"看起来永远像"还没设置" ✓（不会有人想到是拼错了域名 ✓）。
+   */
+  const paintZhi = (el, url, fallback) => {
+    const ch = String(fallback || '?').slice(0, 1);
+    el.textContent = ch;
+    el.style.backgroundImage = '';
+    if (!url) return;
+    const probe = new Image();
+    probe.onload = () => {
+      el.textContent = '';
+      el.style.backgroundImage = "url('" + url + "')";
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+    };
+    probe.src = url;
   };
 
   const navNewRow = () => {
@@ -3683,8 +3790,9 @@
       cta: '开始做',
       hint: '随便起一个你自己认得出的就行，以后随时能改。',
       save: async (name) => {
-        // 服务端那边会先看"未固化 3 个"的额度 ✓ —— 满了就把原因 toast 出来 ✓
-        // （它那句写清了手上是哪几个、下一步能干什么 ✓，别拿别的字盖掉它 ✓）。
+        // 名字**不是白问的** ✓ —— 它一路走到组件上 ✓（服务端以它为准 ✓），
+        // 也会出现在导航这一列上 ✓。失败的话把原因原样 toast 出来 ✓
+        // （服务端那句话是写给人看的 ✓，别拿别的字盖掉它 ✓）。
         if (await wsNewTask('', name)) pushScreen('wsChat');
       },
     });
@@ -3703,13 +3811,36 @@
     nm.className = 'nm';
     nm.textContent = t.title || (t.slug || '还没起名');
     col.appendChild(nm);
-    // 「未固化」**写在这儿** ✓ —— 列表比图标网格宽得多 ✓，一行小字完全放得下 ✓，
-    // 不用再挤成一颗小点 ✓（那样还得让用户猜那颗点是什么意思 ✓）。
-    if (!t.kept) {
+    // ★ 这一行的第二行现在只说**两件事** ✓（"未固化"那句跟着整套去掉了 ✓）：
+    //   ① 谁正在改它 ✓（用户定的：要在导航上标注 ✓）
+    //   ② 还没有人做过它（"还没起名" ✓）—— 说清它是个空壳 ✓
+    const busy = t.slug ? (wsCur.editing || {})[t.slug] : null;
+    if (busy && busy.nickname) {
       const s = document.createElement('span');
       s.className = 'sub';
-      s.textContent = '未固化';
+      s.textContent = busy.nickname + ' 正在改…';
       col.appendChild(s);
+    } else if (!t.slug) {
+      const s = document.createElement('span');
+      s.className = 'sub';
+      s.textContent = '还没做什么';
+      col.appendChild(s);
+    }
+    // ★ **参与过这个组件的人的头像** ✓（用户定的：导航上每个组件右边标头像 ✓）。
+    //   ⚠️ 按 **slug** 取 ✓（`people` 是那个组件的参与者名单 ✓）——
+    //      不是"这条对话是谁的"✓（那永远只有你一个 ✓，就标不出什么来了 ✓）。
+    const ppl = (t.people || []).slice(0, 4);
+    if (ppl.length) {
+      const avs = document.createElement('span');
+      avs.className = 'avs';
+      ppl.forEach(p => {
+        const a = document.createElement('span');
+        a.className = 'av';
+        a.title = p.nickname || '';
+        paintZhi(a, shellURL(p.avatar), p.nickname || '?');
+        avs.appendChild(a);
+      });
+      b.appendChild(avs);
     }
     const chev = document.createElement('span');
     chev.className = 'chev';
@@ -3735,8 +3866,6 @@
    * 从**组件页那个图标**进来：找我**自己**为这个组件开过的对话 ✓；
    * 没有就现开一条**冲着它去**的 ✓。
    *
-   * ⚠️ **那条路不吃"未固化 3 个"的额度** ✓ —— 改造一个早就做好的组件，
-   *    不该被"你手上有 3 个半成品"拦住 ✓（服务端那边按 `slug` 判的 ✓）。
    *
    * ⚠️ **先把组件页关掉** ✗→✓ —— 用户定的是"每个组件界面左上角 < 用于返回
    *    **导航界面**" ✓：所以从预览页那个图标进来之后，返回应该落到导航 ✓，
@@ -3784,7 +3913,7 @@
     } catch (e) { return null; }   // 拉不到不影响正在看的这一条 ✓
   };
 
-  /** 按照务器的当前值，把顶栏那两样刷一遍 ✓（保留/改名之后用 ✓）。 */
+  /** 按照务器的当前值，把顶栏那个名字刷一遍 ✓（改名之后用 ✓）。 */
   const refreshCurrent = async () => {
     const d = await wsReloadTasks();
     if (!d) return;
@@ -3792,7 +3921,6 @@
     if (!t) return;
     wsCur.slug = t.slug || '';
     wsCur.title = t.title || '';
-    wsCur.kept = !!t.kept;
     setWsHead();
   };
 
@@ -3866,14 +3994,35 @@
       wsCur.seen[m.id] = 1;
     }
     const box = $('#wsMsgs');
+    const mine = m.sender_type === 'user';
     const row = document.createElement('div');
-    row.className = 'mkrow ' + (m.sender_type === 'user' ? 'mine' : 'agent');
+    row.className = 'mkrow ' + (mine ? 'mine' : 'agent');
+    // ★ 头像（2026-10-07 深夜 ✓）—— 用户定的「组件聊天界面也需要有用户区别」✓。
+    //   你那边用**你自己的头像** ✓（和群聊里同一张 ✓，一眼认得出是自己 ✓）；
+    //   它那边用小助手那张 ✓（没设就是一个首字 ✓）。
+    const av = document.createElement('div');
+    av.className = 'av';
+    if (mine) paintZhi(av, shellURL(me && me.avatar), (me && me.nickname) || '我');
+    else paintZhi(av, wsCur.assistant.avatar, wsCur.assistant.name || '助');
+    const wrap = document.createElement('div');
+    wrap.className = 'wrap2';
+    if (!mine) {
+      // ⚠️ 名字**只挂在它那边** ✓ —— 你的名字你自己知道 ✓，
+      //    而**它叫什么随时能改** ✓（改了要立刻看得见 ✓）。
+      const who = document.createElement('div');
+      who.className = 'who';
+      who.textContent = wsCur.assistant.name || 'diy 小助手';
+      wrap.appendChild(who);
+    }
     const b = document.createElement('div');
     b.className = 'mkbub';
     fillBubble(b, m.content || '');      // ★ 渲染（粗体/代码/列表/问题标签 ✓），不进 innerHTML ✓
-    row.appendChild(b);
+    wrap.appendChild(b);
+    row.append(av, wrap);
     box.appendChild(row);
     box.scrollTop = box.scrollHeight;
+    // ⚠️ 返回的是**气泡**（不是整行 ✓）—— 流式那一段拿它往里追加字 ✓
+    //    （`wsCur.streaming.textContent += …` ✓）。
     return b;
   };
 
@@ -3954,33 +4103,10 @@
       return b;
     };
 
+    // ★ 2026-10-07 深夜：原来这里还有「保留这一版 / 取消保留」两项 ✗→✓ ——
+    //   用户定了「组件聊天没有所谓的固化和非固化概念了」✓，一起删掉了 ✓。
+    //   现在这个菜单就**两件事**：重命名 ✓、删除 ✓（用户点名的那两件 ✓）。
     if (t && t.slug) {
-      const latest = t.latest_version, live = t.live_version;
-      // ★ 「未固化」这件事**在这一屏就能改** ✓ —— 用户定的：
-      //   "未保存的组件会有特殊的标识，这个同步体现在创意工坊聊天界面里的设置" ✓。
-      //   ⚠️ 改的是**最新做的那一版** ✓（不是"随便挑一版"✗）——
-      //     他在说"这个东西我认了" ✓，指的当然是刚看着它做出来的那一版 ✓。
-      if (latest && live !== latest) {
-        mk('保留这一版（v' + latest + '）', async () => {
-          closeSheet();
-          try {
-            await api(`/components/${encodeURIComponent(t.slug)}/keep?group_id=${group.id}`,
-                      { method: 'POST', body: JSON.stringify({ version: latest }) });
-          } catch (e) { toast('没保留下来：' + e.message); return; }
-          await refreshCurrent();
-          toast('保留好了');
-        });
-      } else if (live) {
-        mk('取消保留', async () => {
-          closeSheet();
-          try {
-            await api(`/components/${encodeURIComponent(t.slug)}/unkeep?group_id=${group.id}`,
-                      { method: 'POST', body: JSON.stringify({ version: live }) });
-          } catch (e) { toast('没取消掉：' + e.message); return; }
-          await refreshCurrent();
-          toast('取消保留了');
-        });
-      }
       mk('重命名', () => openRenameSheet(t.slug, t.title || ''));
       // ★ 「删除组件等于删除对话」✓ —— 所以删的是**整块**（不传版本号 ✓），
       //   服务端会把文件、所有版本、这条对话一起收掉 ✓。
@@ -4122,6 +4248,106 @@
     },
   });
 
+  // ── diy 小助手的设置 ✓（2026-10-07 深夜）────────────────────────────
+  //
+  // 用户定的：「agent 叫 diy 小助手，这个小助手的信息可以在导航界面右上角进入，
+  // 右上角展示头像，点击进去后可以设置头像，昵称和一些其他规则，
+  // **暂时只有头像和昵称**」✓。而且「这个助手**每个组件里通用**」✓
+  // —— 所以它存在**群**上（`groups.diy_name` / `diy_avatar` ✓），
+  //    不是每条对话一份 ✓（那样改八遍也改不齐 ✓）。
+
+  const openDiySet = async () => {
+    if (!$('#diySet').classList.contains('on')) pushScreen('diySet');
+    await renderDiySet();
+  };
+  const closeDiySet = () => {
+    popScreen('diySet');
+    if ($('#wsNav').classList.contains('on')) renderWsNav();
+  };
+
+  const renderDiySet = async () => {
+    const box = $('#diyBody');
+    let d;
+    try { d = await api(`/workshop/${group.id}/assistant`); }
+    catch (e) { box.textContent = '打不开：' + e.message; return; }
+    wsCur.assistant = d;
+    paintDiyAvatar();
+    box.innerHTML = '';
+
+    const head = document.createElement('div');
+    head.className = 'diyhead';
+    const av = document.createElement('div');
+    av.className = 'diyav2';
+    av.id = 'diyAv';
+    head.appendChild(av);
+    const change = document.createElement('div');
+    change.className = 'diychange';
+    change.textContent = '换头像';
+    change.onclick = () => $('#fileDiy').click();
+    head.appendChild(change);
+    box.appendChild(head);
+    paintDiyAvatar();                    // `#diyAv` 刚建出来 ✓，现在才画得上 ✓
+
+    const grp = document.createElement('div');
+    grp.className = 'grp';
+    const row = document.createElement('button');
+    row.className = 'row';
+    const k = document.createElement('span'); k.className = 'k';
+    k.textContent = '昵称';
+    const v = document.createElement('span'); v.className = 'v';
+    v.textContent = wsCur.assistant.name || 'diy 小助手';
+    const chev = document.createElement('span'); chev.className = 'chev';
+    chev.textContent = '›';
+    row.append(k, v, chev);
+    row.onclick = () => openNameSheet({
+      heading: '小助手叫什么？',
+      initial: wsCur.assistant.name || '',
+      cta: '保存',
+      hint: '这个名字只在这儿用——群聊里那个管家还是它自己的名字。',
+      save: async (name) => {
+        wsCur.assistant = await api(`/workshop/${group.id}/assistant`,
+                                     { method: 'PATCH', body: JSON.stringify({ name }) });
+        paintDiyAvatar();
+        await renderDiySet();
+        toast('改好了');
+      },
+    });
+    grp.appendChild(row);
+    box.appendChild(grp);
+
+    const hint = document.createElement('div');
+    hint.className = 'diyhint';
+    hint.textContent = '这个助手在**每个组件里都是它**——改一次，到处都跟着变。'
+                     + '（群聊里那个说话的是另一个身份，名字不跟着改。）';
+    box.appendChild(hint);
+  };
+
+  const uploadDiyAvatar = async (file) => {
+    if (!file) return;
+    // ⚠️ **先缩再传** ✗→✓ —— 和群管家那张同一个路子（见上面那段 ✓）：
+    //    手机随手一张就 3-5MB ✓，直接传必然 413 ✓，而用户看到的是"换头像失败"✓。
+    let blob = file;
+    try { blob = await shrinkToJpeg(file, 320); } catch (e) { blob = file; }
+    const fd = new FormData();
+    // ⚠️ **缩完是 JPEG** ✓（`shrinkToJpeg` 那个名字就是这么来的 ✓）——
+    //    文件名还写 `.png` 的话，服务端按**内容**判类型 ✓ 但按**扩展名**存盘 ✓，
+    //    于是会存出一个叫 `.png`、其实是 jpeg 的文件 ✓（能显示 ✓，但下一个人看目录时
+    //    一定会以为哪儿写错了 ✓）。缩不了、原样传时才真是 png ✓。
+    fd.append('file', blob, blob.type === 'image/jpeg' ? 'a.jpg' : 'a.png');
+    try {
+      const r = await fetch(`/api/workshop/${group.id}/assistant-avatar`,
+                            { method: 'POST', body: fd, credentials: 'same-origin' });
+      if (!r.ok) throw new Error((await r.text()) || r.status);
+      wsCur.assistant = await r.json();
+    } catch (e) {
+      toast('头像没换成：' + e.message);
+      return;
+    }
+    paintDiyAvatar();
+    if ($('#diySet').classList.contains('on')) renderDiySet();
+    toast('换好了');
+  };
+
   /** 删完之后回**导航屏** ✓ —— 用户定的："此时会自动退回导航界面" ✓。 */
   const backToNav = () => {
     wsCur.task = null;
@@ -4142,6 +4368,9 @@
     syncArrangeIcon();
   };
   $('#wsNavBack').onclick = closeWsNav;
+  // ★ diy 小助手：导航右上角那颗头像 → 设置屏 ✓（用户 2026-10-07 深夜定的 ✓）
+  $('#wsDiy').onclick = openDiySet;
+  $('#diyBack').onclick = closeDiySet;
   $('#compBack').onclick = closeComp;
   $('#wsBack').onclick = closeWsChat;
   // ⚠️ ⋯ **自己会先刷一次列表** ✗→✓ —— 菜单上"保留这一版（v几）"那几个字
