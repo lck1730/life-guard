@@ -790,17 +790,12 @@
   .modal .box .acts button { flex:1; padding:12px; border-radius:12px;
                              font:inherit; font-size:15px; font-weight:600; }
 
-  /* ── diy 小助手的设置屏 ✓ ── */
-  #diySet .diyhead { display:flex; flex-direction:column; align-items:center;
-                     gap:12px; padding:22px 0 8px; }
-  #diySet .diyav2 { width:82px; height:82px; border-radius:50%;
-                    background:var(--panel2); color:var(--muted);
-                    display:flex; align-items:center; justify-content:center;
-                    font-size:30px; background-size:cover; background-position:center; }
-  #diySet .diychange { color:var(--accent); font-size:14px; }
-  #diySet .diyname { font-size:17px; font-weight:600; }
-  #diySet .diyhint { color:var(--muted); font-size:13px; line-height:1.75;
-                     padding:10px 4px 0; }
+  /* ⚠️ diy 小助手的设置屏**没有自己的样式** ✓ —— 它整屏照抄
+     改管家资料那一屏（`.card.avcard` / `.bigav` / `.tip` / `.field` /
+     `.btn-save` / `.swap` ✓，都在 `.ascreen` 底下 ✓）。
+     ⚠️ **别在这儿另发明一套** ✗ —— 两屏一旦各有一套，改一边的间距
+        另一边不跟 ✓，而那是用户**看得见**的不一致 ✓。（原来那几条
+        `.diyhead` / `.diyav2` / `.diychange` 就是这么删掉的 ✓。） */
 
   /* 「+」面板：微信那种横向网格 —— 圆角方块图标 + 下方小字 */
   .plus-grid { display:flex; gap:16px; flex-wrap:wrap; }
@@ -970,7 +965,6 @@
   <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden>
   <input type="file" id="fileGallery" accept="image/*" hidden>
   <input type="file" id="fileAvatar" accept="image/*" hidden>
-  <input type="file" id="fileDiy" accept="image/*" hidden>
 
   <!-- 图片大图查看 -->
   <div class="lightbox" id="lightbox">
@@ -2867,7 +2861,6 @@
   $('#fileCamera').addEventListener('change', e => { addPending(e.target.files[0], 'image'); e.target.value = ''; });
   $('#fileGallery').addEventListener('change', e => { addPending(e.target.files[0], 'image'); e.target.value = ''; });
   $('#fileAvatar').addEventListener('change', e => { uploadAvatar(e.target.files[0]); e.target.value = ''; });
-  $('#fileDiy').addEventListener('change', e => { uploadDiyAvatar(e.target.files[0]); e.target.value = ''; });
 
   $('#pickMedia').onclick = () => {
     const p = $('#sheetPanel');
@@ -4369,96 +4362,126 @@
   // —— 所以它存在**群**上（`groups.diy_name` / `diy_avatar` ✓），
   //    不是每条对话一份 ✓（那样改八遍也改不齐 ✓）。
 
+  //: 选好但**还没上传**的头像 ✓ —— 和管家那边一个做法：
+  //: 选完先在本地显示出来 ✓，点「保存」才真传 ✓（用户："最后一起保存"✓）。
+  let diyFile = null;
+
   const openDiySet = async () => {
+    diyFile = null;
     if (!$('#diySet').classList.contains('on')) pushScreen('diySet');
     await renderDiySet();
   };
   const closeDiySet = () => {
+    diyFile = null;
     popScreen('diySet');
     if ($('#wsNav').classList.contains('on')) renderWsNav();
   };
 
+  /**
+   * diy 小助手的设置屏 ✓（2026-10-07 深夜用户定的：
+   * 「我觉得 diy 助手点击后**可以参考管家的这个界面去布局**」✓）。
+   *
+   * ⚠️ **版式整个照抄改管家资料那一屏** ✗→✓ —— 不是"看着像" ✓，
+   *    是**同一批 class**（`.card.avcard` / `.bigav` / `.tip` / `.field` /
+   *    `.btn-save` / `.swap` ✓）→ 两边永远一起变 ✓。
+   *    自己另写一套的话，用户改一边的间距、另一边的不会跟着动 ✓
+   *    —— 而那是他**看得见**的不一致 ✓。
+   *    那批数值（150px 头像、30px 的 tip 间距 ✓）是他 2026-10-06
+   *    量着截图来回调出来的 ✓（CSS 里那句注释写着"别再自己发明"✓）。
+   */
   const renderDiySet = async () => {
-    const box = $('#diyBody');
+    const m = $('#diyBody');
     let d;
     try { d = await api(`/workshop/${group.id}/assistant`); }
-    catch (e) { box.textContent = '打不开：' + e.message; return; }
+    catch (e) { m.textContent = '打不开：' + e.message; return; }
     wsCur.assistant = d;
     paintDiyAvatar();
-    box.innerHTML = '';
+    m.textContent = '';
 
-    const head = document.createElement('div');
-    head.className = 'diyhead';
-    const av = document.createElement('div');
-    av.className = 'diyav2';
-    av.id = 'diyAv';
-    head.appendChild(av);
-    const change = document.createElement('div');
-    change.className = 'diychange';
-    change.textContent = '换头像';
-    change.onclick = () => $('#fileDiy').click();
-    head.appendChild(change);
-    box.appendChild(head);
-    paintDiyAvatar();                    // `#diyAv` 刚建出来 ✓，现在才画得上 ✓
+    // 卡片一：头像
+    const card = mkel('div', 'card avcard');
+    const f = mkel('input');
+    f.type = 'file';
+    f.accept = 'image/*';
+    f.style.display = 'none';           // 原生文件框太丑，藏起来 ✓
+    const big = mkel('div', 'bigav');
+    const av = mkel('div', 'av');
+    paintZhi(av, wsCur.assistant.avatar, wsCur.assistant.name || '助');
+    av.onclick = () => f.click();       // **头像本身就是那个按钮** ✓，不多放按钮 ✓
+    f.onchange = () => {
+      const file = f.files && f.files[0];
+      if (!file) return;
+      // 选完**先在本地显示出来** ✓ —— 不然用户点完"看不到变化" ✓，
+      // 会以为没选上、再点一次 ✓。
+      shrinkToJpeg(file, 320).then(blob => {
+        diyFile = new File([blob], 'a.jpg', { type: 'image/jpeg' });
+        av.textContent = '';
+        av.style.backgroundImage = "url('" + URL.createObjectURL(blob) + "')";
+      }).catch(e => toast(e.message));
+    };
+    big.appendChild(av);
+    card.appendChild(f);
+    card.appendChild(big);
+    card.appendChild(mkel('div', 'tip', '点击头像替换'));
+    m.appendChild(card);
 
-    const grp = document.createElement('div');
-    grp.className = 'grp';
-    const row = document.createElement('button');
-    row.className = 'row';
-    const k = document.createElement('span'); k.className = 'k';
-    k.textContent = '昵称';
-    const v = document.createElement('span'); v.className = 'v';
-    v.textContent = wsCur.assistant.name || 'diy 小助手';
-    const chev = document.createElement('span'); chev.className = 'chev';
-    chev.textContent = '›';
-    row.append(k, v, chev);
-    row.onclick = () => openNameSheet({
-      heading: '小助手叫什么？',
-      initial: wsCur.assistant.name || '',
-      cta: '保存',
-      hint: '这个名字只在这儿用——群聊里那个管家还是它自己的名字。',
-      save: async (name) => {
-        wsCur.assistant = await api(`/workshop/${group.id}/assistant`,
-                                     { method: 'PATCH', body: JSON.stringify({ name }) });
+    // 卡片二：昵称 + 保存
+    const card2 = mkel('div', 'card');
+    card2.appendChild(mkel('label', null, '昵称'));
+    const nm = mkel('input', 'field');
+    nm.value = wsCur.assistant.name || '';
+    nm.maxLength = 24;
+    card2.appendChild(nm);
+    const err = mkel('div', 'err', '');
+    card2.appendChild(err);
+    const save = mkel('button', 'btn-save', '保存');
+    card2.appendChild(save);
+    m.appendChild(card2);
+
+    // 卡片**外面**的取消 ✓ —— 夹在卡片里会跑到「保存」上面去 ✗
+    //（管家那边就是这么定的 ✓，两屏保持一致 ✓）。
+    const back = mkel('div', 'swap');
+    back.appendChild(mkel('b', null, '取消'));
+    back.onclick = () => closeDiySet();
+    m.appendChild(back);
+
+    save.onclick = async () => {
+      save.disabled = true;
+      err.textContent = '';
+      try {
+        // ★ **最后一起保存** ✓（管家那边同一条规矩 ✓）：先传头像、再存昵称 ✓。
+        if (diyFile) await uploadDiyAvatar(diyFile);
+        const name = nm.value.trim();
+        if (name && name !== wsCur.assistant.name) {
+          wsCur.assistant = await api(`/workshop/${group.id}/assistant`,
+                                      { method: 'PATCH', body: JSON.stringify({ name }) });
+        }
+        diyFile = null;
         paintDiyAvatar();
-        await renderDiySet();
-        toast('改好了');
-      },
-    });
-    grp.appendChild(row);
-    box.appendChild(grp);
-
-    const hint = document.createElement('div');
-    hint.className = 'diyhint';
-    hint.textContent = '这个助手在**每个组件里都是它**——改一次，到处都跟着变。'
-                     + '（群聊里那个说话的是另一个身份，名字不跟着改。）';
-    box.appendChild(hint);
+        toast('已保存');
+        // ⚠️ **退回导航** ✓（管家那边改完也是退回去 ✓）——
+        //    而且导航上那颗头像和气泡上的名字都得跟着变 ✓。
+        closeDiySet();
+      } catch (e) {
+        err.textContent = e.message || '没存上';
+        save.disabled = false;
+      }
+    };
   };
 
+  /** 上传选好的头像 ✓ —— 只被「保存」调 ✓（见 `renderDiySet` 那段 ✓）。 */
   const uploadDiyAvatar = async (file) => {
-    if (!file) return;
-    // ⚠️ **先缩再传** ✗→✓ —— 和群管家那张同一个路子（见上面那段 ✓）：
-    //    手机随手一张就 3-5MB ✓，直接传必然 413 ✓，而用户看到的是"换头像失败"✓。
-    let blob = file;
-    try { blob = await shrinkToJpeg(file, 320); } catch (e) { blob = file; }
     const fd = new FormData();
-    // ⚠️ **缩完是 JPEG** ✓（`shrinkToJpeg` 那个名字就是这么来的 ✓）——
+    // ⚠️ **缩完就是 JPEG** ✓（`shrinkToJpeg` 那个名字就是这么来的 ✓）——
     //    文件名还写 `.png` 的话，服务端按**内容**判类型 ✓ 但按**扩展名**存盘 ✓，
-    //    于是会存出一个叫 `.png`、其实是 jpeg 的文件 ✓（能显示 ✓，但下一个人看目录时
-    //    一定会以为哪儿写错了 ✓）。缩不了、原样传时才真是 png ✓。
-    fd.append('file', blob, blob.type === 'image/jpeg' ? 'a.jpg' : 'a.png');
-    try {
-      const r = await fetch(`/api/workshop/${group.id}/assistant-avatar`,
-                            { method: 'POST', body: fd, credentials: 'same-origin' });
-      if (!r.ok) throw new Error((await r.text()) || r.status);
-      wsCur.assistant = await r.json();
-    } catch (e) {
-      toast('头像没换成：' + e.message);
-      return;
-    }
+    //    于是会存出一个叫 `.png`、其实是 jpeg 的文件 ✓（能显示 ✓，但下一个人
+    //    看目录时一定会以为哪儿写错了 ✓）。缩不了才可能真是 png ✓。
+    fd.append('file', file, file.type === 'image/jpeg' ? 'a.jpg' : 'a.png');
+    const r = await fetch(`/api/workshop/${group.id}/assistant-avatar`,
+                          { method: 'POST', body: fd, credentials: 'same-origin' });
+    if (!r.ok) throw new Error((await r.text()) || r.status);
+    wsCur.assistant = await r.json();
     paintDiyAvatar();
-    if ($('#diySet').classList.contains('on')) renderDiySet();
-    toast('换好了');
   };
 
   /** 删完之后回**导航屏** ✓ —— 用户定的："此时会自动退回导航界面" ✓。 */
