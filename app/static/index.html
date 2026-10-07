@@ -157,6 +157,11 @@
   .bubble { padding:9px 13px; border-radius:14px; background:var(--panel2);
             word-break:break-word; white-space:pre-wrap; }
   .bubble .at { color:var(--accent); font-weight:600; }
+  /* ★ **提到一个真的存在的组件 → 蓝色可点** ✗→✓（2026-10-07 深夜用户定的：
+     「只要是生活管家里聊天提到了某存在的组件，都标蓝色可跳转」✓）。
+     ⚠️ 判据是**这个群里到底有没有这个组件** ✓ —— 不是"消息里有没有那种字样" ✗：
+        没做出来的名字**不标** ✓（点了会 404 ✓，那比不标更糟 ✓）。 */
+  .bubble .clink { color:var(--accent); }
   .row.mine .bubble { background:var(--accent-bg); border-bottom-right-radius:4px; }
   /* 系统提示：居中、灰、无头像无气泡。
      **故障通报必须一眼看出不是管家在说话**——混在气泡里的话，用户会以为
@@ -527,6 +532,13 @@
   /* 顶栏中间那一块：组件名 + 下面一行状态 ✓（和群聊顶栏同一个位置 ✓）。 */
   #wsChat .hmid { flex:1; min-width:0; display:flex; flex-direction:column;
                   align-items:center; gap:1px; }
+  /* 名字是个**按钮** ✓（点了直达组件界面 ✓）—— 但长得和原来的标题一模一样 ✓，
+     不然"这里能点"会变成一条要学的规矩 ✗。 */
+  #wsChat .nmtap { background:none; border:0; padding:0; margin:0; color:inherit;
+                   font:inherit; font-size:17px; font-weight:600; max-width:100%;
+                   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #wsChat .nmtap[disabled] { color:inherit; }   /* 没得跳的那种：**照旧是标题** ✓ */
+  #wsChat .nmtap:not([disabled]):active { opacity:.6; }
   /* ★ 状态：**组件名下面、居中** ✓（用户定的 ✓）。
      ⚠️ 它说的是"这个组件在干什么" ✓ —— 所以两个状态要**分得开** ✓：
         · 思考中 → 图标是转圈 ✓（短暂 ✓）
@@ -1149,7 +1161,11 @@
          ⚠️ 原来它吊在输入框上面 ✓ —— 那个位置属于"你正在打的东西" ✓，
             状态是**这个组件在干什么** ✓，该跟名字在一起 ✓。 -->
     <div class="hmid">
-      <h2><span class="nm" id="wsTitle">组件</span></h2>
+      <!-- ★ **点名字直达组件界面** ✗→✓（2026-10-07 深夜用户定的：
+           「点击聊天界面正上方的组件名称后可以直达该组件界面」✓）。
+           ⚠️ 还没做出组件的那种（没有 slug ✓）**不点得动** ✓ —— 没有东西可直达 ✓，
+              做成可点会让它点一下什么都不发生 ✓（那比不可点更让人犯嘀咕 ✓）。 -->
+      <h2><button class="nmtap" id="wsTitle">组件</button></h2>
       <div class="wsstat" id="wsStatus" hidden><i></i><span id="wsStatusText"></span></div>
     </div>
     <button class="icon-btn" id="wsMore" aria-label="更多">
@@ -2019,6 +2035,10 @@
     historyDone = first.length < 50;             // 不够 50 条 → 就这么多历史了
     scrollDown(true);   // 首屏**强制**到底（之后图片撑开会自己再跟，见 scrollDown）
     normalizeStatus(); renderSettings(); connectWS();
+    // ★ 组件名的那份索引 ✓ —— 消息里的组件名要靠它才能标蓝 ✓
+    //   （`renderContent` 要用 ✓）。**不等它** ✓：历史消息先渲染 ✓，
+    //   索引回来之后下一批消息就带色了 ✓（顶多最近几条没色 ✓，不值得为它卡开屏 ✓）。
+    refreshCompIndex();
     tailReady = true;   // 到这儿才允许"滚到顶往回加载"（否则开屏时会误触发）
     _fire('ready');   // agent 的 ui/app.js 在这里接手（历史消息已经渲染完了）
   };
@@ -2135,19 +2155,57 @@
   };
 
   // 把正文里的 @某人 高亮出来，让"我 @ 了谁"一眼可见
+  //: 这个群**真有的**组件，`[{name, slug}]` ✓ —— 消息里的名字靠它标蓝可点 ✓。
+  //:
+  //: ⚠️ **只有存在的才标** ✗ —— 组件还在做的名字（"开始做「X」…"那条 ✓）点不了 ✓，
+  //:    那是对的 ✓：点了会 404 ✓，比不标更糟 ✓。
+  let compIndex = [];
+
+  const refreshCompIndex = async () => {
+    if (!group) return;
+    try {
+      const d = await api(`/components?group_id=${group.id}`);
+      compIndex = (d.components || [])
+        .map(c => ({ name: String(c.title || c.slug || ''), slug: c.slug }))
+        .filter(c => c.name);
+    } catch (e) { /* 拉不到就不标 ✓ —— 退化成"普通文字" ✓，不是故障 ✓ */ }
+  };
+
+  const _escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
   const renderContent = (el, text, isMine) => {
     el.textContent = '';
+    if (!text) return;
     const names = [...new Set(
       members.filter(m => !m.is_agent).map(m => m.nickname).concat([agentName()])
-    )].filter(Boolean).sort((a,b) => b.length - a.length);
-    if (!text) return;
-    if (!names.length) { el.textContent = text; return; }
-    const re = new RegExp('@(' + names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')', 'g');
+    )].filter(Boolean);
+    // ★ **两套"名字"要一起扫** ✗→✓（2026-10-07 深夜用户定的 ✓）：
+    //   ① 群里的人 → 蓝色（@ 他）✓
+    //   ② **这个群真有的组件** → 蓝色**可点直达** ✓
+    //   ⚠️ 分开扫会互相吃掉 ✓（同一条消息里既有 @某人 又有组件名 ✓），
+    //      所以拼成一个正则、一次走完 ✓。
+    //   ⚠️ **长的排前面** ✗ —— 组件叫"记账"、另一个叫"记账面板"时，
+    //      短的先把长的吃掉一半 ✓（"记账面板"会变成[记账][面板]✓）。
+    const alts = [];
+    names.forEach(n => alts.push({ s: '@' + n, kind: 'at', name: n }));
+    compIndex.forEach(c => alts.push({ s: c.name, kind: 'comp', slug: c.slug, name: c.name }));
+    if (!alts.length) { el.textContent = text; return; }
+    alts.sort((a, b) => b.s.length - a.s.length);
+    const byStr = new Map(alts.map(a => [a.s, a]));
+    const re = new RegExp(alts.map(a => _escRe(a.s)).join('|'), 'g');
     let last = 0, m;
     while ((m = re.exec(text)) !== null) {
+      const hit = byStr.get(m[0]);
+      if (!hit) continue;
       if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
       const span = document.createElement('span');
-      span.className = 'at'; span.textContent = m[0];
+      span.className = hit.kind === 'at' ? 'at' : 'clink';
+      span.textContent = m[0];
+      if (hit.kind === 'comp') {
+        // ⚠️ **`stopPropagation`** ✓ —— 气泡上还挂着长按（引用）✓，
+        //    不拦的话点一下会同时触发那一套 ✓。
+        span.onclick = (ev) => { ev.stopPropagation(); openComp(hit.slug, hit.name); };
+      }
       el.appendChild(span);
       last = m.index + m[0].length;
     }
@@ -2318,7 +2376,21 @@
       const sys = document.createElement('div');
       sys.className = 'sysrow';
       sys.dataset.id = m.id;
-      sys.textContent = (m.content || '') + ' · ' + fmtTime(m.created_at);
+      // ★ 系统消息也要走渲染 ✓ —— 因为**组件那两条就是系统消息** ✓
+      //   （"开始做「X」…" / "X 做完了，快去看看吧。"✓），而里面的名字要标蓝可点 ✓
+      //   （用户定的"提到存在的组件就标蓝"✓）。原来这里是 `textContent = 原文` ✗。
+      const put = () => {
+        sys.textContent = '';
+        renderContent(sys, m.content || '', false);
+        const t = document.createElement('span');
+        t.textContent = ' · ' + fmtTime(m.created_at);
+        sys.appendChild(t);
+      };
+      put();
+      // ⚠️ **刷一次再重画** ✗→✓ —— 系统消息到达时，组件列表**正好变了** ✓：
+      //    "做完了"那条到的时候，那个组件**刚刚落成** ✓ ——
+      //    拿旧索引画的话，它自己的名字**不会变蓝** ✓（而那正是最该点的那一次 ✓）。
+      refreshCompIndex().then(put);
       if (prepend) $('#msgs').prepend(sys);
       else { $('#msgs').appendChild(sys); scrollDown(); }
       return;
@@ -3792,6 +3864,12 @@
       ? (wsCur.title || wsCur.slug || '做一个新的')
       : '创意工坊';
     // 这里原来挂过一枚「未固化」的小牌子 ✓ —— 跟着"固化"整套一起去掉了 ✓（见上 ✓）。
+    // ★ 有 slug 才点得动 ✓（见 HTML 那段 ✓）—— 点到的是**预览页** ✓（那才是"组件界面"✓）。
+    t.disabled = !wsCur.slug;
+    t.onclick = () => {
+      if (!wsCur.slug) return;
+      openComp(wsCur.slug, wsCur.title || wsCur.slug);
+    };
   };
 
   /** 落地一条对话的全部界面状态（历史 + 标题 + 谁在改）✓。 */
