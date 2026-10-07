@@ -446,6 +446,16 @@
                      white-space:pre-wrap; word-break:break-word; font-size:15px; }
   #makeView .mkrow.mine .mkbub { background:var(--accent-bg); }
   #makeView .mkrow.agent .mkbub { background:var(--panel2); }
+  /* 「问题 2/3」那个小标签 —— 让他一眼看见"还有几个" ✓（用户点名的可视化 ✓） */
+  #makeView .qchip { display:inline-block; margin-right:7px; padding:1px 8px;
+                     border-radius:999px; font-size:12px; font-weight:600;
+                     color:var(--accent); border:1px solid #35507a; background:#0e1c30; }
+  #makeView .mkbub b { color:#fff; font-weight:600; }
+  #makeView .mkbub code { font-family:ui-monospace,Menlo,Consolas,monospace;
+                          font-size:13.5px; background:#0e1116; border:1px solid var(--line);
+                          border-radius:5px; padding:0 4px; }
+  /* 列表项前面那个小圆点（正文里的 `- …`） */
+  #makeView .mli::before { content:'·'; color:var(--muted); margin-right:7px; font-weight:700; }
   /* 开场那句提示：淡淡的一行，不是消息 */
   #makeView .mknote { color:var(--muted); font-size:13.5px; line-height:1.8;
                       background:var(--panel); border:1px solid var(--line);
@@ -2304,7 +2314,18 @@
         if (!$('#makeView').classList.contains('on')) return;
         if (d.group_id !== group.id) return;
         if ((d.slug || '') !== wsCur.slug) return;
-        if (d.sender_type === 'agent') { wsCur.streaming = null; setMakeStatus('idle'); }
+        if (d.sender_type === 'agent') {
+          // ⚠️ **先把流式那条摘掉** ✗→✓ —— 2026-10-07 用户报的「回复两句重复的，
+          //    刷新过后只会留一句」✓：流式过程中已经画了一条气泡 ✓，
+          //    落库之后 `ws_message` 又画一条 ✓ → 两条一模一样的 ✓；
+          //    刷新时只从库里读 ✓ → 只剩一条 ✓。**这就是那个症状的全部原因** ✓。
+          if (wsCur.streaming) {
+            const r = wsCur.streaming.closest('.mkrow');
+            if (r) r.remove();
+            wsCur.streaming = null;
+          }
+          setMakeStatus('idle');
+        }
         addMakeMsg(d);
       }
       else if (pkt.type === 'ws_stream') {
@@ -3135,6 +3156,14 @@
     add.textContent = '＋ 做一个新的';
     add.onclick = () => startMaking();
     box.appendChild(add);
+    // ★ **说明放在这儿** ✗→✓ —— 用户 2026-10-07 定的：
+    //   「这些提示应该在工作区就和用户说明，不要在展示区占地方」✓。
+    //   所以：工坊首页放一句"规矩" ✓，组件页只留预览和按钮 ✓。
+    const note = document.createElement('div');
+    note.className = 'wshelp';
+    note.textContent = '跟它说想要什么就行——它会先问清「要看什么」，再动手。'
+                     + '做好的先进实验区，你点「开始使用」才会进正常使用区。';
+    box.appendChild(note);
 
     // ② 分区。**有 live 的进"正常使用"，有 draft 的进"实验"** ✓ ——
     //    两边都有（改了还没启用）就**两边都出现** ✓：那样才看得出"攒着一版没启" ✓。
@@ -3214,12 +3243,15 @@
     ifr.srcdoc = inject + (d.html || '');
     wrap.appendChild(ifr);
 
+    // ⚠️ **这一页只放"这一版是什么"和两个按钮** ✗→✓ —— 2026-10-07 用户点名：
+    //    「做好的组件下面一堆提示，这些提示应该在工作区就和用户说明，
+    //      不要在展示区占地方」✓。
+    //    所以：**删掉那段说明性的文字** ✗（它搬去了工坊首页 ✓），
+    //    只留一行**事实** ✓（第几版、在不在用 ✓）—— 那不是提示，是状态 ✓。
     const meta = document.createElement('div');
     meta.className = 'cpmeta';
-    meta.textContent = '正在看 v' + d.version +
-      (d.state === 'live' ? '（正在用的这一版）' : '（实验中的这一版）') +
-      (d.note ? '\n' + d.note : '');
-    meta.style.whiteSpace = 'pre-line';
+    meta.textContent = 'v' + d.version +
+      (d.state === 'live' ? ' · 正在用' : ' · 实验中的这一版');
     bar.appendChild(meta);
 
     // 实验中的那一版 → 给"开始使用" ✓。**这个动作只有用户能做** ✓
@@ -3280,7 +3312,10 @@
     wsCur.slug = slug || '';
     wsCur.streaming = null;
     wsCur.seen = {};
-    $('#makeTitle').textContent = title || (slug ? slug : '做一个新的');
+    // ⚠️ **标题要说清"在弄哪一个"** ✗→✓ —— 用户报的：「点'继续改这个组件'，
+    //    进去都是同一个聊天界面」✓。历史现在按 slug 分了 ✓（服务端 ✓），
+    //    但**顶上还得写着**在弄哪个 ✓ —— 不然进去还是一头雾水 ✓。
+    $('#makeTitle').textContent = slug ? ('改：' + (title || slug)) : '做一个新的';
     const box = $('#makeMsgs');
     box.innerHTML = '';
     const hint = document.createElement('div');
@@ -3307,6 +3342,62 @@
     if ($('#workshop').classList.contains('on')) renderWorkshop();
   };
 
+  // ── 正文的渲染（2026-10-07）─────────────────────────────────────────
+  //
+  // 两件事，都是用户报的：
+  //   ① 「回答的时候有些渲染不出来，出现一堆 `**`」✓ —— 它写的是 markdown ✓，
+  //      而原来这里是 `textContent = ...` ✗ → 原样显示 ✓。
+  //   ② 「问问题最好可视化：一共几个、一个一个问」✓ —— 它在问题前面写
+  //      `[问 2/3]` 或 `[问 追问]` ✓（人格里约定的 ✓）→ 这里画成小标签 ✓。
+  //
+  // ⚠️ **全程 createElement + textContent** ✗→✓ —— 这是**模型写的字** ✓，
+  //    进 `innerHTML` 就是注入 ✓（群聊那边也是这么办的 ✓，同一个规矩 ✓）。
+  const fmtInline = (el, text) => {
+    // ⚠️ **别在这个正则里写裸的反引号** ✗→✓ —— 2026-10-07 撞的：
+    //    部署前那道"检查未定义名字"的闸会**剥字符串** ✓，而它按字符扫描 ✓，
+    //    看到一个裸反引号就以为"模板字符串开始了" ✗ → 把**后面整段代码**当字符串吃掉 ✓
+    //    → 于是 `openSheet` / `logout` 这些定义在它眼里**凭空消失** ✓
+    //    → 报一堆"调用了但没定义" ✗ → **部署被自己的误报挡住** ✓。
+    //    用 `\x60` 写反引号 ✓，扫过去就是个普通转义 ✓。
+    const re = /(\*\*[^*\n]+\*\*|[\x60][^\x60\n]+[\x60])/g;
+    let last = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
+      const raw = m[0];
+      const s = document.createElement(raw.startsWith('**') ? 'b' : 'code');
+      s.textContent = raw.startsWith('**') ? raw.slice(2, -2) : raw.slice(1, -1);
+      el.appendChild(s);
+      last = m.index + raw.length;
+    }
+    if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
+  };
+
+  const fillBubble = (el, text) => {
+    el.textContent = '';
+    const lines = String(text == null ? '' : text).split('\n');
+    lines.forEach((line, i) => {
+      if (i) el.appendChild(document.createElement('br'));
+      const q = line.match(/^\s*\[问\s*([0-9]{1,2}\/[0-9]{1,2}|追问)\]\s*(.*)$/);
+      if (q) {
+        const chip = document.createElement('span');
+        chip.className = 'qchip';
+        chip.textContent = /^[0-9]/.test(q[1]) ? ('问题 ' + q[1]) : '追问';
+        el.appendChild(chip);
+        fmtInline(el, q[2]);
+        return;
+      }
+      const li = line.match(/^\s*[-*]\s+(.*)$/);
+      if (li) {
+        const dot = document.createElement('span');
+        dot.className = 'mli';
+        el.appendChild(dot);
+        fmtInline(el, li[1]);
+        return;
+      }
+      fmtInline(el, line);
+    });
+  };
+
   const addMakeMsg = (m) => {
     if (m && m.id != null) {
       if (wsCur.seen[m.id]) return;      // WS 推回来的 + 本地先画的那条，只算一次 ✓
@@ -3317,7 +3408,7 @@
     row.className = 'mkrow ' + (m.sender_type === 'user' ? 'mine' : 'agent');
     const b = document.createElement('div');
     b.className = 'mkbub';
-    b.textContent = m.content || '';     // textContent：不进 innerHTML ✓
+    fillBubble(b, m.content || '');      // ★ 渲染（粗体/代码/列表/问题标签 ✓），不进 innerHTML ✓
     row.appendChild(b);
     box.appendChild(row);
     box.scrollTop = box.scrollHeight;
@@ -3346,6 +3437,14 @@
       const d = await api(`/workshop/${group.id}/chat`, {
         method: 'POST', body: JSON.stringify({ content: t, slug: wsCur.slug }),
       });
+      // ⚠️ **"它手上还有活"是 200 + ok:false** ✗→✓ —— 不是 HTTP 错误 ✓
+      //    （`api()` 只在非 2xx 时抛 ✓）→ 不单独接的话，这里会拿着 undefined 去画 ✗。
+      //    它本来就是一条**给用户看的话** ✓，所以原样显示、并把输入还给他 ✓。
+      if (d && d.ok === false) {
+        toast(d.error || '它现在没法接这一句');
+        ta.value = t; syncMakeSend();
+        return;
+      }
       addMakeMsg(d.message);              // 先画出来 ✓（WS 也会推一次，靠 id 去重 ✓）
     } catch (e) {
       toast('没发出去：' + e.message);

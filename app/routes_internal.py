@@ -941,7 +941,12 @@ async def components_confirm(body: ComponentConfirmIn) -> dict:
     await execute(
         "INSERT INTO component_tickets(token, group_id, slug, brief, handle, created_at, expires_at)"
         " VALUES(?,?,?,?,?,?,?)",
-        (token, body.group_id, slug, body.brief.strip(), handle, ts, ts + 1800))
+        # ⚠️ **2 小时，不是 30 分钟** ✗→✓ —— 用户 2026-10-07 指出的：
+        #    「派票 30 分钟过期，但子代理未必 30 分钟交差」✓ —— 对 ✓。
+        #    写一个组件要读、改、试、再改 ✓，慢起来十几二十分钟很正常 ✓；
+        #    过期了它只会看到一句「重新确认一次」✓ —— 那一轮就白干了 ✗。
+        #    票是**一次性**的 ✓（用掉就作废 ✓），所以放宽时限不多出风险 ✓。
+        (token, body.group_id, slug, body.brief.strip(), handle, ts, ts + 7200))
     # 干活之前先把话说出去 —— **这是"开工"那一条** ✓
     await _say_system(body.group_id,
                       "要做一个组件：" + body.brief.strip()[:40] + "（细节已确认，开工了）")

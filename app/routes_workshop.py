@@ -144,14 +144,23 @@ async def _assert_open(group_id: int) -> None:
 async def workshop_history(
     group_id: int, slug: str = Query(""), user: dict = Depends(current_user),
 ) -> dict:
-    """**你自己**在这儿的对话 ✓ —— 别人的工坊你看不到 ✓（每人一条会话 ✓）。"""
+    """**你自己**在这儿的对话 ✓ —— 别人的工坊你看不到 ✓（每人一条会话 ✓）。
+
+    ⚠️ **按 `slug` 分开** ✗→✓ —— 2026-10-07 用户报的：「点'继续改这个组件'，
+    进去都是同一个聊天界面」✓。原因是这个接口**声明了 slug 却没用它** ✗
+    （查询里只按群和用户过滤 ✓）—— 于是每个组件的对话混在一条时间线上 ✓。
+
+    聊天区**共用一块地方** ✓（用户也是这么说的 ✓），但**内容按组件分** ✓：
+    做 A 时的问答不会出现在改 B 的界面里 ✓。
+    """
     await require_member(group_id, user["id"])
     await _assert_open(group_id)
     rows = await fetch_all(
         "SELECT id, slug, sender_type, content, created_at FROM workshop_messages"
-        " WHERE group_id = ? AND user_id = ? ORDER BY id ASC LIMIT 200",
-        (group_id, user["id"]))
-    return {"messages": [dict(r) for r in rows]}
+        " WHERE group_id = ? AND user_id = ? AND slug = ? ORDER BY id ASC LIMIT 200",
+        (group_id, user["id"], (slug or "").strip().lower()))
+    return {"messages": [dict(r) for r in rows],
+            "busy": _lock_for(group_id, user["id"]).locked()}
 
 
 @router.post("/{group_id}/chat")
@@ -167,6 +176,17 @@ async def workshop_say(
     await _assert_open(group_id)
     slug = (body.slug or "").strip().lower()
     text = body.content.strip()
+
+    # ⚠️ **同时只能做或改一个** ✗→✓ —— 用户 2026-10-07 定的 ✓。
+    #
+    # 锁本来就是"每人一把" ✓（所以两个人互不打扰 ✓），但**同一个人**发起第二次时，
+    # 原来的行为是**排队等** ✗ —— 用户看到的是"我说话了，它没理我" ✓，
+    # 过一会儿它突然回一句**上一个**的答案 ✓（比拒绝难懂得多 ✓）。
+    # 所以改成**当场说清楚** ✓。
+    if _lock_for(group_id, user["id"]).locked():
+        return {"ok": False, "busy": True,
+                "error": ("它手上还有一个在做（要么在问你，要么在等那个小助手写完）✓。"
+                          "**等这一轮完了再说** ✓ —— 同时开两个会搅在一起 ✓。")}
     msg = await _save(group_id, user["id"], slug, "user", text)
     await _push(user["id"], {"type": "ws_message", "data": msg})
     task = asyncio.create_task(_run_turn(group_id, user["id"], slug, text))

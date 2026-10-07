@@ -371,10 +371,29 @@ async def index(request: Request, ws: str | None = None) -> Response:
         if problem:
             log.warning("进工作区 %s 没成功：%s", ws, problem)
 
-    # ★ ETag 把 `ws` 算进去 ✓ —— 换工作区 = 不同的 ETag = 老老实实 200 ✓。
-    #   （同一页里 `ws` 编进 cookie 的设定 ✓，所以两者必须一起变 ✓，
-    #     不然会出现"页面是新的、cookie 还是上一个空间"✗。）
-    etag = '"' + hashlib.sha256((ws or "").encode() + html.encode()).hexdigest()[:16] + '"'
+    # ★ ETag 把 `ws` **和当前 cookie 里的 ws** 一起算进去 ✗→✓ —— 2026-10-07。
+    #
+    # 用户报的：「切到测试2群之后，再切回测试群回不去了」✓。机制（已用 curl 复现）：
+    #
+    #   切群靠**设 cookie** ✓（页面不从 URL 读 ws ✗，它读 `lg_chat_ws` ✓）；
+    #   而 ETag 命中时走 **304** ✓，那条路上**不带 `Set-Cookie`** ✗。于是 A→B→A：
+    #
+    #     ① `?ws=A`（第一次）→ 200 + cookie=A ✓
+    #     ② `?ws=B`          → 200 + cookie=B ✓
+    #     ③ `?ws=A`（第二次）→ ETag 和①**一模一样** → **304** ✗ → cookie 还是 B ✗
+    #
+    #   → 页面按 A 的地址加载 ✓，而它读到的 cookie 是 B ✗ → **显示 B** ✓
+    #   —— 就是"回不去" ✓。
+    #
+    # ⚠️ 为什么**把 cookie 算进 ETag**，而不是"在 304 上也带 Set-Cookie" ✗→✓：
+    #   后者能行 ✓（304 上带 Set-Cookie 是标准允许的 ✓），但它依赖各家浏览器的
+    #   实现一致 ✓ —— 而 WebView 是**这个问题唯一发生的地方** ✓（浏览器里本来
+    #   就很少"拿着旧 ETag 切回去"✓）。**把 ETag 做成"它必然不匹配"** ✓
+    #   不依赖任何浏览器行为 ✓，代价只是**换群那一次**重传一遍正文 ✓
+    #   （~100KB ✓，而这正是唯一需要重传的时候 ✓）。
+    _cur = request.cookies.get("lg_chat_ws") or ""
+    etag = ('"' + hashlib.sha256((ws or "").encode() + _cur.encode() + html.encode())
+            .hexdigest()[:16] + '"')
     inm = request.headers.get("if-none-match") or ""
     if etag in [x.strip() for x in inm.split(",")]:
         return Response(status_code=304, headers=dict(_NO_REVALIDATE, ETag=etag))
