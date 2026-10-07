@@ -21,8 +21,11 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import json
 import logging
 import os
+import re
+import secrets
 import subprocess
 import time
 from pathlib import Path
@@ -584,7 +587,7 @@ def _autocommit(note: str) -> tuple[str | None, str | None]:
 
     ⚠️ 原来它只返回一个字符串，而 git 失败时 `git log --oneline -1`
     **也会失败** -> 返回的是**那段报错文字** -> 被当成"存好的 commit 号"
-    塞进重启的说明里 -> **"没存就重启"**。
+    塞进重启的说明里 -> **「没存就重启」**。
     而这恰恰是这张网最该拦住的事：那个 SOUL 敢说"放手改、改坏了能退回来"，
     靠的就是"每次重启前都存了一档"。
     
@@ -846,3 +849,212 @@ async def preview_ticket(body: PreviewIn) -> dict:
 #   "有没有比我正在回的这批更新的消息"。**整个拿掉了**——那是"拉"：
 #   查不查由它决定（会漏），而且它有一半时候查出来是空的（白花一整次往返）。
 #   现在复审改成由编排层在轮次结束时**主动推**回去，见 orchestrator/agent.py。）
+
+# ── 创意工坊：做组件的四个工具 ────────────────────────────────────────────
+#
+# ## 为什么是"工具"，不是告诉它路径
+#
+# 本文件上面那段教训（`set_app_theme` 那一节）原话：
+# *"说了之后它仍然跑去改 index.html…30 个工具回合折腾完也没干成。
+# __给一个名字就是这个动作的工具，它就不用猜了。__"*
+#
+# ## 两道硬校验落在这儿
+#
+#   ① **没确认过不许写** ✓ —— 用户在工作坊里确认之前，**世界上不存在可用的票** ✓。
+#      写入必须带票 ✓，票只能一次 ✓、30 分钟过期 ✓。这是真的能拦的 ✓。
+#   ② **必须由子代理写** ✓ —— ⚠️ **服务端证明不了** ✗，能保证的是**形状** ✓：
+#      `save` **只收 handle（服务端发出去的暂存路径）** ✓、**不收正文** ✓ ——
+#      于是"在主对话里直接拼一大坨 HTML 塞进来"这条路**在接口层不存在** ✓。
+#      至于那个文件到底是谁写的 —— 靠 skill 约定 + 主对话看不到正文来保证 ✓。
+#      **不假装它是硬校验** ✗（假装了，将来坏了会以为是代码问题 ✓）。
+#
+# ## 为什么 save 的群号从票反查
+#
+# 真正写文件的是**子代理** ✓，而它的会话标识里**没有群号** ✓
+# （2026-10-07 实测：子代理的会话 id 形如 20261007_115135_5b1a85 ✓）。
+# 所以收尾这一步**不能靠会话推** ✗ —— 票里存着群号 ✓，从票拿 ✓。
+# 这一步顺手把"子代理认不出群"那个风险整个绕开了 ✓。
+
+class ComponentConfirmIn(BaseModel):
+    group_id: int
+    slug: str = Field(min_length=1, max_length=32)
+    brief: str = Field(min_length=1, max_length=2000)
+
+
+class ComponentSaveIn(BaseModel):
+    #: ⚠️ **只有票** ✗ —— 不收正文、不收群号、不收版本号 ✓（见上面那段 ✓）。
+    token: str = Field(min_length=8, max_length=80)
+    title: str = Field(default="", max_length=40)
+    icon: str = Field(default="", max_length=8)
+    note: str = Field(default="", max_length=8000)
+    data: dict[str, Any] | None = None
+
+
+class ComponentSlugIn(BaseModel):
+    group_id: int
+    slug: str = Field(default="", max_length=32)
+
+
+def _slug_ok(slug: str) -> bool:
+    """和后端 `main.py` 里那条**同一个形状** ✓（小写字母、数字、连字符，≤32）✓。
+
+    中文名会带来 URL 编码、文件名编码两处麻烦 ✓ —— 不值当 ✓。
+    """
+    return bool(re.match(r"^[a-z0-9][a-z0-9-]{0,31}$", slug or ""))
+
+
+async def _say_system(group_id: int, text: str) -> None:
+    """往**主群聊**放一条系统消息。
+
+    ⚠️ **由服务端发，不靠 agent 记得** ✗→✓ —— 这是项目那条铁律：
+       *提示词只能请求，不能强制*（见 `orchestrator/agent.py` 里那两段 ✓）。
+       让 agent 自己记得发这两条，就是给自己埋一个"它忘了"的故障 ✓。
+
+    发 `system` 类型 ✓（不是 agent 说的 ✓）—— 界面上它是一条居中的提示 ✓，
+    不是管家在说话 ✓。
+    """
+    await create_message(group_id=group_id, sender_id=None,
+                         sender_type="system", msg_type="text", content=text)
+
+
+@router.post("/components/confirm", dependencies=[Depends(require_internal_token)])
+async def components_confirm(body: ComponentConfirmIn) -> dict:
+    """**用户在工作坊里确认了细节** → 发一张票 + 开一个暂存文件。
+
+    ⚠️ 票和 handle 都**由服务端生成** ✓ —— 主对话只是把它们转给子代理 ✓。
+       `brief` 存进票里 ✓：子代理的 brief 就有了**权威来源** ✓，
+       主对话不必"凭记忆复述用户要什么" ✓（子代理看不到会话 ✓）。
+    """
+    await _assert_group(body.group_id)
+    slug = body.slug.strip().lower()
+    if not _slug_ok(slug):
+        return {"ok": False,
+                "error": ("短名只能用**小写字母、数字、连字符**，不超过 32 位，"
+                          "而且要用英文（比如 bookkeeping-panel，不要用中文）。"
+                          "起一个说得清它干嘛的英文短名。")}
+    token = secrets.token_hex(16)
+    handle = str(settings.staging_dir / (token + ".html"))
+    ts = int(time.time())
+    await execute(
+        "INSERT INTO component_tickets(token, group_id, slug, brief, handle, created_at, expires_at)"
+        " VALUES(?,?,?,?,?,?,?)",
+        (token, body.group_id, slug, body.brief.strip(), handle, ts, ts + 1800))
+    # 干活之前先把话说出去 —— **这是"开工"那一条** ✓
+    await _say_system(body.group_id,
+                      "要做一个组件：" + body.brief.strip()[:40] + "（细节已确认，开工了）")
+    log.info("组件开工：群 %s 的 %s（票 %s…）", body.group_id, slug, token[:8])
+    return {
+        "ok": True, "token": token, "slug": slug, "handle": handle,
+        "next": ("把这个 handle 原样交给子代理，让它把**整份 HTML 写进那个文件**"
+                 "（单文件、不引外部资源）。它写完只回一句结论。"
+                 "然后你调 component_save，**带上这张 token**，并把 title/icon/note/data 填上。"
+                 "⚠️ token 和 handle 一个字都别改，原样传。"),
+    }
+
+
+@router.post("/components/save", dependencies=[Depends(require_internal_token)])
+async def components_save(body: ComponentSaveIn) -> dict:
+    """**凭票认领** —— 把暂存文件落成组件仓库里的新一版（`draft`）。"""
+    row = await fetch_one("SELECT * FROM component_tickets WHERE token = ?", (body.token,))
+    if not row:
+        return {"ok": False, "error": "这张票不认得（拼错了？还是过期被清了？）"}
+    if row["used_at"]:
+        return {"ok": False, "error": "这张票**已经用过了**。要再做一版，得重新走一遍确认。"}
+    if int(row["expires_at"]) < int(time.time()):
+        return {"ok": False, "error": "这张票过期了（30 分钟）。重新确认一次细节再做。"}
+    group_id = int(row["group_id"])          # ★ 群号**从票反查** ✓，不从会话推 ✓
+    slug = str(row["slug"])
+    handle = Path(str(row["handle"] or ""))
+    if not handle.is_file():
+        return {"ok": False,
+                "error": ("暂存文件还不存在 —— 子代理**还没把 HTML 写进去**。"
+                          "先让它写完（它回来说写好了），再调这个。")}
+    try:
+        html = handle.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return {"ok": False, "error": "暂存文件读不出来：" + str(exc)}
+    if not html.strip():
+        return {"ok": False, "error": "暂存文件是**空的** —— 让子代理真的写点东西进去。"}
+    if len(html) > 400_000:
+        return {"ok": False,
+                "error": "太大了（" + str(len(html)) + " 字符，上限 40 万）。拆小一点。"}
+
+    # 版本号**服务端自增** ✓ —— 不接受 agent 传 ✗（它会数错自己做过几版 ✓）
+    prev = await fetch_one(
+        "SELECT COALESCE(MAX(version), 0) AS v FROM components WHERE group_id = ? AND slug = ?",
+        (group_id, slug))
+    version = int((prev or {}).get("v") or 0) + 1
+    # ⚠️ 别去 import `main.group_components_dir` ✗ —— 那是循环导入 ✓。
+    #    规则就一条（`var/components/g<群号>/<slug>/v<N>/`）✓，照写 ✓。
+    d = settings.components_dir / ("g" + str(group_id)) / slug / ("v" + str(version))
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "index.html").write_text(html, encoding="utf-8")
+    except OSError as exc:
+        return {"ok": False, "error": "写不进组件仓库：" + str(exc)}
+    await execute(
+        "INSERT INTO components(group_id, slug, version, state, title, icon, data_json, note, created_at)"
+        " VALUES(?,?,?,'draft',?,?,?,?,?)",
+        (group_id, slug, version, body.title.strip() or slug, body.icon.strip() or "🧩",
+         json.dumps(body.data or {}, ensure_ascii=False), body.note.strip(), int(time.time())))
+    await execute("UPDATE component_tickets SET used_at = ? WHERE token = ?",
+                  (int(time.time()), body.token))
+    try:
+        handle.unlink(missing_ok=True)       # 认领完把暂存文件收掉 ✓（免得越攒越多 ✓）
+    except OSError:
+        pass
+    await _say_system(group_id, "「" + (body.title.strip() or slug) + "」做好了，去创意工坊看看。")
+    log.info("组件落成：群 %s 的 %s v%s（draft）", group_id, slug, version)
+    return {"ok": True, "slug": slug, "version": version, "state": "draft",
+            "note": ("已经放进**实验区**了 ✓ —— 等用户在创意工坊里点"
+                     "**开始使用**才会转正 ✓。"
+                     "你可以让他去看看，但**别说「已经启用了」**（那不是你说了算的）。")}
+
+
+@router.post("/components/list", dependencies=[Depends(require_internal_token)])
+async def components_list_tool(body: ComponentSlugIn) -> dict:
+    """这个群有哪些组件、各自到哪一步 —— **只回摘要行** ✓。
+
+    ⚠️ **不要回全文** ✗ —— 组件一多，把 N 份 NOTE 全灌进上下文就是灾难 ✓
+    （和 `records` 那句"每加一种就得给可视化写个特例"是同类的错 ✓）。
+    要看某一个的细节，另调 `components/note` ✓。
+    """
+    await _assert_group(body.group_id)
+    rows = await fetch_all(
+        "SELECT slug, version, state, title, icon FROM components"
+        " WHERE group_id = ? ORDER BY slug ASC, version DESC", (body.group_id,))
+    out: dict[str, dict] = {}
+    for r in rows:
+        slug = str(r["slug"])
+        it = out.setdefault(slug, {"slug": slug, "title": r["title"] or slug,
+                                   "icon": r["icon"] or "🧩", "versions": [],
+                                   "live": None, "draft": None})
+        it["versions"].append(int(r["version"]))
+        if r["state"] == "live" and it["live"] is None:
+            it["live"] = int(r["version"])
+        elif r["state"] == "draft" and it["draft"] is None:
+            it["draft"] = int(r["version"])
+    return {"ok": True, "components": [out[k] for k in sorted(out)]}
+
+
+@router.post("/components/note", dependencies=[Depends(require_internal_token)])
+async def components_note(body: ComponentSlugIn) -> dict:
+    """某一个组件的**工程笔记** ✓ —— 「回顾之前的组件」就靠它 ✓。
+
+    ⚠️ 说清它是什么、不是什么 ✗→✓ —— **它是这个组件的笔记，不是它在群里的第二套记忆** ✓。
+       项目已经否过一次同样形状的东西（`db.py` 里 `group_memory` 那段停用注释 ✓：
+       *「只追加、不整理、不总结、不去重、不衰减…留着只会和内置记忆打架」*✓）。
+       群成员的偏好、聊过的事，那些归**它的内置记忆** ✓，不归这儿 ✓。
+    """
+    await _assert_group(body.group_id)
+    slug = (body.slug or "").strip().lower()
+    if not _slug_ok(slug):
+        return {"ok": False, "error": "短名不合法（小写字母、数字、连字符）"}
+    rows = await fetch_all(
+        "SELECT version, state, title, note, created_at, enabled_at FROM components"
+        " WHERE group_id = ? AND slug = ? ORDER BY version ASC", (body.group_id, slug))
+    if not rows:
+        return {"ok": False, "error": "这个群还没有 " + slug + " 这个组件"}
+    return {"ok": True, "slug": slug, "versions": [dict(r) for r in rows],
+            "about": ("这是**这个组件自己的笔记**（像 README）✓，不是你在群里的第二套记忆 ✓。"
+                      "群成员的偏好、聊过的事，那些归你的内置记忆 ✓。")}

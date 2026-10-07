@@ -202,6 +202,28 @@ CREATE INDEX IF NOT EXISTS idx_components_group
 CREATE UNIQUE INDEX IF NOT EXISTS idx_components_one_live
     ON components(group_id, slug) WHERE state = 'live';
 
+-- 「做组件」那张一次性票。**它是硬校验①的全部依据** ✓ ——
+-- 用户在工作坊里确认细节之前，**世界上不存在任何可用的票** ✓；
+-- 写入组件必须带票 ✓，票只能用一次 ✓、30 分钟过期 ✓。
+--
+-- ⚠️ **必须落库，不能放内存** ✗→✓ —— agent 手里有 `restart_backend` 工具 ✓
+--    而且它会用 ✓。内存里的票会被它自己重启掉 ✓，症状是
+--    "用户确认了、子代理也写完了，却被拒" ✓ —— 而**两边都不知道为什么** ✓。
+--
+-- ⚠️ `group_id` 在这张表里不是多余的 ✗→✓：`component_save` 的群号
+--    **从票反查** ✓，不从会话标识推 ✓ —— 因为真正动手写文件的是**子代理** ✓，
+--    而子代理的会话标识里**没有群号** ✓（见 2026-10-07 那条实测）。
+CREATE TABLE IF NOT EXISTS component_tickets (
+    token      TEXT PRIMARY KEY,
+    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    slug       TEXT    NOT NULL,
+    brief      TEXT,                      -- 用户确认下来的那句需求（子代理的 brief 就靠它）
+    handle     TEXT,                      -- 暂存文件的绝对路径（子代理往那儿写）
+    created_at INTEGER NOT NULL,
+    used_at    INTEGER,                   -- 用过一次就填上，**再用就拒**
+    expires_at INTEGER NOT NULL
+);
+
 -- 登录失败计数。存在的理由：密码是用户自设的短密码，一旦服务被暴露，
 -- 没有限流就是几秒钟的事。
 --
