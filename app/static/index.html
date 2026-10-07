@@ -123,6 +123,11 @@
      ⚠️ 换了图标或改了尺寸，这三个数要**重算** ✓（算法就在上面 ✓）。 */
   #openSettings { transform: translateX(2.3px); }     /* 墨迹 → 离左 23.9px ✓ */
   #reloadBtn    { transform: translateX(-6.4px); }    /* 墨迹 → 离右 23.9px ✓ */
+  /* 创意工坊（右上角）—— 2026-10-07 加 ✓。
+     **墨迹跨度和 ☰ 一样**（24 格里 6..18 ✓，描边圆头再往外 1 ⇒ 5..19 ✓）
+     → 直接取它的**镜像** ✓：☰ 在左、往右推 2.3px ✓；这个在右、往左推 2.3px ✓。
+     ⚠️ **换了图标这个数要重算** ✗ —— 算法在下面那段注释里 ✓。 */
+  #openWorkshop { transform: translateX(-2.3px); }
 
   /* 返回箭头是 SVG（见 HTML），这里只管对齐和颜色 */
   .icon-btn.back { color:var(--text); }
@@ -375,6 +380,31 @@
   #agentEdit { z-index:21; }      /* 一层压一层 ✓：列表 < 改资料 ✓ */
   .ascreen.anim-in  { animation:sheetIn  .24s cubic-bezier(.22,1,.36,1); }
   .ascreen.anim-out { animation:sheetOut .18s cubic-bezier(.4,0,1,1) forwards; }
+
+  /* ── 创意工坊 ────────────────────────────────────────────────────────
+     两屏：工坊本身（#workshop）+ 组件预览（#cpView，压在它上面）。
+     ⚠️ z-index 要**比 .ascreen 的 20 高** ✗ —— 工坊是从群聊进的独立去处 ✓，
+        和"管家"那三屏不是一层 ✓（但它进来的时候那三屏都是关着的 ✓，
+        高了只是保险 ✓）。 */
+  #workshop { z-index:22; }
+  #cpView   { z-index:23; }
+  #workshop .wssec { font-size:12.5px; color:var(--muted); letter-spacing:.04em;
+                     margin:18px 2px 9px; }
+  #workshop .wssec:first-child { margin-top:6px; }
+  #workshop .wsgrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  #workshop .wscard { background:var(--panel); border:1px solid var(--line);
+                      border-radius:14px; padding:13px 12px;
+                      display:flex; align-items:center; gap:9px; }
+  #workshop .wscard:active { background:var(--panel2); }
+  #workshop .wscard .ico { font-size:21px; line-height:1; flex:0 0 auto; }
+  #workshop .wscard .nm { font-size:14.5px; overflow:hidden;
+                          text-overflow:ellipsis; white-space:nowrap; }
+  #workshop .wsempty { color:var(--muted); text-align:center;
+                       padding:52px 18px; line-height:1.9; font-size:14.5px; }
+  #cpView .cpwrap { flex:1; min-height:0; margin:0 14px 14px;
+                    border:1px solid var(--line); border-radius:14px;
+                    overflow:hidden; background:var(--bg); }
+  #cpView iframe { width:100%; height:100%; border:0; display:block; }
   .ascreen .abody { flex:1; overflow-y:auto; overscroll-behavior:contain;
                     padding:calc(var(--inset-top) + 14px) 14px calc(var(--inset-bottom) + 24px); }
 
@@ -619,11 +649,22 @@
       <div class="gname" id="gname">—</div>
       <div class="status" id="status"><span class="dot"></span><span id="statusText"></span></div>
     </div>
-    <div class="spacer"></div>
-    <!-- ★ 右上角**空着** ✓ —— 2026-10-06 用户定的：那个刷新按钮搬去了「设置」的右上角 ✓。
-         这地方先留白 ✓（用户："聊天界面右上角先空着" ✓）。
-         `spacer` 留着 ✗ —— 它是用来把左边那个 ☰ 撑到贴边的 ✓，
-         删了群名会跑到最左边 ✓。 -->
+    <!-- ★ 右上角：**创意工坊** ✓ —— 2026-10-07。这个位置 10-06 特地留白过 ✓，
+         现在给它 ✓。它顶掉了原来那个 `.spacer` ✓ —— 占位本来就是
+         "放一个和左边等宽的东西、让群名真居中"用的 ✓，
+         现在右边真有一个 40px 的按钮 ✓，占位就是多余的 ✗。
+         ⚠️ 图标是 SVG（和 ☰ / ↻ 同一套画法 ✓）而不是文字或 emoji ✗ ——
+            字形的墨迹位置算不准 ✓，就没法跟另外两个对齐 ✓。 -->
+    <div class="icon-btn plain" id="openWorkshop" aria-label="创意工坊">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <rect x="6" y="6" width="5" height="5" rx="1.4" />
+        <rect x="13" y="6" width="5" height="5" rx="1.4" />
+        <rect x="6" y="13" width="5" height="5" rx="1.4" />
+        <rect x="13" y="13" width="5" height="5" rx="1.4" />
+      </svg>
+    </div>
   </header>
   <div id="msgs"></div>
   <div id="composer">
@@ -714,6 +755,41 @@
 <!-- ⚠️ 报给原生的屏名一律是 'settings' ✓（见 __goBack / openAgentSettings 的注释 ✓） -->
 <div class="screen ascreen" id="agent"><div class="abody" id="agentBody"></div></div>
 <div class="screen ascreen" id="agentEdit"><div class="abody" id="agentEditBody"></div></div>
+
+<!-- ★ 创意工坊（2026-10-07）—— 群聊右上角那个入口进的就是这一屏。
+     它展示**这个群自己**的组件（服务端按 group_id 分目录 ✓），
+     空的时候就是"尚未创建组件" ✓。
+     ⚠️ 报给原生的屏名走 pushScreen ✓，这里不用管 ✓。 -->
+<div class="screen ascreen" id="workshop">
+  <header class="sub">
+    <button class="icon-btn back" id="backWorkshop" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 4.5 8.5 12 15 19.5" />
+      </svg>
+    </button>
+    <h2>创意工坊</h2>
+    <div class="spacer"></div>
+  </header>
+  <div class="abody" id="wsBody"></div>
+</div>
+
+<!-- 组件的整屏预览 —— 压在工坊上面 ✓（不是底部弹层 ✗：组件要尽量大 ✓）。 -->
+<div class="screen ascreen" id="cpView">
+  <header class="sub">
+    <button class="icon-btn back" id="cpViewBack" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 4.5 8.5 12 15 19.5" />
+      </svg>
+    </button>
+    <h2 id="cpViewTitle">组件</h2>
+    <div class="spacer"></div>
+  </header>
+  <div class="cpwrap" id="cpViewWrap"></div>
+</div>
 
 <!-- 设置 -->
 <div class="screen" id="settings">
@@ -1451,6 +1527,10 @@
   //   （编状态 > 改资料 > 列表 > 群设置 ✓），得从上往下关 ✓。
   window.__goBack = () => {
     if ($('#sheet').classList.contains('on')) { closeSheet(); return; }
+    // ★ 创意工坊那两屏（2026-10-07）—— **压在管家那三屏上面** ✓：
+    //   组件预览 > 工坊 > 编状态 > 改资料 > 管家列表 > 群设置 ✓。
+    if ($('#cpView').classList.contains('on')) { closeComponent(); return; }
+    if ($('#workshop').classList.contains('on')) { closeWorkshop(); return; }
     if ($('#agentEdit').classList.contains('on')) { closeAgentEdit(); return; }
     if ($('#agent').classList.contains('on')) { closeAgentSettings(); return; }
     if ($('#settings').classList.contains('on')) { closeSettings(); return; }
@@ -2832,7 +2912,10 @@
         else toast('浏览器里没有这一项——回 App 里点');
       }
       else if (act === 'shell') backToShell();
-      else if (act === 'plugins') openComponents();
+      // ⚠️ 原来这里有一条 `act === 'plugins' → openComponents()` ✗→✓ ——
+      //    它是条**死路**：设置里那一行 DOM 早就被拿掉了 ✓（用户"后续我自有安排"✓），
+      //    所以那个分支永远不会被触发 ✓，只会让人以为"有个组件入口在设置里" ✗。
+      //    2026-10-07 创意工坊搬到群聊右上角 ✓，这条删掉 ✓。
       else if (act === 'logout') logout();
     };
   });
@@ -2895,67 +2978,93 @@
   const _rb = $('#reloadBtn');
   if (_rb) _rb.onclick = () => location.reload();
 
-  const openComponents = async () => {
-    const p = $('#sheetPanel');
-    p.innerHTML = '<h3>组件</h3><div id="cpList" style="color:var(--muted);font-size:14px">正在加载…</div>'
-                + '<div class="actions"><button class="btn-solid" id="cpClose">关闭</button></div>';
-    p.querySelector('#cpClose').onclick = closeSheet;
-    openSheet();
-    const box = p.querySelector('#cpList');
-    let list = [];
-    try { list = (await api(`/components?group_id=${group.id}`)).components || []; }
-    catch (e) { box.textContent = '加载失败：' + e.message; return; }
-    box.innerHTML = '';
-    if (!list.length) {
-      box.textContent = '还没有组件。跟管家说一句「给我做个记账面板」试试——它会写在这儿。';
-      return;
-    }
-    list.forEach(c => {
-      const it = document.createElement('div');
-      it.className = 'item';
-      const k = document.createElement('span'); k.className = 'k';
-      k.textContent = (c.icon || '🧩') + ' ' + c.title;   // textContent：不进 innerHTML
-      const chev = document.createElement('span'); chev.className = 'chev'; chev.textContent = '›';
-      it.append(k, chev);
-      it.onclick = () => openComponent(c.name, c.title);
-      box.appendChild(it);
-    });
+  // ── 创意工坊（2026-10-07）─────────────────────────────────────────
+  //
+  // 从群聊右上角进 ✓。展示**这个群自己**的组件 —— 服务端按 `group_id` 分目录 ✓
+  // （`/api/components?group_id=`），所以别的群的东西**根本不会出现在这儿** ✓；
+  // 这一点**不靠前端过滤** ✓（过滤是能绕过的 ✗）。
+  const openWorkshop = () => {
+    pushScreen('workshop');
+    // ⚠️ **先推屏、再画** ✗→✓ —— 画要发请求（几十毫秒 ✓）；
+    //    反过来的话那几十毫秒里这一屏是空的 ✓，看着像"点了没反应" ✓。
+    renderWorkshop();
   };
 
-  const openComponent = async (name, title) => {
-    const p = $('#sheetPanel');
-    p.innerHTML = '<h3 id="cpTitle"></h3>'
-                + '<div id="cpWrap" style="height:58vh;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)"></div>'
-                + '<div class="actions"><button class="btn-solid" id="cpBack">返回</button></div>';
-    p.querySelector('#cpTitle').textContent = title;
-    p.querySelector('#cpBack').onclick = () => openComponents();
-    openSheet();
+  const closeWorkshop = () => popScreen('workshop');
+
+  const renderWorkshop = async () => {
+    const box = $('#wsBody');
+    let list = [];
+    try {
+      list = (await api(`/components?group_id=${group.id}`)).components || [];
+    } catch (e) {
+      box.textContent = '打不开：' + e.message;
+      return;
+    }
+    box.innerHTML = '';                       // 下面全部走 createElement，不进 innerHTML ✓
+    if (!list.length) {
+      const em = document.createElement('div');
+      em.className = 'wsempty';
+      em.textContent = '尚未创建组件。\\n在群里跟管家说一句「给我做个记账面板」试试。';
+      em.style.whiteSpace = 'pre-line';       // 上面那个换行要真的生效
+      box.appendChild(em);
+      return;
+    }
+    const sec = document.createElement('div');
+    sec.className = 'wssec';
+    sec.textContent = '这个群的组件';
+    box.appendChild(sec);
+    const grid = document.createElement('div');
+    grid.className = 'wsgrid';
+    list.forEach(c => {
+      const it = document.createElement('div');
+      it.className = 'wscard';
+      const ico = document.createElement('span'); ico.className = 'ico';
+      ico.textContent = c.icon || '🧩';
+      const nm = document.createElement('span'); nm.className = 'nm';
+      nm.textContent = c.title || c.name;
+      it.append(ico, nm);
+      it.onclick = () => showComponent(c.name, c.title);
+      grid.appendChild(it);
+    });
+    box.appendChild(grid);
+  };
+
+  // 组件的整屏预览
+  const showComponent = async (name, title) => {
+    $('#cpViewTitle').textContent = title || name;
+    const wrap = $('#cpViewWrap');
+    wrap.innerHTML = '';
+    pushScreen('cpView');
     let d;
     try { d = await api(`/components/${encodeURIComponent(name)}?group_id=${group.id}`); }
-    catch (e) { p.querySelector('#cpWrap').textContent = '打不开：' + e.message; return; }
+    catch (e) { wrap.textContent = '打不开：' + e.message; return; }
 
-    // <base> 让组件里的相对路径（图、字体）能找到自己的目录；
-    // 数据先塞进去（它自己取不了）；下面那两个标签**必须拼出来，不能写成字面量**。
+    // 数据先塞进去（**它自己取不了** —— 沙箱里没有 same-origin ✓）。
+    // 下面那两个标签**必须拼出来，不能写成字面量** ✗：
+    // HTML 解析器不认识 JS 注释 ✓，本文件是个内联脚本 ✓，
+    // 它只要扫到结束标签那几个字符就认为"脚本到此为止" ✓ ——
+    // **后面整段 JS 会被当普通文本丢掉** ✓（2026-10-04 就是这么做白屏的 ✓）。
     //
-    // 原因是 HTML 解析器不认识 JS 注释：本文件是个内联脚本，它在里面只要扫到
-    // 结束标签那几个字符就认为"脚本到此为止"——**后面整段 JS 会被当普通文本丢掉**。
-    // 2026-10-04 就是这么把 App 搞白屏的：我写了一条"千万别这么写"的注释，
-    // 注释里正好有那几个字，于是从那一行起登录、enterApp、LifeGuard 全没了，
-    // 用户看到的是"登录页在、按钮点了没反应"。
+    // ⚠️ 这里**不再需要 `<base>`** ✗→✓ —— 组件搬到 `var/` 之后
+    //    `<base href="/ui/components/…">` 指向一个不存在的路径 ✓，
+    //    而规范本来就是"单文件、不引外部资源" ✓（2026-10-07）。
     const S = '<' + 'script>', E = '<' + '/script>';
-    const inject = `<base href="/ui/components/${encodeURIComponent(name)}/">`
-                 + S + `window.__LG_DATA__=${JSON.stringify(d.data)};` + E;
+    const inject = S + `window.__LG_DATA__=${JSON.stringify(d.data)};` + E;
     const ifr = document.createElement('iframe');
     ifr.setAttribute('sandbox', 'allow-scripts');   // ★ 没有 allow-same-origin
     ifr.setAttribute('referrerpolicy', 'no-referrer');
-    ifr.style.cssText = 'width:100%;height:100%;border:0;background:transparent';
     ifr.srcdoc = inject + (d.html || '');
-    const wrap = p.querySelector('#cpWrap');
-    wrap.innerHTML = '';
     wrap.appendChild(ifr);
   };
 
+  const closeComponent = () => popScreen('cpView');
+
   $('#openSettings').onclick = openSettings;
+  // ★ 创意工坊（2026-10-07）—— 三个按钮：进去 / 从工坊退 / 从组件预览退 ✓
+  $('#openWorkshop').onclick = openWorkshop;
+  $('#backWorkshop').onclick = closeWorkshop;
+  $('#cpViewBack').onclick = closeComponent;
   $('#backChat').onclick = closeSettings;
 
   const logout = async () => {
