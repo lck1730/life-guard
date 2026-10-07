@@ -3231,8 +3231,14 @@
       go.onclick = () => enableComp(slug, d.version, go);
       bar.appendChild(go);
     }
-    // ⚠️ "继续改"还没做（P3 的制作页）✓ —— **不摆一个点不动的按钮** ✗：
-    //    这个项目为"像有人会调的假接口"删过一次东西 ✓，宁可先不放 ✓。
+    // 「继续改」—— 进**制作页**（那个组件的对话 ✓）。
+    // ⚠️ 拿到 `slug` 一起带进去 ✓ —— 制作页那边靠它：① 拉**这个组件**的对话历史 ✓
+    //    ② 系统提示里点明"这次是要动它" ✓（它会先去读这个组件的笔记 ✓，不凭印象改 ✓）。
+    const again = document.createElement('button');
+    again.className = 'cpbtn ghost';
+    again.textContent = '继续改这个组件';
+    again.onclick = () => openMake(slug, d.title || slug);
+    bar.appendChild(again);
   };
 
   const enableComp = async (slug, version, btn) => {
