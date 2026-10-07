@@ -983,6 +983,17 @@ async def diy_persona(group_id: int, task_id: int | None = None) -> str:
             (int(task_id), group_id))
         focus_slug = str((row or {}).get("slug") or "")
         my_title = str((row or {}).get("my_title") or "")
+        # ⚠️ **对不上的 slug 当没有** ✗→✓（2026-10-07 深夜）——
+        #    组件删掉之后对话上可能留着个悬空指针 ✓。不清的话它会被告知
+        #    "用户这次是要动 X 这个组件" ✓ → 它去 `component_note(X)` ✓
+        #    → 得到"这个群还没有 X 这个组件" ✓ → **它会把这句话当成"用户搞错了"** ✓，
+        #    然后开始跟用户解释一个不存在的东西 ✓。
+        if focus_slug:
+            alive = await fetch_one(
+                "SELECT 1 AS ok FROM components WHERE group_id = ? AND slug = ? LIMIT 1",
+                (group_id, focus_slug))
+            if not alive:
+                focus_slug = ""
 
     rows = await fetch_all(
         "SELECT slug, version, state, title FROM components WHERE group_id = ?"

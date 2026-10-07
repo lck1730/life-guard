@@ -646,6 +646,23 @@ async def execute(sql: str, params: Sequence[Any] = ()) -> int:
     return cur.lastrowid or 0
 
 
+async def execute_rc(sql: str, params: Sequence[Any] = ()) -> int:
+    """执行写操作，返回**影响了几行** ✓（`rowcount` ✓）。
+
+    ⚠️ **和 `execute()` 是两个东西，别混** ✗→✓（2026-10-07 深夜踩到）：
+      `execute()` 返回的是 `lastrowid` ✓ —— 那是"上一次 INSERT 的行号" ✓。
+      拿它去判一条 UPDATE 影响了几行，**它永远非零** ✗（是**别的**语句留下的号 ✓）——
+      于是 `if not n: 404` 那种检查**永远不会触发** ✓（该报没找到的地方，
+      安静地成功 ✓）。这类错**没有任何症状** ✓：改不存在的对象 → 返回成功 ✓。
+
+      要用"影响几行"做判断（存不存在 ✓、改到没改到 ✓、清了几条 ✓），就用这个 ✓。
+    """
+    conn = await get_conn()
+    cur = await conn.execute(sql, params)
+    await conn.commit()
+    return int(cur.rowcount or 0)
+
+
 async def execute_many(sql: str, seq: Iterable[Sequence[Any]]) -> None:
     conn = await get_conn()
     await conn.executemany(sql, seq)

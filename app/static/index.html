@@ -397,6 +397,13 @@
   #compView { z-index:23; }
   #wsNav    { z-index:24; }
   #wsChat   { z-index:25; }
+  /* ⚠️ **`#diySet` 原来没写 z-index** ✗→✓（2026-10-07 深夜，用户报的：
+     「导航界面点击右上角没有显示 diy 助手的界面」✓）——
+     它落在 `.ascreen` 的默认值（20）上 ✓，而它只可能从 `#wsNav`（24）进去 ✓ →
+     **推上来了，但排在导航屏底下** ✓ —— 屏幕上什么都不变 ✓，
+     看着像"点了没反应" ✓（最像坏掉的一种 ✓）。
+     谁后推谁在上 ✓，它和 `#wsChat` 不会同时开 ✓，所以同档就行 ✓。 */
+  #diySet   { z-index:25; }
 
   /* 「＋ 做一个新的」—— 全宽、最显眼 ✓（它是这一屏的主行动 ✓） */
   #workshop .wsnew { display:flex; align-items:center; justify-content:center; gap:9px;

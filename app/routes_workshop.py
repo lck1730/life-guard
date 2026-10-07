@@ -58,7 +58,7 @@ from pydantic import BaseModel, Field
 
 from .auth import current_user, require_member
 from .config import settings
-from .db import execute, fetch_all, fetch_one, now
+from .db import execute, execute_rc, fetch_all, fetch_one, now
 from .hub import hub
 from .orchestrator.agent import (
     _group_profile,
@@ -209,6 +209,15 @@ async def _my_tasks(group_id: int, user_id: int) -> list[dict]:
     out: list[dict] = []
     for r in rows:
         slug = str(r["slug"] or "")
+        # ★ **对不上的 slug 一律当没有** ✗→✓（2026-10-07 深夜，用户报的：
+        #   「有些显示删不掉」✓）。
+        #   起因：组件删掉之后，**冲着它开过的那条对话还留着 `slug`** ✗
+        #   （删组件时清的是它自己那条对话 ✓，别的对话没清 ✓）→
+        #   于是导航上那一行**还以为自己是个组件** ✓ → ⋯ 里给的是「删除组件」✓
+        #   → 一点就 404「没有可删的版本」✓（用户看到的正是"删不掉"✓）。
+        #   ⚠️ 判据就是**这个群里到底有没有这个 slug** ✓（`titles` 那份表里就有 ✓）。
+        if slug and slug not in titles:
+            slug = ""
         out.append({"id": int(r["id"]),
                     "slug": slug,
                     # 名字的优先顺序 ✓（2026-10-07 晚上排过）：
@@ -216,7 +225,8 @@ async def _my_tasks(group_id: int, user_id: int) -> list[dict]:
                     #   ② 它冲着去的那个组件**现在**叫什么 ✓（从「继续改」进来的 ✓）
                     #   ③ **用户开做时起的那个名字** ✓ —— 还没做成组件时，
                     #      导航上靠它才认得出来 ✓（不然是一排"还没起名" ✓）。
-                    "title": str(r["title"] or titles.get(slug) or r["my_title"] or ""),
+                    "title": str(r["title"] or (titles.get(slug) if slug else "")
+                                 or r["my_title"] or ""),
                     # ★ **谁参与过这个组件**（同一组件下的对话，不管是谁开的 ✓）——
                     #   导航上那一行右边就是这几个头像 ✓。
                     #   ⚠️ 按 **slug** 取，不按对话 ✓：这个组件的对话可能有好几条
@@ -315,7 +325,7 @@ async def _void_tickets(task_id: int) -> int:
       那个子代理可能还在写 ✓，写完主对话也会照常调 `component_save` ✓ ——
       但票作废了 ✓，`components_save` 会拒 ✓，**东西进不来** ✓。
     """
-    n = await execute(
+    n = await execute_rc(
         "UPDATE component_tickets SET expires_at = 0"
         " WHERE task_id = ? AND used_at IS NULL AND expires_at > 0",
         (int(task_id),))

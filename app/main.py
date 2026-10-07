@@ -42,7 +42,8 @@ from . import idle, records as rec, reminders
 from .auth import (PREVIEW_SCOPE, SESSION_COOKIE, current_user, decode_token,
                    ensure_user, make_token, new_invite_code, require_member)
 from .config import settings
-from .db import close_db, execute, fetch_all, fetch_one, init_db, now
+from .db import (close_db, execute, execute_rc, fetch_all, fetch_one, init_db,
+                 now)
 from .hub import hub
 from .messages import current_status_for
 from .routes_auth import router as auth_router
@@ -732,8 +733,11 @@ async def component_rename(
     title = body.title.strip()
     if not title:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "名字不能是空的")
-    n = await execute("UPDATE components SET title = ? WHERE group_id = ? AND slug = ?",
-                      (title, group_id, name))
+    # ⚠️ **`execute_rc` 不是 `execute`** ✗→✓（2026-10-07 深夜，见 db.py 那段）——
+    #    `execute` 返回的是 `lastrowid` ✓，拿它判"改到没改到"**永远非零** ✗ →
+    #    给一个不存在的组件改名会**安静地成功** ✓（这里本来该报 404 ✓）。
+    n = await execute_rc("UPDATE components SET title = ? WHERE group_id = ? AND slug = ?",
+                         (title, group_id, name))
     if not n:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"没有 `{name}` 这个组件")
     log.info("组件改名：群 %s 的 %s → %r（用户 %s，%d 版一起改）",
@@ -798,6 +802,20 @@ async def component_delete(
     if not v:
         await execute("DELETE FROM component_spots WHERE group_id = ? AND slug = ?",
                       (group_id, name))
+        # ★ **把"冲着它开过"的那些对话的指针清掉** ✗→✓（2026-10-07 深夜，
+        #   用户报的"有些显示删不掉" ✓）。
+        #   ⚠️ 上面删的是**用它做出来的那条对话** ✓（`task_id` 指回来的 ✓）——
+        #      而**别的**对话也可能挂着这个 slug ✓（别人开过、或者开过没做成的 ✓），
+        #      它们**不在** `task_id` 那张名单里 ✗ → 不清的话就留着一个**悬空指针** ✓：
+        #      导航上那一行还以为自己是个组件 ✓、⋯ 里给的是「删除组件」✓、
+        #      一点就 404 ✓ —— 而用户完全看不出为什么 ✗。
+        #   清成空之后，那些对话就老实变成"还没做出组件" ✓（可以正常删掉 ✓）。
+        n = await execute_rc(
+            "UPDATE workshop_tasks SET slug = NULL WHERE group_id = ? AND slug = ?",
+            (group_id, name))
+        if n:
+            log.info("组件删除：顺手把 %d 条对话的悬空指针清了（群 %s 的 %s）",
+                     n, group_id, name)
     # ⚠️ 版本删光之后，那个 **slug 目录也要收掉** ✗→✓ ——
     #    不然仓库里会留一堆空壳 ✓（界面看不见 ✓，因为列表是从库读的 ✓，
     #    但下次同一个 slug 再做一版时，`mkdir(parents=True)` 会**默默复用它** ✓ ——
