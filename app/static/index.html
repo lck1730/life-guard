@@ -762,6 +762,23 @@
   .rninput:focus { outline:none; border-color:var(--accent); }
   .rnhint { color:var(--muted); font-size:13px; line-height:1.7; margin:-6px 0 12px; }
 
+  /* ── 一个居中的确认框 ✓ ──────────────────────────────────────────────
+     ⚠️ **不用弹层那套** ✗（`.sheet` 是从底下升上来的 ✓，那是"选点什么"的姿势 ✓）：
+        确认是**打断**——它在问"你确定吗"✓，居中、盖住、两句话 ✓。
+     ⚠️ z-index 比弹层（50）高 ✓ —— 它是**在弹层上面**弹出来的 ✓
+        （点"删除"时弹层还没关干净 ✓）。 */
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.62); z-index:60;
+           display:none; align-items:center; justify-content:center; padding:34px; }
+  .modal.on { display:flex; }
+  .modal .box { width:100%; max-width:320px; background:var(--panel);
+                border:1px solid var(--line); border-radius:16px;
+                padding:20px 18px 14px; }
+  .modal .box h4 { margin:0 0 9px; font-size:16.5px; font-weight:600; }
+  .modal .box p { margin:0 0 16px; color:var(--muted); font-size:14px; line-height:1.75; }
+  .modal .box .acts { display:flex; gap:10px; }
+  .modal .box .acts button { flex:1; padding:12px; border-radius:12px;
+                             font:inherit; font-size:15px; font-weight:600; }
+
   /* ── diy 小助手的设置屏 ✓ ── */
   #diySet .diyhead { display:flex; flex-direction:column; align-items:center;
                      gap:12px; padding:22px 0 8px; }
@@ -1161,6 +1178,10 @@
 </div>
 
 <div class="sheet" id="sheet"><div class="panel" id="sheetPanel"></div></div>
+
+<!-- ★ 确认框（2026-10-07 深夜）—— 用户定的：删东西不要"按钮上改字"那种提示，
+     「只需要删除的时候弹出个框提示一下，二次确认就行」✓。 -->
+<div class="modal" id="modal"><div class="box" id="modalBox"></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1829,6 +1850,9 @@
   // ⚠️ 顺序不能换 ✗ —— 弹层在最上 ✓，三屏是**一层压一层** ✓
   //   （编状态 > 改资料 > 列表 > 群设置 ✓），得从上往下关 ✓。
   window.__goBack = () => {
+    // ⚠️ **确认框排最前面** ✓ —— 它在最上面（z-index 60 > 弹层 50 > 各屏 20 几 ✓），
+    //    所以按返回该先关它 ✓（顺序就是"从上往下"✓，见下面那段 ✓）。
+    if ($('#modal').classList.contains('on')) { if (modalClose) modalClose(); return; }
     if ($('#sheet').classList.contains('on')) { closeSheet(); return; }
     // ★ 创意工坊那两屏（2026-10-07）—— **压在管家那三屏上面** ✓：
     //   组件页 > 工坊 > 编状态 > 改资料 > 管家列表 > 群设置 ✓。
@@ -4119,23 +4143,43 @@
       //    这类"样式没生效"从代码上很难一眼看出来 ✓（那行确实有一句
       //    `if (danger) …红色` ✓，只是**没人给它 danger** ✓）。
       //
-      // ⚠️ 标签**不带"（连这条对话）"了** ✓（用户："不要后面提示"✓）——
-      //    那句话改到**第一下点完之后的按钮上** ✓（"再点一下：会连对话一起删"✓）：
-      //    菜单里不占地方 ✓，而**该说清代价的那一刻**它还在 ✓。
-      armDelete(mk('删除组件', () => {}, true), '删除组件', async () => {
-        await api(`/components/${encodeURIComponent(t.slug)}?group_id=${group.id}`,
-                  { method: 'DELETE' });
-        toast('删了');
+      // ★ 代价改由**确认框**说 ✓（用户定的："弹出个框提示一下，二次确认就行"✓）——
+      //   菜单里那一行**干干净净三个字** ✓，点下去才弹框 ✓。
+      //   ⚠️ **先把菜单关了再弹** ✓ —— 不关的话那个从底下升上来的菜单
+      //      会**压在确认框下面** ✓（z-index 虽然够 ✓，但视觉上是两层东西叠着 ✓）。
+      mk('删除组件', async () => {
         closeSheet();
+        const ok = await confirmBox({
+          title: '删除组件',
+          body: '删掉之后，这个组件和它那条对话都会没，撤不回来。',
+          ok: '删除',
+          danger: true,
+        });
+        if (!ok) return;
+        try {
+          await api(`/components/${encodeURIComponent(t.slug)}?group_id=${group.id}`,
+                    { method: 'DELETE' });
+        } catch (e) { toast('没删掉：' + e.message); return; }
+        toast('删了');
         backToNav();
-      });
+      }, true);
     } else {
-      armDelete(mk('删掉这次对话', () => {}, true), '删掉这次对话', async () => {
-        await api(`/workshop/${group.id}/tasks/${wsCur.task}`, { method: 'DELETE' });
-        toast('删了');
+      mk('删掉这次对话', async () => {
         closeSheet();
+        const ok = await confirmBox({
+          title: '删掉这次对话',
+          body: '这条对话和里面的来回都会没，撤不回来。'
+              + '（组件本身不受影响。）',
+          ok: '删除',
+          danger: true,
+        });
+        if (!ok) return;
+        try {
+          await api(`/workshop/${group.id}/tasks/${wsCur.task}`, { method: 'DELETE' });
+        } catch (e) { toast('没删掉：' + e.message); return; }
+        toast('删了');
         backToNav();
-      });
+      }, true);
     }
 
     const cancel = document.createElement('div');
@@ -4150,40 +4194,53 @@
   };
 
   /**
-   * **两下才删** ✓（删组件 = 连对话一起没 ✓，撤不回来 ✓）。
+   * 一个**居中的确认框** ✓ —— 返回 `Promise<boolean>` ✓（点了删除就是 true ✓）。
    *
-   * ⚠️ 第二次点之前**把代价写在按钮上** ✓（"再点一下：连这条对话一起删"✓）——
-   *   不是拦一道 ✓，是**先说清** ✓。项目里那条老话：说清代价比拦一道管用 ✓。
+   * ⚠️ 2026-10-07 深夜改的 ✗→✓：原来是"再点一下同一个按钮"（按钮上改字 ✓）——
+   *    用户说：「不需要这种提示，**只需要删除的时候弹出个框提示一下，
+   *    二次确认就行**」✓。
+   *    ⚠️ 换过来是对的 ✓：改按钮文字那种做法，**那句话会挤在一行菜单里** ✓
+   *    （长一点就被截断 ✓），而弹框是**单独一块地方** ✓ ——
+   *    该说的代价能说全 ✓，而且它是一次真正的"停一下" ✓。
    */
-  const armDelete = (b, label, run) => {
-    // ⚠️ 拿到的是**那个按钮本身** ✓，不是"菜单里最后一个" ✗ ——
-    //    按位置找的那种写法，将来菜单里多一行就会删错东西 ✓，
-    //    而且它错得很安静 ✓（按钮还是会变红、还是会问"再点一下"✓ —— 只是删的是别的 ✓）。
-    if (!b) { run().catch(() => {}); return; }
-    b.onclick = () => {
-      if (b.dataset.armed) {
-        b.disabled = true;
-        b.textContent = '正在删…';
-        run().catch(e => {
-          toast('没删掉：' + e.message);
-          b.disabled = false;
-          b.textContent = label;
-        });
-        return;
-      }
-      b.dataset.armed = '1';
-      // ⚠️ **代价写在这一刻** ✓ —— 菜单里那句"（连这条对话）"拿掉了 ✓（用户要的 ✓），
-      //    但"这一下会连对话一起删"这件事**必须在按下去之前说出来** ✓：
-      //    两下才删的全部意义就是**第二下之前他知道会付什么** ✓。
-      b.textContent = '再点一下：会连对话一起删';
-      setTimeout(() => {
-        if (b.isConnected && b.dataset.armed) {
-          delete b.dataset.armed;
-          b.textContent = label;
-        }
-      }, 5000);
+  //: 当前那个确认框的"取消"动作 ✓（返回键要能关它 ✓）。没有框开着时是 null ✓。
+  let modalClose = null;
+  const confirmBox = ({ title, body, ok, danger }) => new Promise((resolve) => {
+    const m = $('#modal'), box = $('#modalBox');
+    box.innerHTML = '';                      // 里面全是自己建的 ✓，没有用户内容 ✓
+    const h = document.createElement('h4');
+    h.textContent = title;
+    box.appendChild(h);
+    if (body) {
+      const p = document.createElement('p');
+      p.textContent = body;
+      box.appendChild(p);
+    }
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    const no = document.createElement('button');
+    no.className = 'btn-ghost';
+    no.textContent = '取消';
+    const yes = document.createElement('button');
+    yes.className = 'btn-solid';
+    yes.textContent = ok || '确定';
+    if (danger) yes.style.background = 'var(--danger)';
+    const done = (v) => {
+      m.classList.remove('on');
+      box.innerHTML = '';
+      modalClose = null;
+      resolve(v);
     };
-  };
+    no.onclick = () => done(false);
+    yes.onclick = () => done(true);
+    m.onclick = (ev) => { if (ev.target === m) done(false); };   // 点框外 = 取消 ✓
+    // ⚠️ **安卓返回键也要能取消** ✓ —— 不然返回键会一路退到导航屏去 ✓，
+    //    而框还开着 ✓（用户看到的是"框没关，页面变了"✓）。见 `__goBack` ✓。
+    modalClose = () => done(false);
+    acts.append(no, yes);
+    box.appendChild(acts);
+    m.classList.add('on');
+  });
 
   /**
    * 一个"起名字"的弹层 ✓ —— **两处都在用** ✓：新建组件时问名字 ✓、⋯ 里的重命名 ✓。
