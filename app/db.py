@@ -319,7 +319,18 @@ CREATE TABLE IF NOT EXISTS workshop_messages (
     sender_type TEXT    NOT NULL,          -- 'user' | 'agent'
     content     TEXT    NOT NULL,
     created_at  INTEGER NOT NULL,
-    task_id     INTEGER                    -- 属于哪条对话（迁移前的老行是 NULL）
+    task_id     INTEGER,                   -- 属于哪条对话（迁移前的老行是 NULL）
+    -- ★ ★ 2026-10-07 深夜：**把群聊那套聊天能力搬过来** ✗→✓ ——
+    --   用户定的：「组件 diy 界面的聊天界面的功能应该套用生活管家的模板，
+    --   比如…底部聊天框的右边加个添加图片按钮…图片也和生活管家一样
+    --   添加后不立刻发送，而是等文字后一起发送」✓。
+    -- ⚠️ **和 `messages` 那几张列同名同义** ✓ —— 两边形状一致，
+    --    `_image_parts` / `_quote` 那些现成件才搬得动 ✓（见 routes_workshop.py ✓）。
+    msg_type    TEXT    NOT NULL DEFAULT 'text',   -- 'text' | 'image'
+    media_path  TEXT,                      -- 相对 media_dir
+    media_meta  TEXT,                      -- JSON
+    reply_to    INTEGER,                   -- 引用的是**本表**哪一条
+    mentions    TEXT                       -- JSON（工坊里没有 @ 的对象，留列备用）
 );
 CREATE INDEX IF NOT EXISTS idx_workshop_msgs
     ON workshop_messages(group_id, user_id, id);
@@ -447,6 +458,12 @@ _MIGRATIONS: list[tuple[str, str, str]] = [
     ("workshop_tasks", "title", "TEXT"),
     # 这一版在"容纳界面"里怎么展示（见 SCHEMA 里那段 ✓）。
     ("components", "spot_json", "TEXT"),
+    # 工坊聊天的图片和引用（2026-10-07 深夜，见 SCHEMA 里那段 ✓）。
+    ("workshop_messages", "msg_type", "TEXT NOT NULL DEFAULT 'text'"),
+    ("workshop_messages", "media_path", "TEXT"),
+    ("workshop_messages", "media_meta", "TEXT"),
+    ("workshop_messages", "reply_to", "INTEGER"),
+    ("workshop_messages", "mentions", "TEXT"),
 ]
 
 

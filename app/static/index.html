@@ -196,6 +196,16 @@
   #qbar .qwho { color:var(--accent); font-size:12px; margin-bottom:2px; }
   #qbar .qtext { color:var(--muted); font-size:13px; white-space:nowrap;
                  overflow:hidden; text-overflow:ellipsis; }
+  /* 工坊那条引用条**用同一套 class** ✓（`.qbody` / `.qwho` / `.qtext` ✓）——
+     只是它是 `#wsQbar` ✓（两屏各有各的 ✓，形状一致 ✓，改一处两边一起变 ✓）。 */
+  #wsQbar { display:flex; align-items:center; gap:8px; background:var(--panel2);
+            border:1px solid var(--line); border-radius:10px; padding:6px 10px;
+            margin:0 12px 6px; }
+  #wsQbar[hidden] { display:none; }   /* 上面写了 display:flex，得显式盖回来 */
+  #wsQbar .qbody { min-width:0; flex:1; }
+  #wsQbar .qwho { color:var(--accent); font-size:12px; margin-bottom:2px; }
+  #wsQbar .qtext { color:var(--muted); font-size:13px; white-space:nowrap;
+                   overflow:hidden; text-overflow:ellipsis; }
   #qbar .qx { background:none; border:none; color:var(--muted); font-size:15px;
               cursor:pointer; padding:2px 4px; line-height:1; }
 
@@ -323,6 +333,14 @@
                          display:flex; align-items:center; gap:4px;
                          color:var(--accent); font-size:13px; line-height:1;
                          white-space:nowrap; opacity:0; pointer-events:none; }
+  /* 工坊那条也一样 ✓（`#wsMsgs` 里的行是 `.mkrow` ✓，不是 `.row` ✗）——
+     左右滑引用是**两屏共有的手势** ✓，提示长得一样 ✓。 */
+  #wsChat .mkrow.swiping { position:relative; }
+  #wsChat .mkrow.swiping .swhint { position:absolute; top:50%; left:0;
+                                   transform:translateY(-50%);
+                                   display:flex; align-items:center; gap:4px;
+                                   color:var(--accent); font-size:13px; line-height:1;
+                                   white-space:nowrap; opacity:0; pointer-events:none; }
 
   /* 头像上**不许选字** ✓ —— 长按头像的活儿是"@ 他" ✓，
      让浏览器顺手把那个字选中了会显得很脏 ✓。 */
@@ -523,6 +541,25 @@
   #wsChat textarea:focus { outline:none; border-color:var(--accent); }
   #wsChat .mksend { width:44px; height:44px; flex:0 0 auto; display:none;
                     align-items:center; justify-content:center; color:var(--accent); }
+  /* ★ **右边那个按钮：有字就是发送、没字就是加图** ✗→✓（用户定的 ✓）——
+     两个都在 DOM 里 ✓，`syncWsSend` 按"输入框里有没有字"决定显示哪个 ✓
+     （和生活管家的 ＋ / 发送同一套做法 ✓）。 */
+  #wsChat .mkpick { width:44px; height:44px; flex:0 0 auto; display:flex;
+                    align-items:center; justify-content:center; color:var(--muted); }
+  /* 待发的那张图 —— 缩略图 + 一个 ✕ ✓（和生活管家的待发区一个意思 ✓） */
+  #wsChat .mkpend { flex:0 0 auto; display:flex; gap:8px; padding:8px 12px 0; }
+  #wsChat .mkpend[hidden] { display:none; }
+  #wsChat .mkpend .pv { position:relative; width:62px; height:62px; border-radius:10px;
+                        overflow:hidden; border:1px solid var(--line);
+                        background:var(--panel2); }
+  #wsChat .mkpend .pv img { width:100%; height:100%; object-fit:cover; display:block; }
+  #wsChat .mkpend .rm { position:absolute; top:-1px; right:-1px; width:20px; height:20px;
+                        border-radius:0 10px 0 10px; background:rgba(0,0,0,.62);
+                        color:#fff; font-size:12px; line-height:20px; text-align:center; }
+  /* 气泡里的图 ✓ —— 和小管家那边同一套尺寸规矩（max-width 别撑破气泡 ✓） */
+  #wsChat .mkbub.media { padding:6px; }
+  #wsChat .mkbub.media img { max-width:100%; border-radius:10px; display:block; }
+  #wsChat .mkbub .cap { white-space:pre-wrap; padding:7px 7px 3px; }
 
   /* ── 导航屏（工坊的门口）─────────────────────────────────────────────
      ★ 2026-10-07 晚上用户定的形状 ✗→✓：＋ 进来**先是这一屏** ✓ ——
@@ -1104,8 +1141,34 @@
   </header>
   <div class="mkbody" id="wsMsgs"></div>
   <div class="mkst" id="wsStatus" hidden><i></i><span id="wsStatusText"></span></div>
+  <!-- ★ 待发的图（2026-10-07 深夜 ✓）—— 和生活管家同一条规矩：
+       选完**不立刻发** ✓，停在这儿等你把它要说的话打完 ✓，点发送才一起走 ✓。
+       ⚠️ 放在输入框**上面** ✓：它和输入框是**一件事的两个部分** ✓
+          （就像引用条那样 ✓），塞进输入框里会把输入框搅乱 ✗。 -->
+  <div class="mkpend" id="wsPend" hidden></div>
+  <!-- 引用条 —— 和群聊那条**同一个形状** ✓（见 CSS 那段 ✓）。
+       ⚠️ 它是**输入状态**的一部分 ✓（微信也是），发完就没 ✓。 -->
+  <div id="wsQbar" hidden>
+    <div class="qbody">
+      <div class="qwho" id="wsQwho"></div>
+      <div class="qtext" id="wsQtext"></div>
+    </div>
+    <button class="qx" id="wsQclose" aria-label="取消引用">✕</button>
+  </div>
   <div class="mkfoot">
     <textarea id="wsText" rows="1" placeholder="想做个什么？"></textarea>
+    <!-- ★ 右边那个按钮**看图还是看发送**，由"输入框里有没有字"决定 ✓
+         （用户定的：「添加后，输入字后，图片按钮替换为发送按钮」✓）——
+         和生活管家那个 ＋ **一模一样** ✓（那边也是打字就把 ＋ 换成发送 ✓）。 -->
+    <button class="mkpick" id="wsPick" aria-label="加一张图">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+           stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4.5" width="18" height="15" rx="2.5"/>
+        <circle cx="8.5" cy="9.5" r="1.4"/>
+        <path d="M3.5 16.5l4.6-4.3a1.6 1.6 0 0 1 2.2 0l3.2 3 2-1.8a1.6 1.6 0 0 1 2.2 0l3.3 3.1"/>
+      </svg>
+    </button>
     <button class="mksend" id="wsSend" aria-label="发送">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
            stroke="currentColor" stroke-width="1.8"
@@ -1115,6 +1178,7 @@
     </button>
   </div>
 </div>
+<input type="file" id="fileWs" accept="image/*" hidden>
 
 <!-- 设置 -->
 <div class="screen" id="settings">
@@ -3668,6 +3732,12 @@
                   assistant: { name: 'diy 小助手', avatar: '' },
                   streaming: null, seen: {}, tasks: [] };
 
+  //: 这条对话里的消息，按 id 存一份 ✓ —— **左右滑引用**要回头找它的完整信息 ✓
+  //: （滑动拿到的是 DOM 行 ✓，而行里只有个 id ✓）。和群聊的 `_msgs` 同一个用途 ✓。
+  //: ⚠️ **换对话时要清** ✗ —— 不清的话 id 是**表级自增** ✓、两条对话不冲突 ✓
+  //:    但会一直涨 ✓（一条长对话翻完能存几百条 ✓，纯属白占 ✓）。
+  const _wsById = new Map();
+
   const setWsHead = () => {
     const t = $('#wsTitle');
     t.textContent = wsCur.task
@@ -3685,6 +3755,13 @@
     if (d.assistant) wsCur.assistant = d.assistant;
     wsCur.streaming = null;
     wsCur.seen = {};
+    // ⚠️ **换对话要把输入状态清干净** ✗→✓ —— 待发的图和引用都是**这条对话**的事 ✓：
+    //    带到另一条去，用户会看到"我明明没选那张图"✓（而它其实是从上一条跟过来的 ✓）。
+    _wsById.clear();
+    if (wsPending) { URL.revokeObjectURL(wsPending.url); wsPending = null; }
+    wsQuote = null;
+    syncWsPending();
+    setWsQuoteBar();
     setWsHead();
     const box = $('#wsMsgs');
     box.innerHTML = '';
@@ -4031,6 +4108,66 @@
     });
   };
 
+  // ── 那条对话的输入状态（待发的图 / 引用）✓ ──────────────────────────
+  //
+  // ★ 2026-10-07 深夜：和生活管家**同一套规矩** ✓ ——
+  //   图片选完先停在待发区 ✓、引用是**输入状态**的一部分 ✓（发完就没了 ✓）。
+  //   ⚠️ 但**一条消息只发一次** ✗→✓（和群聊不一样 —— 群聊是"图一条、字一条"✓，
+  //      而工坊**每发一次就起一轮对话** ✗：发两条 = 第二轮撞上"它手上还有活" ✓）。
+  //      所以这里的图和字**合成一条**走 ✓（正好也是用户说的"一起发送"✓）。
+  let wsPending = null;      // {file, url}
+  let wsQuote = null;        // {id, sender_type, msg_type, content}
+
+  /** 气泡里那块引用条 ✓ —— 和群聊那份**同一套 class** ✓（`.quote` ✓）。 */
+  const buildWsQuoteEl = (q) => {
+    const el = document.createElement('div');
+    el.className = 'quote';
+    const who = document.createElement('div'); who.className = 'qwho';
+    who.textContent = q.sender_type === 'agent'
+      ? (wsCur.assistant.name || 'diy 小助手') : '你';
+    const tx = document.createElement('div'); tx.className = 'qtext';
+    tx.textContent = q.msg_type === 'image' ? '[图片]' : (q.content || '');
+    el.append(who, tx);
+    return el;
+  };
+
+  const wsQuoteText = (m) => (m.msg_type === 'image' ? '[图片]'
+                             : (m.content || '').slice(0, 60));
+
+  const setWsQuoteBar = () => {
+    const el = $('#wsQbar');
+    if (!el) return;
+    if (!wsQuote) { el.hidden = true; return; }
+    $('#wsQwho').textContent = wsQuote.sender_type === 'agent'
+      ? (wsCur.assistant.name || 'diy 小助手') : '你';
+    $('#wsQtext').textContent = wsQuoteText(wsQuote);
+    el.hidden = false;
+  };
+
+  /** 待发那张图的缩略图 ✓ —— 选完**不立刻发** ✓（用户定的 ✓）。 */
+  const syncWsPending = () => {
+    const box = $('#wsPend');
+    if (!box) return;
+    box.textContent = '';
+    if (!wsPending) { box.hidden = true; return; }
+    box.hidden = false;
+    const pv = document.createElement('div');
+    pv.className = 'pv';
+    const img = document.createElement('img');
+    img.src = wsPending.url;
+    const rm = document.createElement('div');
+    rm.className = 'rm';
+    rm.textContent = '✕';
+    rm.onclick = () => {
+      URL.revokeObjectURL(wsPending.url);
+      wsPending = null;
+      syncWsPending();
+      syncWsSend();
+    };
+    pv.append(img, rm);
+    box.appendChild(pv);
+  };
+
   const addWsMsg = (m) => {
     if (m && m.id != null) {
       if (wsCur.seen[m.id]) return;      // WS 推回来的 + 本地先画的那条，只算一次 ✓
@@ -4038,8 +4175,11 @@
     }
     const box = $('#wsMsgs');
     const mine = m.sender_type === 'user';
+    // ⚠️ 长按要回头找这条消息的完整信息 ✓（引用用 ✓）—— 和群聊那边同一张表 ✓。
+    if (m && m.id != null) _wsById.set(m.id, m);
     const row = document.createElement('div');
     row.className = 'mkrow ' + (mine ? 'mine' : 'agent');
+    if (m && m.id != null) row.dataset.id = String(m.id);
     // ★ 头像（2026-10-07 深夜 ✓）—— 用户定的「组件聊天界面也需要有用户区别」✓。
     //   你那边用**你自己的头像** ✓（和群聊里同一张 ✓，一眼认得出是自己 ✓）；
     //   它那边用小助手那张 ✓（没设就是一个首字 ✓）。
@@ -4047,6 +4187,13 @@
     av.className = 'av';
     if (mine) paintZhi(av, shellURL(me && me.avatar), (me && me.nickname) || '我');
     else paintZhi(av, wsCur.assistant.avatar, wsCur.assistant.name || '助');
+    // ★ **点头像进详情** ✗→✓（用户定的："比如点击头像进入详情啊"✓）——
+    //   和群聊那边**同一条去向** ✓：它 → **小助手的设置** ✓（名字头像都在这儿改 ✓）；
+    //   你 → 回壳的「我的」 ✓（那才是"你自己的详情" ✓，这儿没有第二份 ✓）。
+    av.onclick = (ev) => {
+      ev.stopPropagation();
+      if (mine) backToShell(); else openDiySet();
+    };
     const wrap = document.createElement('div');
     wrap.className = 'wrap2';
     if (!mine) {
@@ -4059,7 +4206,22 @@
     }
     const b = document.createElement('div');
     b.className = 'mkbub';
-    fillBubble(b, m.content || '');      // ★ 渲染（粗体/代码/列表/问题标签 ✓），不进 innerHTML ✓
+    if (m && m.quote) b.appendChild(buildWsQuoteEl(m.quote));
+    if (m && m.msg_type === 'image' && m.media_path) {
+      b.classList.add('media');
+      const img = document.createElement('img');
+      img.src = '/media/' + m.media_path;
+      img.onclick = () => openLightbox(img.src);
+      b.appendChild(img);
+      if ((m.content || '').trim()) {
+        const cap = document.createElement('div');
+        cap.className = 'cap';
+        fillBubble(cap, m.content);
+        b.appendChild(cap);
+      }
+    } else {
+      fillBubble(b, (m && m.content) || '');   // ★ 渲染（粗体/代码/列表/问题标签 ✓），不进 innerHTML ✓
+    }
     wrap.appendChild(b);
     row.append(av, wrap);
     box.appendChild(row);
@@ -4072,7 +4234,17 @@
   const setWsStatus = (state) => {
     const el = $('#wsStatus');
     if (!el) return;
-    const text = { thinking: '正在想…', working: '正在做（这一步它交给一个小助手去写，要等一会儿）',
+    // ★ 2026-10-07 深夜用户定的**两种**状态 ✓：
+    //   · 平时 →「**{它的名字}** 思考中…」✓ —— 名字是**它会变的那个** ✓，
+    //     所以每次现取 ✓（写死"diy 小助手"的话，改完名字这儿还写着旧的 ✓）
+    //   · 派了子代理去写组件时 →「**组件制作中…**」✓ —— 那一段最长（十几分钟 ✓），
+    //     而且**性质不一样** ✓：那不是在"想"，是在**干活** ✓，用户等的东西也不同 ✓。
+    //
+    //   状态由**服务端在准确的那一刹那推** ✓（`components/confirm` 里 ✓），
+    //   我们这边只是换个说法 ✓（见 `push_workshop_status` ✓）。
+    const name = wsCur.assistant.name || 'diy 小助手';
+    const text = { thinking: name + ' 思考中…',
+                   working: '组件制作中…',
                    done: '做好了', idle: '' }[state] || '';
     // ⚠️ 写那个 **`<span>`**，不是外层 ✗→✓ —— 外层里还有个转圈的 `<i>` ✓，
     //    往外层写 textContent 会**把转圈一起抹掉** ✓（文字有了、圈没了 ✓，看着像卡住 ✓）。
@@ -4085,12 +4257,30 @@
   const sendWs = async () => {
     const ta = $('#wsText');
     const t = (ta.value || '').trim();
-    if (!t) return;
+    const pic = wsPending;
+    if (!t && !pic) return;
     if (!wsCur.task) { toast('先开一条对话'); return; }
-    ta.value = ''; syncWsSend();
+    ta.value = ''; ta.style.height = 'auto';
+    wsPending = null; syncWsPending();
+    const q = wsQuote; wsQuote = null; setWsQuoteBar();
+    syncWsSend();
     try {
+      // ⚠️ **图和字合成一条** ✗→✓（见上面那段 ✓）——
+      //    分两条发的话，第二条会撞上"它手上还有一个在做"✓（每一发就是一轮 ✓）。
+      let mediaPath = '';
+      if (pic) {
+        const up = await uploadFile(pic.file);   // 复用群聊那个上传 ✓
+        mediaPath = up.path;
+        URL.revokeObjectURL(pic.url);
+      }
       const d = await api(`/workshop/${group.id}/tasks/${wsCur.task}/chat`, {
-        method: 'POST', body: JSON.stringify({ content: t }),
+        method: 'POST',
+        body: JSON.stringify({
+          content: t,
+          msg_type: pic ? 'image' : 'text',
+          media_path: mediaPath,
+          reply_to: q ? q.id : null,
+        }),
       });
       // ⚠️ **"它手上还有活"是 200 + ok:false** ✗→✓ —— 不是 HTTP 错误 ✓
       //    （`api()` 只在非 2xx 时抛 ✓）→ 不单独接的话，这里会拿着 undefined 去画 ✗。
@@ -4112,9 +4302,88 @@
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = Math.min(120, ta.scrollHeight) + 'px';
-    const has = !!(ta.value || '').trim();
-    $('#wsSend').style.display = has ? 'flex' : 'none';
+    // ★ **右边那个按钮：有字显示发送、没字显示加图** ✓（用户定的 ✓）——
+    //   待发区有图时也要能发 ✓（图发出去不用配字是允许的 ✓）。
+    const typed = !!(ta.value || '').trim();
+    $('#wsSend').style.display = typed ? 'flex' : 'none';
+    $('#wsPick').style.display = typed ? 'none' : 'flex';
   };
+
+  // ── 左右滑 → 引用 ✓（和群聊那套**同一个手势** ✓）──────────────────────
+  //
+  // ★ 用户 2026-10-07 深夜定的：「滑动引用，长按 @ 都该安排上」✓ ——
+  //   滑引用的那份**整段照搬**群聊的判据 ✓（见那边那一大段注释 ✓）：
+  //   横向位移要压过纵向 1.2 倍 ✓、超过 8px 才认 ✓、**认了之后才拦** ✓
+  //   —— 这三条是"别跟上下滚打架"的全部依据 ✓，改一条就开始抢手势 ✓。
+  //
+  // ⚠️ **长按 @ 这边没做** ✗，是**故意**的：@ 的作用是"从好几个人里点一个" ✓，
+  //    而这里**只有你和助手两个人** ✓ —— @ 谁都是它 ✓。做了只会往输入框里
+  //    塞一个没意义的 `@名字` ✓，而那个名字还会进它的提示词 ✓（它得先想
+  //    "这是在叫我吗" ✓）。**群聊那边有 @ ✓**，那才是它该在的地方 ✓。
+  const wsSw = { min: 8, px: 56, max: 88 };
+  let wsSwipe = null;
+
+  const wsSwipeEnd = (fire) => {
+    if (!wsSwipe) return;
+    const { row, hint, m } = wsSwipe;
+    wsSwipe = null;
+    row.style.transition = 'transform .18s cubic-bezier(.22,1,.36,1)';
+    row.style.transform = '';
+    if (hint) {
+      hint.style.transition = 'opacity .15s ease';
+      hint.style.opacity = '0';
+      const h = hint;
+      setTimeout(() => { if (h.parentNode) h.parentNode.removeChild(h); }, 240);
+    }
+    setTimeout(() => { row.style.transition = ''; row.classList.remove('swiping'); }, 240);
+    if (fire && m) {
+      // ★ **直接就引用到输入框** ✓ —— 和群聊同一条规矩：不弹"已引用" ✓
+      //   （引用条冒出来本身就是反馈 ✓，再弹一句正好挡住它 ✓）。
+      wsQuote = m;
+      setWsQuoteBar();
+      $('#wsText').focus();
+    }
+  };
+
+  $('#wsMsgs').addEventListener('touchstart', (ev) => {
+    if (ev.touches.length !== 1) return;
+    const row = ev.target.closest && ev.target.closest('.mkrow[data-id]');
+    if (!row) return;
+    const p0 = ev.touches[0];
+    wsSwipe = { row, m: _wsById.get(Number(row.dataset.id)),
+                x0: p0.clientX, y0: p0.clientY, d: 0, dir: 0, hint: null };
+  }, { passive: true });
+
+  $('#wsMsgs').addEventListener('touchmove', (ev) => {
+    if (!wsSwipe) return;
+    const p0 = ev.touches[0];
+    const dx = p0.clientX - wsSwipe.x0;
+    const dy = p0.clientY - wsSwipe.y0;
+    if (!wsSwipe.dir) {
+      if (Math.abs(dx) < wsSw.min) return;
+      if (Math.abs(dx) < Math.abs(dy) * 1.2) { wsSwipe = null; return; }
+      wsSwipe.dir = dx > 0 ? 1 : -1;
+      wsSwipe.hint = document.createElement('div');
+      wsSwipe.hint.className = 'swhint';
+      wsSwipe.hint.textContent = '↩ 引用';
+      if (wsSwipe.dir > 0) wsSwipe.hint.style.left = '0';
+      else { wsSwipe.hint.style.left = 'auto'; wsSwipe.hint.style.right = '0'; }
+      wsSwipe.row.appendChild(wsSwipe.hint);
+      wsSwipe.row.classList.add('swiping');
+    }
+    ev.preventDefault();
+    const raw = Math.abs(dx);
+    const damp = raw <= wsSw.max ? raw : wsSw.max + (raw - wsSw.max) * 0.12;
+    wsSwipe.d = wsSwipe.dir * damp;
+    wsSwipe.row.style.transform = 'translateX(' + wsSwipe.d + 'px)';
+    wsSwipe.hint.style.opacity = Math.min(1, raw / wsSw.px);
+    wsSwipe.hint.style.transform = 'translate(' + (-wsSwipe.d) + 'px, -50%)';
+  }, { passive: false });
+
+  $('#wsMsgs').addEventListener('touchend', () => {
+    if (wsSwipe) wsSwipeEnd(Math.abs(wsSwipe.d) >= wsSw.px);
+  });
+  $('#wsMsgs').addEventListener('touchcancel', () => { if (wsSwipe) wsSwipeEnd(false); });
 
   /**
    * 顶栏那个 ⋯ —— 用户 2026-10-07 晚上定的两件事：**删除组件**、**重命名组件** ✓
@@ -4514,6 +4783,22 @@
   //    （"我明明刚做完 v3，它说我保留的是 v2" ✓ —— 那是很难说得清的一种错 ✓）。
   $('#wsMore').onclick = openWsMenu;
   $('#wsSend').onclick = sendWs;
+  // ★ 加图那个按钮 ✓ —— 选完先停在待发区 ✓（用户定的 ✓）。
+  $('#wsPick').onclick = () => $('#fileWs').click();
+  $('#fileWs').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    // ⚠️ **同时只留一张** ✗→✓（这一版）—— 群聊那边能排队好几张 ✓，
+    //    而这边**发一次就是一轮对话** ✗，堆太多没有意义 ✓。
+    //    再选一张就是**换掉**上一张 ✓（换的时候要把上一张的预览地址收掉 ✓，
+    //    不收的话每换一次漏一个 blob ✓）。
+    if (wsPending) URL.revokeObjectURL(wsPending.url);
+    wsPending = { file, url: URL.createObjectURL(file) };
+    syncWsPending();
+    syncWsSend();
+  });
+  $('#wsQclose').onclick = () => { wsQuote = null; setWsQuoteBar(); };
   $('#wsText').oninput = syncWsSend;
   $('#wsText').onkeydown = (ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); sendWs(); } };
   $('#backChat').onclick = closeSettings;

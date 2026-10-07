@@ -49,6 +49,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from typing import Any
@@ -60,8 +61,10 @@ from .auth import current_user, require_member
 from .config import settings
 from .db import execute, execute_rc, fetch_all, fetch_one, now
 from .hub import hub
+from .messages import _quote
 from .orchestrator.agent import (
     _group_profile,
+    _image_parts,
     _stream_completion,
     diy_session_id_for,
     diy_persona,
@@ -355,14 +358,60 @@ async def _abort(group_id: int, user_id: int) -> int | None:
 
 # ── 一轮对话 ────────────────────────────────────────────────────────────
 
-async def _save(group_id: int, user_id: int, task_id: int,
-                sender: str, content: str) -> dict:
+#: 工坊消息的取法 ✓ —— **和群聊那份同一个形状** ✗→✓（2026-10-07 深夜）：
+#: 引用那条 JOIN 出来 ✓、昵称、头像 ✓ —— 前端就能拿**同一套**代码画气泡 ✓
+#: （`buildQuoteEl` / 引用条 / 图片 ✓）。
+_WS_SELECT = """
+SELECT m.id, m.group_id, m.user_id, m.task_id, m.sender_type, m.msg_type,
+       m.content, m.media_path, m.media_meta, m.reply_to, m.created_at,
+       -- 引用的是**本表**的另一条 ✓（工坊里就你和助手两个人，
+       -- 所以昵称只有两种：你、或者助手 ✓ —— 助手那个名字是**可改的** ✓，
+       -- 由前端按 `wsCur.assistant.name` 现取 ✓，这里给个标记就行 ✓）
+       q.id           AS quote_id,
+       q.sender_type  AS quote_sender_type,
+       q.msg_type     AS quote_msg_type,
+       q.content      AS quote_content
+FROM workshop_messages m
+LEFT JOIN workshop_messages q ON q.id = m.reply_to
+"""
+
+
+def _ws_msg(row: dict[str, Any], assistant_name: str) -> dict[str, Any]:
+    """一条工坊消息 → 前端要的形状 ✓（**和群聊那条同一个形状** ✓）。"""
+    out = dict(row)
+    out["media_meta"] = _load_json(row.get("media_meta"))
+    out["quote"] = _quote(row) if row.get("quote_id") else None
+    if out["quote"]:
+        # 引用条上的"谁"——工坊里就两个人 ✓，助手那个名字是群级设置 ✓。
+        out["quote"]["sender_nickname"] = (
+            assistant_name if out["quote"].get("sender_type") == "agent" else "你")
+    return out
+
+
+def _load_json(raw: Any) -> Any:
+    if isinstance(raw, str) and raw:
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+    return raw
+
+
+async def _save(group_id: int, user_id: int, task_id: int, sender: str, content: str,
+                *, msg_type: str = "text", media_path: str | None = None,
+                media_meta: dict | None = None,
+                reply_to: int | None = None) -> dict:
     mid = await execute(
         "INSERT INTO workshop_messages(group_id, user_id, sender_type, content,"
-        " created_at, task_id) VALUES(?,?,?,?,?,?)",
-        (group_id, user_id, sender, content, now(), int(task_id)))
-    row = await fetch_one("SELECT * FROM workshop_messages WHERE id = ?", (mid,))
-    return dict(row or {})
+        " created_at, task_id, msg_type, media_path, media_meta, reply_to)"
+        " VALUES(?,?,?,?,?,?,?,?,?,?)",
+        (group_id, user_id, sender, content, now(), int(task_id), msg_type,
+         media_path,
+         json.dumps(media_meta, ensure_ascii=False) if media_meta else None,
+         reply_to))
+    row = await fetch_one(_WS_SELECT + " WHERE m.id = ?", (mid,))
+    name = (await _assistant(group_id))["name"]
+    return _ws_msg(dict(row or {}), name)
 
 
 async def _touch(task_id: int) -> None:
@@ -371,8 +420,17 @@ async def _touch(task_id: int) -> None:
                   (now(), int(task_id)))
 
 
-async def _run_turn(group_id: int, user_id: int, task_id: int, text: str) -> None:
-    """跑一轮工坊对话 —— 后台任务 ✓（POST 立刻返回，正文走 WebSocket 推 ✓）。"""
+async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
+                    *, msg_type: str = "text", media_path: str | None = None,
+                    quote: dict | None = None) -> None:
+    """跑一轮工坊对话 —— 后台任务 ✓（POST 立刻返回，正文走 WebSocket 推 ✓）。
+
+    ★ 2026-10-07 深夜：**收下图片和引用** ✗→✓ —— 用户定的：工坊聊天要
+      「套用生活管家的模板」✓（图片一起发 ✓、引用能引用 ✓）。
+      ⚠️ **图片必须真的发给它** ✗ —— 只画在界面上、不塞进这一轮的话，
+        它会说"我没看到图" ✓，而那和引用那个 bug 是**同一个形状** ✓
+        （数据在、但没人告诉它 ✓，见 `_render_transcript` 那段 ✓）。
+    """
     key = (group_id, user_id)
     async with _lock_for(group_id, user_id):
         # ⚠️ **进锁之后再登记** ✗→✓ —— 反过来的话，等锁的那几毫秒里
@@ -387,9 +445,21 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str) -> Non
         try:
             profile = await _group_profile(group_id)
             system = await diy_persona(group_id, task_id)
+            # 引用光有个 id 没用 ✓ —— 把那句话**摊开写进正文** ✓
+            # （`_render_transcript` 里那个 bug 就是"只存不告诉"✓，这边不重复它 ✓）。
+            if quote:
+                qtext = ("[图片]" if quote.get("msg_type") == "image"
+                         else (quote.get("content") or "").strip()[:80])
+                who = "你自己" if quote.get("sender_type") == "agent" else "用户"
+                text = f"（在回{who}说的「{qtext}」）{text}"
+            # ⚠️ 只有图片、没打字是允许的 ✓ —— 那一轮就把图交给它看 ✓
+            #    （正文给一句占位 ✓，因为 Hermes 那条消息的 text 部分是必须的 ✓）。
+            if msg_type == "image" and not text.strip():
+                text = "（发了一张图）"
+            images = _image_parts([{"msg_type": msg_type, "media_path": media_path}])
             parts: list[str] = []
             async for piece in _stream_completion(
-                group_id, text, [], profile,
+                group_id, text, images, profile,
                 system=system,
                 session_id=diy_session_id_for(group_id, user_id, task_id),
             ):
@@ -487,7 +557,15 @@ async def assistant_avatar(group_id: int, file: UploadFile = File(...),
 
 
 class TaskSayIn(BaseModel):
-    content: str = Field(min_length=1, max_length=4000)
+    # ★ 2026-10-07 深夜：**图片和引用跟着一起收** ✗→✓（用户定的"套用生活管家模板"✓）。
+    # ⚠️ `content` 现在**可以是空的** ✗→✓ —— 只发一张图不打字是正常的 ✓
+    #    （群聊那边也允许 ✓）。真正的"什么都没发"由下面那两句合起来判 ✓。
+    content: str = Field(default="", max_length=4000)
+    msg_type: str = Field(default="text", max_length=16)
+    media_path: str = Field(default="", max_length=200)
+    media_meta: dict[str, Any] | None = None
+    #: 引用的是**本表**哪一条 ✓（前端长按气泡选"引用"时给 ✓）。
+    reply_to: int | None = None
 
 
 async def _assert_open(group_id: int) -> None:
@@ -609,9 +687,12 @@ async def task_open(group_id: int, task_id: int,
             await _save(group_id, user["id"], killed, "agent",
                         "（你切走了，这一轮掐掉了）")
     await _touch(row["id"])
+    # 历史走 `_WS_SELECT` ✓ —— 图片、引用、谁发的都在里面 ✓，
+    # 前端才能用**同一段代码**画气泡 ✓（见 `_ws_msg` 那段 ✓）。
+    aname = (await _assistant(group_id))["name"]
     rows = await fetch_all(
-        "SELECT id, sender_type, content, created_at FROM workshop_messages"
-        " WHERE task_id = ? ORDER BY id ASC LIMIT 200", (int(task_id),))
+        _WS_SELECT + " WHERE m.task_id = ? ORDER BY m.id ASC LIMIT 200", (int(task_id),))
+    rows = [_ws_msg(dict(r), aname) for r in rows]
     # ★ **有人正在改这个组件吗** ✓（用户定的：「此时其他用户进入时会被提示」✓）——
     #   ⚠️ 只提示**别人** ✓：自己那条正在跑是**正常状态** ✓
     #      （界面上那个转圈就是它 ✓），再弹一句"你正在改"只会让人莫名其妙 ✓。
@@ -621,7 +702,7 @@ async def task_open(group_id: int, task_id: int,
         editing = None
     return {"ok": True, "task_id": int(task_id),
             "task": await _task_payload(group_id, user["id"], task_id),
-            "messages": [dict(r) for r in rows],
+            "messages": rows,                 # 已经收拾好了 ✓（见上面那两行 ✓）
             "editing": editing,
             "assistant": await _assistant(group_id),
             "busy": _busy(group_id, user["id"])}
@@ -640,6 +721,27 @@ async def task_say(group_id: int, task_id: int, body: TaskSayIn,
     row = await _own_task(group_id, user["id"], task_id)
     text = body.content.strip()
 
+    # ★ **图片这条路** ✓（2026-10-07 深夜）—— 和生活管家同一套规矩 ✓：
+    #   图片先传上来（前端先传 ✓），路径跟着这一条消息走 ✓。
+    kind = "image" if (body.msg_type == "image" and body.media_path) else "text"
+    if kind == "text" and not text:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "发点东西吧")
+    # ⚠️ **引用只认本对话里的消息** ✗ —— 前端给的 id 是它自己画出来的 ✓，
+    #    但**不能信** ✓（换个 id 就能引用别人的对话 ✓）。查一下归属 ✓，
+    #    对不上就当没引用 ✓（**降级**，不是报错 ✓ —— 引用丢了远好过整句发不出去 ✓）。
+    reply_to = None
+    if body.reply_to:
+        q = await fetch_one(
+            "SELECT id, msg_type, sender_type, content FROM workshop_messages"
+            " WHERE id = ? AND task_id = ?", (int(body.reply_to), int(row["id"])))
+        if q:
+            reply_to = int(q["id"])
+            q = dict(q)
+        else:
+            q = None
+    else:
+        q = None
+
     # ⚠️ **同时只能做或改一个** ✗→✓ —— 用户 2026-10-07 定的 ✓。
     #
     # 判据是 `_running` 而不是锁 ✓（见文件头那段 ✓）：锁是被掐掉的那个协程
@@ -652,12 +754,18 @@ async def task_say(group_id: int, task_id: int, body: TaskSayIn,
                 "error": ("它手上还有一个在做（要么在问你，要么在等那个小助手写完）✓。"
                           "**等这一轮完了再说** ✓，或者切到别的对话去 ✓"
                           "（切走会把这一轮掐掉 ✓）。")}
-    msg = await _save(group_id, user["id"], row["id"], "user", text)
+    msg = await _save(group_id, user["id"], row["id"], "user", text,
+                      msg_type=kind,
+                      media_path=body.media_path or None,
+                      media_meta=body.media_meta,
+                      reply_to=reply_to)
     await _touch(row["id"])
     await _push(user["id"], {"type": "ws_message", "data": msg})
 
     key = (group_id, user["id"])
-    task = asyncio.create_task(_run_turn(group_id, user["id"], row["id"], text))
+    task = asyncio.create_task(_run_turn(
+        group_id, user["id"], row["id"], text,
+        msg_type=kind, media_path=body.media_path or None, quote=q))
     _running[key] = (int(row["id"]), task)
 
     def _done(t: asyncio.Task, _key: tuple[int, int] = key,

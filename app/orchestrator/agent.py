@@ -442,6 +442,25 @@ def _render_transcript(messages: list[dict[str, Any]], agent_name: str) -> str:
         else:
             text = f"[{kind}]"
         if text:
+            # ★ **把"这条在回哪一条"写进去** ✗→✓（2026-10-07 深夜，用户报的：
+            #   「引用后没有效果…我问管家，他都表示没有引用」✓）。
+            #
+            #   ⚠️ **根因就在这一行**：`reply_to` 从头到尾都存着 ✓（库里 9 条 ✓）、
+            #     前端也画了引用条 ✓ —— 但**这份记录里从来没提过它** ✗ →
+            #     模型看到的只是一句没头没尾的话 ✓ → 它说"没有引用"**是对的** ✓
+            #     （它确实没收到 ✓）。**数据在，人没告诉它** —— 这一类错
+            #     特别容易被当成"模型不听话" ✗。
+            q = m.get("quote") or {}
+            if q.get("id"):
+                qname = q.get("sender_nickname") or "某人"
+                qkind = q.get("msg_type")
+                if qkind == "image":
+                    qtext = "[图片]"
+                elif qkind == "voice":
+                    qtext = "[语音]"
+                else:
+                    qtext = (q.get("content") or "").strip().replace("\n", " ")[:60]
+                text = f"（在回 #{q['id']} {qname}：「{qtext}」）{text}"
             # **每行行首带消息编号。** 两个能力都指着它：
             #   · 引用某条 → 写 `[引用 #157]`
             #   · 回忆某张图 → `look_at_image(155)`
