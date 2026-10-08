@@ -12,9 +12,7 @@ import hashlib
 import logging
 import re
 import shutil
-import time
 
-import httpx
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -39,8 +37,11 @@ from fastapi.staticfiles import StaticFiles
 STATIC_DIR = Path(__file__).parent / "static"
 
 from . import idle, records as rec, reminders
+# ⚠️ `ensure_user` / `new_invite_code` **合并之后这里不再需要** ✗→✓：
+#    前者是"按需镜像用户行"的工具 ✓（现在用户表就是本地的 ✓，注册时建 ✓），
+#    后者是"本地摇邀请码"（现在只有建空间那一处摇 ✓，在 `routes_shell` 里 ✓）。
 from .auth import (PREVIEW_SCOPE, SESSION_COOKIE, current_user, decode_token,
-                   ensure_user, make_token, new_invite_code, require_member)
+                   make_token, require_member)
 from .config import settings
 from .db import (close_db, execute, execute_rc, fetch_all, fetch_one, init_db,
                  now)
@@ -51,6 +52,8 @@ from .routes_groups import router as groups_router
 from .routes_internal import restart_watcher
 from .routes_internal import router as internal_router
 from .routes_media import router as media_router
+from .routes_shell import router as shell_router
+from .routes_shell import sweep_leaving as shell_router_sweep
 from .routes_workshop import poke_loop
 from .routes_workshop import router as workshop_router
 
@@ -73,6 +76,13 @@ async def lifespan(app: FastAPI):
     # 第三个：**重启排队**。agent 在对话中间调 restart_backend 时，
     # 直接重启会把它正在说的那一轮掐掉（用户那边就是"问了没回"）。
     # 所以那个接口只排队，由这个循环挑"没人在跑"的时机动手。
+    # ★ 启动时先收一遍"正在退出"的空间 ✓（2026-10-08）——
+    #   那个收尾的后台任务活在进程里 ✓，重启就没了 ✓ →
+    #   没这一步的话，"标记了退出、worker 也删完了"的空间会永远停在那儿 ✓。
+    #   ⚠️ **不等它** ✓（`create_task` 就行 ✓）：它是收尾，不该挡住开机 ✓；
+    #      慢一点没关系 ✓（那个空间对用户已经不可见了 ✓）。
+    asyncio.create_task(shell_router_sweep())
+
     tasks = [
         asyncio.create_task(reminders.ticker_loop()),
         asyncio.create_task(idle.loop()),
@@ -111,6 +121,12 @@ app.include_router(groups_router)
 app.include_router(media_router)
 app.include_router(internal_router)
 app.include_router(workshop_router)
+# ★ 2026-10-08 合并：**「壳」那一半搬进来了** ✓（登录 / 注册 / 账号 / 生活空间 ✓）。
+#   路径一个字没改 ✓ —— 手机上缓存着老页面、老书签 ✓。
+#   ⚠️ 挂载顺序有讲究 ✗：它必须在 `groups_router` **之后** ——
+#       `/api/workspaces` 和 `/api/groups` 不冲突 ✓，但 `/api/me`
+#       （本文件这条 ✓）和 `auth_router` 的 `/api/auth/me` 也不能撞 ✓。
+app.include_router(shell_router)
 
 # 禁缓存的头。界面是"改服务器文件 = 用户重开 App 生效"的架构，
 # 一旦被 WebView 缓存住，改了不生效，用户会以为改动没做
@@ -138,7 +154,36 @@ _NO_REVALIDATE = {"Cache-Control": "no-cache", "Pragma": "no-cache"}
 
 
 settings.ensure_dirs()
-app.mount("/media", StaticFiles(directory=settings.media_dir), name="media")
+# ★ 2026-10-08：`/media` **从"裸挂载"改成带鉴权** ✗→✓。
+#
+#   原来它是 `app.mount("/media", StaticFiles(...))` ✓ —— **没有任何鉴权** ✗：
+#   谁知道路径谁就拿得到 ✓（`/media/20261008/<32位hex>.jpg` ✓ 猜不到 ✓，
+#   但"猜不到"不是"拿不到"✓ —— 它是**公开**的 ✓）。
+#   图片时代还能将就 ✓（名字是随机 24 字节 ✓），**文件时代不行了** ✗：
+#   用户会传账本截图、体检报告、家里地址那种东西 ✓，
+#   而"文件夹里的一堆文件名"一旦泄出去，等于告诉别人你有什么 ✓。
+#
+#   ⚠️ 同源的话**前端一行都不用改** ✗ —— 浏览器会自己带上 cookie ✓
+#   （`<img src="/media/…">` ✓、`<audio src>` ✓、下载链接 ✓ 都是同源请求 ✓）。
+#   ⚠️ 组件 iframe（**不透明源** ✓）本来就带不上 cookie ✗ ——
+#      但组件从来不是靠 URL 取数据的 ✓（数据是保存时声明、由主页面塞进
+#      `window.__LG_DATA__` 的 ✓），所以它不受影响 ✓。
+#   ⚠️ 代价：媒体不再走 `immutable` 长缓存了 ✓（要过一遍鉴权 ✓）——
+#      同机同进程 ✓，这点开销可以接受 ✓。
+
+
+@app.get("/media/{path:path}")
+async def media_file(path: str, user: dict = Depends(current_user)) -> Response:
+    """取媒体（图片 / 语音 / 文件 / 音频）✓ —— **要登录** ✓。"""
+    base = settings.media_dir.resolve()
+    p = (settings.media_dir / path).resolve()
+    # ⚠️ **路径穿越要挡住** ✗ —— `path` 是 URL 里来的 ✓（和组件那个端点一个做法 ✓）
+    if not p.is_relative_to(base) or not p.is_file():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "没有这个文件")
+    # ⚠️ 不给 `immutable` ✗（那要求 URL 自己带版本号 ✓，而媒体路径本身是随机的 ✓
+    #     —— 随机名 = 内容变了名字就变 ✓，其实也可以长缓存 ✓；
+    #     但**下载**那种"点一下"的场景更在意"拿到最新的" ✓，就统一 no-cache ✓。）
+    return FileResponse(p, headers=dict(_NO_REVALIDATE))
 
 
 class _NoStoreStatic(StaticFiles):
@@ -220,125 +265,71 @@ async def app_latest() -> dict:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "latest.json 格式不对")
 
 
-# ── 进一个工作区 ─────────────────────────────────────────────────────────────
+# ── 进一个生活空间 ───────────────────────────────────────────────────────────
 #
-# 用户是从「壳」点进来的：`8741/?ws=<uuid>` ✓。
+# 用户带着地址进来：`/?ws=<uuid>` ✓（App 开机 → 门 → 这里 ✓）。
 #
-# ## 为什么"这人真在这个空间里吗"要去问壳
+# ## ★ 2026-10-08：这一段从 77 行**塌到十几行** ✓
 #
-# 成员关系的事实**归壳** ✓（它持有 users / workspaces / members ✓），
-# 本服务只镜像一份"我见过的工作区" ✓，用来放消息和账本 ✓。
+#   原来它要**带着用户的票去问壳**：「这人真在这个空间里吗」✓
+#   （`GET {shell}/api/internal/membership?ws=…` ✓），
+#   然后把名字 / 邀请码 / 角色**抄回本地** ✓ ——
+#   因为"谁是哪个空间的成员"这个事实**归壳** ✗（壳持有 users/workspaces/members ✓），
+#   这边只是一份**镜像** ✓（用来放消息、账本、组件 ✓）。
 #
-# ## 为什么带着**用户自己的票**去问
-#
-# 那样壳那边**不需要第二套内部凭证** ✓，而且回答天然是"针对这个人的" ✓ ——
-# 壳**不相信调用方自称的 user_id** ✗（那正是要避免的东西 ✓）。
-# 一个 cookie 就够：它本来就会跟着请求过来 ✓（cookie 按主机共享、不按端口 ✓）。
+#   合并之后那个事实就在**这个库**里 ✓（`group_members` + `groups` ✓），
+#   所以这一趟跨服务往返整个没有了 ✓：
+#   不需要问谁 ✓、不需要抄 ✓、也不会再有"两边漂了"这种事 ✓
+#   （用户为"同一个信息存两处"栽过至少三次 ✓：群名 ✓、邀请码 ✓、屏名 ✓）。
 async def enter_workspace(request: Request, ws: str) -> str | None:
     """成功返回 None；失败返回一句给用户看的话。"""
-
     token = request.cookies.get(SESSION_COOKIE) or ""
-    if not token:
-        return "还没有登录（先回壳登录一次）"
+    payload = decode_token(token) if token else None
+    if not payload:
+        return "还没有登录"
 
-    url = f"{settings.shell_base_url.rstrip('/')}/api/internal/membership?ws={ws}"
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as c:
-            r = await c.get(url, headers={"Authorization": f"Bearer {token}"})
-        if r.status_code == 403:
-            return "你不在这个工作区里"
-        if r.status_code != 200:
-            return f"壳那边没答上来（HTTP {r.status_code}）"
-        info = r.json()
-    except Exception as exc:  # noqa: BLE001
-        return f"问不到壳（{exc}）—— 它可能没起来"
+    uid = int(payload["sub"])
+    row = await fetch_one("""
+        SELECT g.id, g.profile FROM groups g
+        JOIN group_members gm ON gm.group_id = g.id
+        WHERE g.uuid = ? AND gm.user_id = ?
+    """, (ws, uid))
+    if not row:
+        return "你不在这个生活空间里"
 
-    # ⚠️ **先把用户行补出来** ✗ —— groups.owner_id 是外键，
-    # 用户行不在，下面那条 INSERT 会直接 FOREIGN KEY constraint failed ✗
-    #（进工作区走的是 cookie ✓，没经过常规鉴权那条路 ✓，所以这里得自己补 ✓）。
-    uid = int(info["user_id"])
-    # ⚠️ 这两个值要**每次都同步** ✗ —— 票里的昵称是**签发那一刻**的快照 ✓，
-    # 用户后来改了昵称/用户名，票还是旧的 ✓。
-    # 症状就是：设置里「我的」那一行写着**上一个昵称** ✗（2026-10-06 实测 ✓）。
-    # 进工作区这一步本来就要问壳 ✓，顺路把这两个值带回来最省事 ✓。
-    await ensure_user(uid, (info.get("nickname") or "").strip(),
-                      (info.get("username") or "").strip(), authoritative=True,
-                      avatar=(info.get("avatar") or "").strip())
-
-    # ── 把"我见过这个工作区"在本地补出来 ──
-    #
-    # 用 profile 做键 ✓（一个工作区 ⇄ 一个 profile，两边唯一 ✓），
-    # 所以重复进同一个工作区不会造出第二个群 ✓。
-    profile = info.get("profile") or ""
-    if not profile:
-        return "壳那边没给 profile 名"
-    # ★ **邀请码以壳为准** ✗→✓（2026-10-08 用户报的：「testuser那个群的邀请码
-    #   不能用」✓）。
-    #
-    #   这张表原来**自己摇一个码** ✓（下面那个 `new_invite_code()` ✓）——
-    #   那是**壳之前**的老做法 ✓（那时"加入一个群"是生活管家自己管的 ✓）。
-    #   现在加入是**壳**管的 ✓（`/api/workspaces/join` 认的是
-    #   `workspaces.invite_code` ✓），于是两边各有一个"邀请码" ✗ ——
-    #   设置页显示的是**这一个** ✗、加入时认的是**那一个** ✗ →
-    #   照抄界面上那个码，永远进不去 ✓（而且不报错，只说"没有这个邀请码"✓）。
-    #
-    #   所以**每次进工作区顺路把它抄成壳那一份** ✓ —— 名字本来就是这么同步的 ✓
-    #   （同一处、同一个来源 ✓），邀请码跟着走最省事、也不会再多一个会漂的字段 ✓。
-    #   ⚠️ 壳没给（老壳 / 字段缺）就**留着原值** ✗ —— 清成空的，界面会变成
-    #      "这个群没有邀请码" ✓，那比显示一个旧码更难解释 ✓。
-    code = (info.get("invite_code") or "").strip()
-    row = await fetch_one("SELECT id FROM groups WHERE profile = ?", (profile,))
-    if row:
-        gid = int(row["id"])
-        if code:
-            await execute("UPDATE groups SET name = ?, invite_code = ? WHERE id = ?",
-                          (info.get("name") or "空间", code, gid))
-        else:
-            await execute("UPDATE groups SET name = ? WHERE id = ?",
-                          (info.get("name") or "空间", gid))
-    else:
-        gid = await execute(
-            "INSERT INTO groups(name, owner_id, profile, invite_code, created_at) "
-            "VALUES(?,?,?,?,?)",
-            (info.get("name") or "空间", int(info["user_id"]), profile,
-             code or new_invite_code(), int(time.time())),
-        )
+    # ★ 「我上次在哪个空间」记在这儿 ✓ —— 原来是壳的 `/api/enter` 管的 ✓。
+    #   一人一空间之后它几乎没用了（只有一个 ✓），但留着：
+    #   同一个人换设备、或者以后真允许多空间时，它是"该落哪一屏"的判据 ✓。
+    #   ⚠️ 存的必须是**自己真在里面的**空间 ✓ —— 上面那条 join 已经把这件事
+    #      验过了（查不到就是不在 ✓），所以这一句不用再判 ✓。
     await execute(
-        "INSERT OR IGNORE INTO group_members(group_id, user_id, role, joined_at) "
-        "VALUES(?,?,?,?)",
-        (gid, uid, info.get("role") or "member", int(time.time())),
-    )
-    log.info("工作区 %s（profile=%s）→ 本地群 id=%s，用户 %s 已就位",
-             ws, profile, gid, info.get("user_id"))
+        "INSERT INTO user_prefs(user_id, last_ws) VALUES(?,?) "
+        "ON CONFLICT(user_id) DO UPDATE SET last_ws = excluded.last_ws", (uid, ws))
+    log.info("进入空间 %s（profile=%s，群 id=%s，用户 %s）",
+             ws, row["profile"], row["id"], uid)
     return None
 
 
-@app.get("/")
-async def index(request: Request, ws: str | None = None) -> Response:
-    """网页界面。客户端（App 里的 WebView 和浏览器）都从这里加载。
+def _render_page(route: str) -> str:
+    """把 `static/index.html` 拼出来：注入 agent 的主题/脚本 + **告诉前端"你在哪个地址"** ✓。
 
-    ## 壳是我们的，**行为现在也可以是 agent 的**
+    ★ `window.__ROUTE__` 是 2026-10-08 合并那次加的 ✓ —— 原来"你在哪个地址"
+    这件事由**壳**在服务端把 `__ROUTE__` 塞进它自己那份页面 ✓
+    （`/` 判去向 · `/login` 清票 · `/me` 到了就画 ✓）。
+    合并之后页面只剩这一个 ✓，所以这个变量也搬进来了 ✓。
 
-    这个页面（`static/index.html`）是**壳**：登录、WebSocket、消息渲染都在里面。
-    它归 root，agent 改不了——**但它读得到**（读得到是必须的，否则它没法知道
-    自己能挂哪些钩子）。
-
-    它改不了壳，但可以往 `ui/` 里写两样东西，这里都会挂上去：
-
-    | 文件 | 挂在哪 | 作用 |
-    |---|---|---|
-    | `ui/theme.css` | 内联进 `<head>` | 覆盖样式（配色、版式、气泡形状） |
-    | `ui/app.js` | 页面**末尾** | 它写的脚本，跑在页面自己的脚本之后 |
-
-    **为什么现在才敢开 `app.js` 这个口子**：登录凭证已经从网页的
-    `localStorage` 搬进了 httpOnly Cookie（见 `auth.py` 的 `SESSION_COOKIE`）。
-    页面上任何一段 JS——包括它写的——**都读不到令牌**。
-    所以"它能写 JS"不再等于"它能偷走你的登录态"，这条线才画得下去。
-
-    **文件不存在就什么都不做**——这就是"它改坏了"的自愈方式：删掉即回默认。
-    删掉 `app.js`，交互立刻回到原样，不需要重新部署任何东西。
+    ⚠️ **它是唯一一条"去向"的判据** ✗，不许再加第二个标记 ——
+    这个项目为"标记会丢"栽过一整轮（见 `memory/route-not-flag.md` ✓）：
+    地址不会丢 ✓，标记会 ✓。
     """
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    # ⚠️ 注入点必须是 `<head>` 之后（**在那段大脚本之前** ✓）——
+    #    页面末尾那个 IIFE 开局就要读它 ✓。
+    html = html.replace(
+        "<head>",
+        f'<head>\n<script>window.__ROUTE__={json.dumps(route)};</script>',
+        1,
+    )
     theme = settings.theme_path
     if theme.exists():
         try:
@@ -382,6 +373,93 @@ async def index(request: Request, ws: str | None = None) -> Response:
             1,
         )
         log.info("已挂载 %d 个 agent 脚本：%s", len(scripts), ", ".join(scripts))
+    return html
+
+
+def _etag(*parts: str) -> str:
+    return '"' + hashlib.sha256("\x00".join(parts).encode()).hexdigest()[:16] + '"'
+
+
+@app.get("/login")
+async def page_login(request: Request) -> Response:
+    """登录页。
+
+    ★ **这个地址自己就把票清掉** ✗→✓ —— 这条是壳那边立的规矩（2026-10-06 ✓），
+    合并时**原样搬过来** ✓：
+
+      · 这就是"退出登录 = 清空登录信息"的**全部实现** ✓ ——
+        不需要 `logout=1` 标记 ✓、不依赖"页面看得见 cookie"（**看不见** ✗
+        httpOnly ✓）、也不依赖"从别的端口发的删 cookie 手机认不认"（**实测不认** ✗）。
+      · 副作用正好是要的 ✓：登出之后**必须重新输密码** ✓ ——
+        就算谁手动把地址敲成 `/login`，票也会被清掉 ✓（这正是"登出"的语义 ✓）。
+    """
+    html = _render_page("login")
+    etag = _etag("login", html)
+    if etag in [x.strip() for x in (request.headers.get("if-none-match") or "").split(",")]:
+        r = Response(status_code=304, headers=dict(_NO_REVALIDATE, ETag=etag))
+        r.delete_cookie(SESSION_COOKIE, path="/")
+        return r
+    resp = HTMLResponse(html, headers=dict(_NO_REVALIDATE, ETag=etag))
+    resp.delete_cookie(SESSION_COOKIE, path="/")
+    return resp
+
+
+@app.get("/me")
+async def page_me(request: Request) -> Response:
+    """「我的」。
+
+    ★ 它**是一个地址** ✓ —— 到了就画 ✓，**永不自动跳走** ✓。
+    这条是那次重构的全部成果（`memory/route-not-flag.md` ✓）：
+    原来它只是"规则没跳走时剩下的结果" ✗ → 想停在它上面就得偷偷带个标记 ✗ →
+    而标记要跨三跳才到得了 ✓ → 任何一跳丢了就被弹回群聊 ✓。**改成地址之后没有标记可丢** ✓。
+    """
+    html = _render_page("me")
+    etag = _etag("me", html)
+    if etag in [x.strip() for x in (request.headers.get("if-none-match") or "").split(",")]:
+        return Response(status_code=304, headers=dict(_NO_REVALIDATE, ETag=etag))
+    return HTMLResponse(html, headers=dict(_NO_REVALIDATE, ETag=etag))
+
+
+@app.get("/admin")
+async def page_admin() -> Response:
+    """★ 这个 App 里**没有管理那套**了 ✗→✓（2026-10-08 用户定的）。
+
+    App 管家 / 模型那两个入口是**管理员专属**的 ✓，用户说「这个 App 里不管，
+    回头弄个别的 app，专属于我自己的技术 app」✓。
+    所以这个地址**只留一个 302** ✓（老书签/老页面点到它不至于 404 ✓）。
+
+    ⚠️ 那两个服务**照旧在跑** ✓（`http://<host>:8742/`、`:8722/` ✓），
+    浏览器直接开就行 ✓ —— 只是这个 App 里不再有入口 ✓。
+    """
+    return RedirectResponse("/me", status_code=302)
+
+
+@app.get("/")
+async def index(request: Request, ws: str | None = None) -> Response:
+    """网页界面。客户端（App 里的 WebView 和浏览器）都从这里加载。
+
+    ## 壳是我们的，**行为现在也可以是 agent 的**
+
+    这个页面（`static/index.html`）是**壳**：登录、WebSocket、消息渲染都在里面。
+    它归 root，agent 改不了——**但它读得到**（读得到是必须的，否则它没法知道
+    自己能挂哪些钩子）。
+
+    它改不了壳，但可以往 `ui/` 里写两样东西，这里都会挂上去：
+
+    | 文件 | 挂在哪 | 作用 |
+    |---|---|---|
+    | `ui/theme.css` | 内联进 `<head>` | 覆盖样式（配色、版式、气泡形状） |
+    | `ui/app.js` | 页面**末尾** | 它写的脚本，跑在页面自己的脚本之后 |
+
+    **为什么现在才敢开 `app.js` 这个口子**：登录凭证已经从网页的
+    `localStorage` 搬进了 httpOnly Cookie（见 `auth.py` 的 `SESSION_COOKIE`）。
+    页面上任何一段 JS——包括它写的——**都读不到令牌**。
+    所以"它能写 JS"不再等于"它能偷走你的登录态"，这条线才画得下去。
+
+    **文件不存在就什么都不做**——这就是"它改坏了"的自愈方式：删掉即回默认。
+    删掉 `app.js`，交互立刻回到原样，不需要重新部署任何东西。
+    """
+    html = _render_page("landing")
     # ★ 副作用**先跑**，和"发不发正文"无关 ✓ —— 2026-10-06。
     #   304 只是"正文不用重传了" ✓，不是"这次进来什么都没做" ✗：
     #   进工作区那一步还要**镜像昵称和头像** ✓（见 enter_workspace ✓），
@@ -546,6 +624,40 @@ async def _spots_of(group_id: int) -> dict[str, int]:
     return {str(r["slug"]): int(r["pos"]) for r in rows}
 
 
+#: 「组件界面diy」那一格的 slug ✓ —— 前端同一份约定 ✓（`WALL_SLUG` ✓）。
+WALL_SLUG = "wall"
+
+
+async def _ensure_wall(group_id: int) -> None:
+    """保证这个群有「组件界面diy」那一格 ✓，而且**排在第一个** ✓。
+
+    ★ 用户 2026-10-08 定的 ✓（原话：「提供一个默认组件聊天入口，名字叫[组件界面diy]…
+       **并且这个不可删除**，其他的依旧按照原来的进行」✓）。
+
+    ⚠️ 它**不是一个真的组件** ✗ —— 它没有 HTML 文件 ✓、点了也不会去渲染什么 ✓
+       （前端认这个 slug ✓，点了就直接进它那条对话 ✓）。
+       库里那一行只是"让它在收纳页上有一格"✓、以及"让那条对话有个 slug 可挂"✓。
+    ⚠️ **懒建** ✓：谁先进收纳页/谁先下拉，谁就把它建出来 ✓ ——
+       不需要在开通工作区那一步多写一段 ✓（老空间也不用补数据 ✓）。
+    """
+    row = await fetch_one(
+        "SELECT id FROM components WHERE group_id = ? AND slug = ? LIMIT 1",
+        (group_id, WALL_SLUG))
+    if row:
+        return
+    await execute(
+        "INSERT INTO components(group_id, slug, version, state, title, icon, "
+        "data_json, created_at) VALUES(?,?,?,?,?,?,?,?)",
+        (group_id, WALL_SLUG, 1, "live", "组件界面diy", "🎨", "{}", now()))
+    # ★ 排在**第一个** ✓ —— 位置表里给个 -1 ✓（`_scan_components` 按 pos 排 ✓，
+    #   没排过的垫底 ✓，所以 -1 稳在开头 ✓）。
+    await execute(
+        "INSERT INTO component_spots(group_id, slug, pos, updated_at) VALUES(?,?,?,?) "
+        "ON CONFLICT(group_id, slug) DO UPDATE SET pos=excluded.pos",
+        (group_id, WALL_SLUG, -1, now()))
+    log.info("群 %s：建出了「组件界面diy」那一格", group_id)
+
+
 async def _scan_components(group_id: int) -> list[dict]:
     """这个群有哪些组件 —— **以库为准** ✓。
 
@@ -557,6 +669,7 @@ async def _scan_components(group_id: int) -> list[dict]:
       所以每个 slug 回的就是**最新的那一版**长什么样 ✓
       （名字、图标、怎么摆 ✓）—— 界面上不再有任何"状态"要表达 ✓。
     """
+    await _ensure_wall(group_id)
     rows = await fetch_all(
         "SELECT slug, version, state, title, icon, note, spot_json, created_at"
         " FROM components WHERE group_id = ? ORDER BY slug ASC, version DESC",
@@ -755,6 +868,12 @@ async def component_rename(
     await require_member(group_id, user["id"])
     if not valid_slug(name):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
+    # ★ 「组件界面diy」**不能改名** ✗→✓（2026-10-08 用户定的："这个不可删除"✓）——
+    #   它的名字是**那条对话的名字**的一部分 ✓（用户靠它认路 ✓），
+    #   而且它的 slug 是**保留字** ✓ —— 改了名只会让人以为换了个东西 ✓。
+    if name == WALL_SLUG:
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "「组件界面diy」改不了名 —— 它是进组件界面的那条对话")
     title = body.title.strip()
     if not title:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "名字不能是空的")
@@ -768,6 +887,24 @@ async def component_rename(
     log.info("组件改名：群 %s 的 %s → %r（用户 %s，%d 版一起改）",
              group_id, name, title, user["id"], n)
     return {"ok": True, "slug": name, "title": title, "versions": int(n)}
+
+
+@app.get("/api/wall-css")
+async def wall_css(group_id: int = Query(...), user: dict = Depends(current_user)) -> dict:
+    """这一屏（[组件]界面）自己的外观 ✓ —— 由「组件界面diy」那条对话写 ✓。
+
+    ⚠️ **要登录 + 要是成员** ✓（`require_member` ✓）—— 这段 CSS 属于**这个群** ✓，
+       别的群的人不该读到 ✓（虽然 CSS 本身不敏感 ✓，但"谁有什么组件"是隐私 ✓）。
+
+    返回空串 = 没改过 ✓ → 前端就当"没有自定义外观" ✓（默认样子 ✓）。
+    """
+    await require_member(group_id, user["id"])
+    f = Path(settings.var_dir) / "wall" / f"g{int(group_id)}" / "style.css"
+    try:
+        css = f.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        css = ""
+    return {"css": css[:200_000]}
 
 
 @app.delete("/api/components/{name}")
@@ -792,6 +929,12 @@ async def component_delete(
        "再点一下：连它的对话一起删" ✓ —— **说清代价比拦一道更管用** ✓。
     """
     await require_member(group_id, user["id"])
+    # ★ **「组件界面diy」删不掉** ✗→✓（用户原话："并且这个不可删除"✓）——
+    #   它删不得还有个更硬的理由 ✓：它是**唯一**能改组件界面外观的入口 ✓
+    #   （见 `routes_internal` 的 `_wall_task_ok` ✓）→ 删了那个能力就没人够得着了 ✓。
+    if name == WALL_SLUG:
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "「组件界面diy」删不掉 —— 组件界面本身要靠它来改")
     if not valid_slug(name):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
     where = "group_id = ? AND slug = ?" + (" AND version = ?" if v else "")

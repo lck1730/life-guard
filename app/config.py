@@ -144,11 +144,39 @@ class Settings(BaseSettings):
     # **只放自己那几个工作区的 key** ✓ —— 这就是"它读不到别人的东西"在密钥这一层的落实 ✓。
     hermes_keys_dir: Path = Path("/opt/lifeguard-chat/keys")
 
-    # ★ 会话由「壳」签发，所以这里存的是**壳的密钥**（不是自己发的 ✗）。
+    # 会话票的**签发密钥**。★ 2026-10-08 合并之后，**登录也在这个服务里** ✓，
+    # 所以它从"只读别人的密钥"变成了"自己签 ✓"——路径没变 ✓，
+    # 因为**模型网关和 App 管家也在拿它验票** ✓（换路径 = 那两边全哑 ✓）。
     #
     # 只读 ✓：本服务在 `lgauth` 组里所以读得到 ✓，
     # 而 agent（lifeguard 用户）不在那个组里 ✗ —— 它偷不到 ✓。
     shell_jwt_secret: Path = Path("/etc/lifeguard-shell/jwt.secret")
+
+    # ── 合并那次（2026-10-08）从壳搬过来的几项 ─────────────────────────
+    #
+    # 账号头像。**存文件不存库** ✓（库是"事实"、图是"附件" ✓ 混在一起备份和查数据都变笨 ✓）。
+    # ⚠️ 搬家的代价：老文件在 `/opt/lifeguard-shell/var/avatars/`（700 lgshell ✓），
+    #    而这个服务跑在 lgchat 下 ✗ → **P10 切换时拷一份过来** ✓（旧的那份留着，
+    #    回滚时旧壳还要用它 ✓）。
+    avatar_dir: Path = Path("./var/avatars")
+
+    # 开通/删除空间的**队列目录** ✓ —— 见 routes_shell 里 `provision()` 那段长注释：
+    # 这两件事要写 `/root/.hermes` ✓，而这个服务进不去 ✗，也不该为它提权 ✗
+    # → 只往这儿写一个请求文件 ✓，由 root 的 systemd `.path` 单元干活 ✓。
+    provision_queue: Path = Path("/opt/lifeguard-shell/var/provision")
+
+    # ★ 一个人只能有一个生活空间 ✓（2026-10-08 用户定的 ✓）。
+    # 原来壳那边是 3 ✓ —— 换成 1 之后，`/api/workspaces` 建第二个会被拒 ✓，
+    # 文案也说清了"先退出原来那个" ✓。
+    max_spaces_per_user: int = 1
+
+    # ★ 一个空间最多 **3 个真人** ✓（管家不算 ✗ —— 它不是 `group_members` 里的一行 ✓，
+    # 而是查询时动态拼上去的 ✓，所以直接 COUNT 就是真人数 ✓）。
+    # 满员之后邀请码**在加入那一步被拒** ✓（不是把码删掉 ✗：有人退出，名额就该自动回来 ✓）。
+    max_space_members: int = 3
+
+    # 空间邀请码 / 内测码的长度（和壳一致 ✓）。
+    invite_code_len: int = 8
 
     # ── 自己这边的三条“家底”（2026-10-07 修）─────────────────────────
     #

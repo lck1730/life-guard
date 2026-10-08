@@ -46,6 +46,10 @@ from .messages import create_message
 from .routes_workshop import push_workshop_status, start_waiting, stop_waiting
 
 log = logging.getLogger("lifeguard.internal")
+
+#: 「组件界面diy」那条对话的 slug ✓（保留字 ✓）——
+#: 只有它的对话能改组件界面外观 ✓（闸门在 `_wall_task_ok` ✓）。
+WALL_SLUG = "wall"
 router = APIRouter(prefix="/api/internal/tools", tags=["internal"])
 
 
@@ -1212,6 +1216,99 @@ async def components_list_tool(body: ComponentSlugIn) -> dict:
         elif r["state"] == "draft" and it["draft"] is None:
             it["draft"] = int(r["version"])
     return {"ok": True, "components": [out[k] for k in sorted(out)]}
+
+
+# ── ★ 「组件界面」自己的外观（2026-10-08）─────────────────────────────────
+#
+# 用户定的：那条叫「组件界面diy」的对话，**可以改 [组件] 界面本身** ✓
+#（原话：「提供一个默认组件聊天入口，名字叫[组件界面diy]，这个聊天甚至可以
+#   自行diy[组件]界面本身，由于本身就是基本空白，因此可以自由天马行空，
+#   甚至将提示的字都去掉，注意，只有这一个入口可以提供此功能」✓）。
+#
+# ## 存哪
+#
+# `var/wall/g<群号>/style.css` ✓（和组件仓库同一层 ✓：服务写 ✓、agent **写不进** ✗）。
+# 为什么放文件不放库列 ✓：CSS 是**附件**不是**事实** ✓（同 `db.py` 顶上那条对头像的
+# 判断 ✓）。为什么不放 `ui/` ✓：那底下是**无鉴权**挂载 ✓，而这是"某个群自己的东西" ✗
+#（同 `main.py` 里组件为什么住 `var/` 那一段 ✓）。
+#
+# ## ⚠️ 闸门在**服务端**，不在提示词里 ✗
+#
+# 只有**那一条对话**能调它 ✓ —— "我是哪条对话"是从 `session_id` 反查出来的 ✓
+#（插件把它一起发上来 ✓），而判据是"这条任务的 slug 是不是 `wall`" ✓。
+# 提示词里写一句"只有你能改"是**请求**不是**闸门** ✓（这个项目的老结论 ✓）。
+
+class WallStyleIn(BaseModel):
+    group_id: int
+    task_id: int | None = None
+    css: str = ""
+    note: str = ""
+
+
+def _wall_dir(group_id: int) -> Path:
+    d = Path(settings.var_dir) / "wall" / f"g{int(group_id)}"
+    d.mkdir(parents=True, exist_ok=True)
+    # ⚠️ **权限要显式设** ✗ —— `mkdir` 的 mode 会被 umask 削掉 ✓，
+    #    而"agent 写不进"这件事全靠它 ✓（和 `var/components` 一样是 2750 ✓）。
+    try:
+        os.chmod(d, 0o2750)
+    except OSError:
+        pass
+    return d
+
+
+async def _wall_task_ok(group_id: int, task_id: int | None) -> str | None:
+    """这条对话是不是「组件界面diy」那条 ✓？不是就返回一句给模型看的话。"""
+    if not task_id:
+        return ("改「组件界面」的外观只能在**「组件界面diy」那条对话**里做 —— "
+                "你这条对话没有那个权限。")
+    row = await fetch_one(
+        "SELECT slug FROM workshop_tasks WHERE id = ? AND group_id = ?",
+        (int(task_id), int(group_id)))
+    if not row or (row["slug"] or "") != WALL_SLUG:
+        return "只有「组件界面diy」那条对话能改组件界面的外观。"
+    return None
+
+
+@router.post("/components/wall-set", dependencies=[Depends(require_internal_token)])
+async def wall_style_set(body: WallStyleIn) -> dict:
+    """写下这个群的「组件界面」外观 ✓（CSS ✓）。"""
+    await _assert_group(body.group_id)
+    bad = await _wall_task_ok(body.group_id, body.task_id)
+    if bad:
+        return {"ok": False, "error": bad}
+    css = (body.css or "").strip()
+    if not css:
+        return {"ok": False, "error": "css 是空的 —— 要恢复默认请用 wall_clear"}
+    if len(css) > 200_000:
+        return {"ok": False, "error": "太长了（超过 20 万字符）"}
+    # ⚠️ **必须自己限定作用域** ✗ —— 这段 CSS 会挂在**整个页面**上 ✓，
+    #    不限定的话会改到主群聊、我的、设置页…… ✗（用户要的是改**那一屏** ✓）。
+    #    所以这里只做一条**便宜但有效**的检查 ✓：得有 `#workshop` 这个选择器 ✓。
+    #    （不引 CSS 解析器 ✓ —— 那要新依赖 ✓，而这一条已经能挡住 99% 的"忘了限定"✓。）
+    if "#workshop" not in css:
+        return {"ok": False, "error": (
+            "css 里必须用 `#workshop` 限定作用域（那一屏的容器 id 就是 `#workshop`）——"
+            "不然你会把主群聊、我的、设置页也一起改了。"
+            "例：`#workshop .cell { border-radius: 999px; }`")}
+    d = _wall_dir(body.group_id)
+    (d / "style.css").write_text(css, encoding="utf-8")
+    log.info("组件界面外观：群 %s 写了 %d 字符的 CSS（%s）",
+             body.group_id, len(css), (body.note or "")[:60])
+    return {"ok": True, "bytes": len(css), "note": (
+        "已经生效了 —— 用户右滑回群聊、再左滑进来就看得见 ✓"
+        "（不用重启任何东西 ✓）。")}
+
+
+@router.post("/components/wall-clear", dependencies=[Depends(require_internal_token)])
+async def wall_style_clear(body: ComponentSlugIn) -> dict:
+    """把「组件界面」的外观**恢复默认** ✓（删掉那个文件 ✓）。"""
+    await _assert_group(body.group_id)
+    f = Path(settings.var_dir) / "wall" / f"g{int(body.group_id)}" / "style.css"
+    if f.exists():
+        f.unlink(missing_ok=True)
+        return {"ok": True, "note": "已经恢复默认外观 ✓"}
+    return {"ok": True, "note": "本来就是默认外观 ✓"}
 
 
 @router.post("/components/note", dependencies=[Depends(require_internal_token)])

@@ -20,18 +20,42 @@ from .config import settings
 log = logging.getLogger("lifeguard.db")
 
 SCHEMA = """
+-- ★ 2026-10-08：**用户表从"按需镜像"变成"权威"** ✗→✓（合并那次）。
+--
+--   原来是两张 users：壳那张是权威（注册/改名的都在它那儿 ✓），
+--   这张是**按需镜像** —— 第一次见到谁补一条 ✓，`password_hash` 写死 `!`，
+--   昵称/头像靠 `ensure_user(..., authoritative=True)` 从壳那边抄过来 ✓。
+--   合并之后"壳"没有了 ✓，这张表就是唯一的那一张 ✓：
+--   `password_hash` 是真的（**两种格式都认**，见 `auth.verify_password_any`），
+--   `is_admin` 也从壳那边搬了过来 ✓。
 CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT    NOT NULL UNIQUE,
     password_hash TEXT    NOT NULL,
     nickname      TEXT    NOT NULL,
     avatar        TEXT,
+    is_admin      INTEGER NOT NULL DEFAULT 0,
     created_at    INTEGER NOT NULL
 );
 
+-- ★ 2026-10-08：`uuid` 从壳的 `workspaces.uuid` 搬过来 ✓（8 位 hex ✓）。
+--
+--   它和 `profile`（`chat-<uuid>` ✓）是**同一个东西的两种写法** ✓ ——
+--   所以这里**不再单独加唯一约束** ✗：真正的唯一性是
+--   `_ensure_profile_unique()` 按 `profile` 建的那个索引 ✓，
+--   uuid 的唯一性由它推出来 ✓（两处都建 = 两处都要维护 ✓）。
+--   老行（合并之前建的）这一列是空的 ✓ —— 迁移脚本会按 profile 回填 ✓。
 CREATE TABLE IF NOT EXISTS groups (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid        TEXT,
     name        TEXT    NOT NULL,
+    -- ★ 2026-10-08：**正在退出**的时间戳（NULL = 正常 ✓）。
+    --   用途：退出空间是"先标记、后真删"两段（见 `routes_shell.leave_space` ✓）——
+    --   标记一落，这个空间就该**立刻对它的人不可用** ✓，
+    --   不等那个 root worker 删完 profile ✓。
+    --   拦在 **`require_member`** 那一处 ✓（所有群数据的唯一入口 ✓）：
+    --   一处拦住 = 每条路都拦住了 ✓；散在十几个接口里迟早漏一个 ✗。
+    deleting_at INTEGER,
     owner_id    INTEGER NOT NULL REFERENCES users(id),
     invite_code TEXT    NOT NULL UNIQUE,
     created_at  INTEGER NOT NULL
@@ -42,7 +66,32 @@ CREATE TABLE IF NOT EXISTS group_members (
     user_id   INTEGER NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
     role      TEXT    NOT NULL DEFAULT 'member',
     joined_at INTEGER NOT NULL,
+    -- ★ 2026-10-08：**每个人自己写的一段自我介绍**（≤500 字 ✓，可空 ✓）。
+    --   用途只有一个：每轮拼进 `_group_persona` ✓ —— 让他从第一天起就
+    --   知道"这两个人是谁" ✓，而不是靠聊天一点点猜 ✓。
+    --   ⚠️ 它是 (人, 空间) 的 ✓，不是账号级的 ✗ —— 一人一空间之后两者等价 ✓，
+    --      但存法按语义走 ✓（空间没了它就该跟着没 ✓）。
+    self_intro TEXT,
     PRIMARY KEY (group_id, user_id)
+);
+
+-- ★ 2026-10-08：**备注** ✓ —— 你给别人起的名字 ✓。
+--
+--   用户定的一句话说清了它和"昵称"的区别：「备注后群聊里显示就会替换为备注内容，
+--   **对方不感知**」✓。
+--
+--   ⚠️ 所以它**不进给模型的 prompt** ✗（见 `_group_persona` ✓）——
+--      备注是"我私下怎么叫他" ✓，一旦进 prompt，管家完全可能当众说出来 ✓
+--      （"你备注里管他叫老王" ✓），那就正好违反了"对方不感知" ✓。
+--   ⚠️ 它也是 **(我, 他)** 的关系 ✓，不是 (人, 空间) 的 ✗ ——
+--      同一个人对不同人有不同备注 ✓，而且**只该我看得见** ✓
+--      → 独立一张表 ✓（塞进 `group_members` 会变成"大家共用一个备注" ✗）。
+CREATE TABLE IF NOT EXISTS contact_notes (
+    owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    peer_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    note       TEXT    NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (owner_id, peer_id)
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -343,6 +392,34 @@ CREATE TABLE IF NOT EXISTS workshop_messages (
 CREATE INDEX IF NOT EXISTS idx_workshop_msgs
     ON workshop_messages(group_id, user_id, id);
 
+-- ★ 2026-10-08：这两张表从壳搬过来 ✓（合并那次）。形状照抄壳那份 ✓，
+--   连注释里那条"为什么"也一起搬 —— 它们是当初踩过才写下来的 ✓。
+--
+-- 内测码。**注册的闸门** —— 只有拿得到码的人能建账号 ✓。
+-- 为什么用一张表而不是写死在配置里：码要能**一批一批发** ✓、
+-- 能看见"谁什么时候用了" ✓。以后真要开放注册，在**这一层**换（换手机号验证 ✓）。
+CREATE TABLE IF NOT EXISTS beta_codes (
+    code       TEXT PRIMARY KEY,
+    note       TEXT,                    -- 发给谁 / 干什么用（只给自己看）
+    created_at INTEGER NOT NULL,
+    used_by    INTEGER,                 -- 用了就记下来，NULL = 还没用
+    used_at    INTEGER
+);
+
+-- 「上次在用的空间」。
+--
+-- ★ 2026-10-06 从**手机上的 localStorage** 搬到服务端 ✓ —— 那是个"标记" ✓，
+--   而标记会丢 ✗（URL 参数丢了 ✗、`lg_back` 丢了 ✗）。按账号存在服务端就丢不了 ✓，
+--   顺带白捡一条：同一台手机换账号**不会串** ✓（存本机就会串 ✗）。
+-- ⚠️ **一人一空间之后 `default_ws` 没用了** ✗（只有一个，没什么可"默认"的 ✓），
+--   但**列保留** —— 迁移规矩是只加不删 ✓，而且 `last_ws` 还有用
+--   （"上次在哪个空间"= 这一个 ✓，留给以后可能的多空间 ✓）。
+CREATE TABLE IF NOT EXISTS user_prefs (
+    user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    default_ws TEXT,
+    last_ws    TEXT
+);
+
 -- 登录失败计数。存在的理由：密码是用户自设的短密码，一旦服务被暴露，
 -- 没有限流就是几秒钟的事。
 --
@@ -474,6 +551,15 @@ _MIGRATIONS: list[tuple[str, str, str]] = [
     ("workshop_messages", "media_meta", "TEXT"),
     ("workshop_messages", "reply_to", "INTEGER"),
     ("workshop_messages", "mentions", "TEXT"),
+    # ★ 合并那次（2026-10-08）：用户表从"按需镜像"变成"权威" ✓。
+    #   老库里这两列都不存在 ✓（它们原本在**壳**那张 users 表上 ✓），
+    #   所以要在这里补 —— 老行补出来是 0 / NULL ✓（迁移脚本随后回填 ✓）。
+    ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
+    ("groups", "uuid", "TEXT"),
+    # 正在退出（见 SCHEMA 里那段 ✓）。老行补出来是 NULL ✓ = 正常 ✓。
+    ("groups", "deleting_at", "INTEGER"),
+    # 自我介绍（见 SCHEMA 里那段 ✓）。老行补出来是 NULL ✓ = 没写 ✓。
+    ("group_members", "self_intro", "TEXT"),
 ]
 
 

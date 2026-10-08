@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 log = logging.getLogger("lifeguard.groups")
 
 from .agent_status import clean_prompt, dumps
-from .auth import current_user, new_invite_code, require_member
+from .auth import current_user, require_member
 from .config import settings
 from .db import execute, fetch_all, fetch_one, now
 from .messages import (
@@ -25,26 +25,13 @@ from .messages import (
     create_message,
     list_messages,
 )
-from .spaces import check as check_space
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
 
-class CreateGroupIn(BaseModel):
-    name: str = Field(min_length=1, max_length=64)
-    # 记忆空间。**必填，没有默认值。** 早先这里省略了它，落库时吃数据库的
-    # `DEFAULT 'couple'`——建群的人根本不知道自己在往哪儿放，而且不报错。
-    # App 里没有建群 UI，这个接口基本没人调，但"留着一条能绕过硬约束的路"
-    # 本身就是隐患，所以照样校验（校验逻辑与 CLI 共用 app/spaces.py）。
-    profile: str = Field(min_length=1, max_length=64)
-
-
-class JoinGroupIn(BaseModel):
-    invite_code: str = Field(min_length=4, max_length=32)
-
-
 class SendMessageIn(BaseModel):
-    msg_type: str = Field(default="text", pattern="^(text|image|voice)$")
+    # ★ 2026-10-08 加了 `file`（文档）和 `audio`（**上传的音频**，和"按住说的 voice"分开 ✓）
+    msg_type: str = Field(default="text", pattern="^(text|image|voice|file|audio)$")
     content: str | None = None
     media_path: str | None = None
     media_meta: dict | None = None
@@ -194,66 +181,50 @@ async def bootstrap(
     ws = request.cookies.get("lg_chat_ws") or ""
     groups = _normalize_rows(_prefer_current(groups, ws))
 
+    # ★ 备注（`{peer_id: note}` ✓）—— **一趟拿齐** ✗→✓（2026-10-08）。
+    #   它本来也可以单开一个接口 ✓（`GET /api/notes` 也有 ✓），但这里是
+    #   "开一次 App 只走一趟"那条约定的地方 ✓（见这个函数的说明 ✓）——
+    #   而备注**每条消息渲染都要用** ✓（决定显示哪个名字 ✓）→
+    #   分两趟的话，第一屏消息会先按真名画一遍、再被备注覆盖 ✓（看得见的闪 ✓）。
+    notes = {str(r["peer_id"]): r["note"] for r in await fetch_all(
+        "SELECT peer_id, note FROM contact_notes WHERE owner_id = ?", (user["id"],))}
+
     if not groups:
-        return {"me": user, "groups": [], "group": None, "members": [], "messages": []}
+        return {"me": user, "groups": [], "group": None, "members": [],
+                "messages": [], "notes": notes}
     g = groups[0]
     mem = await members(g["id"], user=user)          # 复用同一个函数（它也做成员校验）
     msgs = await list_messages(g["id"], after=0, limit=limit)
-    return {"me": user, "groups": groups, "group": g, "members": mem, "messages": msgs}
+    return {"me": user, "groups": groups, "group": g, "members": mem,
+            "messages": msgs, "notes": notes}
 
 
-@router.post("")
-async def create_group(body: CreateGroupIn, user: dict = Depends(current_user)) -> dict:
-    # 一个群 ⇄ 一个记忆空间。校验不通过就一个群都不建——建出来的只会是个
-    # 每次说话都静默 401 的哑群，或者更糟：落进别人的空间里共享记忆。
-    problem = await check_space(body.profile.strip())
-    if problem:
-        raise HTTPException(status.HTTP_409_CONFLICT, problem)
-
-    # 邀请码理论上可能撞（32^8 空间极小概率），重试几次保证唯一。
-    for _ in range(5):
-        code = new_invite_code()
-        if not await fetch_one("SELECT id FROM groups WHERE invite_code = ?", (code,)):
-            break
-    else:
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "生成邀请码失败")
-
-    gid = await execute(
-        "INSERT INTO groups (name, owner_id, invite_code, created_at, profile) "
-        "VALUES (?,?,?,?,?)",
-        (body.name, user["id"], code, now(), body.profile.strip()),
-    )
-    await execute(
-        "INSERT INTO group_members (group_id, user_id, role, joined_at) VALUES (?,?,?,?)",
-        (gid, user["id"], "owner", now()),
-    )
-    # 给新群把内置记录类型登记上（记账）。不登记的话它第一次记账会拿到
-    # "没有 bookkeeping 这个类型"，虽然能自愈（`record_kinds` 会自动补），
-    # 但没必要让它撞一次。
-    from . import records as _rec
-
-    await _rec.ensure_builtin_kinds(gid)
-    return await fetch_one("SELECT * FROM groups WHERE id = ?", (gid,))  # type: ignore[return-value]
-
-
-@router.post("/join")
-async def join_group(body: JoinGroupIn, user: dict = Depends(current_user)) -> dict:
-    group = await fetch_one(
-        "SELECT * FROM groups WHERE invite_code = ?", (body.invite_code.strip().upper(),)
-    )
-    if not group:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "邀请码无效")
-    existing = await fetch_one(
-        "SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?",
-        (group["id"], user["id"]),
-    )
-    if not existing:
-        await execute(
-            "INSERT INTO group_members (group_id, user_id, role, joined_at) VALUES (?,?,?,?)",
-            (group["id"], user["id"], "member", now()),
-        )
-    return group
-
+# ── ⚠️ 这里原来有两条"自己建群 / 自己加入"的路 ✗→✓（2026-10-08 删掉）──
+#
+#   `POST /api/groups`（建）和 `POST /api/groups/join`（加入）✓ ——
+#   它们是**合并之前**的形状 ✓：那时候"加入一个群"是生活管家自己管的 ✓，
+#   于是这张表里有自己的一份 `invite_code` ✓。
+#   后来壳接管了这件事 ✓（`/api/workspaces` + `/api/workspaces/join` ✓），
+#   两条路就**同时存在**了 ✗ —— 而它们的判据不一样 ✓：
+#   壳那条认 `workspaces.invite_code` ✓，这条认 `groups.invite_code` ✓，
+#   两个码各摇各的 ✓ → **2026-10-08 那个"邀请码不能用"就是这么来的** ✓
+#   （界面显示一个、加入认另一个 ✓）。
+#
+#   合并之后这一半搬进了这个服务 ✓（`routes_shell.py` ✓），
+#   两边终于**都在同一个库上了** ✓ → 这两条重复的路**没有存在的理由** ✓。
+#   ⚠️ 更要紧的是：留着它们，那道"一个空间最多 3 个人"的闸就**形同虚设** ✗
+#      （绕过 `/api/workspaces/join` 走 `/api/groups/join` 就行 ✓）。
+#      上限这类东西必须**每条入口都拦** ✓，那就只能留一条入口 ✓。
+#
+#   它俩各自带的两件事**搬走了**（不是丢了 ✓）：
+#     · `check_space(profile)` —— 建空间前校验记忆空间能不能用 ✓
+#       → 搬进 `routes_shell.create_space` ✓（那边本来就要建 profile ✓）
+#     · `ensure_builtin_kinds(gid)` —— 给新空间登记内置记录类型（记账 ✓）
+#       → 同上 ✓（不登记的话它第一次记账会撞一次"没有 bookkeeping 这个类型"✓，
+#         能自愈 ✓，但没必要 ✓）
+#
+#   （`admin.py` 里那条命令行建群的入口**保留** ✓ —— 那是我们自己运维用的 ✓，
+#     不走 HTTP ✓，也就不构成"第二条对外的路"✓。）
 
 @router.get("/{group_id}/members")
 async def members(group_id: int, user: dict = Depends(current_user)) -> list[dict]:
@@ -498,7 +469,9 @@ async def send_message(
     # 只是管家读不到内容而已。为了转写失败让人发不出话，本末倒置。
     content = body.content
     media_meta = dict(body.media_meta or {})
-    if body.msg_type == "voice" and body.media_path and not (content or "").strip():
+    # ★ `audio`（用户**上传的音频文件** ✓）和 `voice`（按住说的 ✓）**走同一条路** ✓ ——
+    #   对管家来说都是"一段话"，它不需要知道是录的还是传的 ✓。
+    if body.msg_type in ("voice", "audio") and body.media_path and not (content or "").strip():
         from .stt import transcribe
 
         audio = settings.media_dir / body.media_path
@@ -508,7 +481,38 @@ async def send_message(
             media_meta["transcript"] = text
         else:
             media_meta["transcript_failed"] = True
-            log.info("语音转写失败或为空：%s", body.media_path)
+            log.info("音频转写失败或为空：%s", body.media_path)
+
+    # ★ **文本类文件读进来** ✗→✓（2026-10-08 用户定的："文本类能读"✓）——
+    #   txt / md / csv / json 直接读 ✓，截断之后放进 `content` ✓
+    #   （和语音转写同一个模式 ✓：管家看到的是一段带前缀的文字 ✓，
+    #    而不是"这里有个文件但你打不开" ✗）。
+    #
+    #   ⚠️ **只读我们自己白名单里的扩展名** ✗ —— `media_path` 是客户端给的 ✓，
+    #      拼路径之前必须确认它没跑出 `media_dir` ✓（`is_relative_to` ✓，
+    #      和组件那个渲染端点一个做法 ✓）。
+    #   ⚠️ pdf / word / excel **不读** ✗（要装解析库 ✓，见 `routes_media` 那段 ✓）→
+    #      管家只知道文件名和大小 ✓，它会照实说"我打不开这个格式" ✓。
+    if body.msg_type == "file" and body.media_path and not (content or "").strip():
+        from .routes_media import TEXT_EXTS
+        p = (settings.media_dir / body.media_path).resolve()
+        base = settings.media_dir.resolve()
+        ok = p.is_relative_to(base) and p.suffix.lower() in TEXT_EXTS and p.is_file()
+        if ok:
+            try:
+                raw = p.read_text(encoding="utf-8", errors="replace")
+            except OSError as exc:  # noqa: BLE001
+                raw = ""
+                log.info("读文件失败：%s（%s）", body.media_path, exc)
+            if raw.strip():
+                text = raw.strip()[:4000]        # ⚠️ 截断 ✓：别让一个 2MB 的日志把上下文吃光 ✗
+                content = text
+                media_meta["text"] = text
+                media_meta["truncated"] = len(raw) > len(text)
+        else:
+            # 不读的类型（pdf/word/excel…）→ **说清楚它是什么** ✓，
+            # 免得管家猜"这个文件里是什么" ✓（它会编 ✓）。
+            media_meta.setdefault("opaque", True)
 
     # 「反馈：」是用户和它之间的约定（见 SOUL.md）——以这个前缀开头是在**评价它的
     # 表现**，不是在聊生活。**我们不做任何处理**：识别和吸收都是它自己的事。
