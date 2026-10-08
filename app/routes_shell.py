@@ -388,7 +388,7 @@ async def set_self_intro(body: SelfIntroIn, request: Request) -> dict:
     return {"self_intro": text}
 
 
-@app.get("/api/notes")
+@router.get("/api/notes")
 async def list_notes(request: Request) -> dict:
     """我给别人起的备注 ✓（`{peer_id: note}` ✓）—— 只有我自己看得到 ✓。"""
     me = await _require_me(request)
