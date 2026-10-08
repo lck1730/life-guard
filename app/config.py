@@ -119,7 +119,15 @@ class Settings(BaseSettings):
     hermes_base_url: str = "http://127.0.0.1:8642"
     hermes_api_key: str = ""
     # 默认 Profile。群没指定 profile 时用它。
-    hermes_default_profile: str = "couple"
+    # ★ 2026-10-07 深夜改的：原来写的是 `couple` ✗ —— 那是**旧项目的共用空间** ✓，
+    #   2026-10-07 清理时按用户要求删掉了 ✓。
+    #
+    # ⚠️ 它的用途只有一个：**群找不到 profile 时的兜底** ✓。
+    #    而那个兜底**本来就是出事了**（`spaces.py` 那条硬约束被绕过 ✓）——
+    #    所以这个名字要**一眼看出"这儿不该有东西"** ✓：
+    #    Hermes 会照名建一个**空**空间 ✓，不会把数据落进别人的记忆里 ✓，
+    #    日志里那句"回退到 unassigned"也就说得通了 ✓。
+    hermes_default_profile: str = "unassigned"
     # Hermes 家目录，用来读取各 Profile 的 API_SERVER_KEY。
     # 官方要求每个 Profile 独立的 key，default 的 key 在 /p/<name>/ 上会 401，
     # 所以这里不能只存一个 key——按 Profile 现读现用。

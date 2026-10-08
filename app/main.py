@@ -272,16 +272,36 @@ async def enter_workspace(request: Request, ws: str) -> str | None:
     profile = info.get("profile") or ""
     if not profile:
         return "壳那边没给 profile 名"
+    # ★ **邀请码以壳为准** ✗→✓（2026-10-08 用户报的：「testuser那个群的邀请码
+    #   不能用」✓）。
+    #
+    #   这张表原来**自己摇一个码** ✓（下面那个 `new_invite_code()` ✓）——
+    #   那是**壳之前**的老做法 ✓（那时"加入一个群"是生活管家自己管的 ✓）。
+    #   现在加入是**壳**管的 ✓（`/api/workspaces/join` 认的是
+    #   `workspaces.invite_code` ✓），于是两边各有一个"邀请码" ✗ ——
+    #   设置页显示的是**这一个** ✗、加入时认的是**那一个** ✗ →
+    #   照抄界面上那个码，永远进不去 ✓（而且不报错，只说"没有这个邀请码"✓）。
+    #
+    #   所以**每次进工作区顺路把它抄成壳那一份** ✓ —— 名字本来就是这么同步的 ✓
+    #   （同一处、同一个来源 ✓），邀请码跟着走最省事、也不会再多一个会漂的字段 ✓。
+    #   ⚠️ 壳没给（老壳 / 字段缺）就**留着原值** ✗ —— 清成空的，界面会变成
+    #      "这个群没有邀请码" ✓，那比显示一个旧码更难解释 ✓。
+    code = (info.get("invite_code") or "").strip()
     row = await fetch_one("SELECT id FROM groups WHERE profile = ?", (profile,))
     if row:
         gid = int(row["id"])
-        await execute("UPDATE groups SET name = ? WHERE id = ?", (info.get("name") or "空间", gid))
+        if code:
+            await execute("UPDATE groups SET name = ?, invite_code = ? WHERE id = ?",
+                          (info.get("name") or "空间", code, gid))
+        else:
+            await execute("UPDATE groups SET name = ? WHERE id = ?",
+                          (info.get("name") or "空间", gid))
     else:
         gid = await execute(
             "INSERT INTO groups(name, owner_id, profile, invite_code, created_at) "
             "VALUES(?,?,?,?,?)",
             (info.get("name") or "空间", int(info["user_id"]), profile,
-             new_invite_code(), int(time.time())),
+             code or new_invite_code(), int(time.time())),
         )
     await execute(
         "INSERT OR IGNORE INTO group_members(group_id, user_id, role, joined_at) "
