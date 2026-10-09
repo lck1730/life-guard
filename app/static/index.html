@@ -235,6 +235,20 @@
      ⚠️ 这一条以前只写在注释里 ✗（"CSS 里把长按呼出和选择都关了"✓），
         而**代码里根本没加** ✓ —— 注释和代码不一致，等于没有 ✓。 */
   .row .bubble, .mkrow .mkbub { -webkit-touch-callout:none; user-select:none; }
+  /* ★ **点了「自由复制」的那一条：临时放开选择** ✗→✓（2026-10-09 用户第二次点这条 ✓）——
+     平时气泡不给选（上面那条 ✓，为了让我们的长按不被系统抢走 ✓），
+     而"自由复制"要的恰恰是**系统那套选择工具** ✓（框选 + 拖手柄 + 点"复制" ✓）。
+     所以只对**这一条**开口子 ✓（`.seltext` ✓，由 `freeCopyBubble` 加上 ✓）。
+     ⚠️ 三个属性**缺一不可** ✗：`user-select` 管"能不能选" ✓；
+        `-webkit-user-select` 是老 WebView 认的那个名字 ✓；
+        `-webkit-touch-callout` 管"长按能不能呼出系统那排东西" ✓
+        （不放开的话，他在框选里想重新长按反而呼不出菜单 ✓）。
+     ⚠️ **不要写成 `.bubble`** ✗（那就全放了 ✓）—— 长按会同时被系统和我们抢 ✓。 */
+  .row .bubble.seltext, .row .bubble.seltext *,
+  .mkrow .mkbub.seltext, .mkrow .mkbub.seltext * {
+    -webkit-user-select:text !important; user-select:text !important;
+    -webkit-touch-callout:default !important;
+  }
   .row.agent .bubble { background:var(--panel); border:1px solid var(--line);
                        border-left:3px solid var(--agent); border-bottom-left-radius:4px; }
   .row:not(.mine):not(.agent) .bubble { border-bottom-left-radius:4px; }
@@ -598,6 +612,16 @@
               color:var(--muted); font-size:13px; padding:8px 16px;
               border-radius:999px; pointer-events:none; white-space:nowrap;
               transition:color .15s, border-color .15s; }
+  /* ★ **横滑那一条竖着贴在右边** ✗→✓（2026-10-09 用户定的原话：
+     「主群聊左滑进创意工坊的时候，提示不能在最顶部啊，很违和，因为是左滑进去的，
+       **应该在最右侧，竖着**」✓）。
+     ⚠️ 他的理儿是对的 ✓：提示该**跟着手势的方向**站 ✓ ——
+        下拉是"从上往下"✓ 提示在最上面 ✓；左滑是"往左去"✓ 提示就该在**去的那个方向**上
+        （右边 ✓）✓。挂在顶上跟手势一点关系都没有 ✓。
+     `writing-mode:vertical-rl` = 竖排 ✓（中文竖排就从右往左读 ✓，正好贴右边 ✓）。 */
+  #pullHint.side { left:auto; right:10px; top:50%;
+                   writing-mode:vertical-rl; text-orientation:mixed;
+                   padding:16px 8px; letter-spacing:.06em; }
   /* 拉满了：变色 ✓ —— "现在松手就进去" ✓（不给这个反馈的话，
      用户不知道要拉多远 ✓，只会觉得"拉了没反应" ✓）。 */
   #pullHint.ready { color:var(--accent); border-color:#35507a; }
@@ -1122,27 +1146,18 @@
             transition:opacity .22s, transform .22s; }
   .notice.on { opacity:1; transform:translate(-50%,-50%) scale(1); }
 
-  /* ── 「我的」那个弹层里那几样（2026-10-09 照壳那一版还原 ✓）──────────────
-     ⚠️ **用自己的一套类名** ✗（`.pfava` / `.pfrow` / `.pfbody`）——
-        这个页面上已经有两套 `.row` 了 ✓（消息行 `#msgs .row` ✓、
-        设置页 `.ascreen .row` ✓），弹层里再叫 `.row` 只会让人以为
-        "它跟哪一套是一伙的" ✗（而且真的会串味 ✓：`.ascreen .row` 有 50px 高 ✓）。
-     ⚠️ 头像**不能用现成的 `.av`** ✗ —— 那是 34px 的圆 ✓（气泡上用的 ✓），
-        这里是 56px 的方角圆 ✓（壳那一版就是这样 ✓）。 */
-  #sheetPanel .pfava { width:56px; height:56px; border-radius:14px; overflow:hidden;
-                       display:flex; align-items:center; justify-content:center;
-                       background:var(--panel2); border:1px solid var(--line);
-                       background-size:cover; background-position:center;
-                       font-size:22px; font-weight:600;
-                       margin:0 auto 16px; cursor:pointer; }
-  #sheetPanel .pfrow { display:flex; align-items:center; padding:13px 0;
-                       border-bottom:1px solid var(--line); cursor:pointer; }
-  #sheetPanel .pfrow .lbl { flex:1; font-size:14px; }
-  #sheetPanel .pfrow .go { color:var(--muted); font-size:18px; }
-  /* 展开出来的那一块：**平时是 `hidden`** ✓（点那一行才出现 ✓） */
-  #sheetPanel .pfbody { padding:12px 0; border-bottom:1px solid var(--line); }
-  #sheetPanel .pfbody[hidden] { display:none; }
-  #sheetPanel .pfbody .field + .field { margin-top:8px; }
+  /* ★ 「我的」那两张卡的形状（2026-10-09，照壳那版 `paintHome` ✓）——
+     资料卡是**横排**的 ✓（左头像 + 右「昵称 / @用户名」✓），
+     所以 `.who` 里多一行 `@用户名` ✓（`.u` ✓）。
+     ⚠️ `.prof` / `.av` / `.who` / `.n` 那几条**本来就有** ✓（管家、别人那两屏也用 ✓），
+        这里只补**`.u` 这一条** ✗（原来没有 ✓ —— 壳那版有 ✓）。 */
+  .ascreen .prof .who .u { color:var(--muted); font-size:12.5px; margin-top:3px;
+                           overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* ★ 编辑页顶上那个标题（「修改昵称」…）✓ —— 壳那版是卡片**上面**一个 hero 标题 ✓，
+     居中、比正文大一档 ✓。 */
+  .ascreen .mh { font-size:22px; font-weight:600; text-align:center;
+                 color:var(--text); margin:10px 0 20px; }
 
   /* 开机占位。**为什么要它**：以前登录页是静态 HTML 里"默认显示"的那一屏，
      而"到底登录了没"要打一次 /auth/me 才知道——那几百毫秒里，**明明是已登录的
@@ -1587,16 +1602,19 @@
          ⚠️ 右边那一格是**异步填的** ✓（`refreshSpaceInfo` 里 ✓）——
             因为"满员了没有"要问服务端算过的那个值 ✓（`full` ✓），
             而 `bootstrap` 里那个 `group` 没有这一项 ✗。 -->
-    <div class="item" data-act="invite"><span class="k">邀请码</span><span class="v" id="vInvite"></span><span class="chev">›</span></div>
+
     <!-- ⚠️ 「群昵称」这一行**整个删了** ✗→✓（2026-10-08 用户定的）：
          「群昵称的地位被[我的]昵称替换，因为一个人只有一个群，
            已经不必区分昵称和群昵称」✓ —— 所以名字只有一个来源：
          账号昵称 ✓（改在「我的」里 ✓）。 -->
     <div class="item" data-act="agentprofile"><span class="k">管家</span><span class="v" id="vAname"></span><span class="chev">›</span></div>
 
-    <!-- ⚠️ 「邀请码」这一行**删了** ✗→✓（2026-10-09 用户定的：
-         「设置界面邀请码重复了，设置页不留了，只在生活空间里留」✓）——
-         现在只在「空间」那一屏里，点了照样是复制 ✓。 -->
+    <!-- ✅ 2026-10-09 用户定的：**邀请码排在「检查更新」上面** ✓
+         （他看的是这一版：我的 · 空间 · 邀请码 · 管家 · 检查更新 ✓ →
+           这个顺序下"邀请码在检查更新上面"本来就是真的 ✗，
+           所以他说的只能是"**挨着**检查更新、就在它上面" ✓ → 挪到管家后面 ✓）。
+         最终顺序：我的 · 空间 · 管家 · **邀请码** · 检查更新 · 退出当前空间 · 退出登录 ✓ -->
+    <div class="item" data-act="invite"><span class="k">邀请码</span><span class="v" id="vInvite"></span><span class="chev">›</span></div>
 
     <!-- 手动查更新。自动检查是"开 App 时问一次"，但那个时机不由你定——
          这一条让你随时能问，不用等。右边显示当前壳的版本号。 -->
@@ -3201,7 +3219,11 @@
       pressTimer = null;
       pressFired = true;
       if (onAvatar) atFromRow(row);       // 头像 → @ 他 ✓（这一条没变 ✓）
-      else openMsgCard(row);              // 气泡 → 小卡片 ✓（新 ✓）
+      // ★ **这一条刚点过"自由复制"** → 它的长按**归系统** ✓（2026-10-09）——
+      //   系统那排（复制/全选/搜索…）就是他此刻要的东西 ✓，
+      //   我们再弹一张卡片只会挡着它 ✓（而且他也没法"再复制一次" ✓）。
+      else if (row.querySelector('.bubble.seltext')) { /* 让给系统 ✓ */ }
+      else openMsgCard(row);              // 气泡 → 小卡片 ✓
     }, PRESS_MS);
   };
 
@@ -3265,6 +3287,11 @@
     const m = opts && opts.get ? opts.get(row) : _msgs.get(Number(row.dataset.id));
     if (!m) return;
     msgCardOpenedAt = Date.now();
+    // ⚠️ **把上一条"交给系统选择"的状态收回来** ✗→✓（2026-10-09）——
+    //    那一条现在长按归系统 ✓（见 `freeCopyBubble` 和 `onPressStart` 里那一支 ✓）；
+    //    不收的话，他复制完 A、又长按 B 弹出卡片 ✓，而 A 从此**永远弹不出卡片** ✗
+    //    （只剩"系统选择"一种行为 ✓ —— 那种"某条消息跟别的不一样"最难解释 ✓）。
+    $$('#msgs .bubble.seltext').forEach(x => x.classList.remove('seltext'));
     const card = $('#msgcard'), box = card.querySelector('.box');
     msgCardM = m;
     box.textContent = '';
@@ -3281,31 +3308,62 @@
       msgCardPlace(row, card, box, opts);
       return;
     }
-    box.appendChild(mk('自由复制', () => {
-      const t = (opts && opts.text ? opts.text(m) : quoteText(m)) || '';
-      // ★ 2026-10-09 用户定的：**"点击自由复制时把系统复制工具调出来"** ✗→✓。
-      //   做法：① 把那一条气泡的文字**真的选中** ✓（用户看得见那层高亮 ✓，
-      //         而且安卓 WebView 在那个状态下会把系统的复制工具一起带出来 ✓）；
-      //        ② 同时把整条塞进剪贴板 ✓（万一系统那排工具没出来 ✓，
-      //           用户也已经复制到了 ✓ —— **两条路都留** ✓，不赌其中一条 ✓）。
-      try {
-        const sel = window.getSelection();
-        const node = (row.querySelector('.bubble') || row);
-        sel.removeAllRanges();
-        const r = document.createRange();
-        r.selectNodeContents(node);
-        sel.addRange(r);
-      } catch (e) { /* 选中失败不影响下面那一步 ✓ */ }
-      // ⚠️ 老 WebView 上 `navigator.clipboard` 可能没有 ✓ —— `copyText` 兜了
-      //    那一条（textarea + execCommand ✓），失败会返回 false ✓，
-      //    这时给一句人话 ✓（别让它静默失败 ✗ —— 用户会以为"点了没反应"✓）。
-      toast(copyText(t) ? '这条已经选中了' : '复制不了，长按气泡自己选一段吧');
-    }));
+    box.appendChild(mk('自由复制', () => freeCopyBubble(row)));
     box.appendChild(mk('引用', () => {
       if (opts && opts.quote) opts.quote(m); else setQuote(m);
     }));
 
     msgCardPlace(row, card, box, opts);
+  };
+
+  /**
+   * ★ **自由复制 = 把这一条交给系统那套"选择"** ✗→✓（2026-10-09，用户第二次点这条 ✓）。
+   *
+   *   他原话：「长按时自由复制还是不对，**不是这条已经选中了**，而是点击自由复制后，
+   *   **只会调用系统复制工具将这条记录框选上，用户自己自行拖动选择复制哪些**，
+   *   明白这种感觉吗，**照着微信来**」✓。
+   *
+   *   ⚠️ **我上一版错在哪** ✗：我**替他复制了整条** ✓（`copyText(整条)` ✓，
+   *      还 toast 一句「这条已经选中了」✓）—— 那是"全选 + 已复制" ✓，
+   *      等于**替他决定了复制什么** ✗。他要的是**把手伸过去** ✓：
+   *      框选出现 → 他自己拖两头的手柄 → 点系统的"复制" ✓。
+   *
+   *   所以这里只做两件事 ✓：
+   *     ① **让这一条变成可以选的** ✓（平时气泡是 `user-select:none` ✓ ——
+   *        那是为了让我们的长按不被系统抢走 ✓；这里只对**这一条**开口子 ✓）
+   *     ② **把它框选上** ✓（`selection` ✓）→ 系统那套手柄就有东西可拖 ✓
+   *     ③ **绝不碰剪贴板** ✗ —— "复制"这个动作**归用户** ✓。
+   *
+   *   ⚠️ **顺序不能反** ✗：先加 `user-select:text` ✓、**再**建 range ✓ ——
+   *      反过来在有些 WebView 上那层高亮**不会重画** ✗，
+   *      看着就像"点了没反应" ✓（这个项目最烦那种"看着像没做" ✓）。
+   *   ⚠️ **`-webkit-touch-callout` 要一起放开** ✓（`default` ✓）——
+   *      它管的是"长按呼出系统菜单" ✓；只放开 `user-select` 的话，
+   *      他在框选里想重新长按反而呼不出东西 ✓（iOS 上尤其明显 ✓）。
+   *   ⚠️ **只放开这一条** ✗（`.bubble.seltext` ✓）—— 全屏放开的话，
+   *      我们自己的长按（弹这张卡片 ✓）会被系统抢走 ✓，那就绕回去了 ✓。
+   */
+  const freeCopyBubble = (row) => {
+    const bub = row.querySelector('.bubble') || row;
+    bub.classList.add('seltext');
+    try {
+      // ⚠️ **引用条不选进去** ✓ —— 它是"上一句是什么"的提示 ✓，
+      //    不是这条消息的内容 ✓（连它一起复制出来，粘到别处就是一堆莫名其妙的字 ✓）。
+      const kids = [...bub.children].filter(x => !x.classList.contains('quote'));
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      const r = document.createRange();
+      if (kids.length) {
+        r.setStartBefore(kids[0]);
+        r.setEndAfter(kids[kids.length - 1]);
+      } else {
+        r.selectNodeContents(bub);
+      }
+      sel.addRange(r);
+    } catch (e) { /* 框选失败也照样把选择放开了 ✓ —— 他至少能自己长按选 ✓ */ }
+    // ⚠️ 这句话要说的是**下一步做什么** ✓（用户要的正是那个手感 ✓）。
+    //    别再说"已经选中了 / 已经复制了" ✗ —— 那是上一版的说法 ✓（他明确否掉了 ✓）。
+    toast('拖动选中要复制的部分，再点"复制"');
   };
 
   /** 把小卡片摆到**锚点旁边** ✓（默认锚点是气泡 ✓，可以指定别的 ✓）。 */
@@ -4169,8 +4227,16 @@
       <div class="actions"><button class="btn-ghost" id="sCancel">取消</button>
       <button class="btn-solid" id="sOk">保存</button></div>`;
     p.querySelector('h3').textContent = title;
+    // ★ **标题/说明可以是空的** ✗→✓（2026-10-09 用户定的：点「空间」改名时
+    //   「"空间名字"和"群聊顶部那个名字**"去掉」✓）——
+    //   ⚠️ 空着的时候要**真的不占位置** ✗（`textContent=''` 还留着那条 h3 的
+    //      上下外边距 ✓，看着就是"顶上莫名其妙空了一块" ✓）→ 直接 `display:none` ✓。
+    //   ⚠️ 用 `style.display` 而不是 `hidden` 属性 ✗ —— 样式表里给 h3 定了
+    //      `display` 的话，`[hidden]` 会被它盖过去 ✓（这个坑在登录页那两格上踩过 ✓）。
+    if (!title) p.querySelector('h3').style.display = 'none';
     const inp = p.querySelector('#sInput'); inp.value = value || '';
     if (hint) p.querySelector('.hint').textContent = hint;
+    else p.querySelector('.hint').style.display = 'none';
     p.querySelector('#sCancel').onclick = closeSheet;
     p.querySelector('#sOk').onclick = () => { const v = inp.value.trim(); if (v) { closeSheet(); onOk(v); } };
     openSheet(); setTimeout(() => inp.focus(), 120);
@@ -4235,9 +4301,14 @@
     return spaceInfo;
   };
 
-  /** 改空间名 —— 设置页那一行、`#space` 那张卡、**都走它** ✓。 */
+  /** 改空间名 —— 设置页那一行、`#space` 那张卡、**都走它** ✓。
+   *
+   *  ⚠️ **标题和那句说明都不要** ✗→✓（2026-10-09 用户定的 ✓）——
+   *    他要的就是"点了只有一格名字 + 保存" ✓（格子里本来就写着现在的名字 ✓，
+   *    再顶上写一句「空间名字」是废话 ✓，底下那句"顶栏也会跟着变"也是废话 ✓）。
+   */
   const renameSpace = () => {
-    promptText('空间名字', (group && group.name) || '', '群聊顶栏那个名字也会跟着变',
+    promptText('', (group && group.name) || '', '',
       async (v) => {
         try {
           await api('/workspaces/rename', { method: 'POST', body: JSON.stringify({ name: v }) });
@@ -4373,145 +4444,64 @@
   window.__logout = logout;
 
   /**
-   * ★ **「我的」= 从底下升起的弹层** ✗→✓（2026-10-09 · 用户第三次点这一块：
-   *   「目前我的里，还是不对。你再回忆一下之前我们使用**壳加服务**的架构时，
-   *    当时的界面，现在明显不对」✓）。
+   * ★ **「我的」= 一整屏** ✓ —— 形状照**壳那版 `paintHome` / `renderEdit`** 来
+   *   （2026-10-09 用户第三次点这一块 ✓）。
    *
-   *   我去翻了壳那一版（`server/app/static/index.html` 里的 `myProfileSheet()` ✓，
-   *   那份文件还在仓库里 ✓）—— 它**不是一个整屏** ✗，是**底部弹层** ✓，
-   *   从上到下四样：
-   *     ① **用户名**（居中，当标题用 ✓）
-   *     ② **头像**（56px 方角圆，**点它就是换头像** ✓，不多放按钮 ✓）
-   *     ③ 「**修改昵称**」一行 → **点开才出现**输入框 + 保存 ✓
-   *     ④ 「**修改账号或密码**」一行 → 点开才出现三格（当前密码 / 新用户名 / 新密码）+ 保存 ✓
-   *
-   *   ⚠️ **"点一行展开"就是那一版的形状** ✓（两条平时都收着 ✓，屏幕上干干净净 ✓）——
-   *      我上一版做成了"三张卡片全摊开的一整屏" ✗，那是**形状**不对 ✓，
-   *      不是配色不对 ✓（所以他说"还是不对" ✓）。
-   *   ⚠️ 壳里那条叫「修改**群**昵称」✓ —— 群昵称这个概念 2026-10-08 撤了 ✓
-   *      （一个人的名字只有一个 ✓）→ 这里叫「修改昵称」✓，改的是 `users.nickname` ✓
-   *      （走 `PATCH /api/me` ✓，和原先「我的」里那张卡片同一个接口 ✓）。
-   *   ⚠️ **弹层里不放「退出登录」** ✗ —— 它在设置页 ✓（壳那版也是这么分的 ✓）。
+   *   他原话：「你再回忆一下，是**我给你提出重构 app、将管理员的服务从生活管家
+   *   去除之前的那版**，你目前给的这版**更古老**，不对」✓。
+   *   → 那一版在 `tools/lifeguard-shell.py` 的 `paintHome()` 里还活着 ✓
+   *     （这段是**对着它一字一句抄的** ✓，不是凭印象 ✓）：
+   *       ① **资料卡**：**横排** —— 左头像 + 右「昵称 / @用户名」✓
+   *          点**整张卡** = 改头像 ✓
+   *       ② 「账号」一组三行：**昵称 / 用户名 / 密码** ✓
+   *          右边写着**现在的值** ✓（密码那行空着 ✓），**各点各的** ✓
+   *   ⚠️ **我上一版又做错了** ✗：我做成了**底部弹层** ✓（`myProfileSheet` ✓）——
+   *      那是壳**更早**的一版 ✓，和这一版"长得像、但不是同一个东西" ✓。
+   *      他说"更古老"说得准 ✓ —— 那一版是先有的 ✓，`paintHome` 是后来重做的 ✓。
+   *   ⚠️ **没有「退出登录」** ✗ —— 壳那版只在"一个空间都没有"时才给 ✓
+   *      （那种人在合并后落到**初始化屏** ✓）；平时它在**设置页** ✓。
    */
-  const openMeSheet = async () => {
-    if (!me) { toast('还没读到你的资料，等一下再点'); return; }
-    const p = $('#sheetPanel');
-    p.textContent = '';
+  const renderMe = () => {
+    const body = $('#meBody');
+    if (!me) { body.textContent = '读不到你的资料，刷新一下试试'; return; }
+    body.textContent = '';
 
-    const h = mkel('h3', null, me.username || '我');
-    h.style.textAlign = 'center';            // 壳那版也是居中 ✓（`style="text-align:center"` ✓）
+    // ① 资料卡：**横排** ✓（壳那版 `.prof` 就是横的 ✓ ——
+    //    竖着摆一个大头像那种是更早的版式 ✗）
+    const prof = mkel('div', 'prof');
+    const av = mkel('div', 'av');
+    paintAvatar(av, shellURL(me.avatar), me.nickname || me.username || '我');
+    const who = mkel('div', 'who');
+    who.appendChild(mkel('div', 'n', me.nickname || me.username || ''));
+    who.appendChild(mkel('div', 'u', '@' + (me.username || '')));
+    prof.append(av, who);
+    prof.onclick = () => openMeEdit('avatar');
+    body.appendChild(prof);
 
-    // 头像：**点它自己就是那个按钮** ✓（不额外放一颗"换头像"按钮 ✓）
-    const f = mkel('input');
-    f.type = 'file'; f.accept = 'image/*'; f.style.display = 'none';
-    const av = mkel('div', 'pfava');
-    paintAvatar(av, shellURL(me.avatar), me.nickname || '我');
-    av.onclick = () => f.click();
-    f.onchange = async () => {
-      const file = f.files && f.files[0];
-      f.value = '';
-      if (!file) return;
-      try {
-        // ⚠️ 形状要和服务端**对上** ✗：它只收 `data:image/jpeg;base64,…` ✓
-        const blob = await shrinkToJpeg(file, 320);
-        const data = await new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload = () => res(r.result);
-          r.onerror = () => rej(new Error('这张图读不出来'));
-          r.readAsDataURL(blob);
-        });
-        const out = await api('/avatar', { method: 'POST', body: JSON.stringify({ data }) });
-        me.avatar = out.avatar;
-        paintAvatar(av, shellURL(out.avatar), me.nickname || '我');
-        toast('头像换好了');
-      } catch (e) { toast((e && e.message) || '没传上去'); }
-    };
-    p.append(h, f, av);
-
-    // ③ 修改昵称（点一行展开 ✓ —— 壳那一版的形状 ✓）
-    const r1 = mkel('div', 'pfrow');
-    r1.append(mkel('span', 'lbl', '修改昵称'), mkel('span', 'go', '›'));
-    const b1 = mkel('div', 'pfbody');
-    b1.hidden = true;
-    const nIn = mkel('input', 'field');
-    nIn.maxLength = 24;
-    nIn.value = me.nickname || '';
-    nIn.placeholder = '你在这个空间里叫什么';
-    const nErr = mkel('div', 'err', '');
-    const nSave = mkel('button', 'btn-solid', '保存');
-    nSave.onclick = async () => {
-      const v = nIn.value.trim();
-      if (!v) { nErr.textContent = '昵称不能空着'; return; }
-      if (v === (me.nickname || '')) { toast('没改'); return; }
-      nSave.disabled = true;
-      try {
-        const out = await api('/me', { method: 'PATCH', body: JSON.stringify({ nickname: v }) });
-        me.nickname = out.nickname;
-        // ⚠️ 群里那些**已经画出来的**名字也要跟着变 ✓：
-        //    不刷的话退回去还是旧名字 ✓，看着就像"没保存" ✓。
-        try {
-          const b = await api('/groups/bootstrap?limit=1');
-          if (b.group) group = b.group;
-          if (b.members) members = b.members;
-        } catch (e) { /* 刷不到就先这样 ✓ */ }
-        renderHeader(); renderSettings();
-        closeSheet();
-        toast('已保存');
-      } catch (e) { nErr.textContent = (e && e.message) || '没保存上'; }
-      nSave.disabled = false;
-    };
-    const w1 = mkel('div', 'actions');
-    w1.appendChild(nSave);
-    b1.append(nIn, nErr, w1);
-    r1.onclick = () => { b1.hidden = !b1.hidden; };
-
-    // ④ 修改账号或密码（同一条形状 ✓）
-    const r2 = mkel('div', 'pfrow');
-    r2.append(mkel('span', 'lbl', '修改账号或密码'), mkel('span', 'go', '›'));
-    const b2 = mkel('div', 'pfbody');
-    b2.hidden = true;
-    const uIn = mkel('input', 'field');
-    uIn.value = me.username || '';
-    uIn.maxLength = 24;
-    uIn.placeholder = '用户名';
-    const cIn = mkel('input', 'field');
-    cIn.type = 'password'; cIn.autocomplete = 'current-password';
-    cIn.placeholder = '当前密码（改用户名或密码时要填）';
-    const pIn = mkel('input', 'field');
-    pIn.type = 'password'; pIn.autocomplete = 'new-password';
-    pIn.placeholder = '新密码（不改就空着）';
-    const aErr = mkel('div', 'err', '');
-    const aSave = mkel('button', 'btn-solid', '保存');
-    aSave.onclick = async () => {
-      const payload = { current_password: cIn.value };
-      const u = uIn.value.trim();
-      if (u && u !== me.username) payload.username = u;
-      if (pIn.value) payload.password = pIn.value;
-      if (!payload.username && !payload.password) { aErr.textContent = '没改什么'; return; }
-      aSave.disabled = true;
-      try {
-        const out = await api('/me', { method: 'PATCH', body: JSON.stringify(payload) });
-        me = { ...me, ...out };
-        closeSheet();
-        toast('已保存');
-      } catch (e) { aErr.textContent = (e && e.message) || '没保存上'; }
-      aSave.disabled = false;
-    };
-    const w2 = mkel('div', 'actions');
-    w2.appendChild(aSave);
-    b2.append(uIn, cIn, pIn, aErr, w2);
-    r2.onclick = () => { b2.hidden = !b2.hidden; };
-
-    p.append(r1, b1, r2, b2);
-    openSheet();
+    // ② 账号：三行 ✓（右边那一格就是**现值** ✓ —— 一眼看全，不用点进去才知道 ✓）
+    body.appendChild(mkel('div', 'sec', '账号'));
+    const grp = mkel('div', 'grp');
+    grp.appendChild(meRow('昵称', me.nickname || '', () => openMeEdit('nickname')));
+    grp.appendChild(meRow('用户名', me.username || '', () => openMeEdit('username')));
+    grp.appendChild(meRow('密码', '', () => openMeEdit('password')));
+    body.appendChild(grp);
   };
 
-  /** 点「我的」/点自己头像 → **弹层** ✓（下面那三屏（`#me`/`#meEdit`/`#meAccount`）
-   *  现在**没有入口**了 ✗ —— 它们被这个弹层取代了 ✓。
-   *  ⚠️ 没删它们 ✗：牵 `__goBack`、`_OTHER_SCREENS`、CSS 档位六七处 ✓，
-   *     而删的收益只是"文件短一点" ✓（和 `#wsNav`、`#space` 同一个处置 ✓）。
-   *     真要删，清单就在这一段里 ✓。 */
-  const openMe = () => { openMeSheet(); };
+  /** 「我的」里的**一行** ✓（左标题、右现值、最右 `›` ✓）。 */
+  const meRow = (label, value, fn) => {
+    const b = mkel('button', 'row');
+    b.append(mkel('span', 'rl', label), mkel('span', 'rv', value), mkel('span', 'go', '›'));
+    b.onclick = fn;
+    return b;
+  };
+
+  const openMe = () => {
+    if (!$('#me').classList.contains('on')) {
+      if ($('#chat').classList.contains('on')) pushScreen('me');   // 从群聊/设置进来 ✓
+      else show('me');                                            // 直接落在 /me 上 ✓
+    }
+    renderMe();
+  };
   const closeMe = () => {
     // 底下有群聊 → 退回去 ✓；没有（直接从 `/me` 这个地址进来的 ✓）→ 回主群聊 ✓。
     if ($('#chat').classList.contains('on')) { popScreen('me'); tellNative('chat'); }
@@ -4519,68 +4509,38 @@
   };
 
   /**
-   * 「我的」这一屏 ✓（用户 2026-10-08 定的行序：我的 → 账号 → 退出登录 ✓）。
-   *
-   * ⚠️ **版式整个照抄「改管家资料」那一屏** ✗→✓ —— 不是"看着像" ✓，
-   *    是**同一批 class**（`.card.avcard` / `.bigav` / `.tip` / `.field` /
-   *    `.btn-save` ✓）→ 三处（管家 ✓ diy 小助手 ✓ 我 ✓）永远一起变 ✓。
-   *    用户点名过这件事：「明明同构界面却没有保持一致」✓ ——
-   *    根子就是"照着抄了一遍" ✗，抄的东西不会跟着上游变 ✓。
-   *
-   * ⚠️ 这里**没有「空间」那一项** ✗ —— 用户 2026-10-08 明确去掉的 ✓
-   *    （一人一空间之后它没意义了 ✓），"空间"那一摊搬去设置页的
-   *    「生活空间」那一行 ✓（见 `#space` ✓）。
+   * 改完之后**到处都跟着变** ✓ —— 群聊顶栏、成员名单、设置页那几格，
+   * 还有**已经画出来的那些气泡** ✗（它们不会自己更新：名字和头像取的都是
+   * 画那一刻的值 ✓）。
    */
-  /** 「我的」那一屏 ✓ —— **恢复成原来的样子** ✗→✓（2026-10-09 用户定的：
-   *  「[我的]界面有点丑，恢复原来的样子我再教你怎么添加自我介绍」✓）。
-   *
-   *  所以它是**壳那一版的形状** ✓：
-   *    一张资料卡（头像 + 昵称 + `›`）── 点进去 → `#meEdit`（改资料 ✓）
-   *    一行「账号」                        ── 点进去 → `#meAccount`（用户名/密码 ✓）
-   *    一个「退出登录」                     ── 居中红字 ✓
-   *
-   *  ⚠️ **自我介绍那一行先撤了** ✗ —— 用户说"我再教你怎么添加" ✓ →
-   *     后端接口（`POST /api/me/self-intro`）和那一屏（`#selfIntro`）都留着 ✓，
-   *     只是**暂时没有入口** ✓（等他说放哪儿 ✓）。留着的理由：它是测过的 ✓，
-   *     而且多半这两天就要用 ✓ —— 但**界面上不出现** ✓（死按钮比没有更糟 ✗）。
-   */
-  const renderMe = () => {
-    const body = $('#meBody');
-    if (!me) { body.textContent = '读不到你的资料，刷新一下试试'; return; }
-    body.textContent = '';
-
-    // 资料卡：**只显示，点进去改** ✓（和壳那一版一样 ✓）
-    const card = mkel('div', 'card avcard');
-    const big = mkel('div', 'bigav');
-    const av = mkel('div', 'av');
-    big.appendChild(av);
-    paintAvatar(av, shellURL(me.avatar), me.nickname || '我');
-    card.appendChild(big);
-    const grp0 = mkel('div', 'grp');
-    const rowProf = mkel('button', 'row');
-    rowProf.append(mkel('span', 'rl', me.nickname || '我'),
-                   mkel('span', 'chev', '›'));
-    rowProf.onclick = openMeEdit;
-    grp0.appendChild(rowProf);
-    body.append(card, grp0);
-
-    const grp = mkel('div', 'grp');
-    const rowAcc = mkel('button', 'row');
-    rowAcc.append(mkel('span', 'rl', '账号'),
-                   mkel('span', 'act', me.username || ''),
-                   mkel('span', 'chev', '›'));
-    rowAcc.onclick = openMeAccount;
-    grp.appendChild(rowAcc);
-    body.appendChild(grp);
-
-    const quit = mkel('div', 'item');
-    quit.dataset.act = 'logout';
-    quit.appendChild(mkel('span', 'k danger', '退出登录'));
-    body.appendChild(quit);
+  const refreshMembers = async () => {
+    try {
+      const b = await api('/groups/bootstrap?limit=1');
+      if (b.group) group = b.group;
+      if (b.members) members = b.members;
+    } catch (e) { /* 刷不到就先这样 ✓ —— 下次开页会重新拉 ✓ */ }
+    renderHeader(); renderSettings();
+    $$('#msgs .row[data-id]').forEach(row => {
+      const m = _msgs.get(Number(row.dataset.id));
+      if (!m || m.sender_id !== me.id) return;
+      m.sender_nickname = me.nickname;
+      const w = row.querySelector('.who');
+      if (w) w.textContent = me.nickname || '';
+      const a = row.querySelector('.av');
+      if (a) paintAvatar(a, shellURL(me.avatar), me.nickname || '我');
+    });
   };
 
-  // ── 改资料：头像 + 昵称 ✓（就是原来那两张卡，搬到单独一屏 ✓）──────────
-  const openMeEdit = () => {
+  // ── 编辑页：**一面屏，按 kind 分四种** ✓（壳那版的 `renderEdit(kind, me)` ✓）──
+  //
+  //   kind = `'avatar'` / `'nickname'` / `'username'` / `'password'` ✓
+  //   ⚠️ 壳那版**一个函数全包** ✓ —— 这段也照做 ✓。
+  //      原来这里是两屏 ✗（`#meEdit` 管头像和昵称、`#meAccount` 管账号密码 ✓）——
+  //      那是 2026-10-08 合并时**我自己分的** ✗，不是他要的形状 ✓
+  //      （`#meAccount` 现在**没有入口了** ✓，和 `#space`/`#wsNav` 一样留着不删 ✓）。
+  let meEditKind = 'nickname';
+  const openMeEdit = (kind) => {
+    meEditKind = kind || 'nickname';
     if (!$('#meEdit').classList.contains('on')) pushScreen('meEdit');
     renderMeEdit();
   };
@@ -4589,22 +4549,32 @@
   const renderMeEdit = () => {
     const body = $('#meEditBody');
     body.textContent = '';
+    const kind = meEditKind;
+    const T = { nickname: '修改昵称', username: '修改用户名',
+                password: '修改密码', avatar: '修改头像' };
+    body.appendChild(mkel('div', 'mh', T[kind] || '修改'));
 
-    // 卡片一：头像
-    const card = mkel('div', 'card avcard');
-    const f = mkel('input');
-    f.type = 'file'; f.accept = 'image/*'; f.style.display = 'none';
-    const big = mkel('div', 'bigav');
-    const av = mkel('div', 'av');
-    big.appendChild(av);      // ⚠️ **这一行漏过一次** ✗→✓：没塞进去 = 盒子空 = 0 高 = 圈不长 ✗
-    paintAvatar(av, shellURL(me.avatar), me.nickname || '我');
-    av.onclick = () => f.click();          // **头像本身就是那个按钮** ✓，不多放按钮 ✓
-    f.onchange = async () => {
-      const file = f.files && f.files[0];
-      f.value = '';
-      if (!file) return;
-      try {
-        // ⚠️ 形状要和服务端**对上** ✗：它只收 `data:image/jpeg;base64,…` ✓
+    const card = mkel('div', 'card');
+    const err = mkel('div', 'err', '');
+    let save;
+
+    if (kind === 'avatar') {
+      // 头像页：**一个大头像 + 一行小字** ✓（壳那版 2026-10-06 就这么简化过：
+      //   没有"选择图片"按钮 ✓、没有"方形图效果最好"那句 ✓ ——
+      //   多一个按钮就多一步"该点哪个" ✓，而缩放/转格式是**我们的事** ✓）
+      const f = mkel('input');
+      f.type = 'file'; f.accept = 'image/*'; f.style.display = 'none';
+      const big = mkel('div', 'bigav');
+      const av = mkel('div', 'av');
+      paintAvatar(av, shellURL(me.avatar), me.nickname || '我');
+      big.appendChild(av);
+      av.onclick = () => f.click();          // **头像本身就是那个按钮** ✓
+      card.classList.add('avcard');          // 这一张装头像，上下留白大一点 ✓
+      card.append(f, big, mkel('div', 'tip', '点击头像替换'));
+      save = async () => {
+        const file = f.files && f.files[0];
+        if (!file) throw new Error('先点一下头像，选一张图');
+        // 形状要和服务端**对上** ✗：它只收 `data:image/jpeg;base64,…`
         const blob = await shrinkToJpeg(file, 320);
         const data = await new Promise((res, rej) => {
           const r = new FileReader();
@@ -4614,47 +4584,88 @@
         });
         const out = await api('/avatar', { method: 'POST', body: JSON.stringify({ data }) });
         me.avatar = out.avatar;
-        paintAvatar(av, shellURL(out.avatar), me.nickname || '我');
-        toast('头像换好了');
-      } catch (e) { toast((e && e.message) || '没传上去'); }
-    };
-    card.append(f, big, mkel('div', 'tip', '点击头像换一张'));
-    body.appendChild(card);
-
-    // 卡片二：昵称
-    const nc = mkel('div', 'card');
-    nc.appendChild(mkel('label', null, '昵称'));
-    const ni = mkel('input', 'field');
-    ni.maxLength = 24;
-    ni.value = me.nickname || '';
-    const nerr = mkel('div', 'err', '');
-    const nsave = mkel('button', 'btn-save', '保存');
-    nsave.onclick = async () => {
-      const v = ni.value.trim();
-      if (!v) { nerr.textContent = '昵称不能空着'; return; }
-      if (v === (me.nickname || '')) { toast('没改'); return; }
-      nsave.disabled = true;
-      try {
+      };
+    } else if (kind === 'nickname') {
+      card.appendChild(mkel('label', null, '昵称'));
+      const i = mkel('input', 'field');
+      i.value = me.nickname || '';
+      i.maxLength = 24;
+      card.appendChild(i);
+      save = async () => {
+        const v = i.value.trim();
+        if (!v) throw new Error('昵称不能空着');
+        if (v === (me.nickname || '')) return;
         const out = await api('/me', { method: 'PATCH', body: JSON.stringify({ nickname: v }) });
         me.nickname = out.nickname;
-        // ⚠️ 群聊那边显示的名字也要跟着变 ✓（不然退回群聊还是旧名字 ✓）
-        try {
-          const b = await api('/groups/bootstrap?limit=1');
-          if (b.group) group = b.group;
-          if (b.members) members = b.members;
-        } catch (e) { /* 刷不到就先这样 ✓ */ }
-        renderHeader(); renderMe(); renderMeEdit(); renderSettings();
-        toast('已保存');
-      } catch (e) { nerr.textContent = (e && e.message) || '没保存上'; }
-      nsave.disabled = false;
-    };
-    nc.append(ni, nerr, nsave);
-    body.appendChild(nc);
+      };
+    } else if (kind === 'username') {
+      card.appendChild(mkel('label', null, '用户名'));
+      const i = mkel('input', 'field');
+      i.value = me.username || '';
+      i.maxLength = 24;
+      card.appendChild(i);
+      card.appendChild(mkel('label', null, '当前密码'));
+      const cp = mkel('input', 'field');
+      cp.type = 'password'; cp.autocomplete = 'current-password';
+      card.appendChild(cp);
+      save = async () => {
+        const v = i.value.trim();
+        if (!v) throw new Error('用户名不能空着');
+        const out = await api('/me', { method: 'PATCH',
+          body: JSON.stringify({ username: v, current_password: cp.value }) });
+        me = { ...me, ...out };
+      };
+    } else {
+      // 改密码：**输两遍** ✓（壳那版就这么做的 —— 打错了没法回头 ✓）
+      card.appendChild(mkel('label', null, '当前密码'));
+      const c = mkel('input', 'field'); c.type = 'password';
+      c.autocomplete = 'current-password';
+      card.appendChild(c);
+      card.appendChild(mkel('label', null, '新密码'));
+      const a = mkel('input', 'field'); a.type = 'password';
+      a.autocomplete = 'new-password';
+      card.appendChild(a);
+      card.appendChild(mkel('label', null, '重复新密码'));
+      const b = mkel('input', 'field'); b.type = 'password';
+      b.autocomplete = 'new-password';
+      card.appendChild(b);
+      save = async () => {
+        if (!a.value) throw new Error('新密码不能空着');
+        if (a.value !== b.value) throw new Error('两次输入的新密码不一样');
+        await api('/me', { method: 'PATCH',
+          body: JSON.stringify({ password: a.value, current_password: c.value }) });
+      };
+    }
+
+    const btn = mkel('button', 'btn-save', '保存');
     const swap = mkel('div', 'swap');
-    const cb = mkel('b', null, '返回');
-    cb.onclick = closeMeEdit;
-    swap.appendChild(cb);
-    body.appendChild(swap);
+    const back = mkel('b', null, '取消');
+    back.onclick = closeMeEdit;
+    swap.appendChild(back);
+    // ★ 头像那一页**按钮单独一张卡** ✓（壳那版就是两张：一张装头像、一张装按钮 ✓）；
+    //   别的几页一页一张卡 ✓。
+    // ⚠️ `err` 挂在**按钮那张卡**里 ✓（壳那版特意挪过来的）——
+    //    挂在上面那张卡里的话，空着时要占 `min-height` + `margin-top` ≈ 30px 死空间 ✓，
+    //    用户会以为"下面的间距太大" ✓（他当时就是这么说那个间距的 ✓）。
+    const btnCard = (kind === 'avatar') ? mkel('div', 'card') : card;
+    btnCard.append(btn, err, swap);
+    body.appendChild(card);
+    if (btnCard !== card) body.appendChild(btnCard);
+
+    btn.onclick = async () => {
+      btn.disabled = true;
+      err.textContent = '';
+      try {
+        await save();
+        await refreshMembers();
+        closeMeEdit();      // 保存成功 → **回「我的」** ✓（壳那版也是改完就回主页 ✓）
+        renderMe();
+        toast('已保存');
+      } catch (e) {
+        err.textContent = (e && e.message) || '没保存上';
+        btn.disabled = false;
+      }
+    };
   };
 
   // ── 生活空间：改名 / 邀请码 / 退出该空间 ──────────────────────────────
@@ -4978,21 +4989,27 @@
    *    （用死一个数的话：其中一个方向**永远到不了变色那一步** ✗，
    *      而"该松手了"正是靠变色告诉他的 ✓）。
    */
-  const showPullHint = (text, dist, trig) => {
+  const showPullHint = (text, dist, trig, side) => {
     const el = $('#pullHint');
     if (!el) return;
     const p = Math.max(0, Math.min(1, (dist || 0) / (trig || PULL_TRIG)));
     if (!p) { hidePullHint(); return; }
     el.textContent = text;
+    el.classList.toggle('side', !!side);      // ★ 竖排贴右边（横滑那条 ✓）
     el.style.opacity = String(p);
-    // 从上面"掉"下来 ✓ —— 往上收着的那一截随 `p` 归零 ✓
-    el.style.transform = 'translate(-50%, ' + (-140 + p * 140) + '%)';
+    if (side) {
+      // 从**右边**滑进来 ✓ —— 它和手势是同一个方向 ✓（往左滑，条子从右往里走 ✓）
+      el.style.transform = 'translate(' + ((1 - p) * 130) + '%, -50%)';
+    } else {
+      // 从上面"掉"下来 ✓ —— 往上收着的那一截随 `p` 归零 ✓
+      el.style.transform = 'translate(-50%, ' + (-140 + p * 140) + '%)';
+    }
     el.classList.toggle('ready', p >= 1);
   };
   const hidePullHint = () => {
     const el = $('#pullHint');
     if (!el) return;
-    el.classList.remove('ready');
+    el.classList.remove('ready', 'side');
     el.style.opacity = '';
     el.style.transform = '';
   };
@@ -5041,8 +5058,8 @@
     //    也要有提示"继续左滑进入创意工坊"和滑入阈值」✓）。
     // ⚠️ `'R'`（右滑退出那两条）**不给** ✓ —— 用户没要 ✓，
     //    而且"退出"是往回走 ✓ 不需要一句"继续滑"来鼓励 ✓。
-    if (pgSw.dir === 'D') showPullHint(_pullHintText('D'), dy, PULL_TRIG);
-    else if (pgSw.dir === 'L') showPullHint(_pullHintText('L'), -dx, SW_TRIG);
+    if (pgSw.dir === 'D') showPullHint(_pullHintText('D'), dy, PULL_TRIG, false);
+    else if (pgSw.dir === 'L') showPullHint(_pullHintText('L'), -dx, SW_TRIG, true);
   }, { passive: false });
 
   const _endSwipe = () => {
@@ -5580,7 +5597,9 @@
     if (!el) return;
     el.placeholder = wsCur.slug === WALL_SLUG
       ? '想怎么修改组件界面？'
-      : '想怎么diy？，先改，改完再看';
+      : '想怎么diy？';        // ⚠️ 2026-10-09 用户定的：**只要这四个字** ✗→✓
+                              //    （原来是「想怎么diy？，先改，改完再看」✓ ——
+                              //      后半句是我照他上一条原样抄的 ✓，他这一版说不要 ✓）
   };
 
   const setWsHead = () => {
@@ -6877,7 +6896,9 @@
       if (e) $('#loginErr').textContent = e.message;
       return;
     }
-    openMeSheet();
+    // ⚠️ **落到群聊了才进「我的」** ✓ —— 没有空间的人落的是**初始化屏** ✓，
+    //    那种情况该先让他建/进空间 ✓（在初始化屏上再压一屏"我的"没有意义 ✓）。
+    if ($('#chat').classList.contains('on')) openMe();
   };
 
   if (ROUTE === 'login') {
