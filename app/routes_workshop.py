@@ -52,6 +52,7 @@ import asyncio
 import json
 import logging
 import re
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -396,6 +397,27 @@ SELECT m.id, m.group_id, m.user_id, m.task_id, m.sender_type, m.msg_type,
 FROM workshop_messages m
 LEFT JOIN workshop_messages q ON q.id = m.reply_to
 """
+
+
+def _greeting(ts: int | None = None) -> str:
+    """开一条**全新的**组件对话时，它先开口 ✓（用户 2026-10-09 定的：
+
+    「用户第一次进入新的组件聊天不要有"说说你想要什么***"和"这条对话还是空的"
+      提示，而是 diy 助手**主动根据时间问候**：早上好/中午好/晚上好，
+      这次想 diy 什么？」✓）
+
+    ⚠️ **只有三个词** ✗（他给的就是三个 ✓）—— 别自作主张加"下午好""晚安" ✗。
+    ⚠️ 按**服务器本地时间**算 ✓（这台机器是 Asia/Beijing ✓，
+       见 `timedatectl` ✓）—— 用 UTC 的话，晚上八点会跟他说"中午好" ✓。
+    """
+    h = datetime.fromtimestamp(ts if ts else now()).hour
+    if 5 <= h < 12:
+        hi = "早上好"
+    elif 12 <= h < 18:
+        hi = "中午好"
+    else:
+        hi = "晚上好"
+    return f"{hi}，这次想diy什么？"
 
 
 def _ws_msg(row: dict[str, Any], assistant_name: str) -> dict[str, Any]:
@@ -844,8 +866,28 @@ async def tasks_new(group_id: int, body: TaskNewIn | None = None,
         (group_id, user["id"], ts, ts, want or None, got or None))
     log.info("工坊新任务：群 %s 用户 %s 任务 %s（冲着 %s，叫 %r）",
              group_id, user["id"], tid, want or "新组件", got)
+    # ★ **全新的一条：它先开口** ✗→✓（2026-10-09 用户定的 ✓，见 `_greeting` ✓）——
+    #   ⚠️ **只在这条是"全新的"时**（`want` 空 ✓）—— 冲着某个**已有组件**开的那条
+    #      （从组件页下拉进来 ✓）不问候 ✗：那是"我要改这个" ✓，
+    #      不是"我要做个新的" ✓（他第 4 条也说了：那种只在输入框提示 ✓）。
+    #   ⚠️ 它是一条**真消息**（落 `workshop_messages` ✓、进历史 ✓、能被引用 ✓），
+    #      不是前端画出来的假气泡 ✗ —— 这样他引用它、或者隔天回来看，
+    #      那条问候都在 ✓（前端画的就没了 ✓，而且它自己还不知道自己说过 ✓）。
+    greet = None
+    if not want:
+        greet = await _save(group_id, user["id"], int(tid), "agent", _greeting(ts))
     return {"ok": True, "task": await _task_payload(group_id, user["id"], tid),
-            "messages": []}
+            # ⚠️ **要把它带回去** ✗ —— 前端进这一屏走的是这个返回值 ✓
+            #    （`wsNewTask` 直接 `showTask(它)` ✓），这里给空数组的话
+            #    问候**当场看不见** ✓（得再进一次才有 ✓ —— 那就是"它没打招呼"✓）。
+            "messages": [greet] if greet else [],
+            # ⚠️ **小助手的名字也要带上** ✗→✓ —— `showTask` 是**当场**画气泡的 ✓，
+            #    它从 `d.assistant` 取名字和头像 ✓；不给的话那一句问候
+            #    会顶着**默认名**"diy 小助手"出现 ✓ —— 群里改过名的话，
+            #    他看到的是一条"另一个人"打的招呼 ✓（而它的下一次开口又是对的 ✓，
+            #    那种"一半对一半不对"最难解释 ✓）。`task_open` 早就带着它 ✓，
+            #    两个入口给的东西应该一样 ✓。
+            "assistant": await _assistant(group_id)}
 
 
 class TaskTitleIn(BaseModel):

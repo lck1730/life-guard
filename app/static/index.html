@@ -498,6 +498,18 @@
      怎么进来的"小表 ✓（`_dropSet` ✓）。 */
   @keyframes dropIn  { from { transform:translateY(-100%); } to { transform:none; } }
   @keyframes dropOut { from { transform:none; } to { transform:translateY(-100%); } }
+  /* ★ **从右上角弹出 / 收回右上角** ✗→✓（2026-10-09 用户定的：
+     「目前从群聊右上角进入时动效还是页面从上出现，退出时没动效，
+      应该改成**滑入滑出从右上角弹出以及收回右上角**那种动效」✓）。
+     ⚠️ 那是**群聊右上角那个按钮**走的那一条路 ✓（`pushScreen(id,'corner')` ✓）——
+        不是下拉那条 ✓（下拉是"从上往下"，见上面那对 ✓）。两者都属①那一类 ✓，
+        分的还是"手势/入口来的方向" ✓。
+     ⚠️ 起点**在屏幕外**（58% 横 + 58% 纵 ✓）—— 所以动画期间右边和下边会
+        露出底下那一屏 ✓，"弹出"的观感就是从这儿来的 ✓。 */
+  @keyframes cornerIn  { from { transform:translate(58%,-58%) scale(.9); opacity:0; }
+                         to   { transform:none; opacity:1; } }
+  @keyframes cornerOut { from { transform:none; opacity:1; }
+                         to   { transform:translate(58%,-58%) scale(.9); opacity:0; } }
   #settings.anim-in  { animation:pushIn  .24s cubic-bezier(.22,1,.36,1); }
   #settings.anim-out { animation:pushOut .18s cubic-bezier(.4,0,1,1) forwards; }
   /* ④ 首启那几屏（登录/初始化/主群聊）—— `show()` 加 `fade` 用它 ✓ */
@@ -522,6 +534,9 @@
   /* ★ 下拉来的那一屏（见上面 `dropIn` 那段 ✓）—— 进/出各一条 ✓ */
   .ascreen.anim-drop { animation:dropIn  .26s cubic-bezier(.22,1,.36,1); }
   .ascreen.anim-lift { animation:dropOut .2s  cubic-bezier(.4,0,1,1) forwards; }
+  /* ★ 右上角来的那一屏 —— 进/出各一条 ✓ */
+  .ascreen.anim-corner     { animation:cornerIn  .26s cubic-bezier(.22,1,.36,1); }
+  .ascreen.anim-corner-out { animation:cornerOut .2s  cubic-bezier(.4,0,1,1) forwards; }
 
   /* ── 创意工坊（右上角那个入口）────────────────────────────────────────
      三屏：工坊（#workshop，**只罗列组件**）+ 组件页（#compView，压在上面）
@@ -1089,6 +1104,20 @@
            opacity:0; transition:opacity .2s; pointer-events:none; }
   .toast.on { opacity:1; }
 
+  /* ── 居中那张小卡片（**短暂**，几秒后自己没）✗→✓（2026-10-09）──────────
+     用户定的：「进入后在界面**居中**一个小卡片短暂提醒：上次退出时未做出组件，
+     已自动恢复」✓。
+     ⚠️ **和 `toast` 分开** ✗：toast 是屏幕**底下一条** ✓（那是"刚做了什么"的
+        回执 ✓），这个是屏幕**正中的一张卡** ✓（那是"进来的时候发生了什么"✓）——
+        位置和语气都不是一回事 ✓，混用会让人以为"它刚才说了句话" ✓。 */
+  .notice { position:fixed; left:50%; top:50%; z-index:97; pointer-events:none;
+            transform:translate(-50%,-50%) scale(.94);
+            background:var(--panel); border:1px solid var(--line); color:var(--text);
+            padding:14px 20px; border-radius:14px; font-size:14px; line-height:1.6;
+            max-width:78vw; text-align:center; opacity:0;
+            transition:opacity .22s, transform .22s; }
+  .notice.on { opacity:1; transform:translate(-50%,-50%) scale(1); }
+
   /* 开机占位。**为什么要它**：以前登录页是静态 HTML 里"默认显示"的那一屏，
      而"到底登录了没"要打一次 /auth/me 才知道——那几百毫秒里，**明明是已登录的
      用户也会看到登录页一闪而过** ✗ 很影响体验。
@@ -1546,6 +1575,9 @@
      「只需要删除的时候弹出个框提示一下，二次确认就行」✓。 -->
 <div class="modal" id="modal"><div class="box" id="modalBox"></div></div>
 <div class="toast" id="toast"></div>
+<!-- ★ 居中那张"进来时发生了什么"的小卡片 ✓（见 CSS 里 `.notice` 那段 ✓）——
+     它会自己消失 ✓（`showNotice` 里那个计时器 ✓），**不需要点** ✓。 -->
+<div class="notice" id="notice"></div>
 <!-- 长按消息弹出来的小卡片（不是从底部弹 ✓，贴在消息旁边 ✓）-->
 <div class="msgcard" id="msgcard"><div class="box"></div></div>
 
@@ -1564,6 +1596,22 @@
   //:   `tools/check-shell-page.py` 只查"被调用的名字"✓，而它是当**值**用的 ✗
   //:   （已给那个检查器补了一条"全大写常量"的扫描 ✓，见它的注释 ✓）。
   const WALL_SLUG = 'wall';
+
+  //: 屏上所有"进/出场动画"的类名 ✓ —— 换动画之前**必须全清掉** ✓。
+  //:
+  //:   ⚠️⚠️ **这一条是真踩过的** ✗→✓（2026-10-09 用户报的："从群聊右上角进入时
+  //:   动效**还是页面从上出现**，退出时**没动效**"）：原来 `pushScreen` 只
+  //:   `remove('anim-out')` ✓、`popScreen` 只 `remove('anim-in')` ✓ ——
+  //:   于是"下拉进来留下的 `anim-drop`"**一直挂在那一屏上没人摘** ✗。
+  //:   两个类都写 `animation` 属性 ✓ → 后写的那条规则赢（CSS 源顺序）✓ →
+  //:   **之后每一次进/出它都在播"从上滑入"** ✓✓：
+  //:   进的时候看着"从上出现"（该从右边推的 ✓）、退出时原地播一遍入场 ✗ →
+  //:   看着就像"没有退场动效" ✓。**症状离根因很远**（这正是这个项目最怕的那种）✓。
+  //:   → 所以改成"**先全清、再按方向加一个**" ✓，以后加新动画不用再改这两行 ✓。
+  //:   ⚠️ 和 `WALL_SLUG` 一样**必须声明在文件最前面** ✗（`show()` 要用它 ✓ ——
+  //:      `show()` 在启动那几步就会被调 ✓，写在后面就是 TDZ 当场炸 ✓）。
+  const ANIM_CLASSES = ['anim-in', 'anim-out', 'anim-fade',
+                        'anim-drop', 'anim-lift', 'anim-corner', 'anim-corner-out'];
 
 
   // ── 给 agent 的扩展点 ──
@@ -1719,6 +1767,25 @@
     const t = $('#toast'); t.textContent = m; t.classList.add('on');
     clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 1800);
   };
+
+  /**
+   * **屏幕正中的一张小卡片，几秒后自己消失** ✓（用户 2026-10-09 定的 ✓）。
+   *
+   * 用在"**进来的时候就发生了某件事**"上 ✓ —— 眼下只有一处：
+   * 从右上角进来、**续上了上次那条没做完的** ✓
+   * （「上次退出时未做出组件，已自动恢复」✓）。
+   * ⚠️ 和 `toast` 分开 ✗（理由写在 CSS 里 `.notice` 那段 ✓）。
+   * ⚠️ **不用点、也不该挡手** ✓（CSS 里 `pointer-events:none` ✓）——
+   *    它只是"说一声" ✓，不是要人做决定 ✓（要做决定的那些走 `confirmBox` ✓）。
+   */
+  const showNotice = (m, ms) => {
+    const el = $('#notice');
+    if (!el) return;
+    el.textContent = m;
+    el.classList.add('on');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('on'), ms || 3200);
+  };
   /**
    * **整屏替换**（平级切换 ✓）—— 带一个可选的淡入 ✓。
    *
@@ -1734,13 +1801,13 @@
     if (boot) boot.hidden = true;
     if (bootTimer) { clearTimeout(bootTimer); bootTimer = null; }
     $$('.screen').forEach(s => {
-      s.classList.remove('anim-in', 'anim-out', 'anim-fade', 'anim-drop', 'anim-lift');
+      s.classList.remove(...ANIM_CLASSES);
       s.classList.toggle('on', s.id === id);
     });
     // 整屏替换 = 之前那一摞**全没了** ✓ → "这屏是怎么进来的"那张表也一并清 ✓
     // （不清的话，下次它被"从上面滑入"进来时，退场会**往上收** ✗ —— 而它是
     //  从右边推进来的 ✓，方向就对不上了 ✓）。
-    _dropSet.clear();
+    _enterAnim.clear();
     if (anim === 'fade') {
       const s = $('#' + id);
       if (s) { void s.offsetWidth; s.classList.add('anim-fade'); }
@@ -1845,37 +1912,33 @@
   //
   //   要"整屏替换"（登录 → 初始化 → 主群聊那种平级切换 ✓）用 `show()` ✓，
   //   它不带位移 ✓ —— 那几条之间没有深浅关系 ✓（见上面那四类 ✓）。
-  //: ★ **这一屏是怎么进来的** ✓（`from === 'top'` 的记在这儿 ✓）——
-  //:   退场要**顺着来路** ✓：右滑来的往右退 ✓、下拉来的往上收 ✓。
-  //:   ⚠️ 不记的话只有一条退场方向 ✗ —— 于是"下拉进来的编辑页"会**往右边退** ✓，
-  //:   而它明明是从上面下来的 ✓（那种错说不清，但一眼就觉得别扭 ✓）。
-  const _dropSet = new Set();
+  //: ★ **这一屏是怎么进来的** ✓ —— 退场要**顺着来路** ✓：
+  //:   右滑来的往右退 ✓、下拉来的往上收 ✓、右上角来的收回右上角 ✓。
+  //:   ⚠️ 不记的话只有一条退场方向 ✗（那种错说不清，但一眼就觉得别扭 ✓）。
+  const _enterAnim = new Map();
 
   const pushScreen = (id, from) => {
     const s = $('#' + id);
-    s.classList.remove('anim-out', 'anim-lift');
-    if (from === 'top') {
-      _dropSet.add(id);
-      s.classList.remove('anim-in');
-      s.classList.add('on', 'anim-drop');
-    } else {
-      _dropSet.delete(id);
-      s.classList.add('on', 'anim-in');
-    }
+    s.classList.remove(...ANIM_CLASSES);          // ★ 先全清，见上面那段 ✓
+    const cls = from === 'top'    ? 'anim-drop'
+              : from === 'corner' ? 'anim-corner'
+              : 'anim-in';
+    if (from) _enterAnim.set(id, from); else _enterAnim.delete(id);
+    s.classList.add('on', cls);
     void s.offsetWidth;                 // 强制重排，否则连续开关时动画不重放 ✓
     tellNative('settings');             // ⚠️ 一律 'settings' ✓，见上面那段
   };
   const popScreen = (id) => {
     const s = $('#' + id);
-    s.classList.remove('anim-in');
-    if (_dropSet.has(id)) {
-      _dropSet.delete(id);
-      s.classList.add('anim-lift');
-      afterAnim(s, () => s.classList.remove('anim-lift', 'on'));
-    } else {
-      s.classList.add('anim-out');
-      afterAnim(s, () => s.classList.remove('anim-out', 'on'));
-    }
+    const how = _enterAnim.get(id);
+    _enterAnim.delete(id);
+    s.classList.remove(...ANIM_CLASSES);          // ★ 先全清 ✓
+    const cls = how === 'top'    ? 'anim-lift'
+              : how === 'corner' ? 'anim-corner-out'
+              : 'anim-out';                       // 默认：从右边退回去 ✓
+    s.classList.add(cls);
+    void s.offsetWidth;                           // 同理，连点两次也要重放 ✓
+    afterAnim(s, () => s.classList.remove(cls, 'on'));
     tellNative('settings');
   };
 
@@ -4595,7 +4658,12 @@
   //:      从 0 拉到这个数，顶部那条提示才从"看不见"走到"看得见、并且变色" ✓
   //:      （见 `showPullHint` ✓）。给小了就是"手一动就跳进去" ✓，
   //:      用户根本没机会看见那行字 ✓ —— 而提示正是他点名要的 ✓。
-  const PULL_TRIG = 96;
+  //:   ★ **96 → 144**（2026-10-09 用户上手试过之后定的 ✓）——
+  //:      他要的是"**拉得足够靠下才进去**" ✓（手感他觉得已经对了 ✓，
+  //:      所以只动这一个数 ✓，动画一个字没改 ✓）。
+  //:      ⚠️ 这个值同时决定"提示条走到满格要拉多远" ✓ —— 它俩是同一个数 ✓，
+  //:      改它同时改两件事（阈值 + 那根条的行程 ✓），别只按"阈值"想 ✓。
+  const PULL_TRIG = 144;
   let pgSw = null;
 
   const _overlayOn = () =>
@@ -5222,7 +5290,27 @@
   //:    但会一直涨 ✓（一条长对话翻完能存几百条 ✓，纯属白占 ✓）。
   const _wsById = new Map();
 
+  /**
+   * 输入框里那句浅浅的占位提示 ✓（**没打字的时候才看得见** ✓，一打字就没了 ✓）。
+   *
+   * ★ 2026-10-09 用户定的两条文案（原话）：
+   *     · 「组件界面diy」那条 → **「想怎么修改组件界面？」**
+   *     · 别的组件            → **「想怎么diy？，先改，改完再看」**
+   *   ⚠️ 文案**照他写的原样抄** ✗ —— 中间那个逗号看着像顺手打的 ✓，
+   *      但"改用户给的字"这件事不该我自作主张 ✓（要改让他说一声 ✓）。
+   *   ⚠️ 它跟着"**当前是哪一条对话**"变 ✓ → 由 `setWsHead` 统一刷 ✓
+   *      （换对话的入口四五处 ✓，每处各写一遍迟早漏一处 ✓）。
+   */
+  const setWsPlaceholder = () => {
+    const el = $('#wsText');
+    if (!el) return;
+    el.placeholder = wsCur.slug === WALL_SLUG
+      ? '想怎么修改组件界面？'
+      : '想怎么diy？，先改，改完再看';
+  };
+
   const setWsHead = () => {
+    setWsPlaceholder();
     const t = $('#wsTitle');
     // ⚠️ **这里是"有没有 slug"在决定标题** ✗→✓（2026-10-07 深夜，用户报的：
     //    「起了个名字叫功德木鱼…但是主界面显示的竟然是做一个新的」✓）。
@@ -5288,21 +5376,17 @@
     setWsHead();
     const box = $('#wsMsgs');
     box.innerHTML = '';
-    const hint = document.createElement('div');
-    hint.className = 'mknote';
-    hint.textContent = wsCur.slug
-      ? '说说你想怎么改。它会先问清「要看什么」，再动手。'
-      : '说说你想要什么。它会先问清「要看什么」——不用懂技术，说得越像聊天越好。';
-    box.appendChild(hint);
+    // ★ 这块位置原来有**两条说明文字** ✗→✓（2026-10-09 用户定的：
+    //   「用户第一次进入新的组件聊天**不要有**"说说你想要什么***"和
+    //     "这条对话还是空的"提示」✓；第 4 条也说了「组件聊天界面…**就只需要
+    //     在聊天框里提示**」✓）——
+    //   所以**两种都不要了** ✓：
+    //     · 全新的那条 → 由**它自己先开口** ✓（那条问候是服务端插的真消息 ✓，
+    //       见 `_greeting` ✓）；之前那段"说说你想要什么"就多余了 ✓。
+    //     · 改已有组件的那种 → 输入框里那一句就够了 ✓（见下 ✓）。
+    //   ⚠️ 别在这里补"解说" ✗ —— 用户对这两条的原话就是**嫌它们碍事** ✓。
+    setWsPlaceholder();
     const list = (d.messages || []);
-    if (!list.length) {
-      const em = document.createElement('div');
-      em.className = 'mknote';
-      em.textContent = wsCur.slug
-        ? '这条对话还是空的——说要改什么，它先去读那个组件自己的笔记。'
-        : '这条对话还是空的。';
-      box.appendChild(em);
-    }
     list.forEach(m => addWsMsg(m));
     box.scrollTop = box.scrollHeight;
     // ⚠️ **进来的时候它可能还在做** ✗→✓ —— 服务端把状态一起给了 ✓
@@ -5656,10 +5740,36 @@
   const openNewCompChat = async () => {
     await wsReloadTasks();
     const unfinished = wsCur.tasks.find(t => !t.slug);
-    if (unfinished) { await openTaskById(unfinished.id); return; }
-    // 名字**不问了** ✓ —— 用户要的是"进一个聊天界面" ✓；
-    // 叫什么由它自己在对话里定 ✓（随时能改 ✓，见 ⋯ 里的重命名 ✓）。
-    if (await wsNewTask('')) pushScreen('wsChat');
+    if (unfinished) {
+      // 续上上次那条 ✓，并且**在屏幕正中短暂说一句** ✗→✓（用户 2026-10-09 原话：
+      //   「上次进去没做组件就退，则直接进上次，进入后在界面居中一个小卡片短暂提醒，
+      //     **上次退出时未做出组件，已自动恢复**」✓）。
+      // ⚠️ 那句话是**提醒他去哪儿了** ✓ —— 不然他按了右上角、突然进到一条
+      //    上次的半成品里 ✓，会以为"怎么又回来了" ✓。
+      await openTaskById(unfinished.id, 'corner');
+      showNotice('上次退出时未做出组件，已自动恢复');
+      return;
+    }
+    // ★ **新的那条：先起个名字再进去** ✗→✓（用户 2026-10-09 定的：
+    //   「如果是新进入，会弹出界面**先起个名字**再进去新的组件聊天」✓）。
+    //   ⚠️ 上一轮我把它去掉了 ✗（当时按"少一步"理解的 ✓）—— 他这一版明确要它 ✓。
+    //   名字**不是白问的** ✓：它一路走到 `component_save`（以他起的为准 ✓），
+    //   也是这条对话的标题 ✓。⚠️ 起名那个弹层**是异步的** ✓ ——
+    //   "进哪条对话"要在 `save` 回调里做 ✓，别在这儿写（那时名字还没有 ✓）。
+    openNameSheet({
+      heading: '它叫什么？',
+      initial: '',
+      cta: '开始做',
+      hint: '随便起一个你自己认得出的就行，以后随时能改。',
+      save: async (name) => {
+        // ⚠️ **先把弹层收掉，再开对话** ✗→✓ —— 弹层是 50 档 ✓、聊天屏才 28 ✓，
+        //    不收的话它**压在聊天上面** ✓，那条"从右上角弹出"的动效
+        //    会被它挡个正着 ✓（用户点名要这个动效 ✓，那就别让它白播 ✓）。
+        //    两个动画同时跑（弹层往下收 + 对话从右上角进 ✓）本来就自然 ✓。
+        closeSheet();
+        if (await wsNewTask('', name)) pushScreen('wsChat', 'corner');
+      },
+    });
   };
 
   // ── 正文的渲染（2026-10-07）─────────────────────────────────────────
