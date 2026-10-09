@@ -489,7 +489,15 @@
   #settings { z-index:10; }
   @keyframes pushIn  { from { transform:translateX(100%); } to { transform:none; } }
   @keyframes pushOut { from { transform:none; } to { transform:translateX(100%); } }
-  @keyframes fadeIn  { from { opacity:0; } to { opacity:1; } }
+  /* ★ **下拉进来的那一屏：从上方滑入** ✗→✓（2026-10-09 用户定的：
+     「下滑以编辑该界面，然后组件界面diy的聊天**从上面滑入**，动效丝滑」✓）。
+     ⚠️ 它是①那一类（推入/推出）的**同族** ✓，不是新的一类 ✓ ——
+        方向不同是因为**手势来的方向不同** ✓：右滑来的从右边进 ✓，
+        下拉来的就从上面进 ✓（"动效要说的是它从哪儿来"✓）。
+     退出去也顺着来路 ✓（往上收回 ✓）—— 见 `popScreen` 那张"这一屏是
+     怎么进来的"小表 ✓（`_dropSet` ✓）。 */
+  @keyframes dropIn  { from { transform:translateY(-100%); } to { transform:none; } }
+  @keyframes dropOut { from { transform:none; } to { transform:translateY(-100%); } }
   #settings.anim-in  { animation:pushIn  .24s cubic-bezier(.22,1,.36,1); }
   #settings.anim-out { animation:pushOut .18s cubic-bezier(.4,0,1,1) forwards; }
   /* ④ 首启那几屏（登录/初始化/主群聊）—— `show()` 加 `fade` 用它 ✓ */
@@ -511,6 +519,9 @@
   #agentEdit { z-index:21; }      /* 一层压一层 ✓：列表 < 改资料 ✓ */
   .ascreen.anim-in  { animation:pushIn  .24s cubic-bezier(.22,1,.36,1); }
   .ascreen.anim-out { animation:pushOut .18s cubic-bezier(.4,0,1,1) forwards; }
+  /* ★ 下拉来的那一屏（见上面 `dropIn` 那段 ✓）—— 进/出各一条 ✓ */
+  .ascreen.anim-drop { animation:dropIn  .26s cubic-bezier(.22,1,.36,1); }
+  .ascreen.anim-lift { animation:dropOut .2s  cubic-bezier(.4,0,1,1) forwards; }
 
   /* ── 创意工坊（右上角那个入口）────────────────────────────────────────
      三屏：工坊（#workshop，**只罗列组件**）+ 组件页（#compView，压在上面）
@@ -551,7 +562,30 @@
   #init     { z-index:2; }
   #compView { z-index:26; }
   #wsNav    { z-index:24; }
-  #wsChat   { z-index:25; }
+  /* ⚠️ **`#wsChat` 提到 28（原来 25）** ✗→✓（2026-10-09）——
+     用户定的：「在具体组件内时…下滑进入各自组件的编辑页，且返回时回到各自组件」✓。
+     也就是说**组件页要留在底下开着** ✓（以前是"先关组件页再推对话"✓，
+     因为 `#compView`（26）比 `#wsChat`（25）**高** ✗ → 不关就看不见对话 ✗）。
+     现在改成"聊天严格压在组件页上面" ✓ —— 那正是两个方向都成立的那个值 ✓
+     （从导航进组件：26 > 24 ✓；从组件进聊天：28 > 26 ✓）。
+     ⚠️ `#diySet` 必须跟着**再高一档** ✓（27 → 29）——
+        它原来只保证"比聊天高" ✓，聊天一挪它就压不住了 ✗
+        （症状是老毛病：点了头像，屏幕上什么都不变 ✓）。
+     ⚠️ `__goBack` 那个表要**照着新顺序**改 ✓（见它那段注释 ✓）。 */
+  #wsChat   { z-index:28; }
+  /* ⚠️ 下拉的提示条（见 JS 里 `showPullHint`）——
+     只在**收纳页/组件页**上浮现 ✓，所以它要压过这两屏（22 / 26 ✓）、
+     又必须在**聊天屏（28）之下** ✓（聊天一滑进来就该把它盖住 ✓）。
+     它 `pointer-events:none` ✓ —— 绝不抢手势 ✓。 */
+  #pullHint { position:fixed; left:50%; top:calc(var(--inset-top) + 10px);
+              transform:translate(-50%,-140%); opacity:0; z-index:27;
+              background:var(--panel2); border:1px solid var(--line);
+              color:var(--muted); font-size:13px; padding:8px 16px;
+              border-radius:999px; pointer-events:none; white-space:nowrap;
+              transition:color .15s, border-color .15s; }
+  /* 拉满了：变色 ✓ —— "现在松手就进去" ✓（不给这个反馈的话，
+     用户不知道要拉多远 ✓，只会觉得"拉了没反应" ✓）。 */
+  #pullHint.ready { color:var(--accent); border-color:#35507a; }
   /* ⚠️ **`#diySet` 原来没写 z-index** ✗→✓（2026-10-07 深夜，用户报的：
      「导航界面点击右上角没有显示 diy 助手的界面」✓）——
      它落在 `.ascreen` 的默认值（20）上 ✓，而它只可能从 `#wsNav`（24）进去 ✓ →
@@ -565,7 +599,7 @@
      "点了没反应"一模一样 ✓（同一个坑，从另一条边掉进来 ✓）。
      所以它必须**比 `#wsChat` 高一档** ✓；`#compView` 是 26 ✓，
      这两屏不会同时开 ✓，但留一档差更不容易再踩 ✓。 */
-  #diySet   { z-index:27; }
+  #diySet   { z-index:29; }    /* 见上面那段：聊天提到 28 → 它跟着到 29 ✓ */
 
   /* 「＋ 做一个新的」—— 全宽、最显眼 ✓（它是这一屏的主行动 ✓） */
   /* ★ 用户 2026-10-08：「新建组件距离上方距离小一些，目前有些空」✓ ——
@@ -1346,6 +1380,17 @@
   <div class="cpwrap" id="compWrap"></div>
 </div>
 
+<!-- ★ **下拉的提示条** ✗→✓（2026-10-09 用户定的：
+     「下滑时，会出现顶部会慢慢出现一个提示，下滑以编辑该界面」✓）。
+     ⚠️ 它是**一根独立的条** ✓，不是哪一屏的一部分 ✗ ——
+        下拉这个手势在**收纳页**（`#workshop`）和**组件页**（`#compView`）上
+        是同一件事 ✓（都是"去底下那条对话"✓），
+        文案不同而已（见 JS 里 `_pullHintText` ✓）。
+     ⚠️ **不在任何一屏里** ✗ —— 塞进某一屏的话，那一屏一退场它就跟着没了 ✓，
+        而它恰恰要在"聊天从上面滑进来"的过程中**还看得见**（然后被盖住 ✓）。
+     它 `pointer-events:none` ✓（见 CSS ✓）—— 绝不抢手势 ✓。 -->
+<div id="pullHint"></div>
+
 <!-- ★ 对话屏（2026-10-07）—— 工坊里的那段对话，**从输入框的 ＋ 进** ✓。
      ⚠️ 它是**一条对话自己的页** ✓（不是"所有对话"✓）：
         ＋ 进来的默认是**上次那条** ✓，点顶栏中间那个名字可以换一条、或者开一条新的 ✓。
@@ -1683,9 +1728,13 @@
     if (boot) boot.hidden = true;
     if (bootTimer) { clearTimeout(bootTimer); bootTimer = null; }
     $$('.screen').forEach(s => {
-      s.classList.remove('anim-in', 'anim-out', 'anim-fade');
+      s.classList.remove('anim-in', 'anim-out', 'anim-fade', 'anim-drop', 'anim-lift');
       s.classList.toggle('on', s.id === id);
     });
+    // 整屏替换 = 之前那一摞**全没了** ✓ → "这屏是怎么进来的"那张表也一并清 ✓
+    // （不清的话，下次它被"从上面滑入"进来时，退场会**往上收** ✗ —— 而它是
+    //  从右边推进来的 ✓，方向就对不上了 ✓）。
+    _dropSet.clear();
     if (anim === 'fade') {
       const s = $('#' + id);
       if (s) { void s.offsetWidth; s.classList.add('anim-fade'); }
@@ -1790,18 +1839,37 @@
   //
   //   要"整屏替换"（登录 → 初始化 → 主群聊那种平级切换 ✓）用 `show()` ✓，
   //   它不带位移 ✓ —— 那几条之间没有深浅关系 ✓（见上面那四类 ✓）。
-  const pushScreen = (id) => {
+  //: ★ **这一屏是怎么进来的** ✓（`from === 'top'` 的记在这儿 ✓）——
+  //:   退场要**顺着来路** ✓：右滑来的往右退 ✓、下拉来的往上收 ✓。
+  //:   ⚠️ 不记的话只有一条退场方向 ✗ —— 于是"下拉进来的编辑页"会**往右边退** ✓，
+  //:   而它明明是从上面下来的 ✓（那种错说不清，但一眼就觉得别扭 ✓）。
+  const _dropSet = new Set();
+
+  const pushScreen = (id, from) => {
     const s = $('#' + id);
-    s.classList.remove('anim-out');
-    s.classList.add('on', 'anim-in');
+    s.classList.remove('anim-out', 'anim-lift');
+    if (from === 'top') {
+      _dropSet.add(id);
+      s.classList.remove('anim-in');
+      s.classList.add('on', 'anim-drop');
+    } else {
+      _dropSet.delete(id);
+      s.classList.add('on', 'anim-in');
+    }
     void s.offsetWidth;                 // 强制重排，否则连续开关时动画不重放 ✓
     tellNative('settings');             // ⚠️ 一律 'settings' ✓，见上面那段
   };
   const popScreen = (id) => {
     const s = $('#' + id);
     s.classList.remove('anim-in');
-    s.classList.add('anim-out');
-    afterAnim(s, () => s.classList.remove('anim-out', 'on'));
+    if (_dropSet.has(id)) {
+      _dropSet.delete(id);
+      s.classList.add('anim-lift');
+      afterAnim(s, () => s.classList.remove('anim-lift', 'on'));
+    } else {
+      s.classList.add('anim-out');
+      afterAnim(s, () => s.classList.remove('anim-out', 'on'));
+    }
     tellNative('settings');
   };
 
@@ -2226,8 +2294,12 @@
     //     把下面的聊天关掉 ✓）。
     //    加新屏时**照 z-index 插进来** ✓，别凭感觉往后面追加 ✗。
     if ($('#diySet').classList.contains('on')) { closeDiySet(); return; }
-    if ($('#compView').classList.contains('on')) { closeComp(); return; }
+    // ⚠️ **`#wsChat`（28）现在在 `#compView`（26）上面** ✗→✓（2026-10-09）——
+    //    这两行的**先后跟着 z-index 反过来了** ✓（见 CSS 那段：组件页要留在
+    //    底下开着 ✓，聊天压在它上面 ✓）。写反了还是老毛病：按一下返回
+    //    **隔着聊天把底下那个组件页关掉** ✓，屏幕上聊天纹丝不动 ✓。
     if ($('#wsChat').classList.contains('on')) { closeWsChat(); return; }
+    if ($('#compView').classList.contains('on')) { closeComp(); return; }
     if ($('#wsNav').classList.contains('on')) { closeWsNav(); return; }
     if ($('#workshop').classList.contains('on')) { closeWorkshop(); return; }
     if ($('#agentEdit').classList.contains('on')) { closeAgentEdit(); return; }
@@ -4511,7 +4583,13 @@
   //    这一版先把"能进能出"做扎实 ✓（用户要的是这两条 ✓）。
   const SW_EDGE = 24;      // 边缘留给系统 ✓
   const SW_MIN2 = 10;      // 超过它才判方向 ✓
-  const SW_TRIG = 70;      // 拉过这么多才算数 ✓
+  const SW_TRIG = 70;      // 横滑：拉过这么多才算数 ✓
+  //: ★ 下拉：拉过这么多就进那条对话 ✓（2026-10-09）。
+  //:   ⚠️ 比横滑那个（70）**大一档** ✗→✓ —— 下拉是一根**要跟手**的手势 ✓：
+  //:      从 0 拉到这个数，顶部那条提示才从"看不见"走到"看得见、并且变色" ✓
+  //:      （见 `showPullHint` ✓）。给小了就是"手一动就跳进去" ✓，
+  //:      用户根本没机会看见那行字 ✓ —— 而提示正是他点名要的 ✓。
+  const PULL_TRIG = 96;
   let pgSw = null;
 
   const _overlayOn = () =>
@@ -4537,6 +4615,44 @@
     return '';
   };
 
+  //: 收纳页**滚到顶了没有** ✓ —— 下拉那一条**只在顶上认** ✗→✓。
+  //:   ⚠️ 不判的话，组件一多、列表滚到一半时往下一拉 ✗ →
+  //:      本该是"往回滚" ✓ 却会一路把编辑页拉出来 ✓（滚都滚不动了 ✓）。
+  //:   （`overscroll-behavior:contain` 让容器**不橡皮筋** ✓，所以 `scrollTop`
+  //:     在顶上就是 0 ✓，判断很干净 ✓。）
+  const _wallAtTop = () => {
+    const b = $('#wsBody');
+    return !b || b.scrollTop <= 0;
+  };
+
+  //: 顶部那条提示写什么 ✓ —— 收纳页和组件页**各说自己的** ✓
+  //:   （用户 2026-10-09 定的原话：「下滑以编辑该界面」/「下滑以编辑该组件」✓）。
+  const _pullHintText = () => {
+    const s = _whichScreen();
+    if (s === 'comp') return '下滑以编辑该组件';
+    return '下滑以编辑该界面';
+  };
+
+  /** 顶部那条提示 —— **跟着手指浮现** ✓（`p` 0→1 就是"拉了多少" ✓）。 */
+  const showPullHint = (text, dy) => {
+    const el = $('#pullHint');
+    if (!el) return;
+    const p = Math.max(0, Math.min(1, (dy || 0) / PULL_TRIG));
+    if (!p) { hidePullHint(); return; }
+    el.textContent = text;
+    el.style.opacity = String(p);
+    // 从上面"掉"下来 ✓ —— 往上收着的那一截随 `p` 归零 ✓
+    el.style.transform = 'translate(-50%, ' + (-140 + p * 140) + '%)';
+    el.classList.toggle('ready', p >= 1);
+  };
+  const hidePullHint = () => {
+    const el = $('#pullHint');
+    if (!el) return;
+    el.classList.remove('ready');
+    el.style.opacity = '';
+    el.style.transform = '';
+  };
+
   document.addEventListener('touchstart', (ev) => {
     if (ev.touches.length !== 1) { pgSw = null; return; }
     if (_overlayOn()) { pgSw = null; return; }
@@ -4555,37 +4671,45 @@
       // ② 方向要**明确**才认 ✓（斜着划不算 ✓）
       if (Math.abs(dx) > Math.abs(dy) * 1.2) pgSw.dir = dx < 0 ? 'L' : 'R';
       else if (Math.abs(dy) > Math.abs(dx) * 1.2) pgSw.dir = dy > 0 ? 'D' : 'U';
-      else { pgSw = null; return; }
+      else { pgSw = null; hidePullHint(); return; }
       // ③ 这一屏上这个方向有没有意义？没有就把手势丢掉 ✓（免得吃掉正常滚动 ✓）
       const s = _whichScreen();
       const ok = (pgSw.dir === 'L' && s === 'chat')
               || (pgSw.dir === 'R' && (s === 'wall' || s === 'comp'))
-              || (pgSw.dir === 'D' && (s === 'wall' || s === 'comp'));
-      if (!ok) { pgSw = null; return; }
+              || (pgSw.dir === 'D' && ((s === 'wall' && _wallAtTop()) || s === 'comp'));
+      if (!ok) { pgSw = null; hidePullHint(); return; }
       ev.preventDefault();      // ★ 认了之后**才**拦 ✓（早了会把滚动卡死 ✗）
     } else {
       ev.preventDefault();
     }
     pgSw.dx = dx;
     pgSw.dy = dy;
+    // ★ 下拉：顶部那条提示**跟着手指出** ✓（见 `showPullHint` ✓）
+    // ⚠️ 只在 `'D'` 上画 ✓ —— 横滑那两条没有提示 ✓，画了就是"多出来一根条" ✗。
+    if (pgSw.dir === 'D') showPullHint(_pullHintText(), dy);
   }, { passive: false });
 
   const _endSwipe = () => {
     const s = pgSw;
     pgSw = null;
-    if (!s || !s.dir) return;
-    const far = (s.dir === 'L' || s.dir === 'R')
-      ? Math.abs(s.dx || 0) >= SW_TRIG
-      : (s.dy || 0) >= SW_TRIG;
+    if (!s || !s.dir) { hidePullHint(); return; }
+    // 下拉：够远才进 ✓，不够就把提示收回去 ✓（**绝不留着** ✗ —— 留着那根条
+    // 会把"我刚才是不是拉过头了"这件事变成一个疑问 ✓）。
+    if (s.dir === 'D') {
+      const far = (s.dy || 0) >= PULL_TRIG;
+      hidePullHint();
+      if (far) openCompChat();
+      return;
+    }
+    const far = Math.abs(s.dx || 0) >= SW_TRIG;
     if (!far) return;
     const scr = _whichScreen();
     if (s.dir === 'L' && scr === 'chat') { openWorkshop(); return; }
     if (s.dir === 'R' && scr === 'comp') { closeComp(); return; }
     if (s.dir === 'R' && scr === 'wall') { closeWorkshop(); return; }
-    if (s.dir === 'D') openCompChat();
   };
   document.addEventListener('touchend', _endSwipe);
-  document.addEventListener('touchcancel', () => { pgSw = null; });
+  document.addEventListener('touchcancel', () => { pgSw = null; hidePullHint(); });
 
   /**
    * **下拉 → 进这条对话** ✓（收纳页和单个组件页都走这里 ✓）。
@@ -4598,19 +4722,39 @@
    */
   const openCompChat = () => {
     const scr = _whichScreen();
+    // ⚠️ **`'top'` = 从上面滑进来** ✓（用户 2026-10-09 定的："从上面滑入" ✓）——
+    //    这个参数一路传到 `pushScreen` ✓，退场也会顺着它**往上收** ✓。
     if (scr === 'comp') {
-      if (compCur) openTaskForSlug(compCur.slug, compCur.title);
+      if (compCur) openTaskForSlug(compCur.slug, compCur.title, 'top');
       return;
     }
-    if (scr === 'wall') openTaskForSlug(WALL_SLUG, '组件界面diy');
+    if (scr === 'wall') openTaskForSlug(WALL_SLUG, '组件界面diy', 'top');
   };
 
   // ★ **组件里面往下拉**那一条（沙箱里听不到 ✓，由注入的小桥报信 ✓）
+  //
+  // ⚠️ 2026-10-09 改成**报进度** ✗→✓（原来只在"拉够了"的那一下报一嗓子 ✓）——
+  //    用户要的是"顶部**慢慢**出现一个提示" ✓，那就必须**跟手** ✓，
+  //    而跟手需要中间那些值 ✓（只报一个"成了"是画不出渐变来的 ✗）。
+  //    所以小桥现在发三种信 ✓：`pull` 带 dy ✓ / `pullend` / `pullcancel` ✓。
+  let _pullDy = 0;
   window.addEventListener('message', (ev) => {
     const d = ev && ev.data;
-    if (!d || d.lg !== 'pull') return;
+    if (!d || typeof d.lg !== 'string') return;
     if (_whichScreen() !== 'comp') return;   // 只在看组件的时候认 ✓
-    openCompChat();
+    if (d.lg === 'pull') {
+      _pullDy = Number(d.dy) || 0;
+      showPullHint('下滑以编辑该组件', _pullDy);
+      return;
+    }
+    if (d.lg === 'pullend') {
+      const far = _pullDy >= PULL_TRIG;
+      _pullDy = 0;
+      hidePullHint();
+      if (far) openCompChat();
+      return;
+    }
+    if (d.lg === 'pullcancel') { _pullDy = 0; hidePullHint(); }
   });
 
   /** 改账号（用户名 / 密码）✓ —— 和「我的」同构的一屏 ✓。 */
@@ -4745,12 +4889,16 @@
     const box = $('#wsBody');
     box.innerHTML = '';                       // 下面全部走 createElement，不进 innerHTML ✓
     if (!wsCanvas.length) {
-      // ★ 空状态就是用户给的那句话 ✓（2026-10-08 原话：
+      // ★ 空状态那句话 ✓（2026-10-08 用户给的原话：
       //   「当没有组件的时候只会在界面居中位置提示：当前还没有组件，
       //     去创意工坊创建一个组件吧」✓）。
+      // ⚠️ **后半句改了** ✗→✓（2026-10-09）——「去创意工坊」那个入口**没有了** ✓
+      //    （用户：「主群聊右上角的按钮进入的不再是导航页，而是新建组件的
+      //    聊天界面」✓）→ 留着那句话就是在**指一条走不通的路** ✓
+      //    （而且他现在看到这一屏的**第一眼**多半就是它 ✓：新空间里一个组件都没有 ✓）。
       const em = document.createElement('div');
       em.className = 'wsempty';
-      em.textContent = '当前还没有组件，去创意工坊创建一个组件吧';
+      em.textContent = '当前还没有组件，去群里右上角让他做一个吧';
       box.appendChild(em);
       return;
     }
@@ -4847,10 +4995,17 @@
     return cell && cell !== (wsDrag && wsDrag.el) ? cell : null;
   };
 
-  /** 打开一个格子 ✓ —— 「组件收纳页」那一格走**它自己那条对话** ✓。 */
+  /** 打开一个格子 ✓ —— 点一下就进**这个组件**那一屏 ✓。
+   *
+   *  ⚠️ 这里原来有一支 `if (c.slug === WALL_SLUG) openCompChat()` ✗→✓（2026-10-09）——
+   *    「组件界面diy」那一格**不再画出来**了 ✓（用户：「组件收纳界面不要有
+   *    组件界面diy这个图标和入口，它本身点进去不是一个独立组件」✓，
+   *    它在服务端就被筛掉了 ✓，见 `main.py:_scan_components` ✓），
+   *    所以这一支永远进不来 ✓ —— 留着是死代码 ✓（下一个人会照着它以为
+   *    "收纳页上还有那一格" ✓）。**去那条对话现在是下拉** ✓（见 `openCompChat` ✓）。
+   */
   const openCell = (c) => {
     if (!c) return;
-    if (c.slug === WALL_SLUG) { openCompChat(); return; }
     openComp(c.slug, c.title);
   };
 
@@ -4966,14 +5121,26 @@
     //      外面那层听不到"在组件里往下拉" ✗（`postMessage` 是通的 ✓，所以由它报信 ✓）。
     //   ⚠️ 只看**页面滚到顶了还继续往下拉** ✓ ——「滚动中往下拉」是正常滚动 ✓，
     //      不能拿它当手势 ✗（不然滚长组件就会一直触发 ✓）。
+    //   ⚠️ 2026-10-09：它改成**一路报进度** ✗→✓（见下面那段 message 监听 ✓）——
+    //      外面那条提示要跟着手指浮现 ✓，只报"拉够了"那一下是画不出渐变来的 ✓。
+    //      仍然**只看"滚到顶了还继续往下拉"** ✓（滚动中往下拉是正常滚动 ✗）。
+    //      ⚠️ 一旦里层滚起来了（`st>0`）就**撒手**（报 pullcancel ✓）——
+    //         那是"他在滚组件" ✓，不是"他想编辑" ✓；不撒手的话，
+    //         滚到一半手感会变得很怪 ✓（提示跟着乱闪 ✓）。
     const bridge = S
-      + 'var _y0=null;addEventListener("touchstart",function(e){_y0=e.touches[0].clientY;},{passive:true});'
+      + 'var _y0=null;'
+      + 'var _say=function(o){try{parent.postMessage(o,"*")}catch(_){}};'
+      + 'addEventListener("touchstart",function(e){'
+      + '_y0=(e.touches.length===1)?e.touches[0].clientY:null;},{passive:true});'
       + 'addEventListener("touchmove",function(e){if(_y0===null)return;'
       + 'var st=(document.scrollingElement||document.documentElement).scrollTop;'
+      + 'if(st>0){_y0=null;_say({lg:"pullcancel"});return;}'
       + 'var dy=e.touches[0].clientY-_y0;'
-      + 'if(st<=0&&dy>90){_y0=null;try{parent.postMessage({lg:"pull"},"*")}catch(_){}}},'
-      + '{passive:true});'
-      + 'addEventListener("touchend",function(){_y0=null;});'
+      + '_say({lg:"pull",dy:dy});},{passive:true});'
+      + 'var _end=function(ok){if(_y0===null)return;_y0=null;'
+      + '_say({lg:ok?"pullend":"pullcancel"});};'
+      + 'addEventListener("touchend",function(){_end(true)});'
+      + 'addEventListener("touchcancel",function(){_end(false)});'
       + E;
     const inject = S + `window.__LG_DATA__=${JSON.stringify(d.data)};` + E + bridge;
     const ifr = document.createElement('iframe');
@@ -5058,21 +5225,33 @@
       ? (wsCur.title || wsCur.slug || '做一个新的')
       : '创意工坊';
     // 这里原来挂过一枚「未固化」的小牌子 ✓ —— 跟着"固化"整套一起去掉了 ✓（见上 ✓）。
-    // ★ 有 slug 才点得动 ✓（见 HTML 那段 ✓）—— 点到的是**预览页** ✓（那才是"组件界面"✓）。
-    t.disabled = !wsCur.slug;
+    // ★ **「组件界面diy」那条：右上角什么都没有** ✗→✓（2026-10-09 用户定的：
+    //   「组件界面diy的界面，没有右上角三个点，没有重命名，没有删除组件，
+    //    啥都没有，默认不可编辑，只能编辑界面」✓）。
+    //   ⚠️ 用 `visibility` 而不是 `display`/`hidden` ✗ —— `header.sub h2` 是
+    //      `flex:1` 靠**两边各占 40px** 才居中的 ✓：把右边那颗按钮抽走，
+    //      标题会往右偏 ✓（占位留着才居得中 ✓）。
+    //   ⚠️ 服务端那两道闸门**早就有了** ✓（`task_rename` / `component_delete`
+    //      都对 `wall` 报 403 ✓）—— 这里藏按钮是**不给人一个按了会挨骂的按钮** ✓，
+    //      不是安全边界 ✓（边界在服务端 ✓）。
+    const isWall = wsCur.slug === WALL_SLUG;
+    const more = $('#wsMore');
+    if (more) more.style.visibility = isWall ? 'hidden' : '';
+    // ★ 名字**点不动** ✓ —— 点它的意思是"去看这个组件" ✓，而它**不是一个组件** ✓
+    //   （点进去会是一个空白的沙箱页 ✓，那比不可点更让人犯嘀咕 ✓）。
+    t.disabled = !wsCur.slug || isWall;
     t.onclick = () => {
-      if (!wsCur.slug) return;
-      // ⚠️ **先把这一屏关掉再推组件页** ✗→✓（2026-10-07 深夜，用户报的
-      //    「点上上面居中的组件名称也无法直接跳转」✓）。
-      //    原因是一行 z-index ✗：`#wsChat` 是 **25** ✓、`#compView` 是 **23** ✓ ——
-      //    **直接推的话组件页被压在聊天底下** ✓，屏幕上什么都不变 ✓
-      //    （"点了没反应"里最难查的一种 ✓：代码执行了、接口也请求了 ✓）。
-      //    为什么不干脆把 compView 调高 ✗：从组件页那个图标**进聊天**时 ✓，
-      //    聊天必须**在组件页上面** ✓（那是反过来的方向 ✓）—— 一个固定值表达不了两边 ✓。
-      //    关掉再推是唯一两边都成立的做法 ✓：退回时落到导航屏 ✓
-      //    （和用户定的"组件界面返回落在导航"一致 ✓）。
+      if (!wsCur.slug || isWall) return;
+      // ★ 点名字 → **去看这个组件** ✓。
+      // ⚠️ 2026-10-09：`#wsChat` 现在**严格压在** `#compView`（28 > 26 ✓）上面了 ✓
+      //    （见 CSS 那段）—— 所以这里**先关掉这一屏再推**的那套**不用了** ✓。
+      //    而且如果底下**已经就是它**（下拉进来的那条路 ✓，组件页一直开着 ✓），
+      //    就不必再推一次 ✓ —— 推了等于把同一个组件页**重画一遍** ✓
+      //    （沙箱 iframe 会白一下 ✓，看着像闪了一下 ✓）。
+      const sameComp = $('#compView').classList.contains('on')
+                    && compCur && compCur.slug === wsCur.slug;
       closeWsChat();
-      openComp(wsCur.slug, wsCur.title || wsCur.slug);
+      if (!sameComp) openComp(wsCur.slug, wsCur.title || wsCur.slug);
     };
   };
 
@@ -5146,6 +5325,19 @@
   //   既没法接着做、也没法删 ✓（那条对话就成了一个谁都够不着的孤儿 ✓）。
   //   列出来标成"还没做什么" ✓，诚实 ✓。
 
+  // ⚠️⚠️ **这一屏（`#wsNav`）现在没有入口了** ✗→✓（2026-10-09）——
+  //    用户改的：「主群聊右上角的按钮进入的不再是导航页，而是新建组件的聊天界面」
+  //    「这样**省去了导航界面的麻烦**，完全靠上滑进入各自的编辑界面」✓。
+  //    所以：`openWsNav` / `closeWsNav` / `renderWsNav` 这一族**留着但没人调** ✓。
+  //  ⚠️ **为什么不连皮拔掉** ✗：它是 `#wsNav` 那一屏 + 顶栏那颗 diy 助手头像 +
+  //    `closeWsNav` 在 `__goBack` 里那一支 ✓，一共牵七八处 ✓ ——
+  //    而它现在**是死的、不占任何界面** ✓（没有任何路径能推到它 ✓），
+  //    删它的收益只是"文件短一点" ✗（风险却是"顺手删错一处"✓）。
+  //    哪天真要删，删干净这几处：`#wsNav` 的 HTML/CSS ✓、
+  //    `openWsNav/closeWsNav/renderWsNav/navNewRow/navRow` ✓、
+  //    `__goBack` 里那一支 ✓、`_OTHER_SCREENS` 里那一项 ✓、`#wsNavBack/#wsDiy` 的绑定 ✓。
+  //  ⚠️ **diy 小助手的设置没丢** ✓ —— 它还有一条路：**点组件对话里那张助手头像** ✓
+  //    （见 `addWsMsg` 里那句 `else openDiySet()` ✓），那是用户原来就定的入口 ✓。
   const openWsNav = async () => {
     // ⚠️ **先推屏、再画** ✗→✓ —— 画要发请求（几十毫秒 ✓）；
     //    反过来的话那几十毫秒里这一屏是空的 ✓，看着像"点了没反应" ✓。
@@ -5326,9 +5518,9 @@
     return b;
   };
 
-  /** 进「一条对话」—— 导航里点图标走这里 ✓。 */
-  const openTaskById = async (tid) => {
-    if (!$('#wsChat').classList.contains('on')) pushScreen('wsChat');
+  /** 进「一条对话」✓。`from` = `'top'` 就从上面滑进来 ✓（下拉那条路 ✓）。 */
+  const openTaskById = async (tid, from) => {
+    if (!$('#wsChat').classList.contains('on')) pushScreen('wsChat', from);
     try {
       const d = await api(`/workshop/${group.id}/tasks/${tid}/open`, { method: 'POST' });
       showTask(d);
@@ -5348,19 +5540,23 @@
    *    而不是落回**刚才那一页** ✓（那里可能刚刚被你删掉了 ✓ ——
    *    回到一个已经不存在的组件的预览上，是最难解释的一种错 ✓）。
    */
-  const openTaskForSlug = async (slug, title) => {
-    if ($('#compView').classList.contains('on')) closeComp();
-    // ⚠️ **把导航屏补上** ✗→✓ —— 从预览页那个图标进来的话，导航屏**没开着** ✓，
-    //    于是"左上角 < 回导航"就无处可回 ✓（按一下会一路退到群聊去 ✓，
-    //    和用户定的那句话说不上 ✓）。补上之后两条路的后退行为就一样了 ✓。
-    //    ⚠️ 它**不等** ✓：导航屏在底下先渲染着 ✓，等用户真退回来时它是现成的 ✓。
-    if (!$('#wsNav').classList.contains('on')) { pushScreen('wsNav'); renderWsNav(); }
+  const openTaskForSlug = async (slug, title, from) => {
+    // ★ 2026-10-09：**不再动底下那两屏** ✗→✓ ——
+    //   原来这里先把组件页关掉（`closeComp` ✓）、再把导航屏补上（`pushScreen('wsNav')`✓），
+    //   因为"从组件页进聊天"时**聊天必须压在组件页上面** ✓，而当时 `#compView`(26)
+    //   比 `#wsChat`(25) **高** ✗ → 只能先关掉它 ✓。
+    //   ⚠️ 用户这一轮改了规矩：「在具体组件内时…下滑进入各自组件的编辑页，
+    //      **且返回时回到各自组件**」✓ —— 那么组件页就**必须一直开着** ✓
+    //      （关掉它，"返回回到各自组件"就无从谈起 ✗）。
+    //      z-index 已经把它理顺了（28 > 26 ✓，见 CSS 那段）→
+    //      这一屏现在只做一件事：**把那条对话（我自己的）找出来、打开** ✓。
+    //      返回落到哪一屏，由"底下原来是什么"决定 ✓ —— 那正是用户要的 ✓。
     await wsReloadTasks();
     const mine = wsCur.tasks.find(x => x.slug === slug);
-    if (mine) { await openTaskById(mine.id); return; }
+    if (mine) { await openTaskById(mine.id, from); return; }
     // ⚠️ 新开的那条**名字也是对的** ✓ —— 服务端在 `_my_tasks` 里会给它
     //    兜上"那个组件现在的标题" ✓（不然顶上会写着个英文 slug ✓，很难认 ✓）。
-    if (await wsNewTask(slug)) pushScreen('wsChat');
+    if (await wsNewTask(slug)) pushScreen('wsChat', from);
   };
 
   /** 开一条新的 ✓（只置状态，不推屏 ✓ —— 推屏由调用方决定 ✓）。返回成没成 ✓。 */
@@ -5385,6 +5581,14 @@
     try {
       const d = await api(`/workshop/${group.id}/tasks`);
       wsCur.tasks = d.tasks || [];
+      // ★ **顺手把小助手和"谁正在改"也带上** ✗→✓（2026-10-09）——
+      //   这两样原来是 `renderWsNav` 捎带刷的 ✓，而导航屏**没有入口了** ✓
+      //   （见 `openTaskForSlug` 那段）→ 不挪过来的话，气泡上那个名字和头像
+      //   会一直是**默认的**「diy 小助手」✓（改了名也不变 ✓ —— 而那看起来
+      //   像"改了没保存" ✓）。
+      if (d.assistant) wsCur.assistant = d.assistant;
+      wsCur.editing = d.editing || {};
+      paintDiyAvatar();
       return d;
     } catch (e) { return null; }   // 拉不到不影响正在看的这一条 ✓
   };
@@ -5400,12 +5604,48 @@
     setWsHead();
   };
 
-  /** 返回**导航屏** ✓ —— 用户定的："每个组件界面左上角依旧是 < " ✓。 */
+  /** 退出这条对话 ✓ —— **回到它底下原来那一屏** ✓（收纳页 / 组件页 / 群聊 ✓）。
+   *
+   *  ★ 2026-10-09：原来这里退的是**导航屏** ✗→✓ —— 现在底下是什么就回什么 ✓
+   *    （用户：「在组件收纳页…此时如果手势返回还是要进入组件收纳页」✓；
+   *     「在具体组件内时…返回时回到各自组件」✓）。这两条**都是"回底下那一屏"** ✓，
+   *     所以这一屏不用判断自己是从哪儿来的 ✓ —— `popScreen` 本来就是那个意思 ✓。
+   */
   const closeWsChat = () => {
     popScreen('wsChat');
-    // ⚠️ 退回导航要重画一次 ✓ —— 说不定刚刚做好了一个、或者删掉了一个 ✓
-    //    （不重画的话那张图标还在 ✓ —— "明明删了却还在"是最伤信任的一种 ✓）。
-    if ($('#wsNav').classList.contains('on')) renderWsNav();
+    // ⚠️ 底下的收纳页要**重画 + 重挂外观** ✗→✓ —— 说不定刚刚
+    //    （a）做好了一个组件 ✓（b）删了一个 ✓（c）让管家把这一屏改了个样 ✓。
+    //    不重挂的话（c）最要命 ✓：他刚让管家改完界面，退出来**还是老样子** ✓
+    //    → "说了半天没改" ✓（这个项目里最常见的那种"看着像没做" ✓）。
+    if ($('#workshop').classList.contains('on')) {
+      applyWallCss();
+      renderWorkshop();
+    }
+  };
+
+  /**
+   * ★ **群聊右上角那个按钮** ✓ —— 2026-10-09 改成**直接进"新建组件"的对话** ✗→✓。
+   *
+   *   用户原话：「主群聊右上角的按钮进入的不再是导航页，而是新建组件的聊天界面，
+   *   如果在这个界面没有做出组件，下次点击**自动进去上次没生成组件的聊天**，
+   *   一旦建立了组件，退出下次进入时就是新建组件的界面，这样省去了导航界面的麻烦」✓。
+   *
+   *   ⚠️ **"上次没生成组件的那条"是服务端算的** ✗→✓（`updated_at` 最近的那条、
+   *      且**还没做出组件** ✓）—— 不放 localStorage ✓（壳里的存储会被清 ✓、
+   *      换手机就没了 ✓，而这件事本来就该跟着人走 ✓）。
+   *   ⚠️ 判断"没有组件"用的是 `t.slug` **空** ✓ —— 那是服务端在 `_my_tasks`
+   *      里算好的 ✓（`workshop_tasks.slug` + 它做出来的组件的 slug ✓）。
+   *      ⚠️ 「组件界面diy」那条**不算** ✓（它的 slug 是 `wall` ✓，非空 ✓）。
+   *   ⚠️ 最多只会有**一条**这样的对话 ✓ —— 因为每次进来都**续着那条** ✓，
+   *      不会再开第二条 ✓（老数据可能留了几条，那些够不着了；无所谓 ✓）。
+   */
+  const openNewCompChat = async () => {
+    await wsReloadTasks();
+    const unfinished = wsCur.tasks.find(t => !t.slug);
+    if (unfinished) { await openTaskById(unfinished.id); return; }
+    // 名字**不问了** ✓ —— 用户要的是"进一个聊天界面" ✓；
+    // 叫什么由它自己在对话里定 ✓（随时能改 ✓，见 ⋯ 里的重命名 ✓）。
+    if (await wsNewTask('')) pushScreen('wsChat');
   };
 
   // ── 正文的渲染（2026-10-07）─────────────────────────────────────────
@@ -5725,6 +5965,12 @@
    *（它得同时定 slug ✓，那是目录名 ✓）。那种对话只有"删掉这次对话"✓。
    */
   const openWsMenu = async () => {
+    // ★ **「组件界面diy」那条没有 ⋯** ✗→✓（2026-10-09 用户定的：
+    //   「组件界面diy的界面，没有右上角三个点，没有重命名，没有删除组件，
+    //    啥都没有，默认不可编辑，只能编辑界面」✓）。
+    //   按钮已经藏了 ✓（见 `setWsHead` ✓），这一句是**防"从别处按到它"** ✓
+    //   （它是个 async 函数 ✓，将来多一条调用点也不会漏 ✓）。
+    if (wsCur.slug === WALL_SLUG) return;
     await wsReloadTasks();
     const t = wsCur.tasks.find(x => Number(x.id) === Number(wsCur.task));
     const p = $('#sheetPanel');
@@ -5776,7 +6022,7 @@
                     { method: 'DELETE' });
         } catch (e) { toast('没删掉：' + e.message); return; }
         toast('删了');
-        backToNav();
+        backToWall();
       }, true);
     } else {
       // ★ **还没做出组件的也能改名** ✗→✓（2026-10-07 深夜，用户问的：
@@ -5812,7 +6058,7 @@
           await api(`/workshop/${group.id}/tasks/${wsCur.task}`, { method: 'DELETE' });
         } catch (e) { toast('没删掉：' + e.message); return; }
         toast('删了');
-        backToNav();
+        backToWall();
       }, true);
     }
 
@@ -6083,22 +6329,33 @@
     paintDiyAvatar();
   };
 
-  /** 删完之后回**导航屏** ✓ —— 用户定的："此时会自动退回导航界面" ✓。 */
-  const backToNav = () => {
+  /** 删掉一个组件（或一条对话）之后**退回收纳页** ✓。
+   *
+   *  ★ 2026-10-09 改：原来是"退回导航屏" ✗→✓ —— 导航屏**没有入口了** ✓
+   *    （用户：「省去了导航界面的麻烦」✓），而组件本来就住在收纳页上 ✓
+   *    （那才是"组件都在这儿"的那一屏 ✓）。
+   *  ⚠️ **组件页也得关掉** ✗ —— 它底下那个组件**刚被删了** ✓，
+   *     留着就是"回到一个已经不存在的组件上" ✓（最难解释的一种错 ✓）。
+   */
+  const backToWall = () => {
     wsCur.task = null;
     if ($('#wsChat').classList.contains('on')) popScreen('wsChat');
-    if (!$('#wsNav').classList.contains('on')) pushScreen('wsNav');
-    renderWsNav();
+    if ($('#compView').classList.contains('on')) { compCur = null; popScreen('compView'); }
+    if (!$('#workshop').classList.contains('on')) pushScreen('workshop');
+    applyWallCss();
+    renderWorkshop();
   };
 
   $('#openSettings').onclick = openSettings;
   // ★ 创意工坊（2026-10-07）—— 六个入口：右上角列组件 / ＋ 里进工坊 /
   //   导航屏退 / 组件页退 / 对话屏退 / 对话屏的 ⋯ ✓
-  // ★ 右上角那个四格图标：**2026-10-08 改成进「创意工坊」导航屏** ✗→✓
-  //   （用户：「替换原来组件进入的界面，这是一个改动请区分」✓）。
-  //   图标和位置**没动** ✓ —— 变的是它去哪儿 ✓（原来进收纳页 ✓，现在进导航 ✓）；
-  //   收纳页改成**左滑进** ✓（见上面那套手势 ✓）。
-  $('#openWorkshop').onclick = openWsNav;
+  // ★ 右上角那个四格图标 ✓ —— 图标和位置**从头到尾没动过** ✓，
+  //   变的一直是它去哪儿 ✓：
+  //     · 2026-10-07：进收纳页 ✓
+  //     · 2026-10-08：进「创意工坊」导航屏 ✓（收纳页改成左滑进 ✓）
+  //     · **2026-10-09：进"新建组件"的那条对话** ✓（导航屏整个不用了 ✓，
+  //        见 `openNewCompChat` 那段 ✓）—— 用户原话：「省去了导航界面的麻烦」✓。
+  $('#openWorkshop').onclick = openNewCompChat;
   $('#wsNavBack').onclick = closeWsNav;
   // ★ diy 小助手：导航右上角那颗头像 → 设置屏 ✓（用户 2026-10-07 深夜定的 ✓）
   $('#wsDiy').onclick = openDiySet;

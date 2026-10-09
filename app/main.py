@@ -706,6 +706,15 @@ async def _scan_components(group_id: int) -> list[dict]:
     out: dict[str, dict] = {}
     for r in rows:
         slug = str(r["slug"])
+        # ★ **「组件界面diy」不进这一列** ✗→✓（2026-10-09 用户定的：
+        #   「组件收纳界面不要有组件界面diy这个图标和入口，它本身点进去
+        #     不是一个独立组件」✓）。
+        #   ⚠️ 它那一行**还在库里** ✓（`_ensure_wall` 照旧建 ✓ ——
+        #      改名/删除那两道闸门认的就是这个 slug ✓），只是**不列出来** ✓。
+        #   ⚠️ 也不用前端过滤 ✗ —— 过滤写在显示层的话，
+        #      "空状态"就成了前端自己的判断 ✓（只有这一格时该说"还没有组件"✓）。
+        if slug == WALL_SLUG:
+            continue
         it = out.setdefault(slug, {"slug": slug, "title": r["title"] or slug,
                                    "icon": r["icon"] or "🧩", "note": r["note"] or "",
                                    "spot": _spot_of(r["spot_json"]),
