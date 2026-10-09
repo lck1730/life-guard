@@ -249,6 +249,13 @@
     -webkit-user-select:text !important; user-select:text !important;
     -webkit-touch-callout:default !important;
   }
+  /* ★ **这个状态要自己看得出来** ✗→✓（2026-10-09：把底部那句提示撤了 ✓，
+     改由这一条自己的样子说 ✓）—— 一圈淡虚线 = "它现在是可以拖选的" ✓。
+     ⚠️ 用 `outline` 而不是 `border` ✗ —— border 会改尺寸 ✓（气泡会跳一下 ✓，
+        而且它在滚动列表里 ✓，跳一下很显眼 ✓）。 */
+  .row .bubble.seltext, .mkrow .mkbub.seltext {
+    outline:1px dashed var(--accent); outline-offset:2px;
+  }
   .row.agent .bubble { background:var(--panel); border:1px solid var(--line);
                        border-left:3px solid var(--agent); border-bottom-left-radius:4px; }
   .row:not(.mine):not(.agent) .bubble { border-bottom-left-radius:4px; }
@@ -577,12 +584,25 @@
         · `#me` / `#meAccount` 是**压上去的**（从设置页进 ✓）→ 12 / 13 ✓
           放在 `#settings`(10) 上面 ✓、`#agent`(20) 下面 ✓ ——
           它们和管家那三屏不会同时开 ✓，档位只是留个次序 ✓。 */
-  #me       { z-index:12; }
-  #meAccount{ z-index:13; }
-  #meEdit   { z-index:13; }   /* 和账号那一屏同档 ✓（不会同时开 ✓） */
-  #space    { z-index:12; }   /* 和 `#me` 同档 ✓ —— 它们不会同时开 ✓ */
-  #peer     { z-index:12; }   /* 同上 ✓ */
-  #selfIntro{ z-index:13; }   /* 从「我的」再进一层 ✓ */
+  /* ⚠️⚠️ **这六屏必须在工坊那一摞（22–29）上面** ✗→✓（2026-10-09 用户实测报的：
+     「在组件聊天界面点击我的头像，**不会立刻进去我的界面，没有反应**」✓）。
+     真因就是这一档 z-index ✗：`#me` 原来是 **12** ✓，而组件对话是 **28** ✓ →
+     推是推上去了 ✓（`#me` 的 `.on` 真的加上了 ✓），**但它排在对话底下** ✗ →
+     屏幕上什么都不变 ✓ —— 正是这个项目最怕的"点了没反应"型 ✓。
+     更坏的是它**留下了状态** ✗：`#me` 一直开着 →
+       · 组件页上"下滑进对话"**从此失效** ✓（手势第一句就问 `_OTHER_SCREENS` ✓，
+         `#me` 在里面 ✓ → 认不出这一屏 ✓）
+       · 返回时它比谁都晚被关 ✓ → 关完工坊那几屏，**露出的是「我的」** ✗
+         （用户报的"本该是主群聊，现在却是我的界面"✓）。
+     → 所以这几个"detail 屏"一律提到**工坊那一摞的最上面** ✓：
+       它们永远是"最上面那一屏" ✓（只会从设置页/我的/别人/工坊里推进来 ✓，
+       推上来就该盖住一切 ✓）。`#diySet`(29) 在它们下面一档 ✓（两者不会同时开 ✓）。 */
+  #me       { z-index:30; }
+  #meAccount{ z-index:31; }
+  #meEdit   { z-index:31; }   /* 和账号那一屏同档 ✓（不会同时开 ✓） */
+  #space    { z-index:30; }   /* 和 `#me` 同档 ✓ —— 它们不会同时开 ✓ */
+  #peer     { z-index:30; }   /* 同上 ✓ */
+  #selfIntro{ z-index:31; }   /* 从「我的」再进一层 ✓ */
   /* 自我介绍那个多行框：`.field` 是给单行输入用的 ✓，多行要自己说清楚 ✓ */
   #selfIntro textarea.field { min-height:150px; resize:none; line-height:1.6;
                               font-family:inherit; }
@@ -888,7 +908,12 @@
   /* ⚠️ 这里原来有一条「未固化」的小牌子样式 ✓ —— 2026-10-07 深夜跟着"固化"
      整套一起删了 ✓（用户定的：组件聊天没有所谓的固化和非固化概念了 ✓）。 */
   .ascreen .abody { flex:1; overflow-y:auto; overscroll-behavior:contain;
-                    padding:calc(var(--inset-top) + 14px) 14px calc(var(--inset-bottom) + 24px); }
+                    padding:calc(var(--inset-top) + 26px) 14px calc(var(--inset-bottom) + 24px); }
+  /* ⚠️ **有顶栏的那几屏不用再让一次状态栏** ✗→✓（2026-10-09）——
+     `header.sub` 自己已经带 `padding-top: calc(var(--inset-top) + 10px)` ✓，
+     把上面那条再叠一次就是**顶栏下面多空出一条状态栏那么高** ✗（`#diySet` 就是这样 ✓）。
+     只有**没有顶栏**的那几屏（我的 / 改资料 / 空间 / 别人 … ✓）才需要自己让 ✓。 */
+  .ascreen > header.sub ~ .abody { padding-top:14px; }
 
   .ascreen .sec { color:var(--muted); font-size:13px; padding:16px 4px 6px; }
   .ascreen .grp { background:var(--panel); border-radius:14px; overflow:hidden;
@@ -2424,6 +2449,15 @@
     //    （点上方组件名进组件页时，两屏是**同时开着**的 ✓ —— 原来会隔着它
     //     把下面的聊天关掉 ✓）。
     //    加新屏时**照 z-index 插进来** ✓，别凭感觉往后面追加 ✗。
+    // ★★ **2026-10-09：`#me` 那一族提到 30/31** ✗→✓ —— 它们现在**比工坊那一摞还高** ✓
+    //    （用户报的"在组件聊天里点我的头像没反应"就是这条 ✓，见 CSS 那一段 ✓）。
+    //    → 所以这一族要挪到**这里**（表的最前面）✓，不能再留在下面 ✗。
+    if ($('#meEdit').classList.contains('on')) { closeMeEdit(); return; }
+    if ($('#meAccount').classList.contains('on')) { closeMeAccount(); return; }
+    if ($('#selfIntro').classList.contains('on')) { closeSelfIntro(); return; }
+    if ($('#me').classList.contains('on')) { closeMe(); return; }
+    if ($('#space').classList.contains('on')) { closeSpace(); return; }
+    if ($('#peer').classList.contains('on')) { closePeer(); return; }
     if ($('#diySet').classList.contains('on')) { closeDiySet(); return; }
     // ⚠️ **`#wsChat`（28）现在在 `#compView`（26）上面** ✗→✓（2026-10-09）——
     //    这两行的**先后跟着 z-index 反过来了** ✓（见 CSS 那段：组件页要留在
@@ -2443,13 +2477,6 @@
     //   原来它不在这个表里 ✗ → 返回键落到原生那个"再滑一次退出 App" ✓ →
     //   用户的感觉是"进退两难" ✓（他报的就是这个 ✓）。
     if ($('#init').classList.contains('on')) { location.href = '/login'; return; }
-    if ($('#meEdit').classList.contains('on')) { closeMeEdit(); return; }
-    if ($('#meAccount').classList.contains('on')) { closeMeAccount(); return; }
-    if ($('#selfIntro').classList.contains('on')) { closeSelfIntro(); return; }
-    if ($('#peer').classList.contains('on')) { closePeer(); return; }
-    // `#space`（生活空间）和 `#me` 同档 ✓ —— 谁先判都行 ✓（它们不会同时开 ✓）
-    if ($('#space').classList.contains('on')) { closeSpace(); return; }
-    if ($('#me').classList.contains('on')) { closeMe(); return; }
     if ($('#settings').classList.contains('on')) { closeSettings(); return; }
     // ⚠️ `#login` / `#init` **刻意不列在这儿** ✗ —— 它们是**根屏** ✓：
     //   在它们上面按返回键，该走原生那条"再滑一次退出 App" ✓。
@@ -3275,13 +3302,24 @@
   //       长按触发之后浏览器仍会补一次 click ✓（和头像那个 `pressFired` 是同一个现象 ✓）。
   //       用时间窗比用标志位稳 ✓：不依赖两个事件的先后 ✓。
   document.addEventListener('click', (ev) => {
+    // ★ **点别处（或者点那一段文字自己）→ 自由复制那个状态就结束** ✗→✓
+    //   （2026-10-09 用户定的：「**复制完或者点击空白后，自由复制状态就改结束了**」✓）
+    //   ⚠️ 放在这一支里是因为**它的判据正好是"点在别处"** ✓（点卡片里不算 ✓）。
+    //      它比下面那个"关卡片"的判断**更宽** ✓ —— 卡片早就关了的时候，
+    //      这个状态还挂着 ✓，正是上一版"再也弹不出小卡片"的成因 ✓。
+    if (ev.target.closest && ev.target.closest('#msgcard')) return;   // 点的是卡片自己 → 不算 ✓
+    endFreeCopy();
     const c = $('#msgcard');
     if (!c || !c.classList.contains('on')) return;
     if (Date.now() - msgCardOpenedAt < 350) return;
-    if (ev.target.closest && ev.target.closest('#msgcard')) return;
     closeMsgCard();
   }, true);
-  $('#msgs').addEventListener('scroll', closeMsgCard, { passive: true });
+  $('#msgs').addEventListener('scroll', () => { closeMsgCard(); endFreeCopy(); }, { passive: true });
+  // ★ **他点了系统那排的"复制"** → 这一趟就完事了 ✓（收尾 ✓）。
+  //   ⚠️ 这是"复制完了"唯一的可观测信号 ✓ —— 系统那排工具是**它自己**的 ✓，
+  //      我们既叫不出来也收不回去 ✓，只能等这个 `copy` 事件 ✓
+  //      （点"全选""搜索"那几个不会有 ✓，那种情况归"点别处/滚动"那两条 ✓）。
+  document.addEventListener('copy', () => { endFreeCopy(); });
 
   const openMsgCard = (row, opts) => {
     const m = opts && opts.get ? opts.get(row) : _msgs.get(Number(row.dataset.id));
@@ -3361,9 +3399,36 @@
       }
       sel.addRange(r);
     } catch (e) { /* 框选失败也照样把选择放开了 ✓ —— 他至少能自己长按选 ✓ */ }
-    // ⚠️ 这句话要说的是**下一步做什么** ✓（用户要的正是那个手感 ✓）。
-    //    别再说"已经选中了 / 已经复制了" ✗ —— 那是上一版的说法 ✓（他明确否掉了 ✓）。
-    toast('拖动选中要复制的部分，再点"复制"');
+    // ⚠️ **不弹底部的提示** ✗→✓（2026-10-09 用户第二次否掉它 ✓：
+    //    「目前点击自由复制后**底部提示**…不太好」✓）——
+    //    "它在什么状态"由**这一条自己的样子**说 ✓（见 CSS 里 `.seltext` 那条虚线边 ✓），
+    //    不靠一句 toast ✓。
+  };
+
+  /**
+   * **结束"自由复制"那个状态** ✓ —— 用户原话：
+   *   「复制完或者**点击空白后，自由复制状态就改结束了**」✓。
+   *
+   *   ⚠️ 这一个是上一版**漏掉**的 ✗：状态一旦挂上就再也没摘过 ✓ →
+   *      他那一条消息**从此长按只出系统那排、再也不出我们的小卡片** ✗
+   *      （报的正是这个："长按后依旧只能复制，不弹出自由复制和引用的小卡片了"✓）。
+   *      原因就是我给自己加的那句"这一条的长按让给系统" ✓ ——
+   *      它本身是对的 ✓（要拖手柄就得让系统管长按 ✓），
+   *      **错的是没人负责把它收回来** ✗。
+   *
+   *   ⚠️ 三件事一起做 ✓：摘掉类 ✓、**把那层高亮也清掉** ✓（只摘类不清选择，
+   *      屏幕上还留着一段蓝色高亮 ✓ —— 那就是"状态没结束"的样子 ✗）、
+   *      把这条消息归回普通气泡 ✓。
+   */
+  const endFreeCopy = () => {
+    let any = false;
+    $$('#msgs .bubble.seltext, .mkrow .mkbub.seltext').forEach(el => {
+      el.classList.remove('seltext');
+      any = true;
+    });
+    if (any) {
+      try { window.getSelection().removeAllRanges(); } catch (e) { /* 没有就算了 ✓ */ }
+    }
   };
 
   /** 把小卡片摆到**锚点旁边** ✓（默认锚点是气泡 ✓，可以指定别的 ✓）。 */
