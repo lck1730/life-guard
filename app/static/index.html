@@ -1224,7 +1224,16 @@
   .sheet .actions button { flex:1; padding:13px; border-radius:12px; font-weight:600; }
   .btn-ghost { background:var(--panel2); color:var(--text); }
   .btn-solid { background:var(--accent); color:var(--on-accent); }
+  /* ★ **文字居中 + 限宽** ✗→✓（2026-10-09 用户：「感觉这个提示框里文字没有
+     居中对齐啊，强迫症犯了」✓）——
+     ⚠️ 原来只把**盒子**居中 ✓（`left:50% + translateX(-50%)` ✓），
+        盒子里的字是默认的**左对齐** ✗ → 短句看不出来 ✓，
+        一旦**折行**（比如「当前空间人数超过1人，暂不支持退出」✓）第二行就顶到左边 ✓，
+        看着就是"没居中" ✓。
+     ⚠️ `max-width` 一起加上 ✓：不留的话长句会**撑成一整条** ✓（贴着屏幕两边 ✓），
+        折在哪儿完全看屏幕宽度 ✓ —— 限了宽、再居中，折出来的两行才是匀的 ✓。 */
   .toast { position:fixed; left:50%; bottom:90px; transform:translateX(-50%);
+           max-width:calc(100vw - 40px); text-align:center;
            background:var(--panel2); border:1px solid var(--line); color:var(--text);
            padding:10px 18px; border-radius:10px; font-size:14px; z-index:99;
            opacity:0; transition:opacity .2s; pointer-events:none; }
