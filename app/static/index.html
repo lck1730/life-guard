@@ -282,6 +282,16 @@
      ⚠️ 反正此刻**只有文本框该被看见** ✓（连引用条一起藏 ✓，
         因为复制的内容里本来就不含它 ✓ —— 少一个它反而更诚实 ✓）。 */
   .row .bubble.seltext > *, .mkrow .mkbub.seltext > * { visibility:hidden; }
+  /* ⚠️⚠️ **光藏元素不够** ✗→✓（2026-10-09 用户截图："点击自由复制后，字体还变花了"✓）——
+     纯文字那条消息在 DOM 里是**一个文本节点** ✗（不是元素 ✗），
+     上面那条 `> *` 只匹配**元素** ✓ → 底下那层字**根本没被藏住** ✓ →
+     屏幕上就是**两遍字** ✓（差一两个像素 ✓，所以是"花"的 ✓ 不是重影 ✓）。
+     → 再加一条：**把字变成透明** ✓（`color:transparent` ✓ 对文本节点也管用 ✓，
+       而且会被子元素继承 ✓ —— `!important` 是因为正文里的 `**粗体**`/`` `代码` ``
+       那些是**自己带颜色的元素** ✓，不压一下它们还会露出来 ✓）。
+     ⚠️ 这样"对齐差一两个像素"就**不再是问题**了 ✓ —— 屏幕上只剩文本框那一份字 ✓。 */
+  .row .bubble.seltext, .row .bubble.seltext *,
+  .mkrow .mkbub.seltext, .mkrow .mkbub.seltext * { color:transparent !important; }
   /* ★ **盖在气泡上的那个真文本框** ✓（`freeCopyBubble` 建的那一个）——
      它就是"两头能拖的光标 + 系统那排工具"唯一进得去的门 ✓（见那段注释 ✓）。
      ⚠️ 它必须**看起来和气泡一模一样**：透明底 ✓、同样的字体行高内边距 ✓
@@ -3496,11 +3506,21 @@
     ta.style.color = cs.color;
     ta.style.textAlign = cs.textAlign;
     document.body.appendChild(ta);
-    // ⚠️ 焦点+全选：**这两句就是"叫出手柄"的全部** ✓（顺序也不能反 ✓）
-    try {
-      ta.focus({ preventScroll: true });
-      ta.setSelectionRange(0, ta.value.length);
-    } catch (e) { /* 叫不出来也还留着那层高亮 ✓ —— 他至少能自己长按选 ✓ */ }
+    // ⚠️ 焦点+全选：**这是"叫出手柄"的全部** ✓（顺序不能反 ✓）。
+    // ⚠️⚠️ **一次不够** ✗→✓（2026-10-09 用户实测："也没出现光标啊，必须手点一下才可以"✓）——
+    //    刚 append 的元素**还没排过版** ✓，有些 WebView 这一下不吃焦点 ✗
+    //    → 光标不出来 ✓、手柄当然也不出来 ✓，得他自己点一下才成 ✓。
+    //    所以：**先强制一次排版** ✓，再聚焦一次 ✓；
+    //    然后**隔一帧再补一次** ✓（那一帧之后元素是真的在屏幕上了 ✓）。
+    const grab = () => {
+      try {
+        ta.focus({ preventScroll: true });
+        ta.setSelectionRange(0, ta.value.length);
+      } catch (e) { /* 叫不出来也还留着可长按的状态 ✓ —— 他按住那段字照样能出 ✓ */ }
+    };
+    void ta.offsetHeight;                 // ★ 强制排版（就这一行治"光标不出来"✓）
+    grab();
+    setTimeout(grab, 60);                 // ★ 再补一枪 ✓
     // 焦点一走（点别处）→ 收掉 ✓
     ta.onblur = () => setTimeout(() => { if (document.activeElement !== ta) endFreeCopy(); }, 0);
   };
