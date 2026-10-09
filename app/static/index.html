@@ -5565,10 +5565,11 @@
   //:   （用户 2026-10-09 定的原话：「继续左滑进入创意工坊」✓ /
   //:     「下滑以编辑该界面」/「下滑以编辑该组件」✓）。
   const _pullHintText = (dir) => {
-    if (dir === 'L') return '继续左滑进入创意工坊';
-    const s = _whichScreen();
-    if (s === 'comp') return '下滑以编辑该组件';
-    return '下滑以编辑该界面';
+    // ⚠️ **只回后半句** ✗→✓（2026-10-10 用户：「阈值未到时是"**继续**左滑/继续下滑…"，
+    //   到了阈值后应该变成"**松开**…"」✓）—— 前半句由 `showPullHint` 按进度现拼 ✓。
+    // ⚠️ 「下滑以编辑」里的那个「以」也去掉了 ✓（他的原话：「那个"以编辑"的以字去掉」✓）。
+    if (dir === 'L') return '进入创意工坊';
+    return _whichScreen() === 'comp' ? '编辑该组件' : '编辑该界面';
   };
 
   /** 顶部那条提示 —— **跟着手指浮现** ✓（`p` 0→1 就是"拉了多少" ✓）。
@@ -5578,12 +5579,17 @@
    *    （用死一个数的话：其中一个方向**永远到不了变色那一步** ✗，
    *      而"该松手了"正是靠变色告诉他的 ✓）。
    */
-  const showPullHint = (text, dist, trig, side) => {
+  const showPullHint = (tail, dist, trig, side) => {
     const el = $('#pullHint');
     if (!el) return;
     const p = Math.max(0, Math.min(1, (dist || 0) / (trig || PULL_TRIG)));
     if (!p) { hidePullHint(); return; }
-    el.textContent = text;
+    // ★ **两段文案** ✓（用户 2026-10-10 定的 ✓）：
+    //   还差一点 → 「继续左滑 / 继续下滑 …」✓（在催他接着拉 ✓）
+    //   拉够了   → 「松开 …」✓（在催他松手 ✓）
+    //   ⚠️ 分界就是 `p >= 1` ✓ —— 而那根条**同一个点变蓝** ✓（见 `.ready` ✓）：
+    //      "变色"和"换字"是**同一件事的两个说法** ✓，别只改一个 ✗。
+    el.textContent = (p >= 1 ? '松开' : (side ? '继续左滑' : '继续下滑')) + tail;
     el.classList.toggle('side', !!side);      // ★ 竖排贴右边（横滑那条 ✓）
     el.style.opacity = String(p);
     if (side) {
@@ -5706,7 +5712,7 @@
     if (_whichScreen() !== 'comp') return;   // 只在看组件的时候认 ✓
     if (d.lg === 'pull') {
       _pullDy = Number(d.dy) || 0;
-      showPullHint('下滑以编辑该组件', _pullDy);
+      showPullHint('编辑该组件', _pullDy);      // 后半句 ✓，前半句它自己拼 ✓
       return;
     }
     if (d.lg === 'pullend') {
