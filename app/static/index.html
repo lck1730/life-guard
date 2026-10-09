@@ -907,8 +907,12 @@
   #wsChat .sub h2 .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   /* ⚠️ 这里原来有一条「未固化」的小牌子样式 ✓ —— 2026-10-07 深夜跟着"固化"
      整套一起删了 ✓（用户定的：组件聊天没有所谓的固化和非固化概念了 ✓）。 */
+  /* ⚠️ 顶上那个 `+ 26px` → **`+ 44px`** ✗→✓（2026-10-09 用户看了真机截图之后
+     又提了一次："我的界面上面依旧很挤…**头像距离顶部距离很小**"✓）——
+     26 还是不够松 ✓。这个数**只影响"没有顶栏"的那几屏**（我的 / 改资料 /
+     空间 / 别人 / 自我介绍 ✓），调它不会动到别处 ✓。 */
   .ascreen .abody { flex:1; overflow-y:auto; overscroll-behavior:contain;
-                    padding:calc(var(--inset-top) + 26px) 14px calc(var(--inset-bottom) + 24px); }
+                    padding:calc(var(--inset-top) + 44px) 14px calc(var(--inset-bottom) + 24px); }
   /* ⚠️ **有顶栏的那几屏不用再让一次状态栏** ✗→✓（2026-10-09）——
      `header.sub` 自己已经带 `padding-top: calc(var(--inset-top) + 10px)` ✓，
      把上面那条再叠一次就是**顶栏下面多空出一条状态栏那么高** ✗（`#diySet` 就是这样 ✓）。
@@ -1943,9 +1947,12 @@
   //   这一句是它特有的 ✓（`tellNative('chat')` ✓）。
   const openSettings = () => pushScreen('settings');
   const closeSettings = () => {
+    // ⚠️ 这里原来还有一句补报 `tellNative('chat')` ✗→✓（2026-10-09）——
+    //    `popScreen` 现在是**按"它已经没了"现算**的 ✓（见 `tellTop` ✓），
+    //    出来的就是 'chat' ✓（设置页底下就是群聊 ✓）→ 那句成了第二处真相 ✓，
+    //    而"同一件事两处写"迟早走岔 ✓。
     popScreen('settings');
-    tellNative('chat');       // ⚠️ 必须**在 `popScreen` 之后** ✓ —— 那里面把屏名报成
-    scrollDown();             //    `'settings'` ✓，这里再改成 `'chat'` ✓（后说的算 ✓）
+    scrollDown();
   };
 
   // ══════════════════════════════════════════════════════════════════
@@ -2004,6 +2011,36 @@
   //:   ⚠️ 不记的话只有一条退场方向 ✗（那种错说不清，但一眼就觉得别扭 ✓）。
   const _enterAnim = new Map();
 
+  /**
+   * **告诉原生"现在最上面那一屏是谁"** ✓ —— 只有主群聊报 `'chat'` ✓，
+   * 别的屏一律报 `'settings'` ✓（`MainActivity` 只认这两个字符串 ✓，
+   * 而且**根本不看 `__goBack` 的返回值** ✗ —— 见那条"屏名约定"的注释 ✓）。
+   *
+   * ⚠️ **`skipId` 这个参数是必须的** ✗→✓（2026-10-09 用户报的：
+   *   「返回后回到组件聊天也没问题，但**再次返回就提示再滑一次退出了**，
+   *    但这不是主群聊，此时返回应该**按照来时路返回对应组件**才对」✓）。
+   *
+   *   真因：退场有 200ms 动画 ✓，那期间被退的那一屏**仍然 `.on`** ✗ →
+   *   当场算出来的"最上面"还是**它自己** ✓ → 报成 `'settings'` ✗
+   *   （而 `closeMe` 那边更早：它是**写死 `tellNative('chat')`** ✗）→
+   *   原生就以为"我在群聊里" ✓ → 下一次返回走的是**"再滑一次退出 App"** ✗，
+   *   而不是把返回键交回网页 ✓（网页那边本来能一路退回组件页 ✓）。
+   *
+   *   → 所以退屏时按"**当作它已经没了**"来算 ✓（`skipId` ✓）。
+   *     这条规矩的根子是：**"谁在最上面"永远得现算** ✗，
+   *     写死一个名字迟早撞上"我是从别处来的"✓。
+   */
+  const tellTop = (skipId) => {
+    const skip = skipId ? '#' + skipId : '';
+    const others = _OTHER_SCREENS.filter(s => s !== skip);
+    const top =
+      others.some(s => $(s) && $(s).classList.contains('on')) ? ''
+      : ($('#compView').classList.contains('on') && skip !== '#compView') ? 'comp'
+      : ($('#workshop').classList.contains('on') && skip !== '#workshop') ? 'wall'
+      : 'chat';
+    tellNative(top === 'chat' ? 'chat' : 'settings');
+  };
+
   const pushScreen = (id, from) => {
     const s = $('#' + id);
     s.classList.remove(...ANIM_CLASSES);          // ★ 先全清，见上面那段 ✓
@@ -2013,7 +2050,7 @@
     if (from) _enterAnim.set(id, from); else _enterAnim.delete(id);
     s.classList.add('on', cls);
     void s.offsetWidth;                 // 强制重排，否则连续开关时动画不重放 ✓
-    tellNative('settings');             // ⚠️ 一律 'settings' ✓，见上面那段
+    tellTop();                          // ★ 报"现在最上面是谁" ✓，见 `tellTop` 那段
   };
   const popScreen = (id) => {
     const s = $('#' + id);
@@ -2026,7 +2063,9 @@
     s.classList.add(cls);
     void s.offsetWidth;                           // 同理，连点两次也要重放 ✓
     afterAnim(s, () => s.classList.remove(cls, 'on'));
-    tellNative('settings');
+    // ★ **按"它已经没了"来报** ✓（不能等动画收尾再报 ✗ —— 那中间有 200ms
+    //   原生还以为是别的屏 ✓，返回键在这 200ms 里按下去就会走错 ✓）。
+    tellTop(id);
   };
 
   // ── 屏①：列表 ─────────────────────────────────────────────────────
@@ -4568,8 +4607,14 @@
     renderMe();
   };
   const closeMe = () => {
+    // ⚠️ **不能再写死 `tellNative('chat')`** ✗→✓（2026-10-09 用户报的：
+    //   「返回后回到组件聊天也没问题，但再次返回就提示再滑一次退出了，
+    //    但这不是主群聊，**此时返回应该按照来时路返回对应组件才对**」✓）。
+    //   「我的」现在能从**组件对话**里点开头像进来 ✓ —— 那种情况下退回去
+    //   该报的是 `'settings'` ✓（底下是组件对话 ✓，不是群聊 ✓）。
+    //   → 交给 `popScreen` → `tellTop('me')` **现算** ✓。
     // 底下有群聊 → 退回去 ✓；没有（直接从 `/me` 这个地址进来的 ✓）→ 回主群聊 ✓。
-    if ($('#chat').classList.contains('on')) { popScreen('me'); tellNative('chat'); }
+    if ($('#chat').classList.contains('on')) popScreen('me');
     else location.href = '/';
   };
 
