@@ -1240,8 +1240,14 @@
      → 换成 `left:0; right:0; margin:auto; width:fit-content` ✓：
        两边都放开 ✓，盒子按内容收缩 ✓、居中靠 `margin:auto` ✓，
        真正能占到 `max-width` 那么宽 ✓（长句才会在限宽处折 ✓）。 */
+  /* ⚠️ white-space:pre-line ✗→✓（2026-10-09 用户：「第一行…第二行…居中对齐」✓）——
+     它让文案里写下的换行**真的断行** ✓（normal 会把换行当成空格吃掉 ✗），
+     别的行为不变 ✓（空格照样合并 ✓）→ 对**没有换行的那些提示**一点影响都没有 ✓。
+     ⚠️ 别在这条注释里写反引号 ✗ —— 同一段文字我在 JS 那边写过一次，
+        当场把 node --check 弄炸了 ✓（这个文件顶上就写着这个坑 ✓）。 */
   .toast { position:fixed; left:0; right:0; bottom:90px; margin:0 auto;
            width:fit-content; max-width:calc(100vw - 32px); text-align:center;
+           white-space:pre-line;
            background:var(--panel2); border:1px solid var(--line); color:var(--text);
            padding:10px 18px; border-radius:10px; font-size:14px; z-index:99;
            opacity:0; transition:opacity .2s; pointer-events:none; }
@@ -4706,7 +4712,14 @@
     const s = d && d.space;
     if (!s) { toast('你还没有生活空间'); return; }
     // ★ 措辞照用户 2026-10-09 的原话 ✓（他要的是这一句 ✓）：
-    if (!s.alone) { toast('当前空间人数超过1人，暂不支持退出'); return; }
+    // ★ 断行照用户 2026-10-09 给的两行 ✓（第一行「当前人数超过1人，」
+    //   第二行「暂不支持退出」✓）—— ⚠️ 它这次把「空间」两个字去掉了 ✓，
+    //   就按他写的来 ✓（要加回来说一声 ✓）。
+    //   ⚠️ 换行靠【反斜杠 + n 两个字符】+ CSS 的 white-space:pre-line ✓（见 .toast 那段 ✓）。
+    //   ⚠️⚠️ **这条注释里不能写裸反引号** ✗→✓（我刚写的，当场被 node --check 抓住 ✓）：
+    //      抽脚本那一步是**按字符扫**的 ✓，看到一个反引号就以为「模板字符串开始了」✓ → 后面整段被当成字符串吃掉 ✓。
+    //      这个坑**这个文件顶上就写着** ✓ —— 我又踩了一次 ✓。
+    if (!s.alone) { toast('当前人数超过1人，\n暂不支持退出'); return; }
     // ★ **二次防呆** ✓（用户点名要的 ✓）—— 而且**把代价说全** ✓：
     //   这个项目的老规矩是"说清代价比拦一道更管用" ✓。
     const yes = await confirmBox({
@@ -5124,7 +5137,7 @@
     if (!s.alone) {
       // ⚠️ 同一句话，**两处必须一样** ✗（那一屏现在已经没入口了 ✓，
       //    但留着旧措辞迟早绊人 ✓）
-      body.appendChild(mkel('div', 'tip', '当前空间人数超过1人，暂不支持退出'));
+      body.appendChild(mkel('div', 'tip', '当前人数超过1人，\n暂不支持退出'));
     }
     // ⚠️ 这一段原来**自己写了一遍**"二次确认 + 退出 + 重落地"✗→✓（2026-10-09）——
     //    现在它和设置页那一行**共用** `confirmLeaveSpace` ✓
