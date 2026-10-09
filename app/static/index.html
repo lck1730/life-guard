@@ -1028,6 +1028,11 @@
   .ascreen .bigav .av img { width:100%; height:100%; object-fit:cover; display:block; }
   /* 提示语：**在"头像下沿"和"卡片下沿"之间居中** ✓ —— margin-top 要等于卡片的下内边距 ✓ */
   .ascreen .tip { color:var(--muted); font-size:12.5px; text-align:center; margin-top:30px; }
+  /* ★ 别人那一屏、头像下面的**名字** ✓（2026-10-09：用户要「大一些」✓）——
+     和管家/我的那两张资料卡里的名字**同一个字号** ✓（19px/600 ✓），
+     不是 `.tip` 那个"提示"的字号 ✗（12.5px 灰字 ✓ —— 名字不该看着像备注 ✓）。 */
+  .ascreen .pname { color:var(--text); font-size:19px; font-weight:600;
+                    text-align:center; margin-top:14px; line-height:1.25; }
   /* ★ 性格那一块收起时：**一行**，右边一个 ›（2026-10-09 ✓） */
   /* ★ **性格收起时的样子** ✗→✓（2026-10-09 用户定的原话：
      「缩略展示**三行**，如果展示不完，第三行**有些半透明**，**末尾有 `...`**，
@@ -5190,7 +5195,10 @@
     circle.style.cursor = 'default';        // 头像是别人的 → 不是按钮 ✓
     big.appendChild(circle);
     paintAvatar(circle, p.avatar, real);
-    av.append(big, mkel('div', 'tip', real));
+    // ★ 头像下面那个名字要**大一点** ✗→✓（2026-10-09 用户：「头像下面的昵称字体大一些」✓）——
+    //   原来借用的是 `.tip` ✓（12.5px 的灰色小字 ✓，那是"提示"的字号 ✗），
+    //   而**名字**在别处（管家、我的）都是 19px/600 ✓ → 这里自己也起一个类 ✓（见 CSS ✓）。
+    av.append(big, mkel('div', 'pname', real));
     body.appendChild(av);
 
     // 卡片二：备注
@@ -5199,10 +5207,15 @@
     const ni = mkel('input', 'field');
     ni.maxLength = 24;
     ni.value = cur;
-    ni.placeholder = '留空 = 还是显示「' + real + '」';
+    // ★ 空的时候那句提示 ✓（2026-10-09 用户：「备注如果为空就提示：暂未设置备注」✓）
+    //   ⚠️ 它同时是**输入框的占位** ✓ —— 有备注时框里就是那段备注 ✓，这句自然看不见 ✓。
+    ni.placeholder = '暂未设置备注';
     card.appendChild(ni);
-    card.appendChild(mkel('div', 'count',
-                          '只有你自己看得见 —— 他不会知道，管家也不会知道'));
+    // ⚠️ 这里原来有一句「只有你自己看得见 —— 他不会知道，管家也不会知道」✗→✓
+    //    （2026-10-09 用户：「底下的"只有你自己看得见"去掉」✓）——
+    //    那句话本身**还是真的** ✓（备注只改渲染出口 ✓，不进 prompt ✓，
+    //    见 `dispName` 那一段 ✓），只是他不需要在这儿被念一遍 ✓。
+    //    保存成功那句 toast 里还留着一半 ✓（一次性的 ✓，不占版面 ✓）。
     const err = mkel('div', 'err', '');
     const save = mkel('button', 'btn-save', '保存');
     save.onclick = async () => {
