@@ -99,9 +99,12 @@
      现在它是**一行蓝字**（前面带 ＋）✓：`border:none` + 透明底 ✓。
      ⚠️ 内边距留着 ✓ —— 它是个**要点的东西** ✓，不靠边框也要有够大的手感 ✓；
         `:active` 那层淡底色也留着 ✓（否则点下去一点反馈都没有 ✓）。 */
+  /* ⚠️ 字号 15.5 → **17.5** ✗→✓（2026-10-10 用户：「刚才那个界面的加入或新建一个
+     空间的字体再大些」✓）—— 它是这一屏**唯一的主行动** ✓，
+     比副标题（15.5）大一档、又明显小于标题（26）✓。 */
   #init .btn-primary { width:auto; margin:22px auto 0; padding:11px 18px;
                        background:none; border:none;
-                       color:var(--accent); font-size:15.5px; font-weight:600;
+                       color:var(--accent); font-size:17.5px; font-weight:600;
                        border-radius:12px; box-shadow:none; }
   #init .btn-primary:active { background:rgba(90,140,255,.10); }
   #login .logo { width:64px;height:64px;border-radius:50%;background:var(--accent-bg);
@@ -147,6 +150,15 @@
                      border-radius:18px; box-shadow:0 18px 50px rgba(0,0,0,.45);
                      animation:popIn .2s cubic-bezier(.22,1,.36,1) both; }
   #init .introcard h2 { margin:0 0 12px; font-size:17px; text-align:center; }
+  /* ★ 每个框头上那行小提示 ✓（和登录页那套 label 一个长相 ✓ —— 那边也是
+     "框上面写一行灰字" ✓，两屏是平级的首启屏 ✓）。 */
+  #init .introcard .fld { display:block; color:var(--muted); font-size:12.5px;
+                          margin:14px 0 6px; }
+  #init .introcard .fld:first-of-type { margin-top:2px; }
+  /* ⚠️ **被锁上的那个框要一眼看出来** ✗→✓（用户要"一个填了另一个不能填"✓）——
+     光 `disabled` 在深色底上几乎看不出来 ✓（看着还是"能点"的 ✓）→
+     降透明度 + 换光标 ✓，让它自己说"我现在不让填" ✓。 */
+  #init .introcard .field:disabled { opacity:.45; }
   #init .introcard p { margin:0 0 10px; color:var(--muted); font-size:14px; line-height:1.75; }
   #init .introcard p b { color:var(--text); font-weight:600; }
   #init .introcard .foot { margin:16px 0 0; color:var(--muted); font-size:12px; text-align:center; }
@@ -1418,13 +1430,20 @@
             确实进不到设置页 → 也就没有登出入口 ✓。撤了之后**这个缺口又回来了** ✓，
             先记在这儿 ✓，他哪天说"换不了号"就是这一条 ✓。 -->
   </div>
+  <!-- ★ 2026-10-10 用户定的形状 ✓：**两个框 + 底部一颗按钮** ——
+       每个框自己头上一行提示 ✓（「新建个空间？」/「加入已有空间？」✓），
+       框里是占位提示 ✓（「为空间起个名字」/「输入邀请码」✓）；
+       ⚠️ 两颗按钮并排那种**没有了** ✓（原来是一颗"新建"一颗"加入" ✓）——
+         他说的是"底部一个按钮" ✓（名字「加入空间」✓，填哪个框就走哪条路 ✓）。 -->
   <div class="introcard" id="introCard" hidden>
     <div class="err" id="initErr"></div>
-    <input class="field" id="spaceName" placeholder="给它起个名字" maxlength="32" autocomplete="off">
-    <button class="btn-primary" id="btnNewSpace">新建</button>
-    <input class="field" id="joinCode" placeholder="或者填 8 位邀请码" maxlength="16"
-           autocapitalize="characters" autocomplete="off" style="margin-top:14px">
-    <button class="btn-primary" id="btnJoinSpace">加入</button>
+    <label class="fld" for="spaceName">新建个空间？</label>
+    <input class="field" id="spaceName" placeholder="为空间起个名字" maxlength="32" autocomplete="off">
+    <label class="fld" for="joinCode">加入已有空间？</label>
+    <input class="field" id="joinCode" placeholder="输入邀请码" maxlength="16"
+           autocapitalize="characters" autocomplete="off">
+    <!-- ⚠️ 一开始是**灰的** ✓（两个框都空 ✓），填了任意一个才亮 ✓ -->
+    <button class="btn-primary" id="spaceGo" disabled>加入空间</button>
   </div>
 </div>
 
@@ -2891,11 +2910,36 @@
   // ★ 2026-10-09：**没有介绍卡了** ✓（用户："对空间的介绍去掉，界面简洁"✓）——
   //   点这个按钮**直接进表单** ✓。
   $('#initGo').onclick = () => {
+    // ⚠️ **每次浮出来都是干净的一份** ✗→✓：上一次没填完的值还留着 ✓的话，
+    //    两个框的互斥状态也就跟着是旧的 ✓（他看到的会是"另一个框怎么锁着"✓）。
+    $('#spaceName').value = '';
+    $('#joinCode').value = '';
+    syncSpaceForm();                   // 两个都空 → 那颗按钮该是灰的 ✓
     $('#introCard').hidden = false;
     $('#initGo').hidden = true;        // 表单出来了，那个入口就该让位 ✓
     _initErr('');
     setTimeout(() => { try { $('#spaceName').focus(); } catch (e) {} }, 80);
   };
+
+  /**
+   * ★ **两个框互斥 + 底部那颗按钮亮不亮** ✓（用户 2026-10-10 定的 ✓）：
+   *   · 哪个框先有内容 ✓，另一个就**锁上** ✓（他说"自动不能填写"✓）——
+   *     空回来的时候会自己解锁 ✓（因为他把内容删了 ✓）。
+   *   · 两个都空 → 按钮**灰的** ✓；任意一个填了 → 可点 ✓。
+   *
+   * ⚠️ 它挂在 `input` 上 ✓（不是 `change` ✗）—— `change` 要等失焦才发 ✓，
+   *    那样"删空之后按钮还亮着" ✓（点了会走进一个没填的分支 ✓）。
+   */
+  const syncSpaceForm = () => {
+    const nm = $('#spaceName').value.trim();
+    const cd = $('#joinCode').value.trim();
+    $('#spaceName').disabled = !!cd;
+    $('#joinCode').disabled = !!nm;
+    $('#spaceGo').disabled = !nm && !cd;
+  };
+  ['#spaceName', '#joinCode'].forEach((sel) => {
+    $(sel).addEventListener('input', syncSpaceForm);
+  });
 
   const _spaceAction = async (btn, busy, fn) => {
     const was = btn.textContent;
@@ -2914,17 +2958,31 @@
     }
   };
 
-  $('#btnNewSpace').onclick = () => _spaceAction($('#btnNewSpace'), '正在开通…（约 6 秒）',
-    () => api('/workspaces', { method: 'POST',
-                               body: JSON.stringify({ name: $('#spaceName').value.trim() }) }));
-
-  $('#btnJoinSpace').onclick = () => _spaceAction($('#btnJoinSpace'), '加入中…', () => {
-    const code = $('#joinCode').value.trim();
-    if (!code) return Promise.reject(new Error('先把邀请码填上'));
-    return api('/workspaces/join', { method: 'POST', body: JSON.stringify({ code }) });
+  // ★ **一颗按钮管两条路** ✓ —— 填了邀请码就走"加入" ✓，填了名字就走"新建" ✓
+  //   （两个框互斥 ✓，所以到这儿**最多只有一个有内容** ✓，不用判"两个都填了怎么办" ✓）。
+  $('#spaceGo').onclick = async () => {
+    const nm = $('#spaceName').value.trim();
+    const cd = $('#joinCode').value.trim();
+    const btn = $('#spaceGo');
+    if (cd) {
+      await _spaceAction(btn, '加入中…', () =>
+        api('/workspaces/join', { method: 'POST', body: JSON.stringify({ code: cd }) }));
+    } else if (nm) {
+      // ⚠️ 「正在开通…（约 6 秒）」那句话是有用的 ✓ —— 开通要起一个 Hermes profile ✓，
+      //    真会等好几秒 ✓；不写就等于让人对着不动的按钮猜 ✓。
+      await _spaceAction(btn, '正在开通…（约 6 秒）', () =>
+        api('/workspaces', { method: 'POST', body: JSON.stringify({ name: nm }) }));
+    }
+    // 失败时 `_spaceAction` 已经把按钮还原了 ✓ —— 这里再按当前内容算一遍 ✓
+    //（不能直接 `disabled = false` ✗：两个框都空的时候它**就该是灰的** ✓）
+    btn.textContent = '加入空间';
+    syncSpaceForm();
+  };
+  ['#spaceName', '#joinCode'].forEach((sel) => {
+    $(sel).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); $('#spaceGo').click(); }
+    });
   });
-  $('#joinCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btnJoinSpace').click(); });
-  $('#spaceName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btnNewSpace').click(); });
 
   const enterApp = async () => {
     // ★ **一趟拿齐。** 原来是 /auth/me → /groups → /members → /messages
