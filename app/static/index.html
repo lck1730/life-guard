@@ -4688,7 +4688,8 @@
     catch (e) { toast((e && e.message) || '读不到空间'); return; }
     const s = d && d.space;
     if (!s) { toast('你还没有生活空间'); return; }
-    if (!s.alone) { toast('空间里还有别人 —— 等只剩你一个了才能退出'); return; }
+    // ★ 措辞照用户 2026-10-09 的原话 ✓（他要的是这一句 ✓）：
+    if (!s.alone) { toast('当前空间人数超过1人，暂不支持退出'); return; }
     // ★ **二次防呆** ✓（用户点名要的 ✓）—— 而且**把代价说全** ✓：
     //   这个项目的老规矩是"说清代价比拦一道更管用" ✓。
     const yes = await confirmBox({
@@ -5104,7 +5105,9 @@
     if (!s.alone) quit.style.opacity = '.45';
     body.appendChild(quit);
     if (!s.alone) {
-      body.appendChild(mkel('div', 'tip', '空间里还有别人 —— 等只剩你一个了才能退出'));
+      // ⚠️ 同一句话，**两处必须一样** ✗（那一屏现在已经没入口了 ✓，
+      //    但留着旧措辞迟早绊人 ✓）
+      body.appendChild(mkel('div', 'tip', '当前空间人数超过1人，暂不支持退出'));
     }
     // ⚠️ 这一段原来**自己写了一遍**"二次确认 + 退出 + 重落地"✗→✓（2026-10-09）——
     //    现在它和设置页那一行**共用** `confirmLeaveSpace` ✓

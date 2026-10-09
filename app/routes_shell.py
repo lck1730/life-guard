@@ -702,7 +702,7 @@ async def leave_space(request: Request) -> dict:
         (gid, me["id"]))
     if int(others["n"]) > 0:
         raise HTTPException(status.HTTP_409_CONFLICT,
-                            "这个空间里还有别人，暂时不能退出")
+                            "当前空间人数超过1人，暂不支持退出")
 
     uuid = (s["uuid"] or "").strip()
     if not uuid:
