@@ -102,11 +102,17 @@
   /* ⚠️ 字号 15.5 → **17.5** ✗→✓（2026-10-10 用户：「刚才那个界面的加入或新建一个
      空间的字体再大些」✓）—— 它是这一屏**唯一的主行动** ✓，
      比副标题（15.5）大一档、又明显小于标题（26）✓。 */
-  #init .btn-primary { width:auto; margin:22px auto 0; padding:11px 18px;
-                       background:none; border:none;
-                       color:var(--accent); font-size:17.5px; font-weight:600;
-                       border-radius:12px; box-shadow:none; }
-  #init .btn-primary:active { background:rgba(90,140,255,.10); }
+  /* ⚠️⚠️ **这条规则原来写的是 `#init .btn-primary`** ✗→✓（2026-10-10 用户：
+     「加入空间按钮居中」✓）—— 而**表单里那颗按钮也在 `#init` 里面** ✓✓ →
+     它被这条一起改成了"没有底、蓝字、宽度贴字" ✗ → 结果是**一行靠左的蓝字** ✓。
+     → 只认**那一颗**（`#initGo` ✓）；表单那颗回到全局 `.btn-primary` ✓ ——
+       也就是**通栏实心、字居中** ✓，和登录页那颗「登录」**长得一样** ✓
+       （两屏本来就是平级的首启屏 ✓）。 */
+  #initGo { width:auto; margin:22px auto 0; padding:11px 18px;
+            background:none; border:none;
+            color:var(--accent); font-size:17.5px; font-weight:600;
+            border-radius:12px; box-shadow:none; }
+  #initGo:active { background:rgba(90,140,255,.10); }
   #login .logo { width:64px;height:64px;border-radius:50%;background:var(--accent-bg);
                  display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
                  font-size:26px;color:var(--accent); }
