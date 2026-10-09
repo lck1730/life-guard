@@ -109,8 +109,25 @@
   @keyframes popIn { from { opacity:0; transform:translate(-50%,-50%) scale(.92); }
                      to   { opacity:1; transform:translate(-50%,-50%) scale(1); } }
 
-  /* ── 「我的」那一屏：数据由 JS 画（照 `#agent` / `#diySet` 的规矩 ✓）── */
-  #me .abody, #meAccount .abody { padding:8px 0 24px; }
+  /* ── 「我的」那一屏：数据由 JS 画（照 `#agent` / `#diySet` 的规矩 ✓）──
+     ⚠️⚠️ **这里原来有一条 `#me .abody, #meAccount .abody { padding:8px 0 24px; }`
+     —— 2026-10-09 删掉了** ✗→✓，它就是"顶部改两次都没生效"的真凶：
+
+     · 它是**按 id 写的** ✓（`#me .abody` = 一个 id + 一个 class ✓），
+       而通用那条 `.ascreen .abody`（两个 class ✓）**比它低一级** ✗ →
+       **它永远赢** ✓ → 「我的」顶上一直是那个写死的 **8px** ✗。
+     · 于是我改 `.ascreen .abody` 的 14 → 26 → 44 ✓ 三次，
+       **一次都没碰到这一屏** ✓ —— 用户看到的是"改了两次还是贴着状态栏" ✓
+       （他的原话：头像上边缘几乎贴着系统时间 ✓）。
+     · 它是 2026-10-08「我的」还是壳式整屏那会儿写的 ✓，
+       那会儿这一屏**确实**该是 8px 顶距 ✓；后来它变成"要被状态栏让位"的那一屏 ✓，
+       这条就该跟着改 ✓ —— **没人改，因为它藏在一个按 id 写的老选择器里** ✓。
+
+     → 现在**删掉它** ✓：这一屏和其它几屏一样，走 `.ascreen .abody` 那条
+       （`calc(var(--inset-top) + 44px)` 顶距 ✓、14px 左右 ✓、底部让 inset ✓）。
+     ⚠️ 教训：**改 CSS 之前先确认"赢的是哪一条"** ✗ ——
+        数值对不对是第二位 ✓，"这条规则到底有没有生效"才是第一位 ✓
+        （`getComputedStyle(...).paddingTop` 一句话就能回答 ✓）。 */
 
   /* ── 聊天 ── */
   header.top { background:var(--panel); border-bottom:1px solid var(--line);
