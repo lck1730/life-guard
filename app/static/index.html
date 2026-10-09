@@ -4678,6 +4678,14 @@
               || (pgSw.dir === 'R' && (s === 'wall' || s === 'comp'))
               || (pgSw.dir === 'D' && ((s === 'wall' && _wallAtTop()) || s === 'comp'));
       if (!ok) { pgSw = null; hidePullHint(); return; }
+      // ★ **手里正拎着一个格子**（长按 ≥450ms 之后在拖动换位置 ✓）→ 别认下拉 ✗→✓
+      //   （2026-10-09 想到的一个交界处 ✓）：不然"把一个格子往下拖"会
+      //   **同时**被当成这条手势 ✓ —— 松手既换了位置 ✓、又把编辑页拉了出来 ✓
+      //   （两件事都对 ✓，合在一起就没人说得清发生了什么 ✗）。
+      //   ⚠️ 判方向发生在那一下"动"的时候 ✓：正常下拉在 450ms 之内就动了 ✓
+      //      （那时 `wsDrag` 还是 null ✓ → 不受影响 ✓）；
+      //      而"长按再拖"是**先按住不动 450ms** ✓ → 到它动的时候 `wsDrag` 已经在了 ✓。
+      if (pgSw.dir === 'D' && wsDrag) { pgSw = null; hidePullHint(); return; }
       ev.preventDefault();      // ★ 认了之后**才**拦 ✓（早了会把滚动卡死 ✗）
     } else {
       ev.preventDefault();
