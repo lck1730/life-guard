@@ -1232,8 +1232,16 @@
         看着就是"没居中" ✓。
      ⚠️ `max-width` 一起加上 ✓：不留的话长句会**撑成一整条** ✓（贴着屏幕两边 ✓），
         折在哪儿完全看屏幕宽度 ✓ —— 限了宽、再居中，折出来的两行才是匀的 ✓。 */
-  .toast { position:fixed; left:50%; bottom:90px; transform:translateX(-50%);
-           max-width:calc(100vw - 40px); text-align:center;
+  /* ⚠️⚠️ **居中的写法要换一个** ✗→✓（2026-10-09：用户「宽度宽一些，
+     能够将"人"纳入第一行」✓ —— 上一版还是折行 ✓）——
+     根子是老写法 `left:50% + translateX(-50%)`：**`left` 钉在正中、右边又没写** ✗ →
+     这个盒子的可用宽度只剩 `100vw - 50%`＝**半屏** ✓✓ → 所以它**只用了半屏就折行** ✓，
+     我加的那条 `max-width` 根本没轮到 ✗（上限比"可用宽度"还大 ✓）。
+     → 换成 `left:0; right:0; margin:auto; width:fit-content` ✓：
+       两边都放开 ✓，盒子按内容收缩 ✓、居中靠 `margin:auto` ✓，
+       真正能占到 `max-width` 那么宽 ✓（长句才会在限宽处折 ✓）。 */
+  .toast { position:fixed; left:0; right:0; bottom:90px; margin:0 auto;
+           width:fit-content; max-width:calc(100vw - 32px); text-align:center;
            background:var(--panel2); border:1px solid var(--line); color:var(--text);
            padding:10px 18px; border-radius:10px; font-size:14px; z-index:99;
            opacity:0; transition:opacity .2s; pointer-events:none; }
