@@ -3484,8 +3484,14 @@
       .map(n => n.textContent).join('').trim();
     if (!text) return;                       // 空的（纯图片那种）→ 别开 ✓
     endFreeCopy();
-    bub.classList.add('seltext');            // 一圈虚线边 = "它现在在可复制状态" ✓
-
+    // ★★ **颜色必须在「藏字」之前量** ✗→✓（2026-10-09 用户报的：
+    //   「为啥字体是黑色，**光标不选中时，其他文字直接看不见了**」✓）
+    //   ⚠️ 因为「藏字」那一招就是**把这一条的字变成透明** ✓
+    //     （`color:transparent !important` ✓，见 CSS 那段 ✓）——
+    //     而我把这一步放在了**量颜色之前** ✗ → `getComputedStyle` 量到的
+    //     是 `rgba(0,0,0,0)` ✓✓ → 原样抄给文本框 ✓ → **文本框里的字是透明的** ✗ →
+    //     屏幕上只剩「被选中那一段」（选区自己有底色 ✓）看得见 ✓
+    //     —— 他描述得一字不差 ✓。**先量、后改** ✓，这条对任何「量了再动手」都成立 ✓。
     const r = bub.getBoundingClientRect();
     const cs = getComputedStyle(bub);
     const ta = document.createElement('textarea');
@@ -3509,8 +3515,20 @@
     ta.style.padding = cs.padding;
     ta.style.borderRadius = cs.borderRadius;
     ta.style.color = cs.color;
+    // ⚠️ **`-webkit-text-fill-color` 才是 WebKit 里真正决定字色那个** ✗→✓ ——
+    //    只写 `color` 的话可能被别处的 fill 盖住 ✓（本页里就有一条 ✓，见 CSS ✓）。
+    ta.style.webkitTextFillColor = cs.color;
     ta.style.textAlign = cs.textAlign;
+    // ★★ **`getComputedStyle` 返回的东西是「活的」** ✗→✓（2026-10-09，第二次栽在这条上）——
+    //   上面那句 `const cs = getComputedStyle(bub)` 只是**拿了个句柄** ✓，
+    //   真正读 `.color` 是在**下面这几行** ✗ —— 而那会儿我**已经把 `.seltext`
+    //   加上了** ✓（那一加就把字变透明 ✓，见 CSS ✓）→ 读出来的还是**透明** ✗✓
+    //   （所以我"把测量挪到前面"那一版**一点用没有** ✓：挪的是**取句柄**那一步 ✗）。
+    //   → 现在把 `classList.add('seltext')` 挪到**所有样式都抄完之后** ✓：
+    //     它只影响气泡自己的观感 ✓（虚线边 / 藏字 ✓），不影响版面 ✓
+    //     （`outline` 不占位置 ✓），所以晚一点加完全等价 ✓。
     document.body.appendChild(ta);
+    bub.classList.add('seltext');            // 一圈虚线边 = 它现在在可复制状态 ✓
     // ⚠️ 焦点+全选：**这是"叫出手柄"的全部** ✓（顺序不能反 ✓）。
     // ⚠️⚠️ **一次不够** ✗→✓（2026-10-09 用户实测："也没出现光标啊，必须手点一下才可以"✓）——
     //    刚 append 的元素**还没排过版** ✓，有些 WebView 这一下不吃焦点 ✗
@@ -4660,7 +4678,10 @@
     const who = mkel('div', 'who');
     who.appendChild(mkel('div', 'n', me.nickname || me.username || ''));
     who.appendChild(mkel('div', 'u', '@' + (me.username || '')));
-    prof.append(av, who);
+    // ★ 右侧那个 `›` ✓（2026-10-09 用户：「我的，头像栏右侧加上 >，和管家那里对齐」✓）——
+    //   管家那一屏的资料卡（`renderAgent`）本来就有 ✓，
+    //   两屏是**同构**的 ✓（同一套 `.prof` 样式 ✓，`.go` 自带 `margin-left:auto` ✓）。
+    prof.append(av, who, mkel('span', 'go', '›'));
     prof.onclick = () => openMeEdit('avatar');
     body.appendChild(prof);
 
