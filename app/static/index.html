@@ -95,11 +95,12 @@
   #init .hero { display:flex; flex-direction:column; align-items:center;
                 text-align:center; margin:2px 0 0; }
   #init .hero .s { margin-top:22px; font-size:15.5px; }
-  /* ⚠️ 虚线的颜色/蓝字**和创意工坊那颗「＋ 新建组件」是同一套** ✓
-     （`#workshop .wsnew`：`1px dashed #35507a` + `color:var(--accent)` ✓）——
-     一个 App 里"＋ 做一件新事"就该长一样 ✓。 */
+  /* ⚠️ **虚线框去掉了** ✗→✓（2026-10-10 用户：「把按钮虚线框去掉」✓）——
+     现在它是**一行蓝字**（前面带 ＋）✓：`border:none` + 透明底 ✓。
+     ⚠️ 内边距留着 ✓ —— 它是个**要点的东西** ✓，不靠边框也要有够大的手感 ✓；
+        `:active` 那层淡底色也留着 ✓（否则点下去一点反馈都没有 ✓）。 */
   #init .btn-primary { width:auto; margin:22px auto 0; padding:11px 18px;
-                       background:none; border:1px dashed #35507a;
+                       background:none; border:none;
                        color:var(--accent); font-size:15.5px; font-weight:600;
                        border-radius:12px; box-shadow:none; }
   #init .btn-primary:active { background:rgba(90,140,255,.10); }
