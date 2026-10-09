@@ -74,24 +74,21 @@
          改成**弹性盒子居中** ✓（`align-items:center` 管的是盒子 ✓，
          跟字距没关系了 ✓），双保险 ✓。
        · 「这三行之间**间距拉大一些**」→ 标题→副标题 8→16px ✓、副标题→按钮 24→40px ✓。 */
-  /* ★ 第二轮（用户 2026-10-09）：
-       · 三行之间**取同一个数** ✓（原来 16 / 40 一大一小 ✓，他说"间距保持一致"✓）——
-         所以副标题的上边距和整块 hero 的下边距**故意写成同一个 22** ✓。
-       · 「继续使用请先」大一号 ✓（13.5 → 15px，仍然明显小于 26px 的标题 ✓）。 */
+  /* ★ 2026-10-09 用户看了真机之后的两点 ✗→✓：
+       · 「继续使用请先这几个字**不太居中**」→ 光靠 `text-align:center` 不够稳 ✓
+         （它是**行内**居中 ✓，一旦那行自己有字距/尾随空格就会偏 ✓）→
+         改成**弹性盒子居中** ✓（`align-items:center` 管的是盒子 ✓，
+         跟字距没关系了 ✓），双保险 ✓。
+       · 「这三行之间**间距拉大一些**」→ 标题→副标题 8→16px ✓、副标题→按钮 24→40px ✓。
+     ⚠️ 2026-10-09 同一天又撤回过一轮 ✗：那天我先按"三行等距 + 按钮收窄带＋"改了一版 ✓，
+        他看了说「得得…布局先恢复原样，**除了！**」✓ → 也就是**退回这一版** ✓
+        （「！」那个不还回去 ✓）。所以现在这个 16/40 和通栏按钮是**他定下来的样子** ✓，
+        别再自作主张去"优化"它 ✗。 */
   #init .hero { display:flex; flex-direction:column; align-items:center;
-                text-align:center; margin:2px 0 22px; }
-  #init .hero .s { margin-top:22px; font-size:15px; }
-  /* ★ 按钮：**收窄到贴着字** ✗→✓（用户：「按钮宽度和字体比较接近，左右别留太宽距离」✓）——
-     `.btn-primary` 全局是通栏的 ✓（登录页那种表单要用 ✓），这一颗改成按内容宽 ✓。 */
-  #init .btn-primary { width:auto; padding:13px 20px; font-size:16px; margin:0;
+                text-align:center; margin:2px 0 40px; }
+  #init .hero .s { margin-top:16px; }
+  #init .btn-primary { padding:16px; font-size:16px; margin-top:0;
                        box-shadow:0 6px 18px rgba(90,140,255,.18); }
-  /* ★ 底部那条「退出登录」✓ —— 长得和设置页那条一个意思 ✓（红字、居中、无箭头 ✓），
-     但要**收在卡片里当下摆** ✓：整条通栏会宽出卡片 ✓（卡片 360px ✓）。
-     ⚠️ 负外边距是为了**顶到卡片边缘** ✓（卡片内边距 22px ✓）→ 分隔线才是整条 ✓。 */
-  #init .quitrow { margin:22px -22px -26px; padding:15px; text-align:center;
-                   border-top:1px solid var(--line); color:var(--danger);
-                   font-size:15px; border-radius:0 0 18px 18px; }
-  #init .quitrow:active { background:var(--panel2); }
   /* 那一颗按钮：和别处一样宽 ✓、高一点 ✓、给一层很淡的投影把它"抬"起来 ✓ */
   #init .btn-primary { padding:16px; font-size:16px; margin-top:0;
                        box-shadow:0 6px 18px rgba(90,140,255,.18); }
@@ -1393,15 +1390,12 @@
       <div class="t">欢迎使用生活管家</div>
       <div class="s">继续使用请先</div>
     </div>
-    <!-- ⚠️ 「＋」不要贴着一个汉字写 ✗（视觉上会挤 ✓）—— 和别处那颗 ＋ 一样留两格 ✓ -->
-    <button class="btn-primary" id="initGo">＋&nbsp;&nbsp;新建或加入一个空间</button>
-    <!-- ★ **这一条是补了一个真缺陷** ✗→✓（2026-10-09 用户：「目前处于新建或加入
-         一个空间时，底部应该有个退出登录按钮」✓）——
-         还没有空间的人**进不到设置页**（它挂在群里 ✓）→ **想换号都没有出口** ✗。
-         壳那版早就防过这件事 ✓（`paintHome` 里那句：「一个空间都没有的账号…
-         想登出都没有入口 ✗ 那不是洁癖问题，是真的能把人锁在外面」✓）——
-         合并到这一版的时候漏了 ✓。 -->
-    <div class="quitrow" id="initQuit">退出登录</div>
+    <button class="btn-primary" id="initGo">新建或加入一个空间</button>
+    <!-- ⚠️ 这里有过一行「退出登录」（2026-10-09 加的 ✓，理由是"没有空间的人
+         换不了号" ✓）—— 用户当天就让撤了 ✓（「得得，把退出登录去掉」✓）。
+         ⚠️ **那个理由本身是真的** ✗（壳那版也防过这件事 ✓）：还没有空间的人
+            确实进不到设置页 → 也就没有登出入口 ✓。撤了之后**这个缺口又回来了** ✓，
+            先记在这儿 ✓，他哪天说"换不了号"就是这一条 ✓。 -->
   </div>
   <div class="introcard" id="introCard" hidden>
     <div class="err" id="initErr"></div>
@@ -7220,10 +7214,6 @@
     renderWorkshop();
   };
 
-  // ★ 初始化那一屏底部的「退出登录」✓（2026-10-09 补的 ✓）——
-  //   ⚠️ 它**不走** `.item[data-act]` 那套委托 ✗：那条 CSS 会把整行撑成通栏 ✓，
-  //      而这一条要收在卡片里 ✓（见 `#init .quitrow` ✓）。
-  $('#initQuit').onclick = logout;
   $('#openSettings').onclick = openSettings;
   // ★ 创意工坊（2026-10-07）—— 六个入口：右上角列组件 / ＋ 里进工坊 /
   //   导航屏退 / 组件页退 / 对话屏退 / 对话屏的 ⋯ ✓
