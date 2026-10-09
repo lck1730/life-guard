@@ -68,7 +68,15 @@
      `#init` 只要写 `.hero` 就够了 ✓，不用另起一套 `.hero2` ✗（那个类已经删了 ✓）。 */
   #login .hero .t, #init .hero .t { font-size:26px; font-weight:600; letter-spacing:.5px; }
   #login .hero .s, #init .hero .s { color:var(--muted); font-size:13.5px; margin-top:8px; }
-  #init .hero { text-align:center; margin:2px 0 24px; }
+  /* ★ 2026-10-09 用户看了真机之后的两点 ✗→✓：
+       · 「继续使用请先这几个字**不太居中**」→ 光靠 `text-align:center` 不够稳 ✓
+         （它是**行内**居中 ✓，一旦那行自己有字距/尾随空格就会偏 ✓）→
+         改成**弹性盒子居中** ✓（`align-items:center` 管的是盒子 ✓，
+         跟字距没关系了 ✓），双保险 ✓。
+       · 「这三行之间**间距拉大一些**」→ 标题→副标题 8→16px ✓、副标题→按钮 24→40px ✓。 */
+  #init .hero { display:flex; flex-direction:column; align-items:center;
+                text-align:center; margin:2px 0 40px; }
+  #init .hero .s { margin-top:16px; }
   /* 那一颗按钮：和别处一样宽 ✓、高一点 ✓、给一层很淡的投影把它"抬"起来 ✓ */
   #init .btn-primary { padding:16px; font-size:16px; margin-top:0;
                        box-shadow:0 6px 18px rgba(90,140,255,.18); }
