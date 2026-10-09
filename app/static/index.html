@@ -1022,8 +1022,12 @@
   /* 退出登录：**居中、红字、没有箭头** —— 和「我的」那一页保持一致 ✓。
      它不是一个"条目"（没有值、没有去处），是一个动作 ✓；
      跟在一列同样排版的条目后面，会看着像"还能点进去看点什么" ✗。 */
-  .item[data-act="logout"] { justify-content:center; }
-  .item[data-act="logout"] .k { flex:0 0 auto; }
+  /* ★ 2026-10-09：「退出当前空间」也进这一套 ✓（用户原话：
+     「退出当前空间（红色字体居中在退出登录上面）」✓）——
+     它俩是同一种东西（都是"动作"、都没有去处 ✓），**长相必须一样** ✓，
+     位置一上一下紧挨着 ✓（用户就是这么要求的 ✓）。 */
+  .item[data-act="logout"], .item[data-act="leave"] { justify-content:center; }
+  .item[data-act="logout"] .k, .item[data-act="leave"] .k { flex:0 0 auto; }
   .danger { color:var(--danger) !important; }
   .seg { display:flex; gap:0; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
   .seg button { padding:7px 14px; font-size:13px; color:var(--muted); background:var(--panel2); }
@@ -1117,6 +1121,28 @@
             max-width:78vw; text-align:center; opacity:0;
             transition:opacity .22s, transform .22s; }
   .notice.on { opacity:1; transform:translate(-50%,-50%) scale(1); }
+
+  /* ── 「我的」那个弹层里那几样（2026-10-09 照壳那一版还原 ✓）──────────────
+     ⚠️ **用自己的一套类名** ✗（`.pfava` / `.pfrow` / `.pfbody`）——
+        这个页面上已经有两套 `.row` 了 ✓（消息行 `#msgs .row` ✓、
+        设置页 `.ascreen .row` ✓），弹层里再叫 `.row` 只会让人以为
+        "它跟哪一套是一伙的" ✗（而且真的会串味 ✓：`.ascreen .row` 有 50px 高 ✓）。
+     ⚠️ 头像**不能用现成的 `.av`** ✗ —— 那是 34px 的圆 ✓（气泡上用的 ✓），
+        这里是 56px 的方角圆 ✓（壳那一版就是这样 ✓）。 */
+  #sheetPanel .pfava { width:56px; height:56px; border-radius:14px; overflow:hidden;
+                       display:flex; align-items:center; justify-content:center;
+                       background:var(--panel2); border:1px solid var(--line);
+                       background-size:cover; background-position:center;
+                       font-size:22px; font-weight:600;
+                       margin:0 auto 16px; cursor:pointer; }
+  #sheetPanel .pfrow { display:flex; align-items:center; padding:13px 0;
+                       border-bottom:1px solid var(--line); cursor:pointer; }
+  #sheetPanel .pfrow .lbl { flex:1; font-size:14px; }
+  #sheetPanel .pfrow .go { color:var(--muted); font-size:18px; }
+  /* 展开出来的那一块：**平时是 `hidden`** ✓（点那一行才出现 ✓） */
+  #sheetPanel .pfbody { padding:12px 0; border-bottom:1px solid var(--line); }
+  #sheetPanel .pfbody[hidden] { display:none; }
+  #sheetPanel .pfbody .field + .field { margin-top:8px; }
 
   /* 开机占位。**为什么要它**：以前登录页是静态 HTML 里"默认显示"的那一屏，
      而"到底登录了没"要打一次 /auth/me 才知道——那几百毫秒里，**明明是已登录的
@@ -1549,8 +1575,19 @@
            只不过换了个叫法"✓）。
          ⚠️ 它**点进去要去新的一屏**（`#space`：改名 / 邀请码 / 退出该空间 ✓）——
             那一屏在 P5 做 ✓，这一版先保持"点了改个名"✓（不是死按钮 ✓）。 -->
-    <!-- ★ 「生活空间」→「**空间**」✗→✓（2026-10-09 用户定的 ✓："生活空间改名，空间" ✓）。 -->
+    <!-- ★ 「生活空间」→「**空间**」✗→✓（2026-10-09 用户定的 ✓："生活空间改名，空间" ✓）。
+         ★ **点它只改名** ✗→✓（2026-10-09 稍后用户又定的 ✓：
+           「空间的话，拆到设置里吧，**不单独进入了**，点击空间依旧**只修改空间名**」✓）——
+           原来它推开一整屏 `#space` ✓（改名 + 邀请码 + 退出 ✓），现在那三样
+           全在**这一页里** ✓（见下面两行 ✓）。`#space` 那一屏**没有入口了** ✓。 -->
     <div class="item" data-act="gname"><span class="k">空间</span><span class="v" id="vGname"></span><span class="chev">›</span></div>
+    <!-- ★ **邀请码回来了** ✗→✓（2026-10-09 今天第二次改这个 ✓）：
+         上午刚定的"设置页不留、只在空间里留" ✓，晚上他把空间拆了 ✓ →
+         那就得有一条地方放它 ✓（点了照样是复制 ✓，满员时说的话也一样 ✓）。
+         ⚠️ 右边那一格是**异步填的** ✓（`refreshSpaceInfo` 里 ✓）——
+            因为"满员了没有"要问服务端算过的那个值 ✓（`full` ✓），
+            而 `bootstrap` 里那个 `group` 没有这一项 ✗。 -->
+    <div class="item" data-act="invite"><span class="k">邀请码</span><span class="v" id="vInvite"></span><span class="chev">›</span></div>
     <!-- ⚠️ 「群昵称」这一行**整个删了** ✗→✓（2026-10-08 用户定的）：
          「群昵称的地位被[我的]昵称替换，因为一个人只有一个群，
            已经不必区分昵称和群昵称」✓ —— 所以名字只有一个来源：
@@ -1564,6 +1601,13 @@
     <!-- 手动查更新。自动检查是"开 App 时问一次"，但那个时机不由你定——
          这一条让你随时能问，不用等。右边显示当前壳的版本号。 -->
     <div class="item" data-act="update"><span class="k">检查更新</span><span class="v" id="vAppVer"></span><span class="chev">›</span></div>
+
+    <!-- ★ **退出当前空间** ✗→✓（2026-10-09 用户定的 ✓，原话：
+         「邀请码和退出当前空间（**红色字体居中在退出登录上面**）回到设置页」✓）。
+         ⚠️ 它和「退出登录」**同一个长相** ✓（`[data-act="logout"]` 那条 CSS 是
+            "整行居中 + 红字" ✓）—— 所以这里**也挂同一套** ✓：`.k.danger` 红字 ✓，
+            居中靠下面那一条 CSS 里一并算上它 ✓（见 `#settings` 那一块 ✓）。 -->
+    <div class="item" data-act="leave"><span class="k danger">退出当前空间</span></div>
 
     <div class="item" data-act="logout"><span class="k danger">退出登录</span></div>
   </div>
@@ -4086,9 +4130,11 @@
     // 写着名字才像"我的"。
     const eMe = $('#vMe');
     if (eMe) eMe.textContent = (me && (me.nickname || me.username)) || '';
-    // 「邀请码」右边 = **码本身** ✓（点它是复制 ✓，见下面那个 act 分支 ✓）
-    const eInv = $('#vInvite');
-    if (eInv) eInv.textContent = (group && group.invite_code) || '';
+    // 「邀请码」右边 = **码本身** ✓ / 满员了 = 「空间已满」✓
+    // ★ **这一格是异步填的** ✗→✓（2026-10-09）—— "满没满"要问服务端算的
+    //   `full` ✓（`bootstrap` 的 `group` 里没有它 ✗），所以这里**发一趟就走** ✓，
+    //   不 await（`renderSettings` 是同步的 ✓，而且它被调得很勤 ✓）。
+    refreshSpaceInfo();
     const av = $('#vAppVer');
     if (av) {
       const v = (window.LifeGuardNative && LifeGuardNative.appVersion) ? LifeGuardNative.appVersion() : '';
@@ -4156,18 +4202,115 @@
     api(`/groups/${group.id}`, { method:'PATCH', body: JSON.stringify(patch) })
       .then(refreshGroup).then(() => toast('已保存')).catch(e => toast(e.message));
 
+  // ── 空间那三件事：**只有这一处实现** ✓ ──────────────────────────────
+  //
+  // ★ 2026-10-09 用户定的 ✓（原话：「空间的话，拆到设置里吧，**不单独进入了**，
+  //   **点击空间依旧只修改空间名**；然后邀请码和退出当前空间（红色字体居中在
+  //   退出登录上面）回到设置页」✓）。
+  //
+  //   ⚠️ 这三件事原来住在 `#space` 那一屏里 ✓ —— 那一屏**现在没有入口了** ✗
+  //      （和 `#wsNav` 一样留着不删 ✓，理由见 `openMeSheet` 上面那段 ✓）。
+  //      所以我特意把它们**抽成函数**（而不是在设置页重写一份 ✗）：
+  //      `renderSpace` 也调同一批 ✓（"同一件事两处实现"是这个项目反复栽过的 ✓）。
+
+  //: 「这个空间现在什么样」：`full`（满员没有 ✓）、`invite_code`、`alone`（只剩我一个 ✓）。
+  //: ⚠️ **必须问服务端** ✗ —— `bootstrap` 回来那个 `group` **没有** `full` 这一项 ✓
+  //:   （它是每次算出来的 ✓，见 `join_space` ✓）。
+  let spaceInfo = null;
+
+  /** 拉一次空间信息，顺手把设置页那两格刷新 ✓（异步、不等到结果 ✓）。 */
+  const refreshSpaceInfo = async () => {
+    try {
+      const d = await api('/workspaces/mine');
+      spaceInfo = (d && d.space) || null;
+    } catch (e) { spaceInfo = null; }
+    const el = $('#vInvite');
+    if (el) {
+      el.textContent = !spaceInfo ? ''
+        : (spaceInfo.full ? '空间已满' : (spaceInfo.invite_code || '—'));
+    }
+    // 「退出当前空间」那一行：只剩我一个时才是亮的 ✓（能不能退**服务端还要再判一次** ✓）
+    const lv = document.querySelector('.item[data-act="leave"]');
+    if (lv) lv.style.opacity = (spaceInfo && !spaceInfo.alone) ? '.45' : '';
+    return spaceInfo;
+  };
+
+  /** 改空间名 —— 设置页那一行、`#space` 那张卡、**都走它** ✓。 */
+  const renameSpace = () => {
+    promptText('空间名字', (group && group.name) || '', '群聊顶栏那个名字也会跟着变',
+      async (v) => {
+        try {
+          await api('/workspaces/rename', { method: 'POST', body: JSON.stringify({ name: v }) });
+          // ⚠️ 群聊顶栏那个名字也要跟着变 ✓（不然退回去还是旧的 ✓，用户会以为没保存 ✓）
+          try {
+            const b = await api('/groups/bootstrap?limit=1');
+            if (b.group) group = b.group;
+          } catch (e) { /* 刷不到就算了：下次开页会重新拉 ✓ */ }
+          renderHeader(); renderSettings();
+          toast('已保存');
+        } catch (e) { toast((e && e.message) || '没保存上'); }
+      });
+  };
+
+  /** 点「邀请码」= 复制 ✓ —— 满员时说人话，别的啥也不做 ✓。 */
+  const inviteCodeNow = async () => {
+    // ⚠️ **现问一次** ✗→✓（不吃缓存 ✓）—— 缓存里的 `full` 可能已经过时 ✓，
+    //    而"满没满"正是这一步要判的东西 ✓。
+    const s = await refreshSpaceInfo();
+    if (!s) { toast('读不到空间'); return; }
+    if (s.full) { toast('空间已经满了，暂时进不来新人'); return; }
+    const code = s.invite_code || '';
+    if (!code) { toast('这个空间没有邀请码'); return; }
+    // ⚠️ 复制不了的时候要**把码念出来** ✓（老 WebView 没 execCommand 时会走到这儿 ✓）
+    //    —— 静默失败会让人以为"点了没反应" ✓。
+    toast(copyText(code) ? '邀请码已复制' : '复制不了，手动记一下：' + code);
+  };
+
+  /**
+   * **退出当前空间**（连记忆一起删 ✓）—— 设置页那一行和 `#space` 都走它 ✓。
+   *
+   * ⚠️ **"能不能退"由服务端算** ✗（`GET /api/workspaces/mine` 回 `alone` ✓）——
+   *    这里灰不灰、说不说那句话只是体验 ✓；服务端在 `leave_space` 里**再判一次** ✓
+   *    （能被绕过的检查等于没有 ✓，这条是老规矩 ✓）。
+   * ⚠️ 所以这里**每次都现问一次** ✓，不吃 `spaceInfo` 缓存 ✗ ——
+   *    这一步是要删东西的 ✓，值一次网络往返 ✓（"刚刚有人加进来"那种情况，
+   *    缓存会让他先听到一句错的解释 ✓）。
+   */
+  const confirmLeaveSpace = async () => {
+    let d;
+    try { d = await api('/workspaces/mine'); }
+    catch (e) { toast((e && e.message) || '读不到空间'); return; }
+    const s = d && d.space;
+    if (!s) { toast('你还没有生活空间'); return; }
+    if (!s.alone) { toast('空间里还有别人 —— 等只剩你一个了才能退出'); return; }
+    // ★ **二次防呆** ✓（用户点名要的 ✓）—— 而且**把代价说全** ✓：
+    //   这个项目的老规矩是"说清代价比拦一道更管用" ✓。
+    const yes = await confirmBox({
+      title: '退出这个生活空间？',
+      body: '退出之后，这里的一切都会**永久删除**：聊天记录、账本、提醒、'
+          + '做的组件，还有管家在这个空间里的记忆。\n\n'
+          + '删了就找不回来了。要重新开始的话，到时候还得建一个新的。',
+      ok: '退出并删除', danger: true,
+    });
+    if (!yes) return;
+    try {
+      await api('/workspaces/leave', { method: 'POST' });
+      toast('正在退出…');
+      // 空间已经对我不可见了 ✓ → 重走一次落地 ✓ → 会落到初始化屏 ✓
+      //（`enterApp` 里那条"没有空间"的分支 ✓，而且 `show()` 会顺手把
+      //  设置页那一层的 `.on` 全清掉 ✓ —— 不用手动一层层退 ✓）。
+      await enterApp();
+    } catch (e) { toast((e && e.message) || '没退成'); }
+  };
+
   $$('.item[data-act]').forEach(el => {
     el.onclick = () => {
       const act = el.dataset.act;
-      if (act === 'gname') openSpace();   // ★ 2026-10-08：改名 + 邀请码 + 退出，
-                                        //   都搬进「生活空间」那一屏了 ✓
-      else if (act === 'invite') {
-        // 复制邀请码 ✓。没有 copyText 的时候（老 WebView）给一句人话 ✓，
-        // 别让它静默失败 ✗ —— 用户会以为"点了没反应" ✓。
-        const code = (group && group.invite_code) || '';
-        if (!code) { toast('这个群没有邀请码'); return; }
-        toast(copyText(code) ? '邀请码已复制' : '复制不了，手动记一下：' + code);
-      }
+      // ★ **点「空间」只改名** ✗→✓（2026-10-09 用户定的 ✓ —— 原来它推开 `#space` ✓）
+      if (act === 'gname') renameSpace();
+      else if (act === 'invite') inviteCodeNow();
+      // ★ **退出当前空间**（红字居中，就在「退出登录」上面 ✓）—— 二次确认在它里面 ✓
+      else if (act === 'leave') confirmLeaveSpace();
       else if (act === 'agentprofile') {
         // ★ 2026-10-06：打开**这一屏自己的**管家设置 ✓。
         //   原来调的是 `window.openAgentPanel` ✗ —— 那个函数属于一个
@@ -4229,13 +4372,146 @@
   };
   window.__logout = logout;
 
-  const openMe = () => {
-    if (!$('#me').classList.contains('on')) {
-      if ($('#chat').classList.contains('on')) pushScreen('me');   // 从群聊/设置进来 ✓
-      else show('me');                                            // 直接落在 /me 上 ✓
-    }
-    renderMe();
+  /**
+   * ★ **「我的」= 从底下升起的弹层** ✗→✓（2026-10-09 · 用户第三次点这一块：
+   *   「目前我的里，还是不对。你再回忆一下之前我们使用**壳加服务**的架构时，
+   *    当时的界面，现在明显不对」✓）。
+   *
+   *   我去翻了壳那一版（`server/app/static/index.html` 里的 `myProfileSheet()` ✓，
+   *   那份文件还在仓库里 ✓）—— 它**不是一个整屏** ✗，是**底部弹层** ✓，
+   *   从上到下四样：
+   *     ① **用户名**（居中，当标题用 ✓）
+   *     ② **头像**（56px 方角圆，**点它就是换头像** ✓，不多放按钮 ✓）
+   *     ③ 「**修改昵称**」一行 → **点开才出现**输入框 + 保存 ✓
+   *     ④ 「**修改账号或密码**」一行 → 点开才出现三格（当前密码 / 新用户名 / 新密码）+ 保存 ✓
+   *
+   *   ⚠️ **"点一行展开"就是那一版的形状** ✓（两条平时都收着 ✓，屏幕上干干净净 ✓）——
+   *      我上一版做成了"三张卡片全摊开的一整屏" ✗，那是**形状**不对 ✓，
+   *      不是配色不对 ✓（所以他说"还是不对" ✓）。
+   *   ⚠️ 壳里那条叫「修改**群**昵称」✓ —— 群昵称这个概念 2026-10-08 撤了 ✓
+   *      （一个人的名字只有一个 ✓）→ 这里叫「修改昵称」✓，改的是 `users.nickname` ✓
+   *      （走 `PATCH /api/me` ✓，和原先「我的」里那张卡片同一个接口 ✓）。
+   *   ⚠️ **弹层里不放「退出登录」** ✗ —— 它在设置页 ✓（壳那版也是这么分的 ✓）。
+   */
+  const openMeSheet = async () => {
+    if (!me) { toast('还没读到你的资料，等一下再点'); return; }
+    const p = $('#sheetPanel');
+    p.textContent = '';
+
+    const h = mkel('h3', null, me.username || '我');
+    h.style.textAlign = 'center';            // 壳那版也是居中 ✓（`style="text-align:center"` ✓）
+
+    // 头像：**点它自己就是那个按钮** ✓（不额外放一颗"换头像"按钮 ✓）
+    const f = mkel('input');
+    f.type = 'file'; f.accept = 'image/*'; f.style.display = 'none';
+    const av = mkel('div', 'pfava');
+    paintAvatar(av, shellURL(me.avatar), me.nickname || '我');
+    av.onclick = () => f.click();
+    f.onchange = async () => {
+      const file = f.files && f.files[0];
+      f.value = '';
+      if (!file) return;
+      try {
+        // ⚠️ 形状要和服务端**对上** ✗：它只收 `data:image/jpeg;base64,…` ✓
+        const blob = await shrinkToJpeg(file, 320);
+        const data = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.onerror = () => rej(new Error('这张图读不出来'));
+          r.readAsDataURL(blob);
+        });
+        const out = await api('/avatar', { method: 'POST', body: JSON.stringify({ data }) });
+        me.avatar = out.avatar;
+        paintAvatar(av, shellURL(out.avatar), me.nickname || '我');
+        toast('头像换好了');
+      } catch (e) { toast((e && e.message) || '没传上去'); }
+    };
+    p.append(h, f, av);
+
+    // ③ 修改昵称（点一行展开 ✓ —— 壳那一版的形状 ✓）
+    const r1 = mkel('div', 'pfrow');
+    r1.append(mkel('span', 'lbl', '修改昵称'), mkel('span', 'go', '›'));
+    const b1 = mkel('div', 'pfbody');
+    b1.hidden = true;
+    const nIn = mkel('input', 'field');
+    nIn.maxLength = 24;
+    nIn.value = me.nickname || '';
+    nIn.placeholder = '你在这个空间里叫什么';
+    const nErr = mkel('div', 'err', '');
+    const nSave = mkel('button', 'btn-solid', '保存');
+    nSave.onclick = async () => {
+      const v = nIn.value.trim();
+      if (!v) { nErr.textContent = '昵称不能空着'; return; }
+      if (v === (me.nickname || '')) { toast('没改'); return; }
+      nSave.disabled = true;
+      try {
+        const out = await api('/me', { method: 'PATCH', body: JSON.stringify({ nickname: v }) });
+        me.nickname = out.nickname;
+        // ⚠️ 群里那些**已经画出来的**名字也要跟着变 ✓：
+        //    不刷的话退回去还是旧名字 ✓，看着就像"没保存" ✓。
+        try {
+          const b = await api('/groups/bootstrap?limit=1');
+          if (b.group) group = b.group;
+          if (b.members) members = b.members;
+        } catch (e) { /* 刷不到就先这样 ✓ */ }
+        renderHeader(); renderSettings();
+        closeSheet();
+        toast('已保存');
+      } catch (e) { nErr.textContent = (e && e.message) || '没保存上'; }
+      nSave.disabled = false;
+    };
+    const w1 = mkel('div', 'actions');
+    w1.appendChild(nSave);
+    b1.append(nIn, nErr, w1);
+    r1.onclick = () => { b1.hidden = !b1.hidden; };
+
+    // ④ 修改账号或密码（同一条形状 ✓）
+    const r2 = mkel('div', 'pfrow');
+    r2.append(mkel('span', 'lbl', '修改账号或密码'), mkel('span', 'go', '›'));
+    const b2 = mkel('div', 'pfbody');
+    b2.hidden = true;
+    const uIn = mkel('input', 'field');
+    uIn.value = me.username || '';
+    uIn.maxLength = 24;
+    uIn.placeholder = '用户名';
+    const cIn = mkel('input', 'field');
+    cIn.type = 'password'; cIn.autocomplete = 'current-password';
+    cIn.placeholder = '当前密码（改用户名或密码时要填）';
+    const pIn = mkel('input', 'field');
+    pIn.type = 'password'; pIn.autocomplete = 'new-password';
+    pIn.placeholder = '新密码（不改就空着）';
+    const aErr = mkel('div', 'err', '');
+    const aSave = mkel('button', 'btn-solid', '保存');
+    aSave.onclick = async () => {
+      const payload = { current_password: cIn.value };
+      const u = uIn.value.trim();
+      if (u && u !== me.username) payload.username = u;
+      if (pIn.value) payload.password = pIn.value;
+      if (!payload.username && !payload.password) { aErr.textContent = '没改什么'; return; }
+      aSave.disabled = true;
+      try {
+        const out = await api('/me', { method: 'PATCH', body: JSON.stringify(payload) });
+        me = { ...me, ...out };
+        closeSheet();
+        toast('已保存');
+      } catch (e) { aErr.textContent = (e && e.message) || '没保存上'; }
+      aSave.disabled = false;
+    };
+    const w2 = mkel('div', 'actions');
+    w2.appendChild(aSave);
+    b2.append(uIn, cIn, pIn, aErr, w2);
+    r2.onclick = () => { b2.hidden = !b2.hidden; };
+
+    p.append(r1, b1, r2, b2);
+    openSheet();
   };
+
+  /** 点「我的」/点自己头像 → **弹层** ✓（下面那三屏（`#me`/`#meEdit`/`#meAccount`）
+   *  现在**没有入口**了 ✗ —— 它们被这个弹层取代了 ✓。
+   *  ⚠️ 没删它们 ✗：牵 `__goBack`、`_OTHER_SCREENS`、CSS 档位六七处 ✓，
+   *     而删的收益只是"文件短一点" ✓（和 `#wsNav`、`#space` 同一个处置 ✓）。
+   *     真要删，清单就在这一段里 ✓。 */
+  const openMe = () => { openMeSheet(); };
   const closeMe = () => {
     // 底下有群聊 → 退回去 ✓；没有（直接从 `/me` 这个地址进来的 ✓）→ 回主群聊 ✓。
     if ($('#chat').classList.contains('on')) { popScreen('me'); tellNative('chat'); }
@@ -4459,37 +4735,19 @@
     //    会让下一个人以为"这里有个分支、只是没写"✓。用自己的 class ✓。
     const quit = mkel('div', 'item quitrow');
     quit.appendChild(mkel('span', 'k danger', '退出该空间'));
-    if (!s.alone) {
-      // ⚠️ **不给它挂 onclick** ✓（不能点 ✓）—— 下面那句说明就是"为什么不能" ✓。
-      quit.style.opacity = '.45';
-      quit.onclick = () => toast('空间里还有别人，暂时不能退出');
-    }
+    // ⚠️ **点了走的是同一个函数** ✓（`confirmLeaveSpace` ✓）——
+    //    它自己会现问一次 `alone` 并说话 ✓，这里**不再判断一遍** ✗
+    //    （判两遍 = 迟早只改一处 ✓）。
+    quit.onclick = confirmLeaveSpace;
+    if (!s.alone) quit.style.opacity = '.45';
     body.appendChild(quit);
     if (!s.alone) {
       body.appendChild(mkel('div', 'tip', '空间里还有别人 —— 等只剩你一个了才能退出'));
     }
-    if (s.alone) {
-      quit.onclick = async () => {
-        // ★ **二次防呆** ✓（用户点名要的 ✓）—— 而且**把代价说全** ✓：
-        //   这个项目的老规矩是"说清代价比拦一道更管用" ✓。
-        const yes = await confirmBox({
-          title: '退出这个生活空间？',
-          body: '退出之后，这里的一切都会**永久删除**：聊天记录、账本、提醒、'
-              + '做的组件，还有管家在这个空间里的记忆。\n\n'
-              + '删了就找不回来了。要重新开始的话，到时候还得建一个新的。',
-          ok: '退出并删除', danger: true,
-        });
-        if (!yes) return;
-        try {
-          await api('/workspaces/leave', { method: 'POST' });
-          toast('正在退出…');
-          // 空间已经对我不可见了 ✓ → 重走一次落地 ✓ → 会落到初始化屏 ✓
-          //（`enterApp` 里那条"没有空间"的分支 ✓，而且 `show()` 会顺手把
-          //  设置页/这一屏的 `.on` 全清掉 ✓ —— 不用手动一层层退 ✓）。
-          await enterApp();
-        } catch (e) { toast((e && e.message) || '没退成'); }
-      };
-    }
+    // ⚠️ 这一段原来**自己写了一遍**"二次确认 + 退出 + 重落地"✗→✓（2026-10-09）——
+    //    现在它和设置页那一行**共用** `confirmLeaveSpace` ✓
+    //    （上面那句 `quit.onclick = confirmLeaveSpace` 就是全部 ✓）。
+    //    两处各写一遍的下场是"只改一处" ✓（这个项目反复栽过 ✓）。
 
     const swap = mkel('div', 'swap');
     const b = mkel('b', null, '返回');
@@ -4652,9 +4910,13 @@
   //    这一版先把"能进能出"做扎实 ✓（用户要的是这两条 ✓）。
   const SW_EDGE = 24;      // 边缘留给系统 ✓
   const SW_MIN2 = 10;      // 超过它才判方向 ✓
-  const SW_TRIG = 70;      // 横滑：拉过这么多才算数 ✓
+  //: 横滑（主群聊左滑进收纳页 ✓）：拉过这么多才算数 ✓。
+  //: ★ **70 → 96**（2026-10-09 用户定的 ✓）—— 和下拉那条**同一个道理** ✓：
+  //:   它现在也要**跟手出一条提示**（「继续左滑进入创意工坊」✓）✓，
+  //:   所以这个数同时是"阈值"和"那根条走满格的行程" ✓。
+  const SW_TRIG = 96;
   //: ★ 下拉：拉过这么多就进那条对话 ✓（2026-10-09）。
-  //:   ⚠️ 比横滑那个（70）**大一档** ✗→✓ —— 下拉是一根**要跟手**的手势 ✓：
+  //:   ⚠️ 比横滑那个**大一档** ✗→✓ —— 下拉是一根**要跟手**的手势 ✓：
   //:      从 0 拉到这个数，顶部那条提示才从"看不见"走到"看得见、并且变色" ✓
   //:      （见 `showPullHint` ✓）。给小了就是"手一动就跳进去" ✓，
   //:      用户根本没机会看见那行字 ✓ —— 而提示正是他点名要的 ✓。
@@ -4699,19 +4961,27 @@
     return !b || b.scrollTop <= 0;
   };
 
-  //: 顶部那条提示写什么 ✓ —— 收纳页和组件页**各说自己的** ✓
-  //:   （用户 2026-10-09 定的原话：「下滑以编辑该界面」/「下滑以编辑该组件」✓）。
-  const _pullHintText = () => {
+  //: 顶部那条提示写什么 ✓ —— **按手势方向说各自的话** ✓
+  //:   （用户 2026-10-09 定的原话：「继续左滑进入创意工坊」✓ /
+  //:     「下滑以编辑该界面」/「下滑以编辑该组件」✓）。
+  const _pullHintText = (dir) => {
+    if (dir === 'L') return '继续左滑进入创意工坊';
     const s = _whichScreen();
     if (s === 'comp') return '下滑以编辑该组件';
     return '下滑以编辑该界面';
   };
 
-  /** 顶部那条提示 —— **跟着手指浮现** ✓（`p` 0→1 就是"拉了多少" ✓）。 */
-  const showPullHint = (text, dy) => {
+  /** 顶部那条提示 —— **跟着手指浮现** ✓（`p` 0→1 就是"拉了多少" ✓）。
+   *
+   *  ⚠️ `trig` 要**跟着方向传** ✗→✓（2026-10-09：左滑那条也用它 ✓）——
+   *    横滑是 96 ✓、下拉是 144 ✓，条子走到满格的行程得跟本方向一致 ✓
+   *    （用死一个数的话：其中一个方向**永远到不了变色那一步** ✗，
+   *      而"该松手了"正是靠变色告诉他的 ✓）。
+   */
+  const showPullHint = (text, dist, trig) => {
     const el = $('#pullHint');
     if (!el) return;
-    const p = Math.max(0, Math.min(1, (dy || 0) / PULL_TRIG));
+    const p = Math.max(0, Math.min(1, (dist || 0) / (trig || PULL_TRIG)));
     if (!p) { hidePullHint(); return; }
     el.textContent = text;
     el.style.opacity = String(p);
@@ -4766,21 +5036,25 @@
     }
     pgSw.dx = dx;
     pgSw.dy = dy;
-    // ★ 下拉：顶部那条提示**跟着手指出** ✓（见 `showPullHint` ✓）
-    // ⚠️ 只在 `'D'` 上画 ✓ —— 横滑那两条没有提示 ✓，画了就是"多出来一根条" ✗。
-    if (pgSw.dir === 'D') showPullHint(_pullHintText(), dy);
+    // ★ 顶部那条提示**跟着手指出** ✓（见 `showPullHint` ✓）
+    // ★ **左滑那条也要** ✗→✓（用户 2026-10-09：「从群聊主界面左滑进入组件界面时，
+    //    也要有提示"继续左滑进入创意工坊"和滑入阈值」✓）。
+    // ⚠️ `'R'`（右滑退出那两条）**不给** ✓ —— 用户没要 ✓，
+    //    而且"退出"是往回走 ✓ 不需要一句"继续滑"来鼓励 ✓。
+    if (pgSw.dir === 'D') showPullHint(_pullHintText('D'), dy, PULL_TRIG);
+    else if (pgSw.dir === 'L') showPullHint(_pullHintText('L'), -dx, SW_TRIG);
   }, { passive: false });
 
   const _endSwipe = () => {
     const s = pgSw;
     pgSw = null;
-    if (!s || !s.dir) { hidePullHint(); return; }
-    // 下拉：够远才进 ✓，不够就把提示收回去 ✓（**绝不留着** ✗ —— 留着那根条
-    // 会把"我刚才是不是拉过头了"这件事变成一个疑问 ✓）。
+    // ⚠️ **一进门就收掉那根条** ✗→✓ —— 它是"手上正在做的那件事"的一部分 ✓，
+    //    松手那一刻就该没 ✓（留着会变成"我刚才是不是滑过头了"这个疑问 ✓）。
+    //    原来只在 `'D'` 那条分支里收 ✓ → 左滑也加提示之后就会**留在屏幕上** ✗。
+    hidePullHint();
+    if (!s || !s.dir) return;
     if (s.dir === 'D') {
-      const far = (s.dy || 0) >= PULL_TRIG;
-      hidePullHint();
-      if (far) openCompChat();
+      if ((s.dy || 0) >= PULL_TRIG) openCompChat();
       return;
     }
     const far = Math.abs(s.dx || 0) >= SW_TRIG;
@@ -6588,14 +6862,22 @@
   const bootAtMe = async () => {
     try {
       me = await api('/me');
-      show('me', 'fade');
-      tellNative('settings');      // 它有地方可退 ✓（回主群聊 ✓，见 `closeMe` ✓）
-      renderMe();
     } catch (e) {
       if (e && e.status === 401) { location.href = '/login'; return; }
       show('login');
       $('#loginErr').textContent = (e && e.message) || '连不上服务器';
+      return;
     }
+    // ★ **`/me` 现在也是"进 App + 弹出我的"** ✗→✓（2026-10-09）——
+    //   「我的」变成弹层之后它不再是"一屏" ✓，而这个地址的意义**没变** ✓：
+    //   **到了就让你看见你的资料** ✓（"去向由地址决定"那条记忆里的规矩 ✓）。
+    try { await enterApp(); } catch (e) {
+      if (e && e.status === 401) { location.href = '/login'; return; }
+      show('login'); tellNative('chat');
+      if (e) $('#loginErr').textContent = e.message;
+      return;
+    }
+    openMeSheet();
   };
 
   if (ROUTE === 'login') {
