@@ -58,7 +58,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 
 from .auth import current_user, require_member
-from .config import settings
+from .config import WALL_SLUG, settings
 from .db import execute, execute_rc, fetch_all, fetch_one, now
 from .hub import hub
 from .messages import _quote
@@ -159,8 +159,12 @@ async def _own_task(group_id: int, user_id: int, task_id: int) -> dict:
        而不是"查出来再判"✗：查出来再判的话，那个 `if` 漏了就是泄露 ✓）。
     """
     row = await fetch_one(
-        "SELECT * FROM workshop_tasks WHERE id = ? AND group_id = ? AND user_id = ?",
-        (int(task_id), group_id, user_id))
+        # ★ 「组件收纳页」那条**对所有人开放** ✓（它是群共用的 ✓，见 `_my_tasks` ✓）；
+        #    别的对话照旧只看自己的 ✓ —— 这条判据要和列表那边**一致** ✗✓
+        #    （一边列出来、另一边 404，用户看到的是"点了没反应" ✗）。
+        "SELECT * FROM workshop_tasks WHERE id = ? AND group_id = ?"
+        "   AND (user_id = ? OR slug = ?)",
+        (int(task_id), group_id, user_id, WALL_SLUG))
     if not row:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "没有这条对话")
     return dict(row)
@@ -197,9 +201,12 @@ async def _my_tasks(group_id: int, user_id: int) -> list[dict]:
         "       (SELECT c.title FROM components c WHERE c.task_id = t.id"
         "         ORDER BY c.version DESC LIMIT 1) AS title"
         "  FROM workshop_tasks t"
-        " WHERE t.group_id = ? AND t.user_id = ?"
+        # ★ 2026-10-09：**「组件收纳页」那条对谁都在** ✗→✓ ——
+        #   它是这个群的一件东西 ✓，不是"谁开的对话" ✗（用户：「应该在创意工坊里
+        #   默认存在」✓）。别的对话照旧只看自己的 ✓。
+        " WHERE t.group_id = ? AND (t.user_id = ? OR t.slug = ?)"
         " ORDER BY t.updated_at DESC, t.id DESC",
-        (group_id, user_id))
+        (group_id, user_id, WALL_SLUG))
     # 每个 slug 现在的标题 —— 一次查完 ✓（对话一多，逐个查就是 N+1 ✓）
     # ⚠️ 一次查完 ✓（对话一多，逐个查就是 N+1 ✓）——
     #    **顺手把 icon 也带回来** ✓：导航那一行左边那个图标就是它 ✓，
@@ -782,6 +789,10 @@ async def _assert_open(group_id: int) -> None:
 
 @router.get("/{group_id}/tasks")
 async def tasks_list(group_id: int, user: dict = Depends(current_user)) -> dict:
+    # ★ 先保证「组件收纳页」那条**一定在** ✓（2026-10-09）——
+    #   它不靠谁去点才出现 ✓：谁打开创意工坊，它就已经在列表里了 ✓。
+    from .main import _ensure_wall_task
+    await _ensure_wall_task(group_id)
     """我这些对话 ✓ + 默认该打开哪一条（**最近动过的那个** ✓）+ 助手信息 ✓。
 
     ⚠️ **"上次那个"由服务端算** ✗→✓ —— 不放 localStorage ✓：
@@ -862,6 +873,12 @@ async def task_rename(group_id: int, task_id: int, body: TaskTitleIn,
     await require_member(group_id, user["id"])
     await _assert_open(group_id)
     row = await _own_task(group_id, user["id"], task_id)
+    # ★ **「组件收纳页」那条删不掉** ✗→✓（2026-10-09 用户定的："不可删除"✓）——
+    #   而且它删不得还有个硬理由 ✓：它是**唯一**能改组件界面外观的入口 ✓
+    #   （见 `routes_internal` 的 `_wall_task_ok` ✓）→ 删了那个能力就没人够得着了 ✓。
+    if (row.get("slug") or "") == WALL_SLUG:
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "「组件收纳页」删不掉 —— 组件界面本身要靠它来改")
     await execute("UPDATE workshop_tasks SET title = ? WHERE id = ?",
                   (body.title.strip(), int(row["id"])))
     log.info("工坊对话改名：群 %s 任务 %s → %r（用户 %s）",

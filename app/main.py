@@ -42,7 +42,7 @@ from . import idle, records as rec, reminders
 #    后者是"本地摇邀请码"（现在只有建空间那一处摇 ✓，在 `routes_shell` 里 ✓）。
 from .auth import (PREVIEW_SCOPE, SESSION_COOKIE, current_user, decode_token,
                    make_token, require_member)
-from .config import settings
+from .config import WALL_SLUG, settings
 from .db import (close_db, execute, execute_rc, fetch_all, fetch_one, init_db,
                  now)
 from .hub import hub
@@ -624,8 +624,6 @@ async def _spots_of(group_id: int) -> dict[str, int]:
     return {str(r["slug"]): int(r["pos"]) for r in rows}
 
 
-#: 「组件界面diy」那一格的 slug ✓ —— 前端同一份约定 ✓（`WALL_SLUG` ✓）。
-WALL_SLUG = "wall"
 
 
 async def _ensure_wall(group_id: int) -> None:
@@ -640,6 +638,7 @@ async def _ensure_wall(group_id: int) -> None:
     ⚠️ **懒建** ✓：谁先进收纳页/谁先下拉，谁就把它建出来 ✓ ——
        不需要在开通工作区那一步多写一段 ✓（老空间也不用补数据 ✓）。
     """
+    await _ensure_wall_task(group_id)      # ← 顺手把对话建出来 ✓（见它那段 ✓）
     row = await fetch_one(
         "SELECT id FROM components WHERE group_id = ? AND slug = ? LIMIT 1",
         (group_id, WALL_SLUG))
@@ -655,7 +654,35 @@ async def _ensure_wall(group_id: int) -> None:
         "INSERT INTO component_spots(group_id, slug, pos, updated_at) VALUES(?,?,?,?) "
         "ON CONFLICT(group_id, slug) DO UPDATE SET pos=excluded.pos",
         (group_id, WALL_SLUG, -1, now()))
-    log.info("群 %s：建出了「组件界面diy」那一格", group_id)
+    log.info("群 %s：建出了「组件收纳页」那一格", group_id)
+
+
+async def _ensure_wall_task(group_id: int) -> int | None:
+    """保证「组件收纳页」在**创意工坊里也有一条对话** ✓（2026-10-09 用户定的：
+    「没有[组件收纳页]的修改入口，应该在创意工坊里默认存在且不可删除」✓）。
+
+    ⚠️ 它和普通对话有两点不同 ✗：
+      · **每个人都能看见** ✓（`_my_tasks` 里对它不做 user_id 过滤 ✓）——
+        它不是"谁开的对话" ✓，它是这个群的一件东西 ✓。
+      · **删不掉** ✓（`task_delete` 里拦 ✓）—— 删了那一屏就没人能改了 ✓。
+    归属写成**建群那个人** ✓（库里得有个 user_id ✓，反正是共用的 ✓）。
+    """
+    row = await fetch_one(
+        "SELECT id FROM workshop_tasks WHERE group_id = ? AND slug = ? ORDER BY id LIMIT 1",
+        (group_id, WALL_SLUG))
+    if row:
+        return int(row["id"])
+    owner = await fetch_one(
+        "SELECT user_id FROM group_members WHERE group_id = ? ORDER BY joined_at LIMIT 1",
+        (group_id,))
+    if not owner:
+        return None
+    tid = await execute(
+        "INSERT INTO workshop_tasks(group_id, user_id, slug, title, created_at, updated_at) "
+        "VALUES(?,?,?,?,?,?)",
+        (group_id, int(owner["user_id"]), WALL_SLUG, "组件收纳页", now(), now()))
+    log.info("群 %s：建出了「组件收纳页」那条对话（id=%s）", group_id, tid)
+    return int(tid)
 
 
 async def _scan_components(group_id: int) -> list[dict]:

@@ -2,6 +2,13 @@
 
 from pathlib import Path
 
+# ── ★ 「组件收纳页」那条对话 / 那一格的 slug（2026-10-08 定的，2026-10-09 收到这儿）──
+#
+# ⚠️ **只留这一处** ✗→✓：它原来在 `main.py` / `routes_internal.py` / 前端各写了一份 ✓
+#    （前端那一份还是必须的 ✓ —— 那是另一个语言 ✓），
+#    而后端这边**一份就够** ✓：两个模块各写一份，改一处漏一处是迟早的事 ✓。
+WALL_SLUG = "wall"
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 

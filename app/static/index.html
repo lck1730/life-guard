@@ -39,7 +39,22 @@
   .screen { position:fixed; inset:0; height:100dvh; display:none; flex-direction:column; background:var(--bg); }
   .screen.on { display:flex; }
 
-  /* ── 登录 ── */
+  /* ── 登录 ──（**照壳原来那一版** ✓ · 2026-10-09） */
+  #login { justify-content:center; align-items:center; padding:24px; }
+  #login .wrap { width:min(360px,100%); }
+  /* hero：卡片**外面**的大标题 + 一句广告词 ✓ */
+  #login .hero { text-align:center; margin:0 0 22px; }
+  #login .hero .t { font-size:26px; font-weight:600; letter-spacing:.5px; }
+  #login .hero .s { color:var(--muted); font-size:13.5px; margin-top:8px; }
+  #login .card { background:var(--panel); border:1px solid var(--line);
+                 border-radius:18px; padding:22px 20px; }
+  /* 每个输入框上面一个 label ✓（壳那一版就是这样 ✓，不靠 placeholder ✓） */
+  #login label { display:block; color:var(--muted); font-size:12.5px; margin:14px 0 6px; }
+  #login label:first-child { margin-top:0; }
+  #login .btn-primary { margin-top:18px; }
+  #login .swap { margin-top:16px; text-align:center; }
+  #login .swap b { color:var(--accent); font-size:13.5px; font-weight:500; }
+
   #login { justify-content:center; align-items:center; padding:24px; }
   #login .wrap { width:min(360px,100%); padding:26px 22px; background:var(--panel);
                  border:1px solid var(--line); border-radius:18px; }
@@ -209,6 +224,12 @@
   .sysrow { align-self:center; max-width:86%; font-size:12.5px; color:var(--muted);
             background:var(--panel2); border-radius:10px; padding:6px 12px;
             text-align:center; line-height:1.55; }
+  /* ★ 2026-10-09：**气泡上关掉系统的长按呼出 / 文字选择** ✗→✓。
+     用户报的：「长按后不仅出了卡片，还把系统的复制功能调出来了」✓ ——
+     要的是**只有我们那张卡片** ✓（"自由复制"那一项再自己去调复制 ✓）。
+     ⚠️ 这一条以前只写在注释里 ✗（"CSS 里把长按呼出和选择都关了"✓），
+        而**代码里根本没加** ✓ —— 注释和代码不一致，等于没有 ✓。 */
+  .row .bubble, .mkrow .mkbub { -webkit-touch-callout:none; user-select:none; }
   .row.agent .bubble { background:var(--panel); border:1px solid var(--line);
                        border-left:3px solid var(--agent); border-bottom-left-radius:4px; }
   .row:not(.mine):not(.agent) .bubble { border-bottom-left-radius:4px; }
@@ -513,6 +534,7 @@
           它们和管家那三屏不会同时开 ✓，档位只是留个次序 ✓。 */
   #me       { z-index:12; }
   #meAccount{ z-index:13; }
+  #meEdit   { z-index:13; }   /* 和账号那一屏同档 ✓（不会同时开 ✓） */
   #space    { z-index:12; }   /* 和 `#me` 同档 ✓ —— 它们不会同时开 ✓ */
   #peer     { z-index:12; }   /* 同上 ✓ */
   #selfIntro{ z-index:13; }   /* 从「我的」再进一层 ✓ */
@@ -592,7 +614,10 @@
      而**那个模式没有了** ✗→✓（2026-10-08）→ 改成挂在"正在被拖的那个"身上 ✓。
      ⚠️ `touch-action:none` 是必须的 ✗：不写的话，浏览器会把"上下拖"当成
         滚动列表 ✓ → 拖到一半页面跟着滚 ✓（看着像"拖飞了"✓）。 */
-  #workshop .cell { touch-action:none; }
+  /* ⚠️ `touch-action` 从 `none` 改成 **`pan-y`** ✗→✓（2026-10-08 实测）——
+     `none` 会把**从格子上起手的纵向滚动**一起掐掉 ✓ → 组件多了就滚不动列表 ✗。
+     要挡的只有**横向**（右滑是"退出"✓）→ `pan-y` 正好 ✓。 */
+  #workshop .cell { touch-action:pan-y; }
   #workshop .cell.drag { z-index:9; opacity:.92; transition:none;
                          transform-origin:center; }
   #workshop .cell.over { border-color:var(--accent); background:#16233a; border-radius:12px; }
@@ -839,6 +864,11 @@
   .ascreen .bigav .av img { width:100%; height:100%; object-fit:cover; display:block; }
   /* 提示语：**在"头像下沿"和"卡片下沿"之间居中** ✓ —— margin-top 要等于卡片的下内边距 ✓ */
   .ascreen .tip { color:var(--muted); font-size:12.5px; text-align:center; margin-top:30px; }
+  /* ★ 性格那一块收起时：**一行**，右边一个 ›（2026-10-09 ✓） */
+  .ascreen .pbox { display:flex; align-items:center; gap:8px; }
+  .ascreen .pbox .pt { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
+                       white-space:nowrap; }
+  .ascreen .pbox .go { color:var(--muted); font-size:20px; line-height:1; flex-shrink:0; }
   .ascreen .err { color:var(--danger); font-size:13px; min-height:18px; margin-top:10px; }
   .ascreen .swap { margin-top:14px; text-align:center; color:var(--muted); font-size:13px; }
   .ascreen .swap b { color:var(--accent); font-weight:600; }
@@ -1034,50 +1064,62 @@
 
 <!-- 登录 -->
 <div class="screen" id="login">
+  <!-- ★ 2026-10-09：**照壳原来那一版重做** ✗→✓（用户：「登录界面和注册界面
+       之前保持一致，现在不对」✓）。版式全部照抄（`tools/lifeguard-shell.py`
+       的 `renderLogin` ✓）：
+         · hero 在**卡片外面**（大标题 + 一句广告词 ✓）
+         · 每个输入框**上面有 label** ✓（不是光靠 placeholder ✓）
+         · 注册时**内测码排第一** ✓（它是进门凭证 ✓）
+         · 错误**在按钮下面** ✓，切换那行在最后 ✓
+         · 文案也照抄：「还没有账号？创建一个」/「已有账号，去登录」✓ -->
   <div class="wrap">
-    <div class="logo">管</div>
-    <h1>生活管家</h1>
-    <p class="sub">和你的管家，还有重要的人</p>
-    <div class="err" id="loginErr"></div>
-    <input class="field" id="u" placeholder="用户名" autocomplete="username">
-    <input class="field" id="p" type="password" placeholder="密码" autocomplete="current-password">
-    <!-- 注册那两格：**同一屏的两个状态** ✓ —— 不是另开一屏 ✗。
-         用户之前在这页上操作过 ✓，别改他的肌肉记忆 ✓。 -->
-    <input class="field regonly" id="betaCode" placeholder="内测码" autocomplete="off" hidden>
-    <input class="field regonly" id="p2" type="password" placeholder="再输一次密码" autocomplete="new-password" hidden>
-    <button class="btn-primary" id="doLogin">登录</button>
-    <div class="swap"><b id="authSwap">有内测码？去注册</b></div>
+    <div class="hero">
+      <div class="t">生活管家</div>
+      <div class="s">一个越用越懂你的管家</div>
+    </div>
+    <div class="card">
+      <label class="regonly" id="lBeta" hidden>内测码</label>
+      <input class="field regonly" id="betaCode" placeholder="请填写内测码"
+             autocapitalize="off" autocomplete="off" hidden>
+      <label for="u">用户名</label>
+      <input class="field" id="u" placeholder="用户名" autocapitalize="off" autocomplete="username">
+      <label for="p">密码</label>
+      <input class="field" id="p" type="password" placeholder="密码" autocomplete="current-password">
+      <label class="regonly" id="lP2" hidden>重复密码</label>
+      <input class="field regonly" id="p2" type="password" placeholder="再输一遍"
+             autocomplete="new-password" hidden>
+      <button class="btn-primary" id="doLogin">登录</button>
+      <div class="err" id="loginErr"></div>
+      <div class="swap"><b id="authSwap">还没有账号？创建一个</b></div>
+    </div>
   </div>
 </div>
 
-<!-- 初始化：**还没有生活空间**的人停在这一屏 ✓（用户 2026-10-08 定的形状） -->
 <div class="screen" id="init">
+  <!-- ★ 2026-10-09 用户定的两件事 ✗→✓：
+       · 「第一次登录时的新建或加入生活空间也改名空间」✓
+       · 「对空间的介绍去掉，界面简洁」✓ →
+         原来那张"生活空间是什么"的浮卡**整个删了** ✓（点按钮直接进表单 ✓）。 -->
   <div class="hero2">
     <h1>欢迎使用生活管家！</h1>
     <p class="sub">继续使用请先</p>
-    <button class="btn-primary" id="initGo">新建或加入一个生活空间</button>
+    <button class="btn-primary" id="initGo">新建或加入一个空间</button>
   </div>
-  <!-- 点上面那个按钮才浮出来 ✓（居中浮空的一小块 ✓，不是另一屏 ✓） -->
   <div class="introcard" id="introCard" hidden>
-    <h2>生活空间</h2>
-    <p><b>生活空间</b>，是你们一起过日子的一个小地方。</p>
-    <p>它记得你们聊过的话、记下的账、说好要提醒的事 ——
-       而且<b>只记得这一个空间里的</b>。</p>
-    <p>一个空间，一份记忆。换一个，就是另一段日子了。</p>
-    <div class="sep"></div>
     <div class="err" id="initErr"></div>
-    <input class="field" id="spaceName" placeholder="给这个空间起个名字" maxlength="32" autocomplete="off">
+    <input class="field" id="spaceName" placeholder="给它起个名字" maxlength="32" autocomplete="off">
     <button class="btn-primary" id="btnNewSpace">新建</button>
     <input class="field" id="joinCode" placeholder="或者填 8 位邀请码" maxlength="16"
            autocapitalize="characters" autocomplete="off" style="margin-top:14px">
     <button class="btn-primary" id="btnJoinSpace">加入</button>
-    <p class="foot">建好了它就在你的手机里，随时能进</p>
   </div>
 </div>
 
 <!-- 我的（数据由 JS 画 ✓ 和 `#agent` / `#diySet` 一个做法 ✓） -->
 <div class="screen ascreen" id="me"><div class="abody" id="meBody"></div></div>
 <div class="screen ascreen" id="meAccount"><div class="abody" id="meAccountBody"></div></div>
+<!-- 改资料（头像 + 昵称 ✓）—— 和管家、diy 小助手同一批 class ✓ -->
+<div class="screen ascreen" id="meEdit"><div class="abody" id="meEditBody"></div></div>
 <!-- 生活空间：改名 / 邀请码 / 退出该空间（用户 2026-10-08 定的三样 ✓） -->
 <div class="screen ascreen" id="space"><div class="abody" id="spaceBody"></div></div>
 <!-- 自我介绍（≤500 字 ✓，可空 ✓）—— 跟着每一轮进它脑子 ✓ -->
@@ -1422,18 +1464,17 @@
            只不过换了个叫法"✓）。
          ⚠️ 它**点进去要去新的一屏**（`#space`：改名 / 邀请码 / 退出该空间 ✓）——
             那一屏在 P5 做 ✓，这一版先保持"点了改个名"✓（不是死按钮 ✓）。 -->
-    <div class="item" data-act="gname"><span class="k">生活空间</span><span class="v" id="vGname"></span><span class="chev">›</span></div>
+    <!-- ★ 「生活空间」→「**空间**」✗→✓（2026-10-09 用户定的 ✓："生活空间改名，空间" ✓）。 -->
+    <div class="item" data-act="gname"><span class="k">空间</span><span class="v" id="vGname"></span><span class="chev">›</span></div>
     <!-- ⚠️ 「群昵称」这一行**整个删了** ✗→✓（2026-10-08 用户定的）：
          「群昵称的地位被[我的]昵称替换，因为一个人只有一个群，
            已经不必区分昵称和群昵称」✓ —— 所以名字只有一个来源：
          账号昵称 ✓（改在「我的」里 ✓）。 -->
     <div class="item" data-act="agentprofile"><span class="k">管家</span><span class="v" id="vAname"></span><span class="chev">›</span></div>
 
-    <!-- ★ 「邀请码」右边直接写**码本身** ✓ —— 2026-10-06 用户定的。
-         原来写的是"复制邀请码" ✗：那是个**动作说明** ✓，
-         而人真正想看的、想抄给别人的，是**那串码** ✓。
-         点这一行**依旧**是复制 ✓（提示语也还是"邀请码已复制" ✓）。 -->
-    <div class="item" data-act="invite"><span class="k">邀请码</span><span class="v" id="vInvite"></span><span class="chev">›</span></div>
+    <!-- ⚠️ 「邀请码」这一行**删了** ✗→✓（2026-10-09 用户定的：
+         「设置界面邀请码重复了，设置页不留了，只在生活空间里留」✓）——
+         现在只在「空间」那一屏里，点了照样是复制 ✓。 -->
 
     <!-- 手动查更新。自动检查是"开 App 时问一次"，但那个时机不由你定——
          这一条让你随时能问，不用等。右边显示当前壳的版本号。 -->
@@ -1456,6 +1497,18 @@
 (() => {
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
+
+  //: ★ 「组件收纳页」那一格 / 那条对话的 slug ✓（2026-10-08 定的保留字 ✓）。
+  //:
+  //:   ⚠️ **它必须声明在文件最前面** ✗ —— 上一次它写在中间 ✓，
+  //:   后来一次"删掉旧代码块"的编辑把它连声明一起删了 ✓ →
+  //:   点组件时 `Uncaught ReferenceError: WALL_SLUG is not defined` ✓ →
+  //:   **点了什么都不发生** ✓✓（用户报的那个"点组件没反应"就是它 ✓）。
+  //:   ⚠️ 而且**两道检查当时都抓不到** ✗：语法是对的 ✓；
+  //:   `tools/check-shell-page.py` 只查"被调用的名字"✓，而它是当**值**用的 ✗
+  //:   （已给那个检查器补了一条"全大写常量"的扫描 ✓，见它的注释 ✓）。
+  const WALL_SLUG = 'wall';
+
 
   // ── 给 agent 的扩展点 ──
   //
@@ -1796,8 +1849,13 @@
       wrap.textContent = '';
       const cur = (group && group.agent_user_prompt) || '';
       if (!promptEditing) {
-        const box = mkel('div', 'pbox' + (cur ? '' : ' empty'),
-                         cur || '描述一下管家的性格...');
+        // ★ 2026-10-09 用户报的：「管家界面性格那里字数多的时候有点丑，
+        //   应该设置成点击可展开那种卡片」✗→✓。
+        //   所以收起态**只留一行** ✓（CSS 里 `nowrap + ellipsis` ✓），
+        //   右侧一个 `›` 提示"点得进去" ✓ —— 点一下才展开成那个大文本框 ✓。
+        const box = mkel('div', 'pbox' + (cur ? '' : ' empty'));
+        const txt = mkel('span', 'pt', cur || '描述一下管家的性格…');
+        box.append(txt, mkel('span', 'go', '›'));
         box.onclick = () => { promptEditing = true; draw(); };
         wrap.appendChild(box);
         return;
@@ -2171,6 +2229,13 @@
     if ($('#agent').classList.contains('on')) { closeAgentSettings(); return; }
     // ★ 2026-10-08 新加的两屏（`#meAccount` 13 > `#me` 12 > `#settings` 10 ✓）——
     //   照旧**按 z-index 从大到小**插 ✓（这条铁律写在上面那段里 ✓）。
+    // ⚠️ 初始化屏（`#init`）**要在这儿** ✗→✓（2026-10-09）——
+    //   它在最底下 ✓（`show()` 那一类 ✓），但**必须有个出路** ✓：
+    //   退一步 = 回登录页 ✓（那一页会把票清掉 ✓ = 登出 ✓）。
+    //   原来它不在这个表里 ✗ → 返回键落到原生那个"再滑一次退出 App" ✓ →
+    //   用户的感觉是"进退两难" ✓（他报的就是这个 ✓）。
+    if ($('#init').classList.contains('on')) { location.href = '/login'; return; }
+    if ($('#meEdit').classList.contains('on')) { closeMeEdit(); return; }
     if ($('#meAccount').classList.contains('on')) { closeMeAccount(); return; }
     if ($('#selfIntro').classList.contains('on')) { closeSelfIntro(); return; }
     if ($('#peer').classList.contains('on')) { closePeer(); return; }
@@ -2214,23 +2279,28 @@
 
   const _authErr = (msg) => { $('#loginErr').textContent = msg || ''; };
 
+  // ★ 2026-10-09：文案和布局**照壳那一版** ✗→✓（用户说"和之前保持一致"✓）。
   const _setAuthMode = (on) => {
     registering = on;
     $$('#login .regonly').forEach(el => { el.hidden = !on; });
-    $('#doLogin').textContent = on ? '注册' : '登录';
-    $('#authSwap').textContent = on ? '已经有账号了？去登录' : '有内测码？去注册';
+    $('#doLogin').textContent = on ? '注册并登录' : '登录';
+    $('#authSwap').textContent = on ? '已有账号，去登录' : '还没有账号？创建一个';
     _authErr('');
   };
 
   const doLogin = async () => {
     const btn = $('#doLogin');
     const u = $('#u').value.trim(), p = $('#p').value;
-    if (!u || !p) { _authErr(registering ? '用户名和密码都要填' : '用户名和密码都要填'); return; }
+    if (!u || !p) { _authErr('用户名和密码都要填'); return; }
+    if (registering && !$('#betaCode').value.trim()) { _authErr('请填写内测码'); return; }
     btn.disabled = true;
     const was = btn.textContent;
     btn.textContent = registering ? '注册中…' : '登录中…';
     try {
       if (registering) {
+        // 记住上次输的用户名 ✓（壳那一版有这个：`window.__lastUser` ✓）——
+        // 手机上打字贵 ✓，注册没成功再回来不用重打 ✓。
+        try { window.__lastUser = u; } catch (e) {}
         await api('/register', {
           method: 'POST',
           body: JSON.stringify({ code: $('#betaCode').value.trim(), username: u,
@@ -2251,6 +2321,13 @@
       btn.textContent = was;
     }
   };
+  try {
+    if (window.__lastUser) $('#u').value = window.__lastUser;
+    else if (localStorage.getItem('lg_last_user')) $('#u').value = localStorage.getItem('lg_last_user');
+  } catch (e) {}
+  $('#u').addEventListener('change', () => {
+    try { localStorage.setItem('lg_last_user', $('#u').value.trim()); } catch (e) {}
+  });
   $('#doLogin').onclick = doLogin;
   $('#authSwap').onclick = () => _setAuthMode(!registering);
   $('#p').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
@@ -2264,8 +2341,11 @@
   // "没有空间" ✓，现在有了 ✓，它自己会落到主群聊 ✓（不用手写跳转 ✓）。
   const _initErr = (msg) => { $('#initErr').textContent = msg || ''; };
 
+  // ★ 2026-10-09：**没有介绍卡了** ✓（用户："对空间的介绍去掉，界面简洁"✓）——
+  //   点这个按钮**直接进表单** ✓。
   $('#initGo').onclick = () => {
     $('#introCard').hidden = false;
+    $('#initGo').hidden = true;        // 表单出来了，那个入口就该让位 ✓
     _initErr('');
     setTimeout(() => { try { $('#spaceName').focus(); } catch (e) {} }, 80);
   };
@@ -2322,7 +2402,12 @@
       //      （报 'settings' 的话，原生会把返回键交给 `window.__goBack` ✓，
       //       而这一屏**不该**列进 `__goBack` ✓ → 那就是个死按钮 ✓）。
       show('init', 'fade');        // ④ 平级替换：淡入 ✓
-      tellNative('chat');
+      $('#introCard').hidden = true;   // 每次进来都从"只有按钮"那个状态开始 ✓
+      $('#initGo').hidden = false;
+      // ★ 2026-10-09：报 **'settings'**（原来报 'chat' ✗）—— 意思是"返回键交给网页" ✓，
+      //   而这一屏的返回 = **回登录页** ✓（用户：「目前进这个界面后没法退出，
+      //   应该支持返回手势退到登录界面」✓）。见 `__goBack` 里那一支 ✓。
+      tellNative('settings');
       $('#introCard').hidden = true;     // 每次进来都从"只有按钮"那个状态开始 ✓
       _initErr('');
       return;
@@ -3008,10 +3093,23 @@
     }
     box.appendChild(mk('自由复制', () => {
       const t = (opts && opts.text ? opts.text(m) : quoteText(m)) || '';
+      // ★ 2026-10-09 用户定的：**"点击自由复制时把系统复制工具调出来"** ✗→✓。
+      //   做法：① 把那一条气泡的文字**真的选中** ✓（用户看得见那层高亮 ✓，
+      //         而且安卓 WebView 在那个状态下会把系统的复制工具一起带出来 ✓）；
+      //        ② 同时把整条塞进剪贴板 ✓（万一系统那排工具没出来 ✓，
+      //           用户也已经复制到了 ✓ —— **两条路都留** ✓，不赌其中一条 ✓）。
+      try {
+        const sel = window.getSelection();
+        const node = (row.querySelector('.bubble') || row);
+        sel.removeAllRanges();
+        const r = document.createRange();
+        r.selectNodeContents(node);
+        sel.addRange(r);
+      } catch (e) { /* 选中失败不影响下面那一步 ✓ */ }
       // ⚠️ 老 WebView 上 `navigator.clipboard` 可能没有 ✓ —— `copyText` 兜了
       //    那一条（textarea + execCommand ✓），失败会返回 false ✓，
       //    这时给一句人话 ✓（别让它静默失败 ✗ —— 用户会以为"点了没反应"✓）。
-      toast(copyText(t) ? '整条复制好了' : '复制不了，长按气泡自己选一段吧');
+      toast(copyText(t) ? '这条已经选中了' : '复制不了，长按气泡自己选一段吧');
     }));
     box.appendChild(mk('引用', () => {
       if (opts && opts.quote) opts.quote(m); else setQuote(m);
@@ -4011,15 +4109,69 @@
    *    （一人一空间之后它没意义了 ✓），"空间"那一摊搬去设置页的
    *    「生活空间」那一行 ✓（见 `#space` ✓）。
    */
+  /** 「我的」那一屏 ✓ —— **恢复成原来的样子** ✗→✓（2026-10-09 用户定的：
+   *  「[我的]界面有点丑，恢复原来的样子我再教你怎么添加自我介绍」✓）。
+   *
+   *  所以它是**壳那一版的形状** ✓：
+   *    一张资料卡（头像 + 昵称 + `›`）── 点进去 → `#meEdit`（改资料 ✓）
+   *    一行「账号」                        ── 点进去 → `#meAccount`（用户名/密码 ✓）
+   *    一个「退出登录」                     ── 居中红字 ✓
+   *
+   *  ⚠️ **自我介绍那一行先撤了** ✗ —— 用户说"我再教你怎么添加" ✓ →
+   *     后端接口（`POST /api/me/self-intro`）和那一屏（`#selfIntro`）都留着 ✓，
+   *     只是**暂时没有入口** ✓（等他说放哪儿 ✓）。留着的理由：它是测过的 ✓，
+   *     而且多半这两天就要用 ✓ —— 但**界面上不出现** ✓（死按钮比没有更糟 ✗）。
+   */
   const renderMe = () => {
     const body = $('#meBody');
     if (!me) { body.textContent = '读不到你的资料，刷新一下试试'; return; }
     body.textContent = '';
 
+    // 资料卡：**只显示，点进去改** ✓（和壳那一版一样 ✓）
+    const card = mkel('div', 'card avcard');
+    const big = mkel('div', 'bigav');
+    const av = mkel('div', 'av');
+    big.appendChild(av);
+    paintAvatar(av, shellURL(me.avatar), me.nickname || '我');
+    card.appendChild(big);
+    const grp0 = mkel('div', 'grp');
+    const rowProf = mkel('button', 'row');
+    rowProf.append(mkel('span', 'rl', me.nickname || '我'),
+                   mkel('span', 'chev', '›'));
+    rowProf.onclick = openMeEdit;
+    grp0.appendChild(rowProf);
+    body.append(card, grp0);
+
+    const grp = mkel('div', 'grp');
+    const rowAcc = mkel('button', 'row');
+    rowAcc.append(mkel('span', 'rl', '账号'),
+                   mkel('span', 'act', me.username || ''),
+                   mkel('span', 'chev', '›'));
+    rowAcc.onclick = openMeAccount;
+    grp.appendChild(rowAcc);
+    body.appendChild(grp);
+
+    const quit = mkel('div', 'item');
+    quit.dataset.act = 'logout';
+    quit.appendChild(mkel('span', 'k danger', '退出登录'));
+    body.appendChild(quit);
+  };
+
+  // ── 改资料：头像 + 昵称 ✓（就是原来那两张卡，搬到单独一屏 ✓）──────────
+  const openMeEdit = () => {
+    if (!$('#meEdit').classList.contains('on')) pushScreen('meEdit');
+    renderMeEdit();
+  };
+  const closeMeEdit = () => popScreen('meEdit');
+
+  const renderMeEdit = () => {
+    const body = $('#meEditBody');
+    body.textContent = '';
+
     // 卡片一：头像
     const card = mkel('div', 'card avcard');
     const f = mkel('input');
-    f.type = 'file'; f.accept = 'image/*'; f.style.display = 'none';   // 原生文件框太丑，藏起来 ✓
+    f.type = 'file'; f.accept = 'image/*'; f.style.display = 'none';
     const big = mkel('div', 'bigav');
     const av = mkel('div', 'av');
     big.appendChild(av);      // ⚠️ **这一行漏过一次** ✗→✓：没塞进去 = 盒子空 = 0 高 = 圈不长 ✗
@@ -4031,7 +4183,6 @@
       if (!file) return;
       try {
         // ⚠️ 形状要和服务端**对上** ✗：它只收 `data:image/jpeg;base64,…` ✓
-        //（`shrinkToJpeg` 正是干这个的 ✓，和另外两屏同一套 ✓）。
         const blob = await shrinkToJpeg(file, 320);
         const data = await new Promise((res, rej) => {
           const r = new FileReader();
@@ -4048,7 +4199,7 @@
     card.append(f, big, mkel('div', 'tip', '点击头像换一张'));
     body.appendChild(card);
 
-    // 卡片二：昵称（**一个人的名字只有一个** ✓ —— 群昵称那套 2026-10-08 撤了 ✓）
+    // 卡片二：昵称
     const nc = mkel('div', 'card');
     nc.appendChild(mkel('label', null, '昵称'));
     const ni = mkel('input', 'field');
@@ -4064,61 +4215,24 @@
       try {
         const out = await api('/me', { method: 'PATCH', body: JSON.stringify({ nickname: v }) });
         me.nickname = out.nickname;
-        // ⚠️ 群聊那边显示的名字也要跟着变 ✓ —— 不然退回群聊还是旧名字 ✓，
-        //    用户会以为"没保存"✓（这个项目栽过一模一样的形状 ✓）。
-        //    一次 bootstrap 把 group + members 都刷了 ✓（别分两趟 ✗）。
+        // ⚠️ 群聊那边显示的名字也要跟着变 ✓（不然退回群聊还是旧名字 ✓）
         try {
           const b = await api('/groups/bootstrap?limit=1');
           if (b.group) group = b.group;
           if (b.members) members = b.members;
-        } catch (e) { /* 刷不到就先这样：主群聊下次开页会重新拉 ✓ */ }
-        renderHeader(); renderMe(); renderSettings();
+        } catch (e) { /* 刷不到就先这样 ✓ */ }
+        renderHeader(); renderMe(); renderMeEdit(); renderSettings();
         toast('已保存');
       } catch (e) { nerr.textContent = (e && e.message) || '没保存上'; }
       nsave.disabled = false;
     };
     nc.append(ni, nerr, nsave);
     body.appendChild(nc);
-    // 「取消」在卡片**外面** ✓ —— 夹在卡片里会跑到保存上面 ✓（那两屏的注释写着 ✓）
-    const cancel = mkel('div', 'swap');
+    const swap = mkel('div', 'swap');
     const cb = mkel('b', null, '返回');
-    cb.onclick = closeMe;
-    cancel.appendChild(cb);
-    body.appendChild(cancel);
-
-    // 列表：账号 / 退出登录
-    const grp = mkel('div', 'grp');
-    // ★ 「自我介绍」—— 用户 2026-10-08 定的：`我的` 里**去掉「空间」那一项**（搬去
-    //   设置页的「生活空间」了 ✓），**换成它** ✓：「自我介绍是一段自我描述，
-    //   这个类似于管家的性格那个分割，只不过是用户自定义的，可以让管家认识了解自己
-    //   的一种手段，可以不写，也可以写，不超过500字」✓。
-    const rowIntro = mkel('button', 'row');
-    rowIntro.append(mkel('span', 'rl', '自我介绍'),
-                    mkel('span', 'act', (me.self_intro ? '已写' : '还没写')),
-                    mkel('span', 'chev', '›'));
-    rowIntro.onclick = openSelfIntro;
-    grp.appendChild(rowIntro);
-
-    const rowAcc = mkel('button', 'row');
-    rowAcc.append(mkel('span', 'rl', '账号'), mkel('span', 'act', me.username || ''),
-                   mkel('span', 'chev', '›'));
-    rowAcc.onclick = openMeAccount;
-    grp.appendChild(rowAcc);
-    body.appendChild(grp);
-
-    // ⚠️ 「退出登录」这一行**照抄设置页那一行** ✗→✓（同一套 markup ✓、同一个 class ✓）——
-    //    它的排版规则是 `.item[data-act="logout"]`（居中、红字、没有箭头 ✓），
-    //    我上一版用了壳那边的 `.quit` ✗ —— **那张表里根本没有这个类** ✗ →
-    //    渲染出来是个**贴着左边、没样式的裸按钮** ✓（截图里一眼就看出来了 ✓，
-    //    而"读代码"是看不出来的 ✗ —— 那次就是靠真渲染才发现的 ✓）。
-    //    ⚠️ 也**不另挂 onclick** ✗：设置页那段委托（`$$('.item[data-act]')` ✓）
-    //    是全局的 ✓，它会认这一行 ✓ → 两处都挂 = 登出调两次 ✓。
-    const quit = mkel('div', 'item');
-    quit.dataset.act = 'logout';
-    quit.appendChild(mkel('span', 'k danger', '退出登录'));
-    body.appendChild(quit);
-    // ⚠️ **不给它挂 onclick** ✗ —— 设置页那段委托会认它 ✓（见上面那段说明 ✓）。
-    //    两处都挂 = 一次点击登出两回 ✓（症状是"跳两次 `/login`" ✓，看着像闪了一下 ✓）。
+    cb.onclick = closeMeEdit;
+    swap.appendChild(cb);
+    body.appendChild(swap);
   };
 
   // ── 生活空间：改名 / 邀请码 / 退出该空间 ──────────────────────────────
@@ -4398,7 +4512,20 @@
   const _overlayOn = () =>
     ['#msgcard', '#sheet', '#modal'].some(s => $(s) && $(s).classList.contains('on'));
 
+  //: 除了这三屏之外，**其余任何一屏开着就不认手势** ✓（用户 2026-10-09：
+  //: 「[组件沙箱]界面，只有在主群聊时右滑才出现，不能到处出现」✓）。
+  //:
+  //: ⚠️ 原来这里只问"这三屏开没开" ✗ —— 而主群聊是**垫在所有屏底下**的 ✓
+  //:    （打开设置页时它照样 `on` ✓）→ 于是在**设置页、我的、组件对话…**
+  //:    上左滑也会把收纳页推上来 ✗✓（用户看到的就是"到处都能滑出来" ✓）。
+  //:    判据改成"**最上面那一屏**是不是这三屏之一" ✓。
+  const _OTHER_SCREENS = [
+    '#settings', '#me', '#meAccount', '#space', '#peer', '#selfIntro',
+    '#agent', '#agentEdit', '#diySet', '#wsNav', '#wsChat', '#login', '#init',
+  ];
+
   const _whichScreen = () => {
+    if (_OTHER_SCREENS.some(s => $(s) && $(s).classList.contains('on'))) return '';
     if ($('#compView').classList.contains('on')) return 'comp';
     if ($('#workshop').classList.contains('on')) return 'wall';
     if ($('#chat').classList.contains('on')) return 'chat';
@@ -4678,9 +4805,22 @@
   //     · 长按后**没动**         → 弹小卡片（去它那条对话 ✓）——
   //       这是**第二条路** ✓：用户指定的那条是**下拉** ✓（两条都通 ✓，
   //       长按那条只是顺手，免得"长按了却什么都没发生" ✓）。
+
+  // ★ 一个格子上有**两种**结局，不是三种 ✗→✓（2026-10-08 实测改的）：
+  //
+  //     · **没动过**（不管按多久） → 打开这个组件 ✓
+  //     · **动过**                 → 换位置 ✓（松手才落库 ✓）
+  //
+  //   ⚠️ 原来还有第三种"长按不动 → 弹小卡片" ✗ —— 那是我想的 ✓，用户没要 ✓，
+  //      而且它**正好吃掉了点击** ✗：真机上"有意地点一下"很容易超过 450ms ✓ →
+  //      计时器先到 ✓ → 判成"拎起来" ✓ → 松手弹的是那张卡片 ✗ →
+  //      用户看到的就是**点了没反应** ✓（他报的就是这一条 ✓）。
+  //
+  //   ⚠️ 所以现在**只有一条判定路**：`pointerdown` 起计时器 ✓、`pointerup` 定结局 ✓，
+  //      并且**不看 click 事件** ✗（pointer 事件鼠标和手指都发 ✓，
+  //      两套都听会**开两次** ✗ —— 这正是"点击/长按"这类代码最容易出的错 ✓）。
   let wsDrag = null;
   let wsPressTimer = null;
-  let wsPressCell = null;
   let wsPressAt = null;
 
   const saveArrangement = async () => {
@@ -4702,6 +4842,13 @@
     return cell && cell !== (wsDrag && wsDrag.el) ? cell : null;
   };
 
+  /** 打开一个格子 ✓ —— 「组件收纳页」那一格走**它自己那条对话** ✓。 */
+  const openCell = (c) => {
+    if (!c) return;
+    if (c.slug === WALL_SLUG) { openCompChat(); return; }
+    openComp(c.slug, c.title);
+  };
+
   const endDrag = (commit) => {
     const d = wsDrag;
     wsDrag = null;
@@ -4710,15 +4857,11 @@
     d.el.style.transform = '';
     d.el.style.pointerEvents = '';           // ★ 拖的时候关掉它，见下面那段 ✓
     document.querySelectorAll('#wsBody .cell.over').forEach(e => e.classList.remove('over'));
+    if (!commit) return;
+    // ★ **没动过 = 点它** ✗→✓（见上面那段：原来这里弹卡片 ✗）
+    if (!d.moved) { openCell(d.c); return; }
     const to = d.over == null ? d.from : d.over;
-    // ⚠️ **没动过 = 那是"长按"而不是"拖"** ✗→✓ —— 于是弹小卡片 ✓（去它的对话 ✓），
-    //    而不是悄悄回到原位 ✓（那看着就是"长按没反应" ✗）。
-    if (commit && !d.moved) {
-      const c = wsCanvas[d.from];
-      if (c) openCellCard(c, d.el);
-      return;
-    }
-    if (commit && to !== d.from) {
+    if (to !== d.from) {
       const [item] = wsCanvas.splice(d.from, 1);
       wsCanvas.splice(to, 0, item);
       paintCanvas();
@@ -4726,36 +4869,19 @@
     }
   };
 
-  /** 长按格子**没动** → 小卡片：「和它对话」✓（下拉那条路之外的第二条 ✓）。 */
-  const openCellCard = (c, el) => {
-    const row = el || null;
-    if (!row) return;
-    // 复用消息那套卡片 ✓（同一个组件、同一套定位 ✓）——
-    // 传进去的 `get/text/quote` 都是假的 ✓，只用它那两个位置参数 ✗
-    // → 干脆直接把 msgcard 当"通用小卡片"用 ✓：给它一条假消息 + 两个动作 ✓。
-    openMsgCard(row, {
-      get: () => ({ id: -1, sender_type: 'system', msg_type: 'text', content: '' }),
-      text: () => '',
-      quote: () => {},
-      items: [['和它对话', () => openTaskForSlug(c.slug, c.title)]],
-      anchorSel: '.cell',
-    });
-  };
-
   $('#wsBody').addEventListener('pointerdown', (ev) => {
     const cell = ev.target.closest('#wsBody .cell');
     if (!cell) return;
-    // ⚠️ **先起一个 450ms 的计时器** ✗ —— 定时器到点才"拎起来" ✓；
-    //    手指在那之前抬起来 = 短按 ✓（交给下面的 click ✓）。
-    wsPressCell = cell;
-    wsPressAt = { x: ev.clientX || 0, y: ev.clientY || 0 };   // 判"有没有动"要用它 ✓
+    wsPressAt = { x: ev.clientX || 0, y: ev.clientY || 0 };
     clearTimeout(wsPressTimer);
+    // ⚠️ 这里**不 preventDefault** ✗ —— 那会把"从格子上起手的滚动"也掐掉 ✓
+    //    （组件多了就滚不动了 ✓）。拦横向是 CSS 的 `pan-y` 在管 ✓。
     wsPressTimer = setTimeout(() => {
       wsPressTimer = null;
       const c = wsCanvas[Number(cell.dataset.i) || 0];
       if (!c) return;
-      wsDrag = { el: cell, from: Number(cell.dataset.i) || 0, over: null, moved: false,
-                 x0: (ev.clientX || 0), y0: (ev.clientY || 0) };
+      wsDrag = { el: cell, c, from: Number(cell.dataset.i) || 0, over: null,
+                 moved: false, x0: wsPressAt.x, y0: wsPressAt.y };
       cell.classList.add('drag');
       // ★ **被拖的那一个要从"命中测试"里摘出去** ✗→✓ ——
       //   不摘的话，`elementFromPoint` 在手指底下永远先撞到**它自己** ✓
@@ -4768,13 +4894,11 @@
 
   $('#wsBody').addEventListener('pointermove', (ev) => {
     if (!wsDrag) {
-      // 还没拎起来就动了 → 那多半是在**滚动列表** ✓ → 别再把长按判下去 ✓
-      //（⚠️ 要和**按下那一点**比距离 ✗ —— 我第一版写成了"和 0 比"✓，
-      //  那样手指一动就会取消 ✓，长按永远出不来 ✓。）
+      // 还没拎起来就动了 → 那多半是在**滚动** ✓（或手指滑开了 ✓）→ 别判成长按 ✓
       if (wsPressTimer && wsPressAt) {
-        const dx = Math.abs(ev.clientX - wsPressAt.x);
-        const dy = Math.abs(ev.clientY - wsPressAt.y);
-        if (dx > 4 || dy > 4) { clearTimeout(wsPressTimer); wsPressTimer = null; }
+        const dx = Math.abs((ev.clientX || 0) - wsPressAt.x);
+        const dy = Math.abs((ev.clientY || 0) - wsPressAt.y);
+        if (dx > 6 || dy > 6) { clearTimeout(wsPressTimer); wsPressTimer = null; wsPressAt = null; }
       }
       return;
     }
@@ -4791,26 +4915,18 @@
     }
   });
 
-  const endHandler = () => {
+  $('#wsBody').addEventListener('pointerup', (ev) => {
+    const wasTimer = !!wsPressTimer;
     if (wsPressTimer) { clearTimeout(wsPressTimer); wsPressTimer = null; }
-    if (wsDrag) endDrag(true);
-  };
-  $('#wsBody').addEventListener('pointerup', endHandler);
-  $('#wsBody').addEventListener('pointercancel', () => { endDrag(false); });
-
-  // ⚠️ 短按进组件 ✓ —— 长按那两种由上面接 ✓。
-  //    `wsDrag` 还在（正在拖）时不能进 ✓，不然松手那一下会顺带进去 ✗。
-  $('#wsBody').addEventListener('click', (ev) => {
-    if (wsDrag) return;
+    if (wsDrag) { endDrag(true); return; }
+    if (!wasTimer) return;                    // 已经被 pointermove 判成"滚动了" ✓
+    // ★ **短按**（计时器还没到）→ 直接开 ✓ —— 不等 click 事件 ✓（只留一条路 ✓）
     const cell = ev.target.closest('#wsBody .cell');
-    if (!cell) return;
-    const c = wsCanvas[Number(cell.dataset.i) || 0];
-    if (!c) return;
-    // ★ 「组件界面diy」那一格**不是一个真组件** ✗→✓（2026-10-08）——
-    //   它没有 HTML 文件 ✓（它就是这一屏自己 ✓），所以点了不该去渲染什么 ✓，
-    //   而是**直接进它那条对话** ✓（那是唯一能改这一屏外观的地方 ✓）。
-    if (c.slug === WALL_SLUG) { openCompChat(); return; }
-    openComp(c.slug, c.title);
+    if (cell) openCell(wsCanvas[Number(cell.dataset.i) || 0]);
+  });
+  $('#wsBody').addEventListener('pointercancel', () => {
+    if (wsPressTimer) { clearTimeout(wsPressTimer); wsPressTimer = null; }
+    endDrag(false);
   });
 
   // ── 组件页：一个组件自己的页 ✓ ──────────────────────────────────────

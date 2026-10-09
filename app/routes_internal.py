@@ -34,7 +34,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
-from .config import settings
+from .config import WALL_SLUG, settings
 from . import records as rec
 from . import reminders as rem
 from .auth import PREVIEW_SCOPE, make_token
@@ -47,9 +47,6 @@ from .routes_workshop import push_workshop_status, start_waiting, stop_waiting
 
 log = logging.getLogger("lifeguard.internal")
 
-#: 「组件界面diy」那条对话的 slug ✓（保留字 ✓）——
-#: 只有它的对话能改组件界面外观 ✓（闸门在 `_wall_task_ok` ✓）。
-WALL_SLUG = "wall"
 router = APIRouter(prefix="/api/internal/tools", tags=["internal"])
 
 
