@@ -662,10 +662,16 @@
   #workshop .cell.over { border-color:var(--accent); background:#16233a; border-radius:12px; }
   #workshop .edithint { color:var(--muted); font-size:12.5px; text-align:center;
                         padding:0 2px 10px; }
-  /* 「这个群还没有组件」那一句 ✓（只有容纳界面用得到 ✓ ——
-     导航屏永远有「新建组件」那一行 ✓，不会空 ✓）。 */
-  #workshop .wsempty { color:var(--muted); text-align:center;
-                       padding:26px 18px; line-height:1.9; font-size:14px; }
+  /* 「这个群还没有组件」那一句 ✓（只有收纳页用得到 ✓）。
+     ★ **2026-10-09 补成真的"居中"** ✗→✓ —— 用户 2026-10-08 的原话就是
+       「只会在界面**居中位置**提示」✓，而这段样式一直只是"顶上一块带内边距的字" ✗
+       （当时看不出来 ✓：收纳页上永远有「组件界面diy」那一格 ✓，这一句**根本轮不到露面** ✓）。
+       那一格撤掉之后 ✓，**新空间进来第一眼就是它** ✓ —— 现在它得看起来像
+       "这一屏是空的" ✓，而不是像"上面掉下来一行字" ✓。 */
+  #workshop .wsempty { color:var(--muted); text-align:center; line-height:1.9;
+                       font-size:14px; padding:0 18px;
+                       min-height:100%; display:flex; align-items:center;
+                       justify-content:center; }
 
   /* ── 组件页：**纯预览**（2026-10-07 晚上改的）─────────────────────────
      ★ 用户定的：这一屏「不要有任何的提示和设置选项」✓，
