@@ -256,6 +256,25 @@
   .row .bubble.seltext, .mkrow .mkbub.seltext {
     outline:1px dashed var(--accent); outline-offset:2px;
   }
+  /* ★ **盖上去之后，气泡里原来那层字要藏起来** ✗→✓（2026-10-09）——
+     ⚠️ 不藏的话屏幕上就有**两份字** ✗：文本框里那份 ✓ + 底下气泡里那份 ✓，
+        两者只要差一个像素（字体回退、换行位置 ✓）就会**看着像重影** ✓
+        （或者更糟：底下那份没被选中 ✓，看着像"选了一半" ✓）。
+     ⚠️ 藏的是**子元素**（`> *` ✓）—— 气泡自己不能藏 ✗：它的底色、圆角、
+        还有我刚加的那圈虚线边都在它自己身上 ✓。
+     ⚠️ 反正此刻**只有文本框该被看见** ✓（连引用条一起藏 ✓，
+        因为复制的内容里本来就不含它 ✓ —— 少一个它反而更诚实 ✓）。 */
+  .row .bubble.seltext > *, .mkrow .mkbub.seltext > * { visibility:hidden; }
+  /* ★ **盖在气泡上的那个真文本框** ✓（`freeCopyBubble` 建的那一个）——
+     它就是"两头能拖的光标 + 系统那排工具"唯一进得去的门 ✓（见那段注释 ✓）。
+     ⚠️ 它必须**看起来和气泡一模一样**：透明底 ✓、同样的字体行高内边距 ✓
+        （那几样是 JS 从气泡身上量出来写上去的 ✓）、同样的颜色 ✓ ——
+        差一点就会在屏幕上**多出一个白框** ✗（用户会以为界面坏了 ✓）。
+     ⚠️ z 57：小卡片(58)之下 ✓、弹层(50)之上 ✓ —— 和"长按那一族"同一条线 ✓。 */
+  #copyfield { position:fixed; z-index:57; margin:0; padding:0; resize:none;
+               overflow:hidden; border:0; outline:0; box-sizing:border-box;
+               background:transparent; -webkit-text-fill-color:currentColor;
+               -webkit-user-select:text; user-select:text; }
   .row.agent .bubble { background:var(--panel); border:1px solid var(--line);
                        border-left:3px solid var(--agent); border-bottom-left-radius:4px; }
   .row:not(.mine):not(.agent) .bubble { border-bottom-left-radius:4px; }
@@ -2477,6 +2496,9 @@
     if ($('#modal').classList.contains('on')) { if (modalClose) modalClose(); return; }
     // 长按消息的小卡片（z 58 ✓）：在确认框(60)之下、弹层(50)之上 ✓
     if ($('#msgcard').classList.contains('on')) { closeMsgCard(); return; }
+    // ★ **自由复制那个文本框**（z 57 ✓，就在小卡片下面一档 ✓）——
+    //   它开着的时候按返回 = "不复制了" ✓（和点空白是同一件事 ✓）。
+    if ($('#copyfield')) { endFreeCopy(); return; }
     if ($('#sheet').classList.contains('on')) { closeSheet(); return; }
     // ★ 创意工坊那几屏（2026-10-07）—— **压在管家那三屏上面** ✓：
     //   diy 助手 > 组件页 > 聊天 > 导航 > 工坊 > 编状态 > 改资料 > 管家列表 > 群设置 ✓。
@@ -3346,7 +3368,11 @@
     //   ⚠️ 放在这一支里是因为**它的判据正好是"点在别处"** ✓（点卡片里不算 ✓）。
     //      它比下面那个"关卡片"的判断**更宽** ✓ —— 卡片早就关了的时候，
     //      这个状态还挂着 ✓，正是上一版"再也弹不出小卡片"的成因 ✓。
-    if (ev.target.closest && ev.target.closest('#msgcard')) return;   // 点的是卡片自己 → 不算 ✓
+    // ⚠️ **那个复制文本框里的一下也不算"点别处"** ✗→✓ —— 他要在里面
+    //    **按住、拖两头的光标** ✓；那几下都会冒泡成 click ✓ →
+    //    不豁免的话，**一碰就把它自己收掉了** ✗（那这功能就没法用了 ✓）。
+    if (ev.target.closest && (ev.target.closest('#msgcard') ||
+                              ev.target.closest('#copyfield'))) return;
     endFreeCopy();
     const c = $('#msgcard');
     if (!c || !c.classList.contains('on')) return;
@@ -3394,72 +3420,86 @@
   };
 
   /**
-   * ★ **自由复制 = 把这一条交给系统那套"选择"** ✗→✓（2026-10-09，用户第二次点这条 ✓）。
+   * ★ **「自由复制」= 在气泡上盖一个真的文本框** ✗→✓（2026-10-09 第三次改这条 ✓）。
    *
-   *   他原话：「长按时自由复制还是不对，**不是这条已经选中了**，而是点击自由复制后，
-   *   **只会调用系统复制工具将这条记录框选上，用户自己自行拖动选择复制哪些**，
-   *   明白这种感觉吗，**照着微信来**」✓。
+   *   他截图上看到的：点完之后**只有一层高亮** ✓ —— 两头没有可以拖的光标 ✗、
+   *   系统那排工具也没出来 ✗，原话「**现在啥也不是**」✓。
    *
-   *   ⚠️ **我上一版错在哪** ✗：我**替他复制了整条** ✓（`copyText(整条)` ✓，
-   *      还 toast 一句「这条已经选中了」✓）—— 那是"全选 + 已复制" ✓，
-   *      等于**替他决定了复制什么** ✗。他要的是**把手伸过去** ✓：
-   *      框选出现 → 他自己拖两头的手柄 → 点系统的"复制" ✓。
+   *   ⚠️ **为什么高亮有、手柄没有** ✗（这次是实测出来的，不是猜 ✓）：
+   *      `user-select:text` + 程序化 `Selection` 只让浏览器**把字画成选中** ✓；
+   *      而"两头那两个可以拖的光标 + 复制/全选那排"是**安卓给"正在编辑的
+   *      文本框"画的东西** ✓ —— 它只跟着**表单控件**走 ✗，对普通元素的选中
+   *      **一个手柄都不给** ✓（上一版就是这么凉的 ✓）。
    *
-   *   所以这里只做两件事 ✓：
-   *     ① **让这一条变成可以选的** ✓（平时气泡是 `user-select:none` ✓ ——
-   *        那是为了让我们的长按不被系统抢走 ✓；这里只对**这一条**开口子 ✓）
-   *     ② **把它框选上** ✓（`selection` ✓）→ 系统那套手柄就有东西可拖 ✓
-   *     ③ **绝不碰剪贴板** ✗ —— "复制"这个动作**归用户** ✓。
+   *   → 所以做法换成：**在气泡上面盖一个真的 `<textarea>`** ✓，
+   *     里面的字和气泡里一模一样 ✓（同一套字体/行高/内边距/颜色 ✓，透明底 ✓），
+   *     `focus()` 之后整段选中 ✓ → 安卓就把它当"一个正在编辑的输入框" ✓ →
+   *     **两头的手柄 + 系统那排自己就出来了** ✓✓（这次是它**该**出现的场合 ✓）。
    *
-   *   ⚠️ **顺序不能反** ✗：先加 `user-select:text` ✓、**再**建 range ✓ ——
-   *      反过来在有些 WebView 上那层高亮**不会重画** ✗，
-   *      看着就像"点了没反应" ✓（这个项目最烦那种"看着像没做" ✓）。
-   *   ⚠️ **`-webkit-touch-callout` 要一起放开** ✓（`default` ✓）——
-   *      它管的是"长按呼出系统菜单" ✓；只放开 `user-select` 的话，
-   *      他在框选里想重新长按反而呼不出东西 ✓（iOS 上尤其明显 ✓）。
-   *   ⚠️ **只放开这一条** ✗（`.bubble.seltext` ✓）—— 全屏放开的话，
-   *      我们自己的长按（弹这张卡片 ✓）会被系统抢走 ✓，那就绕回去了 ✓。
+   *   ⚠️ `inputmode="none"` 是**必须的** ✗ —— 不写的话，focus 一个可编辑文本框
+   *      会把**软键盘顶上来** ✓（屏幕直接废一半 ✓）。它只说"别弹键盘" ✓，
+   *      不影响选中和手柄 ✓。
+   *   ⚠️ 盖的位置 = **气泡那一段的矩形** ✓；点别处 / 滚动 / 复制完 / 按返回
+   *      都要收掉 ✓（同一个 `endFreeCopy` ✓）—— 它是 `position:fixed` 的 ✓，
+   *      不收就会**跟着屏幕不动** ✗：列表一滚，它就"浮"在别处 ✓。
    */
   const freeCopyBubble = (row) => {
     const bub = row.querySelector('.bubble') || row;
-    bub.classList.add('seltext');
+    // 文字**不含引用条** ✓ —— 引用条是"上一句是什么"的提示 ✓，
+    // 不是这条消息的内容 ✓（连它一起复制出来，粘到别处就是一堆莫名其妙的字 ✓）。
+    const text = [...bub.childNodes]
+      .filter(n => !(n.nodeType === 1 && n.classList && n.classList.contains('quote')))
+      .map(n => n.textContent).join('').trim();
+    if (!text) return;                       // 空的（纯图片那种）→ 别开 ✓
+    endFreeCopy();
+    bub.classList.add('seltext');            // 一圈虚线边 = "它现在在可复制状态" ✓
+
+    const r = bub.getBoundingClientRect();
+    const cs = getComputedStyle(bub);
+    const ta = document.createElement('textarea');
+    ta.id = 'copyfield';
+    ta.value = text;
+    ta.readOnly = false;                     // ⚠️ **不能设 readonly** ✗ —— 只读的
+                                             //    文本框在有些 WebView 上**不给手柄** ✓
+                                             //    （那正是我们要的东西 ✓）；键盘靠
+                                             //    `inputmode=none` 挡 ✓，不靠只读 ✓。
+    ta.setAttribute('inputmode', 'none');
+    ta.setAttribute('spellcheck', 'false');
+    ta.setAttribute('autocapitalize', 'off');
+    ta.setAttribute('autocomplete', 'off');
+    ta.style.left = Math.round(r.left) + 'px';
+    ta.style.top = Math.round(r.top) + 'px';
+    ta.style.width = Math.round(r.width) + 'px';
+    ta.style.height = Math.round(r.height) + 'px';
+    // 把气泡那身字**原样搬过来** ✓ —— 差一点都会看出来（多出一个白框就完了 ✓）
+    ta.style.font = cs.font;
+    ta.style.lineHeight = cs.lineHeight;
+    ta.style.padding = cs.padding;
+    ta.style.borderRadius = cs.borderRadius;
+    ta.style.color = cs.color;
+    ta.style.textAlign = cs.textAlign;
+    document.body.appendChild(ta);
+    // ⚠️ 焦点+全选：**这两句就是"叫出手柄"的全部** ✓（顺序也不能反 ✓）
     try {
-      // ⚠️ **引用条不选进去** ✓ —— 它是"上一句是什么"的提示 ✓，
-      //    不是这条消息的内容 ✓（连它一起复制出来，粘到别处就是一堆莫名其妙的字 ✓）。
-      const kids = [...bub.children].filter(x => !x.classList.contains('quote'));
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      const r = document.createRange();
-      if (kids.length) {
-        r.setStartBefore(kids[0]);
-        r.setEndAfter(kids[kids.length - 1]);
-      } else {
-        r.selectNodeContents(bub);
-      }
-      sel.addRange(r);
-    } catch (e) { /* 框选失败也照样把选择放开了 ✓ —— 他至少能自己长按选 ✓ */ }
-    // ⚠️ **不弹底部的提示** ✗→✓（2026-10-09 用户第二次否掉它 ✓：
-    //    「目前点击自由复制后**底部提示**…不太好」✓）——
-    //    "它在什么状态"由**这一条自己的样子**说 ✓（见 CSS 里 `.seltext` 那条虚线边 ✓），
-    //    不靠一句 toast ✓。
+      ta.focus({ preventScroll: true });
+      ta.setSelectionRange(0, ta.value.length);
+    } catch (e) { /* 叫不出来也还留着那层高亮 ✓ —— 他至少能自己长按选 ✓ */ }
+    // 焦点一走（点别处）→ 收掉 ✓
+    ta.onblur = () => setTimeout(() => { if (document.activeElement !== ta) endFreeCopy(); }, 0);
   };
 
   /**
    * **结束"自由复制"那个状态** ✓ —— 用户原话：
    *   「复制完或者**点击空白后，自由复制状态就改结束了**」✓。
    *
-   *   ⚠️ 这一个是上一版**漏掉**的 ✗：状态一旦挂上就再也没摘过 ✓ →
-   *      他那一条消息**从此长按只出系统那排、再也不出我们的小卡片** ✗
-   *      （报的正是这个："长按后依旧只能复制，不弹出自由复制和引用的小卡片了"✓）。
-   *      原因就是我给自己加的那句"这一条的长按让给系统" ✓ ——
-   *      它本身是对的 ✓（要拖手柄就得让系统管长按 ✓），
-   *      **错的是没人负责把它收回来** ✗。
-   *
-   *   ⚠️ 三件事一起做 ✓：摘掉类 ✓、**把那层高亮也清掉** ✓（只摘类不清选择，
-   *      屏幕上还留着一段蓝色高亮 ✓ —— 那就是"状态没结束"的样子 ✗）、
-   *      把这条消息归回普通气泡 ✓。
+   *   ⚠️ 上一版**漏了这一半** ✗：状态挂上就再也没摘过 ✓ →
+   *      那条消息**从此长按只出系统那排、再也不出我们的小卡片** ✗。
+   *   ⚠️ 所以三件事一起做 ✓：收掉那个文本框 ✓、摘掉虚线边 ✓、
+   *      清掉浏览器那层高亮 ✓（只收文本框不清选择的话，屏幕上还留着一片蓝 ✗）。
    */
   const endFreeCopy = () => {
+    const f = $('#copyfield');
+    if (f) f.remove();
     let any = false;
     $$('#msgs .bubble.seltext, .mkrow .mkbub.seltext').forEach(el => {
       el.classList.remove('seltext');
