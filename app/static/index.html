@@ -61,8 +61,17 @@
   #login .swap b { color:var(--accent); font-size:13.5px; font-weight:500; }
 
   #login { justify-content:center; align-items:center; padding:24px; }
-  #login .wrap { width:min(360px,100%); padding:26px 22px; background:var(--panel);
+  /* ⚠️ `#init` 和它**共用** ✓（2026-10-09：那两屏是平级的首启屏 ✓） */
+  #login .wrap, #init .wrap { width:min(360px,100%); padding:26px 22px; background:var(--panel);
                  border:1px solid var(--line); border-radius:18px; }
+  /* ⚠️ hero 的大标题/小字也共用 ✓（`.t` / `.s` 就是登录那套 ✓）——
+     `#init` 只要写 `.hero` 就够了 ✓，不用另起一套 `.hero2` ✗（那个类已经删了 ✓）。 */
+  #login .hero .t, #init .hero .t { font-size:26px; font-weight:600; letter-spacing:.5px; }
+  #login .hero .s, #init .hero .s { color:var(--muted); font-size:13.5px; margin-top:8px; }
+  #init .hero { text-align:center; margin:2px 0 24px; }
+  /* 那一颗按钮：和别处一样宽 ✓、高一点 ✓、给一层很淡的投影把它"抬"起来 ✓ */
+  #init .btn-primary { padding:16px; font-size:16px; margin-top:0;
+                       box-shadow:0 6px 18px rgba(90,140,255,.18); }
   #login .logo { width:64px;height:64px;border-radius:50%;background:var(--accent-bg);
                  display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
                  font-size:26px;color:var(--accent); }
@@ -84,11 +93,20 @@
      ★ 用户 2026-10-08 定的形状：
        「居中写上"欢迎使用生活管家！继续使用请先"，然后 [新建或加入一个生活空间]
          按钮放在下方」✓ —— 点它才浮出那张介绍卡 ✓。 */
-  #init { flex-direction:column; justify-content:center; align-items:center; padding:24px; }
-  #init .hero2 { text-align:center; }
-  #init h1 { margin:0 0 10px; font-size:21px; font-weight:600; }
-  #init .sub { margin:0 0 22px; color:var(--muted); font-size:14px; }
-  #init .btn-primary { width:auto; padding:14px 22px; font-size:15px; }
+  /* ★ 2026-10-09 收拾这一屏 ✗→✓（用户：「比较朴素…简约大气又不会太简陋」✓）——
+     ⚠️ **和登录那一屏共用同一套**（`.wrap` 卡片 + `.hero .t/.s` ✓）：
+        它俩是**平级的首启屏** ✓（启动 → 登录 → 初始化 → 主群聊 ✓），
+        一个精装一个毛坯会显得像两个 App ✓。
+     ⚠️ 加的那些**都只有一层**：一层柔光 + 一点字距 ✓ ——
+        "大气"来自**留白和层级** ✓，不是来自堆装饰 ✗
+        （所以没有描边、没有阴影叠影、没有渐变字 ✓）。 */
+  #init { flex-direction:column; justify-content:center; align-items:center; padding:24px;
+          position:relative; }
+  /* 身后一层极淡的光晕 —— 纯黑背景上"有个中心" ✓（很淡，看不见边界才对 ✓） */
+  #init::before { content:''; position:absolute; inset:0; pointer-events:none;
+                  background:radial-gradient(60% 42% at 50% 40%,
+                              rgba(90,140,255,.10), rgba(0,0,0,0) 70%); }
+  #init .wrap { position:relative; }
   /* 介绍卡：**居中浮起来**的一小块 ✓（用户："在这个界面居中浮空一个提示小框" ✓）。
      它在同一屏里，不是另一屏 ✓ —— 所以用 absolute + 居中 ✓，不推屏 ✓。 */
   #init .introcard { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -1342,9 +1360,19 @@
        · 「第一次登录时的新建或加入生活空间也改名空间」✓
        · 「对空间的介绍去掉，界面简洁」✓ →
          原来那张"生活空间是什么"的浮卡**整个删了** ✓（点按钮直接进表单 ✓）。 -->
-  <div class="hero2">
-    <h1>欢迎使用生活管家！</h1>
-    <p class="sub">继续使用请先</p>
+  <!-- ★ 2026-10-09 收拾过 ✗→✓（用户：「比较朴素…要那种简约大气又不会太简陋」✓）——
+       做法不是"再糊一层装饰" ✗，而是**把它对齐到登录那一屏的版式** ✓：
+       同一个 `.wrap` 卡片 ✓、同一套 `.hero .t/.s` 大小标题 ✓（他自己的规矩：
+       同构界面必须长一样 ✓）。原来这里是三行裸文字 + 一颗按钮 ✓，
+       什么都没有垫着 ✓ —— 那正是"简陋"的来源 ✓。 -->
+  <div class="wrap">
+    <div class="hero">
+      <!-- ⚠️ 这两句是**他当初给的原文** ✓（「欢迎使用生活管家！」「继续使用请先」✓）——
+           我刚才擅自把它改通顺了 ✗（「欢迎使用生活管家」/「继续使用，请先建一个空间」✓），
+           已经改回来 ✓。**他的字不是拿来润色的** ✓。 -->
+      <div class="t">欢迎使用生活管家！</div>
+      <div class="s">继续使用请先</div>
+    </div>
     <button class="btn-primary" id="initGo">新建或加入一个空间</button>
   </div>
   <div class="introcard" id="introCard" hidden>
