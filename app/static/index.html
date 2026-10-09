@@ -84,11 +84,25 @@
         他看了说「得得…布局先恢复原样，**除了！**」✓ → 也就是**退回这一版** ✓
         （「！」那个不还回去 ✓）。所以现在这个 16/40 和通栏按钮是**他定下来的样子** ✓，
         别再自作主张去"优化"它 ✗。 */
+  /* ★ 2026-10-09 第三条（这一版是**他一条条点名要的** ✓）：
+       · 「三行间距一致」✓ → 副标题上边距和 hero 的下边距**写成同一个 22** ✓
+         （上一版是 16 / 40 ✗，一大一小 ✓）
+       · 「继续使用请先，字体加大一些」✓ → 13.5 → 15.5px ✓（标题 26，层级还在 ✓）
+       · 按钮：「蓝色字体、虚线框环绕、前有 +、虚线框紧凑、整体居中」✓
+     ⚠️ ⚠️ **这一颗按钮和早些时候我撤掉的那一版几乎一样** ✗ ——
+        那次是我自己顺手"优化"的 ✓（他说"先恢复原样"✓）；这次是他点名要的 ✓。
+        同样一个样子，**他提 = 做，我提 = 撤** ✓ —— 记住这个区别 ✓。 */
   #init .hero { display:flex; flex-direction:column; align-items:center;
-                text-align:center; margin:2px 0 40px; }
-  #init .hero .s { margin-top:16px; }
-  #init .btn-primary { padding:16px; font-size:16px; margin-top:0;
-                       box-shadow:0 6px 18px rgba(90,140,255,.18); }
+                text-align:center; margin:2px 0 0; }
+  #init .hero .s { margin-top:22px; font-size:15.5px; }
+  /* ⚠️ 虚线的颜色/蓝字**和创意工坊那颗「＋ 新建组件」是同一套** ✓
+     （`#workshop .wsnew`：`1px dashed #35507a` + `color:var(--accent)` ✓）——
+     一个 App 里"＋ 做一件新事"就该长一样 ✓。 */
+  #init .btn-primary { width:auto; margin:22px auto 0; padding:11px 18px;
+                       background:none; border:1px dashed #35507a;
+                       color:var(--accent); font-size:15.5px; font-weight:600;
+                       border-radius:12px; box-shadow:none; }
+  #init .btn-primary:active { background:rgba(90,140,255,.10); }
   /* 那一颗按钮：和别处一样宽 ✓、高一点 ✓、给一层很淡的投影把它"抬"起来 ✓ */
   #init .btn-primary { padding:16px; font-size:16px; margin-top:0;
                        box-shadow:0 6px 18px rgba(90,140,255,.18); }
@@ -1389,8 +1403,17 @@
     <div class="hero">
       <div class="t">欢迎使用生活管家</div>
       <div class="s">继续使用请先</div>
+      <!-- ⚠️⚠️ **按钮必须在 `.hero` 里面** ✗→✓（2026-10-10 量出来的）——
+           我这天早些时候把它挪到了 hero **外面** ✗：那样一来
+           `align-items:center`（弹性盒子的居中 ✓）根本管不到它 ✓，
+           而它是个 `inline-block` ✓ —— `margin:0 auto` 对**行内级**盒子无效 ✗✗
+           → 它就**贴左**了 ✓（量出来的中点 196 ✓，卡片中点 250 ✓，差 54px ✓）。
+           放回 hero 里面 = 它成了一个 flex item ✓ → 居中由 `align-items` 负责 ✓，
+           和标题/副标题**同一个机制** ✓（以后不用再各管各的 ✓）。
+         ⚠️ 原来的通栏按钮**看不出这个错** ✗（满宽一定是"居中"的 ✓）——
+           这次改成"贴字的紧凑按钮" ✓ 才把它露出来 ✓。 -->
+      <button class="btn-primary" id="initGo">＋&nbsp;&nbsp;新建或加入一个空间</button>
     </div>
-    <button class="btn-primary" id="initGo">新建或加入一个空间</button>
     <!-- ⚠️ 这里有过一行「退出登录」（2026-10-09 加的 ✓，理由是"没有空间的人
          换不了号" ✓）—— 用户当天就让撤了 ✓（「得得，把退出登录去掉」✓）。
          ⚠️ **那个理由本身是真的** ✗（壳那版也防过这件事 ✓）：还没有空间的人
