@@ -1029,9 +1029,22 @@
   /* 提示语：**在"头像下沿"和"卡片下沿"之间居中** ✓ —— margin-top 要等于卡片的下内边距 ✓ */
   .ascreen .tip { color:var(--muted); font-size:12.5px; text-align:center; margin-top:30px; }
   /* ★ 性格那一块收起时：**一行**，右边一个 ›（2026-10-09 ✓） */
-  .ascreen .pbox { display:flex; align-items:center; gap:8px; }
-  .ascreen .pbox .pt { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
-                       white-space:nowrap; }
+  /* ★ **性格收起时的样子** ✗→✓（2026-10-09 用户定的原话：
+     「缩略展示**三行**，如果展示不完，第三行**有些半透明**，**末尾有 `...`**，
+       并且**展开按钮居中**，是方向向下的 `<`」✓）。
+     ⚠️ 三行封顶交给 `-webkit-line-clamp:3` ✓ —— 它**自带末尾那个 `…`** ✓。
+     ⚠️「第三行半透明」用 `mask-image` 从上往下淡出 ✓ —— **不能**用 `::after`
+        盖一层底色 ✗：盖的那层会把末尾的 `…` 一起吃掉 ✓（而 `…` 正是要留的 ✓），
+        而且那层底色还得跟着主题走 ✗（浅色主题下会变成一块黑 ✓）。 */
+  .ascreen .pbox .pt { display:-webkit-box; -webkit-box-orient:vertical;
+                       -webkit-line-clamp:3; overflow:hidden; white-space:normal; }
+  .ascreen .pbox .pt.fade {
+    -webkit-mask-image:linear-gradient(to bottom, #000 58%, rgba(0,0,0,.30));
+            mask-image:linear-gradient(to bottom, #000 58%, rgba(0,0,0,.30)); }
+  /* 展开那个手势：**居中、朝下** ✓ —— `›` 转 90° 就是一个朝下的尖 ✓ */
+  .ascreen .pbox .pmore { display:flex; justify-content:center; padding-top:8px; }
+  .ascreen .pbox .pmore .chev { color:var(--muted); font-size:20px; line-height:1;
+                                display:inline-block; transform:rotate(90deg); }
   .ascreen .pbox .go { color:var(--muted); font-size:20px; line-height:1; flex-shrink:0; }
   .ascreen .err { color:var(--danger); font-size:13px; min-height:18px; margin-top:10px; }
   .ascreen .swap { margin-top:14px; text-align:center; color:var(--muted); font-size:13px; }
@@ -1856,6 +1869,24 @@
     });
   });
 
+  // ⚠️ **聚焦一个输入框之后，把它滚进看得见的地方** ✗→✓（2026-10-09 用户定的：
+  //   「展开后，顺便打开了编辑，此时**输入法也该顶起**」✓）——
+  //   键盘一弹起来会把那一屏压矮 ✓，而刚展开的那个文本框往往正好在**键盘底下** ✗。
+  //   ⚠️ 只管**能滚的那几屏**（`.abody` ✓，管家那几屏就是 ✓）；
+  //      两个聊天的输入框不在 `.abody` 里 ✓，它们走上面那条"键盘留白"的路 ✓。
+  //   ⚠️ 弹层（`#sheetPanel`）有它自己那套 ✓（就在下面 ✓），不在这儿重复管 ✗。
+  document.addEventListener('focusin', (ev) => {
+    const t = ev.target;
+    if (!t || !t.tagName) return;
+    if (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA') return;
+    if (t.closest('#sheetPanel')) return;
+    if (!t.closest('.abody')) return;
+    // ⚠️ 延后 300ms：键盘的升降有动画 ✓，立刻滚算的是**旧高度** ✓（不准 ✓）。
+    setTimeout(() => {
+      try { t.scrollIntoView({ block: 'center' }); } catch (e) { /* 滚不动就算了 ✓ */ }
+    }, 300);
+  });
+
   // 底部面板：键盘弹起时自动滚到聚焦输入框
   const _panelEl = $('#sheetPanel');
   if (_panelEl) {
@@ -2203,10 +2234,20 @@
         //   所以收起态**只留一行** ✓（CSS 里 `nowrap + ellipsis` ✓），
         //   右侧一个 `›` 提示"点得进去" ✓ —— 点一下才展开成那个大文本框 ✓。
         const box = mkel('div', 'pbox' + (cur ? '' : ' empty'));
-        const txt = mkel('span', 'pt', cur || '描述一下管家的性格…');
-        box.append(txt, mkel('span', 'go', '›'));
+        const txt = mkel('div', 'pt', cur || '描述一下管家的性格…');
+        // ⚠️ 那个箭头**单独一行、居中** ✓（原来是贴在文字右边 ✗，见 CSS 那段 ✓）
+        const more = mkel('div', 'pmore');
+        more.appendChild(mkel('span', 'chev', '›'));
+        box.append(txt, more);
         box.onclick = () => { promptEditing = true; draw(); };
         wrap.appendChild(box);
+        // ⚠️ **「展示不完」才淡出** ✗→✓ —— 量一下就好：
+        //   行数封顶之后，超出去的那部分会让 `scrollHeight` 比 `clientHeight`
+        //   **大** ✓；三行以内两者一样高 ✓（那种情况不该蒙一层 ✓，
+        //   不然短文本看着像"字没渲染出来" ✗）。
+        requestAnimationFrame(() => {
+          if (txt.scrollHeight > txt.clientHeight + 1) txt.classList.add('fade');
+        });
         return;
       }
       const ta = mkel('textarea', 'ptext');
