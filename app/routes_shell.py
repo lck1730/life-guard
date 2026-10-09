@@ -368,12 +368,14 @@ async def read_me(request: Request) -> dict:
 class SelfIntroIn(BaseModel):
     #: ⚠️ **空字符串是"擦掉"的意思** ✓ —— 所以不能用"空 = 没改"那套 ✗
     #:（用户会想"我不写了"✓）。这里本来就是"整段替换"的语义 ✓，写空就是空 ✓。
-    text: str = Field(default="", max_length=500)
+    #: ★ **500 → 800**（2026-10-09 用户定的：「将字数上限设为800」✓）——
+    #:   和前端的 `maxLength` 必须是同一个数 ✓。
+    text: str = Field(default="", max_length=800)
 
 
 @router.post("/api/me/self-intro")
 async def set_self_intro(body: SelfIntroIn, request: Request) -> dict:
-    """写/改/擦掉**自己的自我介绍** ✓ —— 用户 2026-10-08 定的 ✓（≤500 字 ✓）。
+    """写/改/擦掉**自己的自我介绍** ✓ —— 用户 2026-10-08 定的 ✓（≤800 字 ✓）。
 
     它跟着每一轮的 `_group_persona` 进 prompt ✓（见那边那段说明 ✓），
     所以改完**下一句话它就知道了** ✓，不用等什么重建 ✓。

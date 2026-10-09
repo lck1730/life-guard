@@ -195,7 +195,18 @@ async def bootstrap(
     g = groups[0]
     mem = await members(g["id"], user=user)          # 复用同一个函数（它也做成员校验）
     msgs = await list_messages(g["id"], after=0, limit=limit)
-    return {"me": user, "groups": groups, "group": g, "members": mem,
+    # ★ **自我介绍要跟着这一趟一起回去** ✗→✓（2026-10-09 做「我的」里那一块时发现的）——
+    #   ⚠️ 它住在 `group_members.self_intro` ✓（**每个空间一份** ✓），
+    #      而 `me` 那份是"这个人"的资料 ✓（`users` 表 ✓，没有空间维度 ✗）→
+    #      以前这里**根本不带它** ✗ → 前端那块**永远显示成空的** ✓
+    #      （老的那一屏没人进 ✓，所以一直没露出来 ✓）。
+    #   → 读的就是**这个空间**那一行 ✓（前端那块显示的是"我在这个空间的自我介绍" ✓）。
+    intro_row = await fetch_one(
+        "SELECT self_intro FROM group_members WHERE group_id = ? AND user_id = ?",
+        (int(g["id"]), int(user["id"])))
+    me = dict(user)
+    me["self_intro"] = (intro_row or {}).get("self_intro") or ""
+    return {"me": me, "groups": groups, "group": g, "members": mem,
             "messages": msgs, "notes": notes}
 
 

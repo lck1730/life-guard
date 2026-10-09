@@ -2223,28 +2223,35 @@
   // 平时只露**前两行** ✓（`-webkit-line-clamp:2` ✓），点开才展开编辑 ✓。
   let promptEditing = false;
 
-  const promptBlock = () => {
+  /**
+   * ★ **一段「能收能展」的长文本** ✓ —— 管家那边的「性格」和「我的」里的
+   *   「自我介绍」**长得一模一样** ✓（用户 2026-10-09：
+   *   「将字数上限设为800，然后将**同样配置在我的也做一份**，在我的那里叫自我介绍」✓）
+   *   → 所以**只写一份** ✗→✓（"同一件事两处写"这个项目栽过好几次 ✓）。
+   *
+   *   `get()` 拿现在的文本 ✓、`save(text)` 存 ✓、`max` 字数上限 ✓、
+   *   `onEditing(v)` 可选 ✓（管家那边要拿它告诉 `patchGroup`「我在编辑，先别重画」✓）。
+   *
+   *   ⚠️ 收起态的规矩写在 CSS 那段里（三行 + 末尾 `…` + 第三行淡出 + 居中朝下的箭头 ✓）。
+   *   ⚠️「展示不完」是**量出来的** ✗→✓（`scrollHeight > clientHeight` ✓），不是猜的 ✓ ——
+   *      短文本不该被白蒙一层 ✓。
+   */
+  const collapsibleText = ({ get, save, placeholder, max, onEditing }) => {
     const wrap = mkel('div', 'pwrap');
+    let editing = false;
+    const setEditing = (v) => { editing = v; if (onEditing) onEditing(v); };
     const draw = () => {
       wrap.textContent = '';
-      const cur = (group && group.agent_user_prompt) || '';
-      if (!promptEditing) {
-        // ★ 2026-10-09 用户报的：「管家界面性格那里字数多的时候有点丑，
-        //   应该设置成点击可展开那种卡片」✗→✓。
-        //   所以收起态**只留一行** ✓（CSS 里 `nowrap + ellipsis` ✓），
-        //   右侧一个 `›` 提示"点得进去" ✓ —— 点一下才展开成那个大文本框 ✓。
+      const cur = get() || '';
+      if (!editing) {
         const box = mkel('div', 'pbox' + (cur ? '' : ' empty'));
-        const txt = mkel('div', 'pt', cur || '描述一下管家的性格…');
-        // ⚠️ 那个箭头**单独一行、居中** ✓（原来是贴在文字右边 ✗，见 CSS 那段 ✓）
+        const txt = mkel('div', 'pt', cur || placeholder);
+        // ⚠️ 那个箭头**单独一行、居中** ✓（原来贴在文字右边 ✗，见 CSS 那段 ✓）
         const more = mkel('div', 'pmore');
         more.appendChild(mkel('span', 'chev', '›'));
         box.append(txt, more);
-        box.onclick = () => { promptEditing = true; draw(); };
+        box.onclick = () => { setEditing(true); draw(); };
         wrap.appendChild(box);
-        // ⚠️ **「展示不完」才淡出** ✗→✓ —— 量一下就好：
-        //   行数封顶之后，超出去的那部分会让 `scrollHeight` 比 `clientHeight`
-        //   **大** ✓；三行以内两者一样高 ✓（那种情况不该蒙一层 ✓，
-        //   不然短文本看着像"字没渲染出来" ✗）。
         requestAnimationFrame(() => {
           if (txt.scrollHeight > txt.clientHeight + 1) txt.classList.add('fade');
         });
@@ -2252,29 +2259,65 @@
       }
       const ta = mkel('textarea', 'ptext');
       ta.value = cur;
-      ta.maxLength = 2000;
+      ta.maxLength = max;
       const foot = mkel('div', 'pfoot');
-      const cnt = mkel('span', 'cnt', cur.length + ' / 2000');
-      ta.oninput = () => { cnt.textContent = ta.value.length + ' / 2000'; };
+      const cnt = mkel('span', 'cnt', cur.length + ' / ' + max);
+      ta.oninput = () => { cnt.textContent = ta.value.length + ' / ' + max; };
       const cancel = mkel('button', null, '取消');
       cancel.style.color = 'var(--muted)';
-      cancel.onclick = () => { promptEditing = false; draw(); };
-      const save = mkel('button', null, '保存');
-      save.onclick = () => {
-        promptEditing = false;
-        draw();                       // 先收起再存 ✓，这样失败时也不会卡在编辑态 ✓
-        patchGroup({ agent_user_prompt: ta.value.trim() });
+      cancel.onclick = () => { setEditing(false); draw(); };
+      const sv = mkel('button', null, '保存');
+      sv.onclick = () => {
+        // ⚠️ **先收起、再存** ✓（和原来那条规矩一样 ✓）——
+        //    存失败时也不会把他卡在编辑态 ✓（原因从那句话里出来 ✓）。
+        setEditing(false);
+        draw();
+        save(ta.value.trim());
       };
-      foot.appendChild(cnt);
-      foot.appendChild(cancel);
-      foot.appendChild(save);
-      wrap.appendChild(ta);
-      wrap.appendChild(foot);
-      setTimeout(() => ta.focus(), 60);
+      foot.append(cnt, cancel, sv);
+      wrap.append(ta, foot);
+      // ⚠️ 聚焦之后"把它滚进看得见的地方"那件事，统一由上面那个 `focusin` 管 ✓，
+      //    这里只负责聚焦 ✓。
+      setTimeout(() => { try { ta.focus(); } catch (e) {} }, 60);
     };
     draw();
     return wrap;
   };
+
+  /**
+   * 「我的」里的**自我介绍** ✓ —— 同一套块 ✓（用户 2026-10-09：
+   * 「将同样配置在我的也做一份，**在我的那里叫自我介绍**」✓）。
+   * ⚠️ 它走的是另一条接口 ✓（`POST /api/me/self-intro` ✓）——
+   *    存的是**这个人自己**的自我介绍 ✓（`group_members.self_intro` ✓），
+   *    每轮对话由服务端注进管家看到的成员名单里 ✓（见 `_group_persona` ✓）。
+   */
+  const selfIntroBlock = () =>
+    collapsibleText({
+      get: () => (me && me.self_intro) || '',
+      save: async (t) => {
+        try {
+          const out = await api('/me/self-intro', {
+            method: 'POST', body: JSON.stringify({ text: t }),
+          });
+          me.self_intro = out.self_intro;
+          renderMe();                 // 收起态那一块要跟着变成新文本 ✓
+          toast(out.self_intro ? '保存了，它下次开口就带着这个' : '擦掉了');
+        } catch (e) { toast((e && e.message) || '没保存上'); }
+      },
+      placeholder: '想让管家知道点什么？比如你习惯什么时候起床、'
+                 + '喜欢什么、最近在忙什么。不写也行。',
+      max: 800,
+    });
+
+  /** 管家的「性格」= 上面那个通用块 ✓（`promptEditing` 是给 `patchGroup` 看的 ✓）。 */
+  const promptBlock = () =>
+    collapsibleText({
+      get: () => (group && group.agent_user_prompt) || '',
+      save: (t) => patchGroup({ agent_user_prompt: t }),
+      placeholder: '描述一下管家的性格…',
+      max: 800,
+      onEditing: (v) => { promptEditing = v; },
+    });
 
   const openAgentSettings = () => {
     promptEditing = false;
@@ -4775,6 +4818,13 @@
     grp.appendChild(meRow('用户名', me.username || '', () => openMeEdit('username')));
     grp.appendChild(meRow('密码', '', () => openMeEdit('password')));
     body.appendChild(grp);
+
+    // ③ 自我介绍 ✓（2026-10-09 用户定的 ✓）—— 和管家的「性格」**同一个形状** ✓
+    //    （可收可展、三行封顶、居中的朝下箭头 ✓，见 `collapsibleText` ✓）
+    body.appendChild(mkel('div', 'sec', '自我介绍'));
+    const g3 = mkel('div', 'grp');
+    g3.appendChild(selfIntroBlock());
+    body.appendChild(g3);
   };
 
   /** 「我的」里的**一行** ✓（左标题、右现值、最右 `›` ✓）。 */
@@ -5080,12 +5130,13 @@
     const card = mkel('div', 'card');
     card.appendChild(mkel('label', null, '自我介绍'));
     const ta = mkel('textarea', 'field');
-    ta.maxLength = 500;
+    ta.maxLength = 800;          // ⚠️ 跟着 `SelfIntroIn` 一起改成 800 ✓（那一屏没入口 ✓，
+                                 //    但数不一致迟早绊人 ✓）
     ta.placeholder = '想让管家知道点什么？比如你习惯什么时候起床、'
                    + '喜欢什么、最近在忙什么。不写也行。';
     ta.value = (me && me.self_intro) || '';
     const count = mkel('div', 'count', '');
-    const sync = () => { count.textContent = ta.value.length + ' / 500'; };
+    const sync = () => { count.textContent = ta.value.length + ' / 800'; };
     ta.oninput = sync;
     sync();
     const err = mkel('div', 'err', '');
