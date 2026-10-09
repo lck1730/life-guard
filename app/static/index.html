@@ -150,7 +150,18 @@
   #init .wrap { position:relative; }
   /* 介绍卡：**居中浮起来**的一小块 ✓（用户："在这个界面居中浮空一个提示小框" ✓）。
      它在同一屏里，不是另一屏 ✓ —— 所以用 absolute + 居中 ✓，不推屏 ✓。 */
-  #init .introcard { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  /* ★ 2026-10-10 用户看截图报的：「卡片略微往上一点，可以在**输入法展开**的情况下
+     也能完整显示按钮」✓。
+     ⚠️ 根子是 `top:50%` ✗ —— 它按**整个视口**居中 ✓，而键盘弹起来时
+        下面那一截是被盖住的 ✓ → 卡片的下半截（那颗按钮）正好压在键盘底下 ✓。
+     ⚠️ 而**键盘高度就在 `--inset-bottom` 里** ✓（原生把它算进"底部留白"报上来 ✓，
+        见 `applyInsets` 那段注释 ✓）→ 所以按它让位就行 ✓：
+        `- var(--inset-bottom) / 2` = **在"还能看见的那一块"里居中** ✓ ——
+        没键盘时几乎不动 ✓，键盘一弹就整张抬起来 ✓✓。
+     ⚠️ 再减 10px 是他说的"略微往上一点" ✓（无键盘时也高一点点 ✓）。 */
+  #init .introcard { position:absolute; left:50%;
+                     top:calc(48% - var(--inset-bottom) / 2 - 10px);
+                     transform:translate(-50%,-50%);
                      width:min(360px, calc(100% - 40px)); padding:24px 22px;
                      background:var(--panel); border:1px solid var(--line);
                      border-radius:18px; box-shadow:0 18px 50px rgba(0,0,0,.45);
@@ -165,6 +176,10 @@
      光 `disabled` 在深色底上几乎看不出来 ✓（看着还是"能点"的 ✓）→
      降透明度 + 换光标 ✓，让它自己说"我现在不让填" ✓。 */
   #init .introcard .field:disabled { opacity:.45; }
+  /* ⚠️ 表单里那行内嵌的红字**不用了** ✗→✓（用户 2026-10-10：「红字…不好看也不会
+     主动消失，应该悬浮一张卡片提示并且一会就消失」✓）→ 改成 `showNotice` ✓
+     （居中那张卡 ✓，3.6 秒自己淡出 ✓，不占版面 ✓、不把下面的东西顶下去 ✓）。 */
+  .notice.err { color:var(--danger); border-color:rgba(224,106,106,.45); }
   #init .introcard p { margin:0 0 10px; color:var(--muted); font-size:14px; line-height:1.75; }
   #init .introcard p b { color:var(--text); font-weight:600; }
   #init .introcard .foot { margin:16px 0 0; color:var(--muted); font-size:12px; text-align:center; }
@@ -1442,7 +1457,6 @@
        ⚠️ 两颗按钮并排那种**没有了** ✓（原来是一颗"新建"一颗"加入" ✓）——
          他说的是"底部一个按钮" ✓（名字「加入空间」✓，填哪个框就走哪条路 ✓）。 -->
   <div class="introcard" id="introCard" hidden>
-    <div class="err" id="initErr"></div>
     <label class="fld" for="spaceName">新建个空间？</label>
     <input class="field" id="spaceName" placeholder="为空间起个名字" maxlength="32" autocomplete="off">
     <label class="fld" for="joinCode">加入已有空间？</label>
@@ -2108,11 +2122,14 @@
    * ⚠️ **不用点、也不该挡手** ✓（CSS 里 `pointer-events:none` ✓）——
    *    它只是"说一声" ✓，不是要人做决定 ✓（要做决定的那些走 `confirmBox` ✓）。
    */
-  const showNotice = (m, ms) => {
+  const showNotice = (m, ms, kind) => {
     const el = $('#notice');
     if (!el) return;
     el.textContent = m;
-    el.classList.add('on');
+    // ★ `kind` 可选 ✓（2026-10-10 加的 ✓）：报错就用 `err` ✓（红字 ✓，见 CSS ✓）。
+    //   ⚠️ 用 `className =` 一把写 ✓，不是 `classList.add` ✗ —— 上一条可能是
+    //     `err` ✓、这一条是普通提示 ✓，不覆盖就会**红字留在下一条提示上** ✗。
+    el.className = 'notice on' + (kind ? ' ' + kind : '');
     clearTimeout(el._t);
     el._t = setTimeout(() => el.classList.remove('on'), ms || 3200);
   };
@@ -2911,7 +2928,10 @@
   // **点按钮才浮出介绍卡** ✓（他要"在这个界面居中浮空一个提示小框"✓）。
   // 建 / 加入之后**重走一次 `enterApp`** ✓ —— 那条路最后一次走是
   // "没有空间" ✓，现在有了 ✓，它自己会落到主群聊 ✓（不用手写跳转 ✓）。
-  const _initErr = (msg) => { $('#initErr').textContent = msg || ''; };
+  // ★ 错了就**弹一张居中的小卡** ✓（用户 2026-10-10 定的 ✓）——
+  //   几秒后自己消失 ✓、不用点 ✓、也不会把卡片里的东西顶下去 ✓
+  //   （内嵌那行红字以前一出现，下面两颗框和按钮全跟着往下挪一下 ✓）。
+  const _initErr = (msg) => { if (msg) showNotice(msg, 3600, 'err'); };
 
   // ★ 2026-10-09：**没有介绍卡了** ✓（用户："对空间的介绍去掉，界面简洁"✓）——
   //   点这个按钮**直接进表单** ✓。
