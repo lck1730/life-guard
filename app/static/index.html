@@ -1798,6 +1798,9 @@
   // 浏览器里没有原生壳，CSS 的 env() 会兜住。
   const isNative = !!(window.LifeGuardNative && window.LifeGuardNative.isNative && window.LifeGuardNative.isNative());
 
+  //: 上一次报上来的"底部留白" ✓ —— 用它判断**键盘是不是刚弹起来** ✓（见下面 ✓）。
+  let lastKbBottom = 0;
+
   const applyInsets = (i) => {
     if (!i || typeof i !== 'object') return;
     // ★ 单位换算：原生报的是**物理像素**，CSS 用的是**逻辑像素**，
@@ -1808,9 +1811,21 @@
     r.setProperty('--inset-top', ((i.top || 0) / dpr) + 'px');
     // 原生报上来的 bottom 已经把键盘算进去了，所以 App 里不需要再额外加 --kb，
     // 否则键盘弹出时会留出双倍空白。
-    r.setProperty('--inset-bottom', ((i.bottom || 0) / dpr) + 'px');
+    const bottom = (i.bottom || 0) / dpr;
+    // ★★ **键盘一弹起来，就把最新那条顶上来** ✗→✓（2026-10-09 用户定的：
+    //   「组件聊天和主聊天，聊天的**输入法要能够顶起最新的消息**」✓）。
+    //   ⚠️ 判据是「底部留白**变大了**」✓ —— 那正是键盘弹起来那一下 ✓
+    //      （原生把键盘高度算进 `bottom` 里报上来 ✓，见上面那段注释 ✓）。
+    //      只在**弹起**时强拉到底 ✓；收键盘时**不**强拉 ✗
+    //      （不然他正翻着上面的记录、一收键盘就被拽到底 ✓）。
+    //   ⚠️ **两个聊天都要** ✗→✓：主群聊 `#msgs` ✓ + 组件对话 `#wsMsgs` ✓
+    //      （组件那边以前**一次都没滚过** ✓ —— 键盘弹起来它纹丝不动 ✓）。
+    const kbJustOpened = bottom > lastKbBottom + 1;
+    lastKbBottom = bottom;
+    r.setProperty('--inset-bottom', bottom + 'px');
     r.setProperty('--kb', '0px');
-    scrollDown();
+    if (kbJustOpened) { scrollDown(true); scrollWsDown(); }
+    else scrollDown();
   };
   window.__onInsets = applyInsets;
 
@@ -1828,6 +1843,18 @@
     window.visualViewport.addEventListener('resize', onVV);
     window.visualViewport.addEventListener('scroll', onVV);
   }
+
+  // ⚠️ **再补一道兜底** ✗→✓（2026-10-09）：**聚焦输入框**那一下也滚一次 ——
+  //    万一原生那次 insets 报得不够及时 ✓（或者浏览器里根本没有原生 ✓），
+  //    这一下能兜住 ✓。两个聊天各一个输入框 ✓。
+  //    ⚠️ 延后 260ms：键盘的升降有动画 ✓，立刻滚会在动画中途算高度 ✓（不准 ✓）。
+  ['#text', '#wsText'].forEach((sel) => {
+    const el = $(sel);
+    if (!el) return;
+    el.addEventListener('focusin', () => {
+      setTimeout(() => { scrollDown(true); scrollWsDown(); }, 260);
+    });
+  });
 
   // 底部面板：键盘弹起时自动滚到聚焦输入框
   const _panelEl = $('#sheetPanel');
@@ -2885,6 +2912,18 @@
     const m = $('#msgs');
     if (force) stickBottom = true;
     if (stickBottom) m.scrollTop = m.scrollHeight;
+  };
+
+  /**
+   * **组件对话那个列表也滚到底** ✓（用户 2026-10-09：「组件聊天和主聊天，
+   * 聊天的**输入法要能够顶起最新的消息**」✓）。
+   * ⚠️ 它**不学** `#msgs` 那套"贴不贴底"的判断 ✗ —— 组件对话本来就是
+   *    "它当着你的面在做东西" ✓，新内容永远该跟着看 ✓
+   *    （那边别处也都是**硬滚** ✓，见流式那段 ✓），这里跟它们保持一致 ✓。
+   */
+  const scrollWsDown = () => {
+    const m = $('#wsMsgs');
+    if (m) m.scrollTop = m.scrollHeight;
   };
   const fmtTime = s => {
     if (!s) return '';
