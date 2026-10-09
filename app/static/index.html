@@ -50,6 +50,11 @@
                  border-radius:18px; padding:22px 20px; }
   /* 每个输入框上面一个 label ✓（壳那一版就是这样 ✓，不靠 placeholder ✓） */
   #login label { display:block; color:var(--muted); font-size:12.5px; margin:14px 0 6px; }
+  /* ⚠️ **`[hidden]` 要显式写** ✗→✓ —— 上面那句 `display:block` 会**压过**
+     `hidden` 那条属性规则 ✓（属性的优先级低于作者样式 ✓）→
+     登录态下"内测码 / 重复密码"两个 **label 会露出来**（输入框却是隐藏的 ✓）
+     —— 2026-10-09 渲染出来一眼看到的 ✓。 */
+  #login label[hidden], #login input[hidden] { display:none !important; }
   #login label:first-child { margin-top:0; }
   #login .btn-primary { margin-top:18px; }
   #login .swap { margin-top:16px; text-align:center; }
