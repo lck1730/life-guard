@@ -1199,8 +1199,14 @@
   .modal .box { width:100%; max-width:320px; background:var(--panel);
                 border:1px solid var(--line); border-radius:16px;
                 padding:20px 18px 14px; }
-  .modal .box h4 { margin:0 0 9px; font-size:16.5px; font-weight:600; }
-  .modal .box p { margin:0 0 16px; color:var(--muted); font-size:14px; line-height:1.75; }
+  /* ⚠️ **确认框里的字也居中** ✗→✓（2026-10-09）——
+     原来标题和正文都是默认的**左对齐** ✓；这一版的正文都是**一句话**（短 ✓），
+     居中了才和上面那条提示条一个调子 ✓（用户刚连着要求过两次"居中"✓）。
+     ⚠️ 将来要是写**成段**的正文（好几段那种），左对齐更耐读 —— 那种情况再单独说 ✓。 */
+  .modal .box h4 { margin:0 0 9px; font-size:16.5px; font-weight:600;
+                   text-align:center; }
+  .modal .box p { margin:0 0 16px; color:var(--muted); font-size:14px; line-height:1.75;
+                  text-align:center; }
   .modal .box .acts { display:flex; gap:10px; }
   .modal .box .acts button { flex:1; padding:12px; border-radius:12px;
                              font:inherit; font-size:15px; font-weight:600; }
@@ -4720,13 +4726,15 @@
     //      抽脚本那一步是**按字符扫**的 ✓，看到一个反引号就以为「模板字符串开始了」✓ → 后面整段被当成字符串吃掉 ✓。
     //      这个坑**这个文件顶上就写着** ✓ —— 我又踩了一次 ✓。
     if (!s.alone) { toast('当前人数超过1人，\n暂不支持退出'); return; }
-    // ★ **二次防呆** ✓（用户点名要的 ✓）—— 而且**把代价说全** ✓：
-    //   这个项目的老规矩是"说清代价比拦一道更管用" ✓。
+      // ★ **二次防呆** ✓（用户点名要的 ✓）—— 而且**把代价说全** ✓。
+      // ★ 文案照用户 2026-10-09 的原话 ✓（他给的是**一整句**，我没改写它 ✗）——
+      //   那句以「注意！」开头 ✓，正好是这段提示的**抬头** ✓ → 抬头进 title ✓、
+      //   后半句进 body ✓，一个字没动 ✓。
+      // ⚠️ 旧文案里写着 **永久删除** ✗，而 confirmBox 是 textContent 渲染的 ✓
+      //    → markdown 不生效 ✓，屏幕上会**原样带两个星号** ✓（趁这次一起没了 ✓）。
     const yes = await confirmBox({
-      title: '退出这个生活空间？',
-      body: '退出之后，这里的一切都会**永久删除**：聊天记录、账本、提醒、'
-          + '做的组件，还有管家在这个空间里的记忆。\n\n'
-          + '删了就找不回来了。要重新开始的话，到时候还得建一个新的。',
+      title: '注意！',
+      body: '此操作将会永久删除该空间的所有组件和记录，是否继续？',
       ok: '退出并删除', danger: true,
     });
     if (!yes) return;
