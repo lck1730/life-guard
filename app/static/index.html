@@ -67,6 +67,11 @@
   /* ⚠️ hero 的大标题/小字也共用 ✓（`.t` / `.s` 就是登录那套 ✓）——
      `#init` 只要写 `.hero` 就够了 ✓，不用另起一套 `.hero2` ✗（那个类已经删了 ✓）。 */
   #login .hero .t, #init .hero .t { font-size:26px; font-weight:600; letter-spacing:.5px; }
+  /* ⚠️ **只有初始化这一屏小一档** ✗→✓（2026-10-10 用户：「欢迎使用生活管家，
+     字体略微小一些些」✓）—— 26 → 24px ✓。
+     ⚠️ 我**没动登录页**那个大标题（「生活管家」✓）—— 他这次点名的是这一句 ✓。
+        要是哪天觉得两屏该继续一样，把这条删掉就行 ✓（一处 ✓）。 */
+  #init .hero .t { font-size:24px; }
   #login .hero .s, #init .hero .s { color:var(--muted); font-size:13.5px; margin-top:8px; }
   /* ★ 2026-10-09 用户看了真机之后的两点 ✗→✓：
        · 「继续使用请先这几个字**不太居中**」→ 光靠 `text-align:center` 不够稳 ✓
