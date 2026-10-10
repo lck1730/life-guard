@@ -354,6 +354,30 @@ def _render_page(route: str) -> str:
     地址不会丢 ✓，标记会 ✓。
     """
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+
+    # ★ 2026-10-11：**给那两个外链加版本号** ✗→✓ ——
+    #   搬出 HTML 之后它们成了外链 ✓ → 每次加载都要走一趟网络 ✓，而 `/static`
+    #   那层对**不带版本号**的走 `no-cache`（每次先问一句 ✓）→ 手机过 WireGuard
+    #   那一趟就是"**黑屏一闪**" ✓（用户报的"刷新后短暂黑屏" ✓）。
+    #   带上 `?v=<mtime>` 之后：`_NoStoreStatic` 会回 **immutable 长缓存** ✓ →
+    #   第二次起**一个字节都不发** ✓；而**文件一改 mtime 就变** ✓ → 地址变 ✓ →
+    #   浏览器自然去取新的 ✓✓ —— "改了能看到"和"不发请求"**同时成立** ✓。
+    #   （这招在这个项目里用熟了 ✓，见 `/avatars/<id>?v=` 那套 ✓。）
+    for _name, _old, _new in (
+        ("app.css", '<link rel="stylesheet" href="/static/app.css">',
+         '<link rel="stylesheet" href="/static/app.css?v={v}">'),
+        ("app.js", '<script src="/static/app.js"></script>',
+         '<script src="/static/app.js?v={v}"></script>'),
+    ):
+        _f = STATIC_DIR / _name
+        if _f.is_file():
+            _mt = _f.stat().st_mtime
+        else:
+            # `app.js` 由 `js/*.js` 拼出来 ✓ → 取它们里最新的那个 mtime ✓
+            _mt = max((q.stat().st_mtime for q in (STATIC_DIR / "js").glob("*.js")),
+                      default=0)
+        if _old in html:
+            html = html.replace(_old, _new.format(v=int(_mt)), 1)
     # ⚠️ 注入点必须是 `<head>` 之后（**在那段大脚本之前** ✓）——
     #    页面末尾那个 IIFE 开局就要读它 ✓。
     html = html.replace(
