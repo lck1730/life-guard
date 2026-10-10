@@ -223,6 +223,26 @@ class _NoStoreStatic(StaticFiles):
 
 # agent 自己那块：/ui/theme.css（覆盖样式）、/ui/avatar.png（它的头像）、
 # /ui/components/...（它做的组件）。归服务用户所有，它随时可以改。
+@app.get("/static/app.js")
+async def app_js() -> Response:
+    """把 `static/js/*.js` **按文件名顺序拼起来**发出去 ✓。
+
+    ★ 2026-10-11：那 5,478 行是一个**闭包**（`me`/`group`/`$`/`api`… 共享同一个作用域 ✓）。
+      拆成多个 `<script>` 会**拆散作用域** ✗ → 所有共享状态都得改成显式的模块导入 ✗
+      （几千行的重构 ✓，而这套前端**没有行为测试** ✗）。
+      所以改成：**仓库里按屏分成 6 个文件 ✓（改代码好找 ✓），服务端拼成一个 ✓
+      （浏览器拿到的还是 1 个 ✓，一次请求 ✓ —— 手机要过 WireGuard ✓，少一次往返是实打实的 ✓）。**
+
+    ⚠️ 这条路**必须排在下面那条 `/static` 挂载前面** ✗（Starlette 按注册顺序匹配 ✓，
+      挂载是按前缀吃 ✓ —— 排在后面就永远轮不到它 ✗）。
+    ⚠️ 每次重新读 ✓（不加缓存 ✓）：这是 6 个小文件 ✓、本机磁盘 ✓，
+      而"改了不生效"是这个项目踩过最多次的坑 ✗ —— 省这点 IO 不值 ✗。
+    """
+    parts = sorted((STATIC_DIR / "js").glob("*.js"))
+    body = "".join(p.read_text(encoding="utf-8") for p in parts)
+    return Response(body, media_type="application/javascript", headers=dict(_NO_STORE))
+
+
 app.mount("/ui", _NoStoreStatic(directory=settings.ui_dir), name="ui")
 
 # ★ 2026-10-11：**样式和脚本也搬出 HTML 了** ✗→✓ ——
