@@ -825,6 +825,10 @@
         const st = (d.agent_status || {})[String(group && group.id)];
         if (st) setStatusTimed(st);        // 重连补状态：文字自己从配置挑 ✓
         syncMissed();
+        // ★ **工坊那条也得补** ✗→✓（2026-10-11）—— 见 `wsResync` 那段：
+        //   原来重连只补群聊 ✓，工坊丢掉的收尾消息**永远回不来** ✓，
+        //   而流式气泡**只有它才会被摘掉** ✓ → 屏幕上卡着半截回复 ✗。
+        wsResync();
         return;
       }
       if (pkt.type === 'message') { if (d.group_id === group.id) addMsg(d); }
@@ -871,6 +875,20 @@
         //    服务端那边也堵了（空片段不推 ✓），这里再堵一道 ✓ ——
         //    因为"第一片"完全可能只是**一个换行** ✓（`''.trim()` 拦住它 ✓），
         //    那种照样会开出一个看着像坏了的空气泡 ✓。
+        // ★ **`reset`：把那个脏气泡整个摘掉** ✗→✓（2026-10-11）——
+        //   服务端发现这一轮**只吐了"天书"**（`<dots_function_call>…` ✓）时会
+        //   补问一轮干净的 ✓，补之前先推这一帧 ✓。
+        //   ⚠️ 不摘的话，补出来的话会**接在天书后面** ✓ → 屏幕上还是那坨 ✓
+        //      （用户看到的就是"回复有问题"✓）。
+        //   ⚠️ 只摘**流式那条** ✓（还在跑的那个气泡 ✓）—— 落库的历史一条都不动 ✓。
+        if (d.reset) {
+          if (wsCur.streaming) {
+            const row = wsCur.streaming.closest('.mkrow');
+            if (row) row.remove();
+            wsCur.streaming = null;
+          }
+          return;
+        }
         const piece = d.delta || '';
         if (!wsCur.streaming) {
           if (!piece.trim()) return;          // 还全是空白 ✓ → 等有字再开 ✓

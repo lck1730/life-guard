@@ -20,6 +20,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import hmac
 import json
 import logging
@@ -28,6 +30,7 @@ import re
 import secrets
 import subprocess
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -37,10 +40,12 @@ from pydantic import BaseModel, Field
 from ..config import WALL_SLUG, settings
 from ..core import records as rec
 from ..core import reminders as rem
+from ..core.hub import hub
 from ..db import execute, fetch_all, fetch_one, now
 from ..core.messages import create_message
 # ⚠️ 这里**只 import 函数**，而且放函数外用 ✓ —— routes_workshop 不 import 本模块 ✓，
 #    所以没有环 ✓。
+from .workshop import _save as _ws_save
 from .workshop import push_workshop_status, start_waiting, stop_waiting
 
 log = logging.getLogger("lifeguard.internal")
@@ -326,6 +331,118 @@ async def image_path(body: ImageIn) -> dict:
         "hint": ("要看清内容，把这个 path 传给 vision_analyze（它的 question 参数问你想知道的）。"
                  "想让它更准就把你真正关心的事写进 question，别只问「这是什么」。"),
     }
+
+
+# ── 发图（反过来：**它 → 你**）──────────────────────────────────────────
+#
+# ★ 2026-10-11 用户报的：「管家和 diy 助手没法给我发图片」✓。
+#
+# ⚠️ **缺的从来不是"渲染"、也不是"存储"** ✗ —— 前端早就认
+#    `msg_type === 'image'` ✓（**不分是谁发的** ✓，见 `04-chat.js` ✓），
+#    `create_message` 也早就收 `media_path` ✓。缺的是**中间那一步**：
+#    它手上有一张图，而**没有任何动作能把它送出来** ✓。
+#    这正是这个项目反复栽的那个形状（"数据存了，但没告诉它"✓）。
+#
+# ★ **图从哪儿来** ✓（用户 2026-10-11 定的，三种都算 ✓）：
+#     · 它自己截的（浏览器那条路 ✓）
+#     · 它工作区里的一个文件 ✓
+#     · 你发过的那张（`/image` 早就把路径给它了 ✓）
+#   → 所以这个接口收的是**字节** ✓，不关心源头 ✓。
+#
+# ⚠️ **为什么是它把字节送来，而不是我们按路径去读** ✗ ——
+#    服务跑在 `lifeguard` 账号下 ✓，agent 的文件在 `hermes` 那边 ✓ →
+#    我们**读不到** ✓（这正是"代码归 root、两边分账号"的代价之一 ✓）。
+#    而插件跑在 Hermes 进程里 ✓，它读得到自己的文件 ✓。
+#    → "读文件"那一步在它那边做 ✓，"存 + 发"这一步在我们这边做 ✓。
+
+#: 收得下的图片类型 ✓ —— **白名单，不是"以 image/ 开头就行"** ✗
+#: （同 `media.py` 那条规矩 ✓：存下来的扩展名**一律用我们表里那个** ✓ ——
+#:   不然等于让人用一个自造的名字把东西塞进一个能被浏览器直接打开的目录 ✓）。
+_SEND_IMG = {
+    "image/jpeg": ".jpg", "image/jpg": ".jpg", "image/png": ".png",
+    "image/webp": ".webp", "image/gif": ".gif",
+}
+_SEND_IMG_MAX = 12 * 1024 * 1024       # 12MB —— 截图和手机照片都够 ✓
+
+
+class SendImageIn(BaseModel):
+    group_id: int
+    #: **图片本身的 base64** ✓（也可以连着 `data:image/png;base64,` 前缀一起给 ✓）。
+    data_b64: str = Field(min_length=16)
+    mime: str = Field(default="image/png", max_length=64)
+    #: 配一句话 ✓（可不给 ✓ —— 一张图不配字是允许的 ✓）。
+    caption: str = Field(default="", max_length=500)
+    #: ★ 工坊那条对话 ✓。**不在工坊里（就是主群聊）给 None** ✓。
+    task_id: int | None = None
+
+
+@router.post("/send-image", dependencies=[Depends(require_internal_token)])
+async def send_image(body: SendImageIn) -> dict:
+    await _assert_group(body.group_id)
+    mime = (body.mime or "").split(";")[0].strip().lower()
+    ext = _SEND_IMG.get(mime)
+    if not ext:
+        return {"ok": False,
+                "error": (f"发不了这个类型：{mime or '（没给 mime）'}。"
+                          f"图片常见的就 png / jpeg / webp / gif 这几种 —— "
+                          f"mime 按实际那个填。")}
+
+    raw = (body.data_b64 or "").strip()
+    # ⚠️ **它有时候会把整个 data URL 一起给** ✓（形如 `data:image/png;base64,AAAA` ✓）
+    #    —— 那不是错 ✓，剥掉前缀接着用 ✓，别为这种事让它重来一次 ✓。
+    if raw.startswith("data:"):
+        _, _, raw = raw.partition(",")
+    # ⚠️ **base64 允许换行** ✗→✓ —— 它有时候是"按 76 字符折行"那种编码 ✓
+    #    （`base64` 命令行工具的默认输出 ✓），带着换行才符合标准 ✓。
+    raw = "".join(raw.split())
+    try:
+        blob = base64.b64decode(raw, validate=True)
+    except (binascii.Error, ValueError):
+        return {"ok": False,
+                "error": ("那不是一段有效的 base64。"
+                          "把图片文件**整个**按 base64 编码后放进来（别截断、别加省略号）。")}
+    if not blob:
+        return {"ok": False, "error": "解出来是空的"}
+    if len(blob) > _SEND_IMG_MAX:
+        return {"ok": False,
+                "error": (f"这张图太大了（{len(blob) // 1024 // 1024}MB），"
+                          f"上限 {_SEND_IMG_MAX // 1024 // 1024}MB。"
+                          f"截小一点、或者压一下再发。")}
+
+    day = datetime.now(timezone.utc).strftime("%Y%m%d")
+    rel = Path(day) / f"{secrets.token_hex(12)}{ext}"      # ★ 名字由**我们**拼 ✓
+    dest = settings.media_dir / rel
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(blob)
+    caption = (body.caption or "").strip()
+
+    # ── 工坊那条对话 ──
+    if body.task_id:
+        row = await fetch_one(
+            "SELECT id, user_id FROM workshop_tasks WHERE id = ? AND group_id = ?",
+            (int(body.task_id), body.group_id))
+        if not row:
+            return {"ok": False, "error": f"这个群里没有 id={body.task_id} 的组件对话"}
+        uid = int(row["user_id"])
+        msg = await _ws_save(body.group_id, uid, int(body.task_id), "agent",
+                             caption or "[图片]", msg_type="image",
+                             media_path=rel.as_posix())
+        # ★ **推给它那条对话的人** ✓ —— 工坊是"你一个人对着它" ✓，
+        #   不是广播给全群 ✓（和 `workshop.py` 里 `_push` 同一条规矩 ✓）。
+        try:
+            await hub.send_to_user(uid, {"type": "ws_message", "data": msg})
+        except Exception:  # noqa: BLE001
+            log.debug("发图：工坊推送失败 user=%s", uid, exc_info=True)
+        log.info("工坊 %s：diy 助手发了一张图 ✓（%d 字节 ✓）", body.task_id, len(blob))
+        return {"ok": True, "message_id": msg.get("id"), "path": rel.as_posix()}
+
+    # ── 主群聊（管家）──
+    msg = await create_message(
+        group_id=body.group_id, sender_id=None, sender_type="agent",
+        msg_type="image", content=caption or None, media_path=rel.as_posix(),
+    )
+    log.info("群 %s：管家发了一张图 ✓（%d 字节 ✓）", body.group_id, len(blob))
+    return {"ok": True, "message_id": msg["id"], "path": rel.as_posix()}
 
 
 # ── 创意工坊：做组件的四个工具 ────────────────────────────────────────────

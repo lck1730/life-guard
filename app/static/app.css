@@ -981,6 +981,19 @@
      而它们其实一件是"等它说话"、一件是"它在干活" ✓。 */
   #wsChat .wsstat.busy { color:var(--accent); }
   #wsChat .wsstat.busy i { border:0; background:var(--accent); animation:pulse 1.4s infinite; }
+  /* ★ **「停掉」** ✗→✓（2026-10-11）—— 见 06-workshop.js 里 `#wsStop` 那段：
+     "切换即终止"改成"占用即拒绝进入"之后 ✓，出口必须**显式** ✓
+     （手滑切走不再等于取消 ✓，想停就明着按 ✓）。
+     ⚠️ 只在**它正在跑**的时候露 ✓（`整体 idle` 时整行都 hidden ✓；
+        `做好了` 那一档里它也得藏 ✓ —— 那时候没有可停的东西 ✓）。
+     ⚠️ 做成**小胶囊**、不要做成主按钮 ✗ —— 它贴着状态字 ✓，
+        是那一行的一部分 ✓，抢眼就成了"这一屏的主行动" ✓（它不是 ✓）。 */
+  #wsChat .wsstat #wsStop { margin-left:2px; padding:1px 8px; border-radius:999px;
+                            border:1px solid var(--line); background:transparent;
+                            color:var(--muted); font:inherit; font-size:11px;
+                            line-height:1.5; }
+  #wsChat .wsstat #wsStop:active { color:#e06a6a; border-color:#e06a6a; }
+  #wsChat .wsstat #wsStop[disabled] { opacity:.45; }
   #wsChat .mkfoot { flex:0 0 auto; display:flex; align-items:flex-end; gap:8px;
                     padding:10px 12px calc(10px + var(--inset-bottom));
                     border-top:1px solid var(--line); background:var(--panel); }

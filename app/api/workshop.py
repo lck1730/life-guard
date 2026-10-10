@@ -23,17 +23,33 @@
 ⚠️ **钥匙不能是 slug** ✗ —— slug 要到流程第 ③ 步（用户确认）才由 agent 定下来 ✓，
    而"＋做一个新的"在那之前就得有身份 ✗。所以要有 `workshop_tasks` 这张表 ✓。
 
-## 切换 = 终止（用户 2026-10-07 定的）
+## 占用 = 不许开第二条（★ 2026-10-11 改的）
 
-**同时只允许一个任务在构建** ✓。**打开另一个任务**时：
+**同时只允许一个任务在构建** ✓ —— 这一条没变 ✓。**变的是"想开第二条时怎么办"**：
 
-1. 掐掉正在跑的那一轮（`asyncio.Task.cancel()` ✓）→ httpx 的流随之关闭 ✓
+    · 原来（2026-10-07 定的）：**打开另一条 → 掐掉正在跑的那一轮** ✗→
+      用户 2026-10-11 原话：「我切走后会提示（你切走了，这一轮掐掉），
+      这是何意味，**我还不能切走**」✓。
+    · 现在：**正在跑的时候，根本不让打开另一条** ✓ ——
+      那一轮**不掐** ✓，被挡下的是"想进去的那条" ✓，
+      提示照用户给的原话：「[diy 助手昵称]正在[组件名称]，不能分心哦」✓。
+      拦在两处：`task_open`（进别的对话 ✓）和 `tasks_new`（开新的 ✓，
+      右上角那条路是"先建再进"✓，只拦打开等于没拦 ✓）。
+
+★ **"掐掉"没被删，它换成了一个显式动作** ✓（`task_stop` ✓，用户当天同时选的 ✓）：
+  不主动按，那一轮就一直在 ✓。**为什么必须有这个出口** ✗ ——
+  原来"切走"顺带就是取消 ✓，改成"拒绝进入"之后那条路没了 ✓ →
+  模型卡住时人会被**永久关在门外** ✓（`_running` 在内存里 ✓，不清就一直在 ✓）。
+
+⚠️ 掐掉那一轮时做的事（都还在 ✓，只是现在由 `task_stop` 触发）：
+
+1. `asyncio.Task.cancel()` ✓ → httpx 的流随之关闭 ✓
 2. **Hermes 那边会自己掐** ✓：我们对 `/v1/chat/completions` 断流之后，
    它接住 → `_abandon_agent_task(...)` → `request_hard_interrupt(agent, …)`
    + `_reap_disconnected_agent_processes(...)`（收掉它派出去的后台进程，也就是子代理 ✓）
    —— **已核实源码** ✓（`gateway/platforms/api_server_openai_routes.py:965` ✓）
-3. **作废这个任务名下还没用掉的票** ✓ —— 那个子代理就算写完了也落不了地 ✓。
-   这是"终止"里**唯一能由我们持久保证**的一半 ✓。
+3. **作废这个任务名下还没用掉的票** ✓（`_void_tickets` ✓）——
+   那个子代理就算写完了也落不了地 ✓。这是"终止"里**唯一能由我们持久保证**的一半 ✓。
 4. 在对话里补一行说明 ✓ —— **不静默消失** ✓（项目铁律：失败要看得见 ✓）
 
 ⚠️ **不把它包装成硬保证** ✗ —— 我们**不可能**点名杀 Hermes 进程里的某个子代理 ✗。
@@ -293,6 +309,51 @@ def _busy_task(group_id: int, task_id: int) -> bool:
         if gid == group_id and tid == task_id and not task.done():
             return True
     return False
+
+
+async def _doing_for(group_id: int, user_id: int) -> dict | None:
+    """**这个人现在占着哪条** ✓（没在跑就是 None ✓）。
+
+    ★ 2026-10-11 改的规矩 ✗→✓（用户原话）：
+
+      「目前在 diy 助手里，diy 助手工作过程中，我切走后会提示（你切走了，
+        这一轮掐掉），这是何意味，**我还不能切走**。如果为了限制不能多个组件
+        同时 diy，可以只能构建一个 diy 助手，**某个组件在创建或修改时，
+        将不能进入组件编辑界面或者不能通过主群聊右上角进入**，会提示：
+        「[diy 助手昵称]正在[组件名称]，不能分心哦」」
+
+    → 于是这里从"**切换即终止**"（见文件头那段）改成"**占用即拒绝进入**" ✓：
+      正在跑的那一轮**不再被掐** ✓；想进别的对话的人**被挡在门外** ✓。
+      "掐掉"收进一个**显式动作** ✓（`task_stop` ✓ —— 用户同时选的 ✓，
+      见它那段：不给出口的话，卡住的一轮会把人**永久**关在门外 ✓）。
+
+    ⚠️ 名字取**组件名**（`components.title` ✓）—— 用户那句说的是"正在[组件名称]" ✓；
+      还没落成组件时退回**对话名** ✓（就是他开做时起的那个 ✓）。
+    """
+    item = _running.get((group_id, user_id))
+    if not item or item[1].done():
+        return None
+    tid = int(item[0])
+    row = await fetch_one(
+        "SELECT t.id,"
+        "       COALESCE(t.slug, '')  AS slug,"
+        "       COALESCE(t.title, '') AS task_title,"
+        "       COALESCE((SELECT c.title FROM components c"
+        "                  WHERE c.group_id = t.group_id AND c.slug = t.slug"
+        "                  ORDER BY c.version DESC LIMIT 1), '') AS comp_title"
+        "  FROM workshop_tasks t WHERE t.id = ?",
+        (tid,))
+    if not row:
+        return None
+    what = str(row["comp_title"] or "").strip() or str(row["task_title"] or "").strip()
+    return {"task_id": tid, "slug": str(row["slug"] or ""), "title": what}
+
+
+async def _blocked_message(group_id: int, doing: dict) -> str:
+    """那句提示 ✓ —— **照用户给的原话写** ✓（「…正在[组件名称]，不能分心哦」✓）。"""
+    name = (await _assistant(group_id))["name"]
+    what = doing.get("title") or "一个组件"
+    return f"{name}正在「{what}」，不能分心哦"
 
 
 async def _editing_map(group_id: int) -> dict[str, dict]:
@@ -646,6 +707,26 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                 #    要等下一片才有字 ✓（看着像坏了 ✓，而且**它确实是多余的** ✓）。
                 if not piece:
                     continue
+                # ★★ **poke 轮一个字都不推** ✗→✓（2026-10-11，用户报的
+                #   「组件编辑时小助手的回复容易出问题」✓）。
+                #
+                #   ⚠️ 这一道**必须在推的时候堵**，不能只在下面 `[SILENT]` 那里堵 ✗ ——
+                #      等走到那一步，流**早就推完了** ✓：前端已经开出一个气泡 ✓，
+                #      而且**只有 agent 的 `ws_message` 才会把它摘掉** ✓
+                #      （见 `04-chat.js` 那段 ✓）—— 而静默那一轮**永远不会**有那条 ✓
+                #      → 屏幕上**挂着一条 `[SILENT]`** ✗，并且因为 `wsCur.streaming`
+                #      还非空 ✓，**下一轮的正文会接着往它上面累加** ✗
+                #      （看见的就是「[SILENT]然后是我要的话」粘成一坨 ✓）。
+                #
+                #   ⚠️ 为什么偏偏在**编辑**时最容易撞见 ✓：poke 循环只在派了子代理之后转 ✓
+                #      （30s→120s 一圈 ✓），而**改一个已有组件比新建还慢** ✓
+                #      （要先读 note、再重做 ✓）→ 轮数更多 ✓ → 撞见的机会更多 ✓。
+                #
+                #   ★ 代价说清：poke 轮**真要说的话不再是逐字长出来的** ✓ ——
+                #     它整条落库、整条推 ✓（就是下面那句 `ws_message` ✓）。
+                #     那一轮本来就是"系统替你问一句、它顺口答一声" ✓，不流式反而干净 ✓。
+                if poke:
+                    continue
                 await _push(user_id, {"type": "ws_stream",
                                       "data": {"group_id": group_id,
                                                "task_id": task_id, "delta": piece}})
@@ -689,6 +770,15 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                     "\n\n[系统] 你上一轮**只输出了思考过程，没有给用户一句能看的话**——"
                     "用户那边收到的是一堆工具调用的文本。现在**直接说话**："
                     "一两句给结论，别调工具，别复述过程。")
+                # ★ **先叫前端把脏气泡清掉** ✗→✓（2026-10-11）——
+                #   那段天书**是已经推下去了的** ✓（用户正看着它一个字一个字长 ✓），
+                #   不喊这一声，补出来的干净话会**接在天书后面** ✓ → 屏幕上还是脏的 ✓
+                #   （等于白补 ✓，而他看到的还是"回复出问题"✓）。
+                #   ⚠️ 前端收到 `reset` 就把那个气泡**整个摘掉** ✓，
+                #     后面的片段自然开一个新的 ✓（见 `04-chat.js` ✓）。
+                await _push(user_id, {"type": "ws_stream",
+                                      "data": {"group_id": group_id,
+                                               "task_id": task_id, "reset": True}})
                 fixed: list[str] = []
                 async for piece in _stream_completion(
                     group_id, nudged, images, profile,
@@ -697,6 +787,11 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                     role="diy",
                 ):
                     fixed.append(piece)
+                    if piece:
+                        await _push(user_id, {"type": "ws_stream",
+                                              "data": {"group_id": group_id,
+                                                       "task_id": task_id,
+                                                       "delta": piece}})
                 got = "".join(fixed).strip()
                 if got and not _looks_like_leaked_reasoning(got):
                     answer = got
@@ -831,7 +926,11 @@ async def tasks_list(group_id: int, user: dict = Depends(current_user)) -> dict:
             # ★ **哪个组件正被人改着** ✓（用户定的：「如果有个组件某个用户正在创建
             #   和修改，需要在导航界面标注上」✓）。键是 slug ✓。
             "editing": await _editing_map(group_id),
-            "busy": _busy(group_id, user["id"])}
+            "busy": _busy(group_id, user["id"]),
+            # ★ **正在做哪条** ✗→✓（2026-10-11）—— 前端要在**推屏之前**
+            #   就知道该不该挡 ✓（不然后端拒了才弹提示 ✓，用户会看见
+            #   那一屏**推进来又退回去** ✓ —— 那是这个项目最怕的"点了像坏了"✓）。
+            "doing": await _doing_for(group_id, user["id"])}
 
 
 class TaskNewIn(BaseModel):
@@ -855,6 +954,14 @@ async def tasks_new(group_id: int, body: TaskNewIn | None = None,
     """
     await require_member(group_id, user["id"])
     await _assert_open(group_id)
+    # ★ **占用期间不许开新的** ✗→✓（2026-10-11）——「不能通过主群聊右上角进入」✓
+    #   那条路最后就落到这里 ✓（`wsNewTask` ✓）。
+    #   ⚠️ **创建也拦** ✗ —— 只拦"打开"不拦"新建"的话，绕一下就能开第二条 ✓
+    #      （右上角那条路本来就是"先建再进"✓），那道闸就等于没有 ✓。
+    doing = await _doing_for(group_id, user["id"])
+    if doing:
+        return {"ok": False, "busy": True, "doing": doing,
+                "error": await _blocked_message(group_id, doing)}
     want = (body.slug if body else "").strip().lower()
     if want and not _SLUG_OK.match(want):
         want = ""                       # 形状不对就当没给 ✓（不拦，当"做一个新的" ✓）
@@ -931,29 +1038,46 @@ async def task_rename(group_id: int, task_id: int, body: TaskTitleIn,
 @router.post("/{group_id}/tasks/{task_id}/open")
 async def task_open(group_id: int, task_id: int,
                     user: dict = Depends(current_user)) -> dict:
-    """**打开 / 切到这条** ✓ —— 打开的同时**掐掉上一条还在跑的** ✓（用户定的 ✓）。
+    """**打开 / 切到这条** ✓。
 
-    ⚠️ **打开同一条不算切换** ✓ —— 重复打开不该把自己正在跑的那轮掐掉 ✓
-       （界面每次进这一屏都会调它 ✓，那是常态 ✓）。
+    ★ 2026-10-11 改了规矩 ✗→✓（用户原话见 `_doing_for` 那段）：
+      **原来是"打开另一条 → 掐掉正在跑的那一轮"** ✓，
+      现在改成"**正在跑的时候，根本不让打开另一条**" ✓ ——
+      那一轮**不再被掐** ✓，被挡下的是"想进去的那条" ✓。
+
+    ⚠️ **打开同一条不算分心** ✓ —— 判据是**任务号** ✓（界面每次进这一屏都会调它 ✓，
+       那是常态 ✓；"自己占着自己"是最常见的一种误拦 ✓）。
+    ⚠️ **"掐掉"没被删掉，它换了个位置** ✓ —— 现在是一个**显式动作** ✓
+       （`task_stop` ✓，用户 2026-10-11 选的 ✓）：不主动按，这一轮就一直在 ✓。
+       为什么必须有那个出口：模型卡住时人会**被永久关在门外** ✓
+       （原来"切走"顺带就是取消 ✓，改了之后那条路没了 ✓）。
     """
     await require_member(group_id, user["id"])
     await _assert_open(group_id)
     row = await _own_task(group_id, user["id"], task_id)
-    running = _running.get((group_id, user["id"]))
-    if running and running[0] != int(task_id):
-        killed = await _abort(group_id, user["id"])
-        if killed:
-            log.info("工坊切换：群 %s 用户 %s 掐掉任务 %s，打开 %s",
-                     group_id, user["id"], killed, task_id)
-            await _save(group_id, user["id"], killed, "agent",
-                        "（你切走了，这一轮掐掉了）")
+    doing = await _doing_for(group_id, user["id"])
+    if doing and int(doing["task_id"]) != int(task_id):
+        log.info("工坊占用：群 %s 用户 %s 正在做任务 %s，挡下打开 %s",
+                 group_id, user["id"], doing["task_id"], task_id)
+        return {"ok": False, "busy": True, "doing": doing,
+                "error": await _blocked_message(group_id, doing)}
     await _touch(row["id"])
     # 历史走 `_WS_SELECT` ✓ —— 图片、引用、谁发的都在里面 ✓，
     # 前端才能用**同一段代码**画气泡 ✓（见 `_ws_msg` 那段 ✓）。
     aname = (await _assistant(group_id))["name"]
+    # ★ **倒序取、再翻回正序** ✗→✓（2026-10-11）——
+    #   原来是 `ORDER BY m.id ASC LIMIT 200` ✓ = 拿的是**最旧的** 200 条 ✗ →
+    #   一条对话超过 200 条之后，**最新的回复整段不见了** ✓
+    #   （往下滑到底也出不来 ✓ —— 它压根没被取出来 ✓）。
+    #   这是用户报的"回复容易出问题"里最直白的一条 ✓。
+    #   ⚠️ **群聊那边早就修过同一个坑** ✓（见 `core/messages.py` 那段注释：
+    #      「原来首屏是 `after=0 LIMIT 50` —— 那拿的是最旧的 50 条 ✗ …
+    #        现在首屏走'倒序取 50 再翻回正序'」✓）——
+    #      工坊这条路**没跟着改** ✗，而"同一个错在两处、只改一处"
+    #      正是这个项目反复栽的形状 ✓。
     rows = await fetch_all(
-        _WS_SELECT + " WHERE m.task_id = ? ORDER BY m.id ASC LIMIT 200", (int(task_id),))
-    rows = [_ws_msg(dict(r), aname) for r in rows]
+        _WS_SELECT + " WHERE m.task_id = ? ORDER BY m.id DESC LIMIT 200", (int(task_id),))
+    rows = [_ws_msg(dict(r), aname) for r in reversed(rows)]
     # ★ **有人正在改这个组件吗** ✓（用户定的：「此时其他用户进入时会被提示」✓）——
     #   ⚠️ 只提示**别人** ✓：自己那条正在跑是**正常状态** ✓
     #      （界面上那个转圈就是它 ✓），再弹一句"你正在改"只会让人莫名其妙 ✓。
@@ -971,6 +1095,45 @@ async def task_open(group_id: int, task_id: int,
             #   → 那三秒里屏幕上是空的 ✓（"组件制作中"看不见了 ✓，而它明明还在做 ✓）。
             "making": _is_waiting(group_id, user["id"], int(task_id)),
             "busy": _busy(group_id, user["id"])}
+
+
+@router.post("/{group_id}/tasks/{task_id}/stop")
+async def task_stop(group_id: int, task_id: int,
+                    user: dict = Depends(current_user)) -> dict:
+    """**显式掐掉正在跑的那一轮** ✓（2026-10-11 加的 ✓，用户选的 ✓）。
+
+    ⚠️ **为什么必须补这个出口** ✗ —— 把"切换即终止"改成"占用即拒绝进入"之后 ✓，
+      原来那条**顺带的取消路就没了** ✓：模型要是卡住不回 ✓，
+      人就被**永久关在门外** ✓（别的组件一个都进不去 ✓，而 `_running` 在内存里 ✓，
+      不清就一直在 ✓）。用户 2026-10-11 明确选的这一条 ✓：
+      「留个显式「掐掉」按钮」✓。
+      → 手滑切走**不再等于**取消 ✓；想停就**明着按** ✓。
+
+    ⚠️ **只能停自己那条** ✓ —— 判据是 `_own_task`（这条对话是我的 ✓）
+      + `_running` 里的任务号（跑着的确实是我这条 ✓）。
+      别人的活轮不到你来掐 ✓（这不只是礼貌 ✓ —— 掐错了会**作废别人的票** ✓）。
+
+    ⚠️ **没在跑不是错误** ✗ —— 手快连按两下、或者刚好自己跑完了 ✓，
+      都落进这一支 ✓。返回 `stopped: None` 如实说 ✓，不报 4xx ✓
+      （那不是用户做错了什么 ✓，弹一个红字只会让人以为哪里坏了 ✓）。
+    """
+    await require_member(group_id, user["id"])
+    await _assert_open(group_id)
+    await _own_task(group_id, user["id"], task_id)
+    doing = await _doing_for(group_id, user["id"])
+    if not doing or int(doing["task_id"]) != int(task_id):
+        return {"ok": True, "stopped": None, "task_id": int(task_id),
+                "busy": _busy(group_id, user["id"])}
+    killed = await _abort(group_id, user["id"])
+    msg = None
+    if killed:
+        log.info("工坊停手：群 %s 用户 %s 掐掉任务 %s（**显式按的** ✓）",
+                 group_id, user["id"], killed)
+        # ★ **失败要看得见** ✓（项目铁律 ✓）—— 那一轮是**我们掐的** ✓，
+        #   不补一句的话，对话里就是"我说了话，它什么都没回" ✓。
+        msg = await _save(group_id, user["id"], killed, "agent", "（这一轮被你停掉了）")
+    return {"ok": True, "stopped": killed, "task_id": int(task_id),
+            "message": msg, "busy": _busy(group_id, user["id"])}
 
 
 @router.post("/{group_id}/tasks/{task_id}/chat")
@@ -1016,9 +1179,8 @@ async def task_say(group_id: int, task_id: int, body: TaskSayIn,
     #    "我说话了，它没理我" ✓，过一会儿它突然回一句**上一个**的答案 ✓。
     if _busy(group_id, user["id"]):
         return {"ok": False, "busy": True,
-                "error": ("它手上还有一个在做（要么在问你，要么在等那个小助手写完）✓。"
-                          "**等这一轮完了再说** ✓，或者切到别的对话去 ✓"
-                          "（切走会把这一轮掐掉 ✓）。")}
+                "error": ("它手上还有一个在做（要么在问你，要么在等那个小助手写完）。"
+                          "**等这一轮完了再说**；真要停就按上面那个「停掉这一轮」。")}
     msg = await _save(group_id, user["id"], row["id"], "user", text,
                       msg_type=kind,
                       media_path=body.media_path or None,

@@ -613,14 +613,50 @@
     probe.src = url;
   };
   const openTaskById = async (tid, from) => {
+    // ★ **先问"能不能进"，再推屏** ✗→✓（2026-10-11）——
+    //   ⚠️ 顺序不能反 ✗：先推再被服务端拒掉的话，用户看到的是
+    //     "那一屏推进来又退回去" ✓ —— 正是这个项目最怕的"点了像坏了"✓。
+    //   ⚠️ 这一趟 `wsReloadTasks` 顺便把**别人的**改动也捞回来 ✓（`editing` ✓），
+    //     一顿往返买两样 ✓；代价是每次进对话多约 20ms ✓，值 ✓。
+    if (tid != null) {
+      await wsReloadTasks();
+      const hint = wsBusyHint(tid);
+      if (hint) { toast(hint); return false; }
+    }
     if (!$('#wsChat').classList.contains('on')) pushScreen('wsChat', from);
     try {
       const d = await api(`/workshop/${group.id}/tasks/${tid}/open`, { method: 'POST' });
+      // ★ **服务端那道闸才是判据** ✓ —— 前端这份可能已经旧了 ✓（见 `wsBusyHint` ✓）。
+      if (d && d.ok === false) { toast(d.error || '现在打不开这条'); return false; }
       showTask(d);
+      return true;
     } catch (e) {
       toast('这条对话打不开：' + e.message);
       closeWsChat();
+      return false;
     }
+  };
+
+  /**
+   * ★ **断线回来把工坊这条也补上** ✗→✓（2026-10-11）。
+   *
+   *   原来重连**只补群聊** ✓（`syncMissed` 打的是 `/groups/{id}/messages` ✓），
+   *   工坊**一个字都不补** ✗ →
+   *     · 断线窗口里丢掉的那条收尾 `ws_message` **永远回不来** ✓，
+   *       而流式气泡**只有它才会被摘掉** ✓（见 `04-chat.js` 那段 ✓）→
+   *       屏幕上**卡着半截回复** ✓，下一轮的话还会**接着往它上面写** ✗。
+   *
+   *   ⚠️ **不做增量补** ✗，直接把这条**重开一次** ✓（`openTaskById` ✓ 重新拉历史 ✓）：
+   *      一条工坊对话就 200 条以内 ✓，重拉最省心 ✓；
+   *      而且它顺手把 `wsCur.streaming` 复位 ✓ —— 那正是要治的东西 ✓。
+   *   ⚠️ **只在"这一屏开着"的时候做** ✓（没开就不管 ✓ —— 进来的时候自然会拉 ✓）。
+   *   ⚠️ 它**不推屏** ✓（`openTaskById` 里那句"已经 on 了就不推"✓）——
+   *      重连不该让人看见屏幕动一下 ✓。
+   */
+  const wsResync = async () => {
+    if (!$('#wsChat').classList.contains('on')) return;
+    if (!wsCur.task) return;
+    await openTaskById(wsCur.task);
   };
 
   /**
@@ -659,6 +695,16 @@
         method: 'POST',
         body: JSON.stringify({ slug: slug || '', title: title || '' }),
       });
+      // ⚠️ **"正占着"是 200 + ok:false** ✗→✓（2026-10-11）—— 不是 HTTP 错误 ✓
+      //    （`api()` 只在非 2xx 时抛 ✓）→ 不接的话会拿着 undefined 去 `showTask` ✗
+      //    （同 `sendWs` 里那条注释 ✓，两处一个形状 ✓）。
+      //    ★ **服务端这道闸必须留着** ✓ —— 只靠前端挡的话，绕一下就能开第二条 ✓
+      //      （右上角那条路本来就是"先建再进"✓），那道闸就等于没有 ✓。
+      if (t && t.ok === false) {
+        wsCur.doing = t.doing || wsCur.doing;
+        toast(t.error || '现在不能开新的');
+        return false;
+      }
       showTask(t);
       await wsReloadTasks();
       return true;
@@ -681,8 +727,34 @@
       //   像"改了没保存" ✓）。
       if (d.assistant) wsCur.assistant = d.assistant;
       wsCur.editing = d.editing || {};
+      // ★ 顺手把「**现在正占着哪条**」也带上 ✗→✓（2026-10-11）——
+      //   它由**服务端**算 ✓（后端 `_doing_for` ✓），这边只是拿它挡一下 ✓。
+      wsCur.doing = d.doing || null;
       return d;
     } catch (e) { return null; }   // 拉不到不影响正在看的这一条 ✓
+  };
+
+  /**
+   * ★ **能不能进这条对话** ✗→✓（2026-10-11 用户定的规矩，见后端 `_doing_for` 那段）。
+   *
+   *   它正在做/改某一条的时候，**别的都进不去** ✓，话照用户给的原话 ✓：
+   *   「[diy 助手昵称]正在[组件名称]，不能分心哦」✓。
+   *   ⚠️ 这一条替掉了原来的「打开另一条 → 把你正在跑的那轮掐掉」✗→✓。
+   *
+   *   ⚠️ 这一份只是"**别让他白点一下**" ✓ —— **判据在服务端** ✓：
+   *      这边这份可能已经旧了 ✓（另一台设备上刚开的活，这边不知道 ✓）。
+   *      所以两处都要有 ✓：这里挡在**推屏之前**（屏不闪 ✓），服务端兜底（真拦得住 ✓）。
+   *   ⚠️ `tid` 是**它自己那条**时要放行 ✓ —— 界面每次进这一屏都会"打开一次" ✓，
+   *      那不是分心 ✓（判据是任务号 ✓）。
+   *   ⚠️ `tid` 传 `null` = "我要**开一条新的**" ✓ —— 那种只要有人在跑就挡 ✓
+   *      （主群聊右上角走的就是这条路 ✓）。
+   */
+  const wsBusyHint = (tid) => {
+    const d = wsCur.doing;
+    if (!d) return '';
+    if (tid != null && Number(d.task_id) === Number(tid)) return '';
+    const name = (wsCur.assistant && wsCur.assistant.name) || 'diy 小助手';
+    return name + '正在「' + (d.title || '一个组件') + '」，不能分心哦';
   };
 
   /** 按照务器的当前值，把顶栏那个名字刷一遍 ✓（改名之后用 ✓）。 */
@@ -740,14 +812,25 @@
       //     **上次退出时未做出组件，已自动恢复**」✓）。
       // ⚠️ 那句话是**提醒他去哪儿了** ✓ —— 不然他按了右上角、突然进到一条
       //    上次的半成品里 ✓，会以为"怎么又回来了" ✓。
-      await openTaskById(unfinished.id, 'corner');
-      // ⚠️ **时间短一点** ✗→✓（2026-10-10 用户：「如果触发恢复，其提示小卡片
-      //   时间短一些」✓；给了 2000 之后他又说「1s 吧」✓ → **1000ms** ✓。
-      //   ⚠️ 这条只剩一秒，但该有的信息还在 ✓（它就是「我刚才替你续上了」✓）；
-      //      再短就来不及读了 ✗，别改到几百毫秒去 ✓。
-      showNotice('上次退出时未做出组件，已自动恢复', 1000);
+      const ok = await openTaskById(unfinished.id, 'corner');
+      // ⚠️ **只在真的进去了才说"已自动恢复"** ✗→✓（2026-10-11）——
+      //    被那道"占用"闸挡下时 `openTaskById` 返回 false ✓；
+      //    这时候还弹"已自动恢复"就是**在骗人** ✓（人明明没进去 ✓）。
+      if (ok) {
+        // ⚠️ **时间短一点** ✗→✓（2026-10-10 用户：「如果触发恢复，其提示小卡片
+        //   时间短一些」✓；给了 2000 之后他又说「1s 吧」✓ → **1000ms** ✓。
+        //   ⚠️ 这条只剩一秒，但该有的信息还在 ✓（它就是「我刚才替你续上了」✓）；
+        //      再短就来不及读了 ✗，别改到几百毫秒去 ✓。
+        showNotice('上次退出时未做出组件，已自动恢复', 1000);
+      }
       return;
     }
+    // ★ **真要开新的一条了 —— 这里才拦** ✗→✓（2026-10-11，用户原话：
+    //   「…或者不能通过**主群聊右上角**进入」✓）。
+    //   ⚠️ 拦在**弹那个起名框之前** ✗ —— 让他在弹层里打完名字、
+    //     点了"开始做"才被告知"不能分心" ✓，那一下是白费他的力气 ✓。
+    const hint = wsBusyHint(null);
+    if (hint) { toast(hint); return; }
     // ★ **新的那条：先起个名字再进去** ✗→✓（用户 2026-10-09 定的：
     //   「如果是新进入，会弹出界面**先起个名字**再进去新的组件聊天」✓）。
     //   ⚠️ 上一轮我把它去掉了 ✗（当时按"少一步"理解的 ✓）—— 他这一版明确要它 ✓。
@@ -996,6 +1079,12 @@
     //    往外层写 textContent 会**把转圈一起抹掉** ✓（文字有了、圈没了 ✓，看着像卡住 ✓）。
     $('#wsStatusText').textContent = text;
     el.hidden = !text;
+    // ★ **「停掉」只在"有活在手上"的时候露** ✗→✓（2026-10-11）——
+    //   见 `#wsStop` 那段：`thinking` / `working` 才停得掉 ✓；
+    //   `done` / `idle` 没东西可停 ✓ → 藏起来 ✓。
+    //   ⚠️ 一个"点了没反应"的按钮**比没有按钮更让人犯嘀咕** ✓（这个项目的老结论 ✓）。
+    const stop = $('#wsStop');
+    if (stop) stop.hidden = !(state === 'thinking' || state === 'working');
   };
 
   const sendWs = async () => {
@@ -1499,6 +1588,32 @@
   //    是从列表里算出来的 ✓：刚做完一个组件、还没刷的话，它会显示**上一版**的号 ✓
   //    （"我明明刚做完 v3，它说我保留的是 v2" ✓ —— 那是很难说得清的一种错 ✓）。
   $('#wsMore').onclick = openWsMenu;
+
+  // ★ **「停掉这一轮」** ✗→✓（2026-10-11，用户选的 ✓）——
+  //   把"切换即终止"改成"占用即拒绝进入"之后 ✓，出口必须**显式** ✓
+  //   （见后端 `task_stop` 那段：不补这个，模型卡住时人会被**永久关在门外** ✓）。
+  //
+  //   ⚠️ **不能在客户端"装作停掉了"** ✗ —— 必须等服务端回话 ✓：
+  //      真正要断的是**服务端那条流** ✓（`asyncio.Task.cancel()` ✓），
+  //      前端清一下状态是**没有用**的 ✓（下一片 delta 照样会推过来 ✓）。
+  //   ⚠️ **服务端写的那句"（这一轮被你停掉了）"要当场画上** ✗ —— 它不走 WebSocket ✓
+  //      （是这次请求的返回值 ✓，见 `task_stop` ✓），等下一轮同步才画＝**看不到** ✓。
+  $('#wsStop').onclick = async () => {
+    const tid = wsCur.task;
+    if (!tid) return;
+    const btn = $('#wsStop');
+    btn.disabled = true;                       // 连按两下 = 两次取消 ✓，挡一下 ✓
+    try {
+      const d = await api(`/workshop/${group.id}/tasks/${tid}/stop`, { method: 'POST' });
+      if (d && d.message) addWsMsg(d.message);
+      setWsStatus('idle');
+      await wsReloadTasks();                   // 占用的登记也要跟着放掉 ✓
+    } catch (e) {
+      toast('没停掉：' + e.message);
+    } finally {
+      btn.disabled = false;
+    }
+  };
   $('#wsSend').onclick = sendWs;
   // ★ 加图那个按钮 ✓ —— 选完先停在待发区 ✓（用户定的 ✓）。
   // ★ 2026-10-08：从"一个图片按钮"改成**和主群聊同款的 ＋** ✓
