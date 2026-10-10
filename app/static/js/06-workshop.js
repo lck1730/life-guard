@@ -49,19 +49,36 @@
       return sel + "{" + kept.join(";") + "}";
     });
 
-  const applyWallCss = async () => {
+  //: ⚠️ **那段外观要"开机就取好"** ✗→✓（2026-10-11 用户："进组件界面/工坊容易黑屏一闪"）——
+  //:   原来是**进屏那一刻才异步取** ✗ → 取回来之前先按默认底色画了一帧 ✓ →
+  //:   那一段就是"黑屏一闪" ✓（主群聊 ⇄ 设置不闪 ✓，因为那两屏的主色**在样式表里** ✓，
+  //:   而这一屏的主色是**取回来的** ✓）。
+  //:   现在：开机（进 App 时）**预取一次** ✓ 缓存在这儿 ✓ → 进屏时**同步**挂上 ✓ → 不闪 ✓。
+  let _wallCss = null;        // null = 还没取过；'' = 取过了、没有自定义外观
+
+  const _paintWallCss = (css) => {
     const old = $('#wall-diy');
     if (old) old.remove();
+    if (!css || !css.trim()) return;                 // 没改过 → 默认样子 ✓
+    const st = document.createElement('style');
+    st.id = 'wall-diy';
+    st.textContent = sanitizeWallCss(css);           // ★ 过闸 ✓（见上面那段）
+    document.head.appendChild(st);
+  };
+
+  const applyWallCss = () => {
+    if (_wallCss !== null) { _paintWallCss(_wallCss); return; }   // ★ **同步** ✓ 不闪 ✓
+    api(`/wall-css?group_id=${group.id}`)
+      .then((d) => { _wallCss = (d && d.css) || ''; _paintWallCss(_wallCss); })
+      .catch(() => { _wallCss = ''; });              // 读不到就当没有 ✓（这一屏照常能用 ✓）
+  };
+
+  //: 开机预热 ✓ —— `enterApp` 进完 App 调它一次 ✓（见 03-auth.js ✓）。
+  const preloadWallCss = async () => {
     try {
       const d = await api(`/wall-css?group_id=${group.id}`);
-      if (!d || !d.css || !d.css.trim()) return;      // 没改过 → 默认样子 ✓
-      const st = document.createElement('style');
-      st.id = 'wall-diy';
-      st.textContent = sanitizeWallCss(d.css);        // ★ 过闸 ✓（见上面那段）
-      document.head.appendChild(st);
-    } catch (e) {
-      // 读不到就当没有自定义外观 ✓ —— 这一屏照常能用 ✓（别让外观把界面挡住 ✗）
-    }
+      _wallCss = (d && d.css) || '';
+    } catch (e) { _wallCss = ''; }
   };
 
   const openWorkshop = () => {
