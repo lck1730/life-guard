@@ -1313,6 +1313,13 @@
     $('#lightboxTxt').hidden = true;
     $('#lightboxImg').hidden = false;
     $('#lightboxImg').src = src;
+    // ★ **能不能存，只看"这张图是不是已经落在服务器上"** ✗→✓（2026-10-11）——
+    //   三个调用点给的 src 只有两种 ✓：
+    //     · `img.src`（聊天里那条已经落库的图 ✓）→ **绝对 http 地址** ✓ → 能存 ✓
+    //     · `blob:`（我自己刚发、还在传的那条 ✓）→ 原生**拿不到** ✓
+    //       （blob 只在页面这个进程里有效 ✓）→ 藏起来 ✓
+    //   ⚠️ 一个"点了没反应"的按钮**比没有按钮更糟** ✓（这个项目的老结论 ✓）。
+    $('#lightboxSave').hidden = !/^https?:/.test(src);
     $('#lightbox').classList.add('on');
   };
 
@@ -1339,6 +1346,30 @@
   //    （它原来塞在群聊屏里的时候就得操这个心 ✓ —— 位置挪对了，这个坑自己就没了 ✓。
   //      "两个问题一个根因"在这类布局错里很常见 ✓，所以**先修位置** ✓。）
   $('#lightbox').onclick = () => closeLightbox();
+
+  // ★ **保存到相册** ✗→✓（2026-10-11 用户：「需要保存」）——
+  //   ⚠️ **网页自己做不到** ✗，这不是偷懒：`/media` 要同源 cookie ✓、
+  //      而 WebView 里 `<a download>` / blob **没有任何下载器接着** ✓
+  //      → 只能喊一声壳 ✓（`MainActivity` 的 `saveImage` ✓，它带 cookie 去取、
+  //        写进系统相册 ✓）。
+  //   ⚠️ **浏览器里没有 `LifeGuardNative`** ✓ —— 那句提示不是"出错了" ✓，
+  //      是"这个动作只有 App 里才有" ✓（电脑上开网页时就是这种情况 ✓）。
+  $('#lightboxSave').onclick = (ev) => {
+    ev.stopPropagation();          // ⚠️ 别顺手把灯箱关了 ✓（按钮在灯箱里面 ✓）
+    const src = $('#lightboxImg').getAttribute('src') || '';
+    if (!src) return;
+    // ⚠️ **两种"没有"要分开说** ✗ —— 它们的下一步完全不同 ✓：
+    //   · 不在 App 里（电脑上开的网页 ✓）→ 说什么都没用 ✓，如实说 ✓
+    //   · 在 App 里、但**壳是旧的**（没有这个方法 ✓）→ 该去**更新 App** ✓
+    //   糊成一句"存不了"的话，他就不知道该干什么 ✓
+    //   （这几行照老写法 ✓：`isNative` + 方法在不在 ✓，见上面 `takePhoto` ✓）。
+    if (!isNative) { toast('保存到相册要在 App 里用（现在这个是浏览器）'); return; }
+    if (!window.LifeGuardNative.saveImage) {
+      toast('这个版本的 App 还不会存图 —— 更新一下 App 再试');
+      return;
+    }
+    window.LifeGuardNative.saveImage(src);   // 存没存上由壳那边 toast 回话 ✓
+  };
 
   /** 看某个人的头像（放大）✓ —— 2026-10-07 用户："如果是群里其他人，
       则是查看其头像放大，点击旁边空白退出查看" ✓。

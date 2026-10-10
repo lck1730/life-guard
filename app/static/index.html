@@ -524,6 +524,14 @@
 <div class="lightbox" id="lightbox">
   <img id="lightboxImg" alt="">
   <div class="bigletter" id="lightboxTxt" hidden></div>
+  <!-- ★ **保存到相册** ✗→✓（2026-10-11 用户：「需要保存」）——
+       网页自己**做不到** ✗（`/media` 要同源 cookie ✓、WebView 里也没有下载器 ✓）→
+       这个按钮只是**喊一声原生** ✓（`LifeGuardNative.saveImage` ✓）。
+       ⚠️ 它**不是**"下载到文件夹" ✓ —— 是进**系统相册**（Pictures/LifeGuard ✓），
+          手机上"保存图片"就是这个意思 ✓。
+       ⚠️ 打开的是 `blob:` 那种（自己刚发、还在传的 ✓）时会**藏起来** ✓ ——
+          原生拿不到 blob ✓，留一个点了没反应的按钮更糟 ✗（见 openLightbox ✓）。 -->
+  <button class="lbsave" id="lightboxSave" type="button" hidden>保存到相册</button>
 </div>
 
 <script src="/static/app.js"></script>

@@ -558,6 +558,19 @@
                          display:flex; align-items:center; justify-content:center;
                          font-size:20vmin; font-weight:600; }
   .lightbox .bigletter[hidden] { display:none; }
+  /* ★ **保存到相册** ✗→✓（2026-10-11，见 index.html 那段）——
+     ⚠️ **挂在灯箱最上面** ✓，别跟图片抢位置 ✓：图片是 `object-fit:contain` ✓，
+        上下留白本来就有 ✓ —— 钉在**右下角**，那是最不会压到正题的地方 ✓。
+     ⚠️ 用**半透明的白**而不是给个实心按钮 ✗ —— 这是在看图 ✓，
+        一个实心按钮会把"看"这件事抢走 ✓（它是**附加动作** ✓，不是主行动 ✓）。
+     ⚠️ `bottom` 要**避开手势条** ✓（`--inset-bottom` ✓，和输入框那排同一条规矩 ✓）。 */
+  .lightbox .lbsave { position:absolute; right:16px;
+                      bottom:calc(20px + var(--inset-bottom));
+                      padding:9px 16px; border:0; border-radius:999px;
+                      background:rgba(255,255,255,.16); color:#fff;
+                      font:inherit; font-size:14px; backdrop-filter:blur(6px); }
+  .lightbox .lbsave:active { background:rgba(255,255,255,.3); }
+  .lightbox .lbsave[hidden] { display:none; }
 
   /* ── 左右滑 → 引用 ✓（2026-10-07 用户："左滑右滑可以引用，有那种动态感" ✓）──
      提示钉在**行原来那一边的边缘**上不动 ✓，行滑开就把那块地方**让出来** ✓
