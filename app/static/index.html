@@ -231,11 +231,7 @@
        accept=".txt,.md,.csv,.json,.pdf,.doc,.docx,.xls,.xlsx">
 <input type="file" id="fileAudio" accept="audio/*" hidden>
 
-  <!-- 图片大图查看 -->
-  <div class="lightbox" id="lightbox">
-    <img id="lightboxImg" alt="">
-    <div class="bigletter" id="lightboxTxt" hidden></div>
-  </div>
+  <!-- ⚠️ 灯箱原来在这儿 ✗→✓（2026-10-11）—— 见下面顶层的那个 ✓ -->
 </div>
 
 <!-- 管家设置：**三屏** ✓（列表 / 改资料 / 编一档状态），见 #settings 那套 -->
@@ -501,6 +497,34 @@
 <div class="notice" id="notice"></div>
 <!-- 长按消息弹出来的小卡片（不是从底部弹 ✓，贴在消息旁边 ✓）-->
 <div class="msgcard" id="msgcard"><div class="box"></div></div>
+
+<!-- ★★ 图片大图查看（灯箱）—— **必须在顶层，不能塞进任何一屏里** ✗→✓（2026-10-11）
+     用户报的：「点击一次图片后，**返回主群聊变成了那张图片**」✓ —— 就是它 ✗。
+
+     ⚠️ **根因是层叠上下文** ✗：它原来住在主群聊那一屏（`div.screen#chat`）**里面** ✓，
+        而 `.screen` 是 `position:fixed` ✓ —— 那本身就**自成一个层叠上下文** ✓ →
+        灯箱那个 `z-index:80` **只在那一屏内部有效** ✗，跟别的屏比不了 ✓。
+        于是（用户在**工坊**那条对话里点图 ✓，`#wsChat` 是 28）：灯箱**真的亮了** ✓，
+        但整块被压在工坊底下 ✓ → **看不见** ✗（"点了没法放大"）。
+        更要命的是那个 `.on` **一直挂着** ✓ —— 一退回主群聊 ✓，工坊一关 ✓，
+        群聊那一屏露出来 ✓ → 那个亮着的灯箱**当场现身** ✓ → "主群聊变成了那张图片" ✓。
+
+     ⚠️ **教训**：`position:fixed` 的屏，自成一格 ✓ —— 凡是"要盖在所有东西上面"的
+        东西 ✓（灯箱 / toast / 浮卡 / 弹层 ✓），**都必须挂在 body 底下** ✗，
+        塞进任何一屏里都只是在那一屏内部称王 ✓。
+        `tools/check-runtime.sh` 那道"body 底下只许有这几样"的闸，
+        就是为了逮住这一类 ✓（它管的正是这个形状 ✓）。
+
+     ⚠️⚠️ **注释里别写字面标签** ✗→✓（2026-10-11，写完当场被自己绊了一跤）——
+        这段原来写的是带尖括号的 `div class="screen" id="chat"` ✓，
+        而那道闸是用**正则扫 dump 出来的 DOM** ✓（注释在 `--dump-dom` 里是**原样保留**的 ✓）
+        → 它把注释里那串字**当成真标签**数了一遍 ✓ →
+        顶层元素凭空多出一个 ✓、还把后面的深度算歪 ✓。
+        所以这里一律写成 `div.screen#chat` 这种**不带尖括号**的写法 ✓。 -->
+<div class="lightbox" id="lightbox">
+  <img id="lightboxImg" alt="">
+  <div class="bigletter" id="lightboxTxt" hidden></div>
+</div>
 
 <script src="/static/app.js"></script>
 </body>
