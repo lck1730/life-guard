@@ -46,7 +46,6 @@ from .db import (close_db, execute, execute_rc, fetch_all, fetch_one, init_db,
                  now)
 from .hub import hub
 from .messages import current_status_for
-from .routes_auth import router as auth_router
 from .routes_groups import router as groups_router
 from .routes_internal import router as internal_router
 from .routes_media import router as media_router
@@ -110,7 +109,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router)
 app.include_router(groups_router)
 app.include_router(media_router)
 app.include_router(internal_router)

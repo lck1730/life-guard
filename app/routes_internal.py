@@ -37,8 +37,6 @@ from pydantic import BaseModel, Field
 from .config import WALL_SLUG, settings
 from . import records as rec
 from . import reminders as rem
-from .auth import PREVIEW_SCOPE, make_token
-from .config import settings
 from .db import execute, fetch_all, fetch_one, now
 from .messages import create_message
 # ⚠️ 这里**只 import 函数**，而且放函数外用 ✓ —— routes_workshop 不 import 本模块 ✓，

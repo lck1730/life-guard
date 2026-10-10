@@ -427,22 +427,6 @@ async def upload_agent_avatar(
     return {"ok": True, "avatar": f"/ui/{rel}"}
 
 
-class UpdateMeIn(BaseModel):
-    nickname: str = Field(min_length=1, max_length=32)
-
-
-@router.patch("/{group_id}/me")
-async def update_my_nickname(
-    group_id: int, body: UpdateMeIn, user: dict = Depends(current_user)
-) -> dict:
-    """改我在**这个群**里的昵称。与账号名无关（账号名是登录凭证）。"""
-    await require_member(group_id, user["id"])
-    await execute(
-        "UPDATE group_members SET nickname = ? WHERE group_id = ? AND user_id = ?",
-        (body.nickname.strip(), group_id, user["id"]),
-    )
-    await broadcast_group_update(group_id)
-    return {"ok": True, "nickname": body.nickname.strip()}
 
 
 @router.get("/{group_id}/messages")

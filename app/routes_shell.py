@@ -390,15 +390,6 @@ async def set_self_intro(body: SelfIntroIn, request: Request) -> dict:
     return {"self_intro": text}
 
 
-@router.get("/api/notes")
-async def list_notes(request: Request) -> dict:
-    """我给别人起的备注 ✓（`{peer_id: note}` ✓）—— 只有我自己看得到 ✓。"""
-    me = await _require_me(request)
-    rows = await fetch_all(
-        "SELECT peer_id, note FROM contact_notes WHERE owner_id = ?", (me["id"],))
-    return {"notes": {str(r["peer_id"]): r["note"] for r in rows}}
-
-
 class NoteIn(BaseModel):
     peer_id: int
     note: str = Field(default="", max_length=24)
