@@ -4388,9 +4388,11 @@
   const paintDiyAvatar = () => {
     const url = wsCur.assistant.avatar || '';
     const ch = (wsCur.assistant.name || '助').slice(0, 1);
-    [$('#wsDiyAv'), $('#diyAv')].forEach(el => {
-      if (el) paintZhi(el, url, ch);
-    });
+    // ⚠️ 这里原来还有个 `$('#diyAv')` 一起画 ✓ —— 那个元素早没了 ✗（2026-10-11
+    //    新加的那道 id 核对把它抓出来的 ✓：**它一直都查不到东西** ✓，
+    //    只是外面套了 `if (el)` 所以没炸 ✓ ——**"不炸"不等于"有用"** ✗）。删掉 ✓。
+    const el = $('#wsDiyAv');
+    if (el) paintZhi(el, url, ch);
   };
 
   /**
