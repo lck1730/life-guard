@@ -17,6 +17,38 @@
   //    常驻就等于"某一屏的外观污染了整个 App" ✓。所以只在**这一屏开着的时候**挂着 ✓。
   // ⚠️ 注入的 `<style>` 挂在 `<head>` 上 ✓（不是这一屏里面 ✓）—— 放屏里面也会全局生效 ✓，
   //    那是 `<style>` 的语义 ✓，所以只能靠"进出时挂/摘"来限定时间 ✓。
+  //: ★ **骨架属性** ✗→✓（2026-10-11 用户抓到的一个真 bug）——
+  //:   那段 CSS 是 **agent 自己写的** ✓，而它写了
+  //:   `#workshop { position: relative !important; }` ✗ —— 那一句**把整屏的定位掀了** ✓：
+  //:   `.screen` 靠 `position:fixed; inset:0` 盖住整个视口 ✓ → 变成 `relative` 之后
+  //:   **它不再盖住** ✓ → 底下的群聊露出来（连输入框一起 ✓）、**页面还变得能滚** ✓
+  //:   （用户："向上滑成这样了，本来向上滑不该有任何触发"✓）。
+  //:
+  //:  ⚠️ **这又一次是"提示词 vs 闸门"** ✓：告诉 agent"别动布局"是**请求** ✗；
+  //:     `!important` + id 选择器还会赢过样式表里那些普通规则 ✓ ——
+  //:     **光在 CSS 里加 `!important` 也拦不住** ✗（id 的选择器更具体 ✓，
+  //:      两边都 important 时按出现顺序 ✓，而这段是**后注入**的 ✓ → 它赢 ✗）。
+  //:     所以闸门只能设在这里：**注入之前把它摘掉** ✓。
+  //:
+  //:  ⚠️ 只对**"屏本身"那个选择器**动手 ✗ —— `#workshop .cell { … }` 那种
+  //:     （改里头的卡片长什么样 ✓）**一个字都不动** ✓，那是它该干的活 ✓。
+  const _LAYOUT_PROP = /^(position|inset|top|right|bottom|left|z-index|display|overflow|overflow-[xy]|height|min-height|max-height|width|min-width|max-width|transform|visibility|opacity|pointer-events|contain|isolation)$/i;
+  const _SCREEN_SEL = /^(#workshop|#wsChat|#compView|\.screen|body|html|:root)$/i;
+  const sanitizeWallCss = (css) => css
+    // ⚠️ **先把注释剥掉** ✗→✓ —— 第一版没剥 ✓，于是选择器那段捕获到的是
+    //    `/* 收纳页 … */\n#workshop` ✓（**带着注释** ✓）→ `^#workshop$` 匹配不上 ✓ →
+    //    闸门**一个字都没拦** ✓。我拿真 CSS 跑了一遍才看见 ✗（"看着写了闸门"≠"闸门拦得住"✓）。
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/([^{}]+)\{([^{}]*)\}/g, (whole, sel, body) => {
+      const hits = sel.split(",").map((s) => s.trim()).filter((s) => _SCREEN_SEL.test(s));
+      if (!hits.length) return whole;                   // 不是在动"屏本身" → 原样放行 ✓
+      const kept = body.split(";").filter((d) => {
+        const name = d.split(":")[0].trim();
+        return !name || !_LAYOUT_PROP.test(name);       // 骨架属性摘掉 ✓，配色之类留着 ✓
+      });
+      return sel + "{" + kept.join(";") + "}";
+    });
+
   const applyWallCss = async () => {
     const old = $('#wall-diy');
     if (old) old.remove();
@@ -25,7 +57,7 @@
       if (!d || !d.css || !d.css.trim()) return;      // 没改过 → 默认样子 ✓
       const st = document.createElement('style');
       st.id = 'wall-diy';
-      st.textContent = d.css;
+      st.textContent = sanitizeWallCss(d.css);        // ★ 过闸 ✓（见上面那段）
       document.head.appendChild(st);
     } catch (e) {
       // 读不到就当没有自定义外观 ✓ —— 这一屏照常能用 ✓（别让外观把界面挡住 ✗）
