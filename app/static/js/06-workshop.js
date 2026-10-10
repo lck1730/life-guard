@@ -521,15 +521,6 @@
   };
 
   /** 把 diy 小助手的头像画到几个地方 ✓ —— 顶栏那颗、气泡旁边、设置屏里 ✓。 */
-  const paintDiyAvatar = () => {
-    const url = wsCur.assistant.avatar || '';
-    const ch = (wsCur.assistant.name || '助').slice(0, 1);
-    // ⚠️ 这里原来还有个 `$('#diyAv')` 一起画 ✓ —— 那个元素早没了 ✗（2026-10-11
-    //    新加的那道 id 核对把它抓出来的 ✓：**它一直都查不到东西** ✓，
-    //    只是外面套了 `if (el)` 所以没炸 ✓ ——**"不炸"不等于"有用"** ✗）。删掉 ✓。
-    const el = $('#wsDiyAv');
-    if (el) paintZhi(el, url, ch);
-  };
 
   /**
    * 按**一个已经拼好的 URL** 画头像 ✓（`/ui/...` 那种 ✓）。
@@ -622,7 +613,6 @@
       //   像"改了没保存" ✓）。
       if (d.assistant) wsCur.assistant = d.assistant;
       wsCur.editing = d.editing || {};
-      paintDiyAvatar();
       return d;
     } catch (e) { return null; }   // 拉不到不影响正在看的这一条 ✓
   };
@@ -1318,7 +1308,6 @@
     try { d = await api(`/workshop/${group.id}/assistant`); }
     catch (e) { m.textContent = '打不开：' + e.message; return; }
     wsCur.assistant = d;
-    paintDiyAvatar();
     m.textContent = '';
 
     // 卡片一：头像
@@ -1380,7 +1369,6 @@
                                       { method: 'PATCH', body: JSON.stringify({ name }) });
         }
         diyFile = null;
-        paintDiyAvatar();
         toast('已保存');
         // ⚠️ **退回导航** ✓（管家那边改完也是退回去 ✓）——
         //    而且导航上那颗头像和气泡上的名字都得跟着变 ✓。
@@ -1404,7 +1392,6 @@
                           { method: 'POST', body: fd, credentials: 'same-origin' });
     if (!r.ok) throw new Error((await r.text()) || r.status);
     wsCur.assistant = await r.json();
-    paintDiyAvatar();
   };
 
   /** 删掉一个组件（或一条对话）之后**退回收纳页** ✓。
@@ -1434,8 +1421,10 @@
   //     · **2026-10-09：进"新建组件"的那条对话** ✓（导航屏整个不用了 ✓，
   //        见 `openNewCompChat` 那段 ✓）—— 用户原话：「省去了导航界面的麻烦」✓。
   $('#openWorkshop').onclick = openNewCompChat;
-  // ★ diy 小助手：导航右上角那颗头像 → 设置屏 ✓（用户 2026-10-07 深夜定的 ✓）
-  $('#wsDiy').onclick = openDiySet;
+  // ⚠️ 这里原来还有一句 `$('#wsDiy').onclick = openDiySet;` ✗→✓（2026-10-11）——
+  //    `#wsDiy`（导航屏右上角那颗「助」头像）**随导航屏一起删了** ✓，
+  //    而这一句还在 ✓ → `null.onclick = …` **加载即抛异常** ✗。
+  //    ⚠️ **diy 设置没丢** ✓：它另有入口 —— 工坊里那颗 diy 头像（下面 `openDiySet` ✓）。
   $('#diyBack').onclick = closeDiySet;
   $('#wsBack').onclick = closeWsChat;
   // ⚠️ ⋯ **自己会先刷一次列表** ✗→✓ —— 菜单上"保留这一版（v几）"那几个字
