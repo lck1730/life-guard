@@ -206,6 +206,13 @@ async def bootstrap(
         (int(g["id"]), int(user["id"])))
     me = dict(user)
     me["self_intro"] = (intro_row or {}).get("self_intro") or ""
+    # ★ 2026-10-11：**`is_admin` 要跟着这一趟回去** ✗→✓ ——
+    #   前端靠它决定"设置里那一行「模型」要不要露出来" ✓。
+    #   ⚠️ 那只是**藏一行** ✓（体验 ✓），**不是闸门** ✗ ——
+    #      真正的闸门在 `/api/models/*` 的 `require_admin` 里 ✓
+    #      （服务端过滤，不靠前端藏 ✓，这个项目的老规矩 ✓）。
+    _adm = await fetch_one("SELECT is_admin FROM users WHERE id = ?", (int(user["id"]),))
+    me["is_admin"] = bool((_adm or {}).get("is_admin"))
     return {"me": me, "groups": groups, "group": g, "members": mem,
             "messages": msgs, "notes": notes}
 

@@ -46,6 +46,12 @@ from .db import (close_db, execute, execute_rc, fetch_all, fetch_one, init_db,
                  now)
 from .hub import hub
 from .messages import current_status_for
+# ★ 2026-10-11：**模型服务并进来了** ✓ —— 它现在是这个 App 的两块：
+#   · `/v1/*`  给 Hermes 当模型端点（每次模型调用都从这儿过 ✓）
+#   · `/api/models/*`  换模型的界面（**管理员专属** ✓）
+#   见 `chat/app/models/__init__.py`（那里写了合并的取舍和代价 ✓）。
+from .models.proxy import router as models_proxy_router
+from .models.routes import router as models_router
 from .routes_groups import router as groups_router
 from .routes_internal import router as internal_router
 from .routes_media import router as media_router
@@ -119,6 +125,10 @@ app.include_router(workshop_router)
 #       `/api/workspaces` 和 `/api/groups` 不冲突 ✓，但 `/api/me`
 #       （本文件这条 ✓）和 `auth_router` 的 `/api/auth/me` 也不能撞 ✓。
 app.include_router(shell_router)
+# ★ 模型那两块 ✓ —— 放最后：`/v1/{path:path}` 是个 catch-all ✓，
+#   虽然和 `/api/*` 不冲突 ✓，但排在有具体路径的那些后面**更不容易出事** ✓。
+app.include_router(models_router)
+app.include_router(models_proxy_router)
 
 # 禁缓存的头。界面是"改服务器文件 = 用户重开 App 生效"的架构，
 # 一旦被 WebView 缓存住，改了不生效，用户会以为改动没做

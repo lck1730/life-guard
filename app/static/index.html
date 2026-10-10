@@ -1257,6 +1257,30 @@
      「退出当前空间（红色字体居中在退出登录上面）」✓）——
      它俩是同一种东西（都是"动作"、都没有去处 ✓），**长相必须一样** ✓，
      位置一上一下紧挨着 ✓（用户就是这么要求的 ✓）。 */
+  /* ★ 2026-10-11 模型池那一屏（`#models`）—— 自己几个类 ✓，不动既有样式 ✓ */
+  .msec { padding:22px 18px 6px; color:var(--muted); font-size:13px; letter-spacing:.06em; }
+  .mitem, .mcard { display:flex; align-items:center; gap:10px; padding:13px 18px;
+                   background:var(--panel); border-bottom:1px solid var(--line); }
+  .mitem .k { flex:1; }
+  .mitem .v { color:var(--muted); }
+  .mitem .v.empty { opacity:.55; }
+  .mitem .chev { color:var(--muted); }
+  .mcard { flex-direction:column; align-items:stretch; gap:6px; }
+  .mcard .top { display:flex; align-items:center; gap:8px; }
+  .mcard .nm { flex:1; font-weight:600; }
+  .mcard .meta { color:var(--muted); font-size:12.5px; word-break:break-all; line-height:1.6; }
+  .mcard .acts { display:flex; gap:8px; margin-top:4px; }
+  .mbtn { padding:7px 13px; border-radius:9px; border:1px solid var(--line);
+          background:transparent; color:var(--text); font-size:13.5px; }
+  .mbtn.danger { color:#ff6b6b; }
+  .mbtn.pri { background:var(--text); color:var(--panel); border-color:transparent; }
+  .mdot { width:8px; height:8px; border-radius:50%; background:#888; flex:0 0 auto; }
+  .mdot.ok { background:#34c759; } .mdot.warn { background:#ffb020; } .mdot.bad { background:#ff453a; }
+  .mhint { padding:10px 18px; color:var(--muted); font-size:13px; line-height:1.75; }
+  .mhint.bad { color:#ff6b6b; }
+  .mform { padding:14px 18px; display:flex; flex-direction:column; gap:12px; }
+  .mform label { color:var(--muted); font-size:13px; }
+
   .item[data-act="logout"], .item[data-act="leave"] { justify-content:center; }
   .item[data-act="logout"] .k, .item[data-act="leave"] .k { flex:0 0 auto; }
   .danger { color:var(--danger) !important; }
@@ -1882,6 +1906,12 @@
     <!-- 手动查更新。自动检查是"开 App 时问一次"，但那个时机不由你定——
          这一条让你随时能问，不用等。右边显示当前壳的版本号。 -->
     <div class="item" data-act="update"><span class="k">检查更新</span><span class="v" id="vAppVer"></span><span class="chev">›</span></div>
+    <!-- ★ 2026-10-11：「模型」—— **只有管理员看得见** ✓（`renderSettings` 按 `me.is_admin` 显示 ✓）。
+         它推开 `#models` 那一屏 ✓（模型池 / 三个用途槽 / 上下文长度 ✓），
+         那一屏**只由这一行进** ✓。
+         ⚠️ 藏起来只是**体验** ✓，**不是闸门** ✗ —— 闸门在 `/api/models/*`
+            的 `require_admin` 里 ✓（服务端过滤、不靠前端藏 ✓，这个项目的老规矩 ✓）。 -->
+    <div class="item" data-act="models" id="rowModels" style="display:none"><span class="k">模型</span><span class="v" id="vModels"></span><span class="chev">›</span></div>
 
     <!-- ★ **退出当前空间** ✗→✓（2026-10-09 用户定的 ✓，原话：
          「邀请码和退出当前空间（**红色字体居中在退出登录上面**）回到设置页」✓）。
@@ -1892,6 +1922,24 @@
 
     <div class="item" data-act="logout"><span class="k danger">退出登录</span></div>
   </div>
+</div>
+
+<!-- ★ 2026-10-11：**模型池** —— 原来它是另一个服务（8722）的一整张网页 ✓，
+     2026-10-11 并进这个 App ✓（见 `chat/app/models/__init__.py` ✓）。
+     管理员专属 ✓；那一行的入口在「设置」里 ✓（只有管理员看得见 ✓）。 -->
+<div class="screen" id="models">
+  <header class="sub">
+    <button class="icon-btn back" id="modelsBack" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 4.5 8.5 12 15 19.5" />
+      </svg>
+    </button>
+    <h2>模型</h2>
+    <button class="icon-btn plain" id="modelsAdd" aria-label="添加模型">＋</button>
+  </header>
+  <div class="body" id="modelsBody"></div>
 </div>
 
 <div class="sheet" id="sheet"><div class="panel" id="sheetPanel"></div></div>
@@ -4729,6 +4777,234 @@
   const autoGrow = () => { const t = $('#text'); t.style.height = 'auto'; t.style.height = Math.min(120, t.scrollHeight) + 'px'; };
 
   // ── 设置 ──
+  // ── 模型池（2026-10-11 从独立的「模型服务」并进来）────────────────────
+  //
+  // 原来整套（池子 / 三个用途槽 / 上下文长度）住在 8722 那个独立网页里 ✓，
+  // 现在搬进这个 App 的一屏 ✓ —— **管理员专属** ✓。
+  //
+  // ⚠️ 这一屏**只由「设置 → 模型」那一行进** ✓（那一行按 `me.is_admin` 显示 ✓）。
+  //    **藏入口只是体验** ✓，闸门在服务端（`/api/models/*` 的 `require_admin` ✓）。
+  //    所以这里**每一处都假设自己可能拿到 403** ✓ → 如实报出来 ✓，
+  //    别装作"池子是空的" ✗（那会让人以为模型丢了 ✓）。
+  let MODELS = null;                 // 最近一次读到的池子
+  const M_LABEL = { chat: '生活管家·chat', diy: '生活管家·diy', aux: '辅助·压缩' };
+
+  const openModels = () => { pushScreen('models', 'settings'); renderModels(); };
+
+  const mSec = (t) => mkel('div', 'msec', t);
+  const mHint = (t, bad) => mkel('div', 'mhint' + (bad ? ' bad' : ''), t);
+  const mBtn = (t, cls, fn) => { const b = mkel('button', 'mbtn' + (cls ? ' ' + cls : ''), t); b.onclick = fn; return b; };
+
+  // 状态点：没测过 / 通 / 不稳 / 不通 —— **和原来那个界面同一套口径** ✓
+  const mStateOf = (c) => {
+    if (!c.test) return { cls: '', text: '还没测过' };
+    const t = c.test;
+    if (!t.ok) return { cls: 'bad', text: '不通 · ' + (t.error || '').slice(0, 42) };
+    const ms = t.connect_ms ? ' · ' + t.connect_ms + 'ms' : '';
+    if (t.tools) return { cls: 'ok', text: '通 ✓ 调工具 ' + (t.tools_hits || '') + ms };
+    if (t.tools_any) return { cls: 'warn', text: '调工具不稳 ' + (t.tools_hits || '') + ms };
+    return { cls: 'warn', text: '调不了工具 ' + (t.tools_hits || '') + ms };
+  };
+
+  const renderModels = async () => {
+    const body = $('#modelsBody');
+    if (!body) return;
+    body.textContent = '';
+    body.appendChild(mHint('正在读…'));
+    try {
+      MODELS = await api('/models/configs');
+    } catch (e) {
+      body.textContent = '';
+      body.appendChild(mHint('读不到模型池：' + ((e && e.message) || e), true));
+      return;
+    }
+    const d = MODELS;
+    body.textContent = '';
+
+    // ① 用途分配：三行，点一行挑一个模型 ✓
+    body.appendChild(mSec('用途分配'));
+    Object.keys(M_LABEL).forEach(k => {
+      const r = (d.roles || {})[k] || {};
+      const row = mkel('div', 'mitem');
+      row.appendChild(mkel('span', 'k', M_LABEL[k]));
+      row.appendChild(mkel('span', 'v' + (r.name ? '' : ' empty'), r.name || '还没选'));
+      row.appendChild(mkel('span', 'chev', '›'));
+      row.onclick = () => pickRole(k);
+      body.appendChild(row);
+    });
+
+    // ② 模型池
+    body.appendChild(mSec('模型池'));
+    if (!d.configs.length) body.appendChild(mHint('池子是空的 —— 点右上角「＋」加一个。'));
+    d.configs.forEach(c => body.appendChild(mCard(c)));
+
+    // ③ 上下文长度
+    body.appendChild(mSec('上下文长度'));
+    body.appendChild(mCtx(d.context));
+
+    body.appendChild(mHint('三个用途各挑一个模型：chat 负责聊天、diy 负责做组件、'
+                           + 'aux 负责压缩和起标题。没选的那一档会哑。'));
+  };
+
+  const mCard = (c) => {
+    const box = mkel('div', 'mcard');
+    const top = mkel('div', 'top');
+    const st = mStateOf(c);
+    top.appendChild(mkel('span', 'mdot ' + st.cls));
+    top.appendChild(mkel('span', 'nm', c.name || '(没名字)'));
+    box.appendChild(top);
+    box.appendChild(mkel('div', 'meta', (c.model || '') + ' · ' + (c.base_url || '')));
+    box.appendChild(mkel('div', 'meta', st.text + (c.has_key ? ' · key …' + (c.key_tail || '') : ' · 没填 key')));
+    const acts = mkel('div', 'acts');
+    acts.appendChild(mBtn('测一下', '', () => testModel(c.id)));
+    acts.appendChild(mBtn('改', '', () => editForm(c)));
+    acts.appendChild(mBtn('删', 'danger', () => delModel(c)));
+    box.appendChild(acts);
+    return box;
+  };
+
+  // 挑某个用途用哪个模型 —— 一张底部弹层 ✓（测过通的排前面 ✓）
+  const pickRole = (role) => {
+    const d = MODELS || { configs: [] };
+    const panel = $('#sheetPanel');
+    panel.textContent = '';
+    panel.appendChild(mkel('div', 'msec', M_LABEL[role]));
+    const sorted = d.configs.slice().sort((a, b) =>
+      ((b.test && b.test.ok) ? 1 : 0) - ((a.test && a.test.ok) ? 1 : 0));
+    sorted.forEach(c => {
+      const row = mkel('div', 'mitem');
+      row.appendChild(mkel('span', 'k', c.name || '(没名字)'));
+      const st = mStateOf(c);
+      row.appendChild(mkel('span', 'mdot ' + st.cls));
+      row.onclick = async () => {
+        try { await api('/models/roles', { method: 'POST', body: JSON.stringify({ role, id: c.id }) }); }
+        catch (e) { closeSheet(); toast((e && e.message) || '没选上'); return; }
+        closeSheet(); renderModels();
+      };
+      panel.appendChild(row);
+    });
+    const none = mkel('div', 'mitem');
+    none.appendChild(mkel('span', 'k empty', '（这一档不选）'));
+    none.onclick = async () => {
+      try { await api('/models/roles', { method: 'POST', body: JSON.stringify({ role, id: '' }) }); }
+      catch (e) { closeSheet(); toast((e && e.message) || '没改成'); return; }
+      closeSheet(); renderModels();
+    };
+    panel.appendChild(none);
+    openSheet();
+  };
+
+  // 新建 / 改一个模型 —— 同一张表单 ✓（**key 留空 = 不改** ✓，见后端那段说明 ✓）
+  const editForm = (c) => {
+    const panel = $('#sheetPanel');
+    panel.textContent = '';
+    panel.appendChild(mkel('div', 'msec', c ? '改这一套' : '加一套'));
+    const form = mkel('div', 'mform');
+    const mk = (label, val, ph) => {
+      form.appendChild(mkel('label', null, label));
+      const i = mkel('input', 'field');
+      i.value = val || ''; i.placeholder = ph || '';
+      form.appendChild(i);
+      return i;
+    };
+    const iName = mk('名字（自己认的）', c && c.name, '如：商汤');
+    const iUrl = mk('接口地址', c && c.base_url, 'https://…/v1');
+    const iModel = mk('模型名', c && c.model, '如：sensenova-6.8-flash-lite');
+    const iKey = mk('密钥' + (c ? '（留空 = 不改）' : ''), '', c ? '' : 'sk-…');
+    const acts = mkel('div', 'acts');
+    acts.appendChild(mBtn('取消', '', () => closeSheet()));
+    acts.appendChild(mBtn('保存', 'pri', async () => {
+      const payload = { name: iName.value.trim(), base_url: iUrl.value.trim(),
+                        model: iModel.value.trim(), api_key: iKey.value.trim() };
+      if (!c && !payload.api_key) { toast('新建要填密钥'); return; }
+      try {
+        if (c) await api('/models/configs/' + c.id, { method: 'PATCH', body: JSON.stringify(payload) });
+        else await api('/models/configs', { method: 'POST', body: JSON.stringify(payload) });
+      } catch (e) { toast((e && e.message) || '没存上'); return; }
+      closeSheet(); renderModels();
+    }));
+    form.appendChild(acts);
+    panel.appendChild(form);
+    openSheet();
+  };
+
+  const delModel = async (c) => {
+    const yes = await confirmBox({
+      title: '删掉「' + (c.name || '') + '」？',
+      body: '它的密钥只存在这儿，删了就找不回来了。', danger: true, ok: '删掉' });
+    if (!yes) return;
+    try {
+      const r = await api('/models/configs/' + c.id, { method: 'DELETE' });
+      if (r && r.freed && r.freed.length) toast('删了 —— 这几个用途现在是空的：' + r.freed.join('、'));
+      renderModels();
+    } catch (e) { toast((e && e.message) || '没删掉'); }
+  };
+
+  // 测一套：**要好几秒** ✓ —— 轮询 `/progress` 把"现在在干什么"显示出来 ✓
+  //（不给反馈的话用户会以为卡死了 ✓，这是原来那个界面的教训 ✓）。
+  const testModel = async (cid) => {
+    const body = $('#modelsBody');
+    const line = mHint('正在测…');
+    let timer = null;
+    const stop = () => { if (timer) clearInterval(timer); timer = null; };
+    try {
+      timer = setInterval(async () => {
+        try {
+          const p = await api('/models/progress');
+          if (p && p.text) line.textContent = p.text;
+        } catch (e) { /* 轮询失败就算了 ✓，别打断测试 */ }
+      }, 600);
+      await api('/models/configs/' + cid + '/test', { method: 'POST' });
+    } catch (e) {
+      stop(); toast((e && e.message) || '测不了'); return;
+    }
+    stop();
+    line.remove();
+    renderModels();
+  };
+
+  // 上下文长度：**只知道排队了、不知道成没成** ✓ —— root 写完之后状态文件里才有 ✓。
+  // 所以这里点完要**轮询一会儿** ✓（原来那个界面就是这么干的 ✓）。
+  const mCtx = (ctx) => {
+    const box = mkel('div', 'mform');
+    const cur = ((ctx && ctx.groups && ctx.groups.chat) || {});
+    const vals = Object.keys(cur).map(k => cur[k]);
+    const now = vals.length ? Math.round(vals[0] / 1000) + 'k' : '还没同步过';
+    box.appendChild(mkel('label', null, '生活管家这一档（现在：' + now + '）'));
+    const i = mkel('input', 'field');
+    i.type = 'number'; i.min = '64'; i.max = '2000'; i.placeholder = '填 k，如 128';
+    box.appendChild(i);
+    const line = mHint(ctx && ctx.last && ctx.last.note
+      ? ('上次：' + (ctx.last.group || '') + ' → ' + Math.round((ctx.last.want || 0) / 1000)
+         + 'k，' + (ctx.last.ok ? '成了' : '没成') + (ctx.last.note ? '（' + ctx.last.note + '）' : ''))
+      : '');
+    const acts = mkel('div', 'acts');
+    acts.appendChild(mBtn('保存', 'pri', async () => {
+      const k = parseInt(i.value, 10);
+      if (!k || k < 64 || k > 2000) { toast('填 64 ~ 2000 之间的数（单位 k）'); return; }
+      try { await api('/models/context', { method: 'POST', body: JSON.stringify({ group: 'chat', tokens: k * 1000 }) }); }
+      catch (e) { toast((e && e.message) || '没排上队'); return; }
+      toast('排上队了，root 那边改完才生效');
+      // 轮询一会儿看它成没成（root 的 worker 是几秒量级 ✓）
+      for (let n = 0; n < 12; n++) {
+        await new Promise(r => setTimeout(r, 1500));
+        try {
+          const d = await api('/models/configs');
+          MODELS = d;
+          const last = d.context && d.context.last;
+          if (last && last.ok !== null && last.ok !== undefined) break;
+        } catch (e) { break; }
+      }
+      renderModels();
+    }));
+    box.appendChild(acts);
+    if (line.textContent) box.appendChild(line);
+    return box;
+  };
+
+  $('#modelsBack').onclick = () => popScreen('models');
+  $('#modelsAdd').onclick = () => editForm(null);
+
   const renderSettings = () => {
     const eGname = $('#vGname'); if (eGname) eGname.textContent = group?.name || '';
     const eAname = $('#vAname'); if (eAname) eAname.textContent = agentName();
@@ -4750,6 +5026,10 @@
       const v = (window.LifeGuardNative && LifeGuardNative.appVersion) ? LifeGuardNative.appVersion() : '';
       av.textContent = v ? 'v' + v : '（浏览器）';
     }
+    // ★ 2026-10-11：「模型」这一行**只有管理员看得见** ✓ ——
+    //   藏入口只是体验 ✓，闸门在服务端（`/api/models/*` 的 `require_admin` ✓）。
+    const rm = $('#rowModels');
+    if (rm) rm.style.display = (me && me.is_admin) ? '' : 'none';
   };
 
   const uploadAvatar = async (file) => {
@@ -4957,6 +5237,8 @@
         else toast('浏览器里没有这一项——回 App 里点');
       }
       else if (act === 'shell') openMe();
+      // ★ 2026-10-11：「模型」—— 只对管理员显示 ✓（那一行在 renderSettings 里控制 ✓）
+      else if (act === 'models') openModels();
       // ⚠️ 原来这里有一条 `act === 'plugins' → openComponents()` ✗→✓ ——
       //    它是条**死路**：设置里那一行 DOM 早就被拿掉了 ✓（用户"后续我自有安排"✓），
       //    所以那个分支永远不会被触发 ✓，只会让人以为"有个组件入口在设置里" ✗。

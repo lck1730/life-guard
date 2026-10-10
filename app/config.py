@@ -165,6 +165,19 @@ class Settings(BaseSettings):
     # → 只往这儿写一个请求文件 ✓，由 root 的 systemd `.path` 单元干活 ✓。
     provision_queue: Path = Path("/opt/lifeguard-shell/var/provision")
 
+    # ── 模型池（2026-10-11 从独立的「模型服务」并进来 ✓）────────────────────
+    #
+    # ⚠️ 那时它在 `/opt/lifeguard-models/var/` ✓（另一个账号的目录 ✓）——
+    #    部署时搬过来 ✓（见 `deploy-chat.sh` 里那一步 ✓）。**格式一字不改** ✓。
+    models_conf: Path = Path("./var/models.json")
+    #: 每次改配置**先留一份旧账** ✓ —— 里面装着所有上游的 key ✗，删一条就真没了 ✓。
+    models_keep_dir: Path = Path("./var/models-keep")
+    #: 上下文长度队列 ✓ —— 和开通队列同一个套路：**我们只排队，root 干活** ✓
+    #: （profile 归 root ✓，见 `tools/set-context-length.sh` ✓）。
+    ctx_queue: Path = Path("./var/ctxq")
+    #: root 写完的状态文件 ✓ —— 界面读它显示"现在是多少" ✓（**只转述、不猜** ✓）。
+    ctx_state: Path = Path("./var/context.json")
+
     # ★ 一个人只能有一个生活空间 ✓（2026-10-08 用户定的 ✓）。
     # 原来壳那边是 3 ✓ —— 换成 1 之后，`/api/workspaces` 建第二个会被拒 ✓，
     # 文案也说清了"先退出原来那个" ✓。
@@ -312,6 +325,13 @@ class Settings(BaseSettings):
         (self.ui_dir / "app").mkdir(parents=True, exist_ok=True)
         # 没有发布物也要能起来——空目录下 /api/app/latest 会如实说"还没发过版本"
         self.releases_dir.mkdir(parents=True, exist_ok=True)
+        # 模型池那几个（2026-10-11 并进来的）。**顺序无所谓** ✓ ——
+        # `store.load()` 对"文件不在"是宽容的 ✓（回空池子 ✓，不是崩 ✓）。
+        for _d in (self.models_conf.parent, self.ctx_queue):
+            try:
+                _d.mkdir(parents=True, exist_ok=True)
+            except OSError:          # pragma: no cover
+                pass
 
 
 settings = Settings()
