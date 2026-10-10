@@ -655,6 +655,30 @@
   #settings { z-index:10; }
   @keyframes pushIn  { from { transform:translateX(100%); } to { transform:none; } }
   @keyframes pushOut { from { transform:none; } to { transform:translateX(100%); } }
+
+  /* ★★ **推屏动画要在合成器上跑** ✗→✓（2026-10-11 用户：「从组件收纳页进入某个
+     组件时依旧会卡一下，很轻微但能感觉到」✓）。
+
+     ⚠️ 卡的不是动画本身 ✗ —— 它动的是 `transform: translateX` ✓（不触发布局 ✓，
+        是最便宜的一类 ✓）。卡的是**动画那 240ms 里主线程在干重活** ✓：
+        进组件那一屏要 `srcdoc` **解析一整个文档**（含组件自己那段 JS ✓）✗，
+        全压在 240ms 里 ✓ → 主线程一堵，动画就顿 ✓。
+
+     ★ 旁证（这条最关键 ✓）：**设置页用的是同一条 `pushIn`** ✓，
+       而用户说「主群聊和设置页的切换最丝滑」✓ —— 同一条动画，
+       **差别只在"期间有没有活"** ✓。所以这是"动画被拖累" ✓，不是"动画不好" ✓。
+
+     `will-change: transform` = 让浏览器**提前把这一层提成独立图层** ✓ →
+     动画交给**合成器线程**跑 ✓，主线程再怎么忙都**影响不到它** ✓。
+
+     ⚠️ 只在 `.anim-*` 挂着时给 ✓（`pushScreen`/`popScreen` 退出时会把类摘干净 ✓，
+        见 `ANIM_CLASSES` ✓）→ 图层跟着释放 ✓。**不能常驻** ✗：
+        这十几个屏每个都是整屏 ✓，一人一张全屏图层 = 白占显存 ✓。
+     ⚠️ `#settings` 那份是单写的规则（不在 `.ascreen` 那一摞里 ✓），所以它也得列 ✓。 */
+  .ascreen.anim-in, .ascreen.anim-out,
+  .ascreen.anim-drop, .ascreen.anim-lift,
+  .ascreen.anim-corner, .ascreen.anim-corner-out,
+  #settings.anim-in, #settings.anim-out { will-change: transform; }
   /* ★ **下拉进来的那一屏：从上方滑入** ✗→✓（2026-10-09 用户定的：
      「下滑以编辑该界面，然后组件界面diy的聊天**从上面滑入**，动效丝滑」✓）。
      ⚠️ 它是①那一类（推入/推出）的**同族** ✓，不是新的一类 ✓ ——

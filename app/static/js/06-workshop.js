@@ -237,7 +237,9 @@
    */
   const openCell = (c) => {
     if (!c) return;
-    openComp(c.slug, c.title);
+    // ★ 把这一格的底色一起带进去 ✓ —— 组件页滑进来的头一帧就刷它 ✓
+    //   （见 `openComp` 里那句 ✓）。没有 tint 的组件给空串 ✓（那它就还是原底色 ✓）。
+    openComp(c.slug, c.title, (c.spot && c.spot.tint) || '');
   };
 
   const endDrag = (commit) => {
@@ -321,9 +323,15 @@
   });
 
   // ── 组件页：一个组件自己的页 ✓ ──────────────────────────────────────
-  const openComp = async (slug, title) => {
+  const openComp = async (slug, title, tint) => {
     const wrap = $('#compWrap');
     wrap.innerHTML = '';
+    // ★ 立刻把这一屏的底色刷成**你点的那一格的颜色** ✗→✓（2026-10-11）——
+    //   `#compView` 是 `.screen`（`background:var(--bg)` ✓ = 近黑 ✓），
+    //   而下面那趟网络**还没回来**时屏里是**空的** ✓ → 滑进来的就是**一整屏黑** ✓。
+    //   刷成那一格的底色之后：看着像"这一格被推开了" ✓，不像"黑了一下" ✓
+    //   （格子本来就是那个颜色 ✓ —— 服务端 `spot.tint` 给的 ✓，见 `canvasCell` ✓）。
+    $('#compView').style.background = tint || '';
     pushScreen('compView');
     let d;
     try { d = await api(`/components/${encodeURIComponent(slug)}?group_id=${group.id}`); }
@@ -377,24 +385,19 @@
     const ifr = document.createElement('iframe');
     ifr.setAttribute('sandbox', 'allow-scripts');   // ★ 没有 allow-same-origin
     ifr.setAttribute('referrerpolicy', 'no-referrer');
-    // ★★ **等推屏动画走完，再把它塞进去** ✗→✓（2026-10-11 用户：
-    //   「从组件收纳页进入某个组件时依旧会卡一下，很轻微但能感觉到」✓）。
+    ifr.srcdoc = inject + (d.html || '');
+    wrap.appendChild(ifr);
+    // ⚠️ 这里**必须立刻塞** ✗→✓（2026-10-11，试错一轮）——
+    //   我先前把它挪到"动画走完之后"干（想的是"别让主线程在动画期间忙" ✓），
+    //   用户当场看到的却是**更长的黑屏** ✓：「明显黑了一下，黑屏时间更长了」✓。
+    //   真因：这一屏在数据回来之前**本来就是空的** ✓（上面那句 `wrap.innerHTML=''` ✓）→
+    //   再往后拖 240ms，就是**白等 240ms 的黑** ✓ —— 比原来更糟 ✗。
     //
-    //   卡的不是动画 ✗：那条动画动的是 `transform: translateX` ✓（GPU 合成 ✓、
-    //   不触发布局 ✓，是最便宜的一类 ✓）。
-    //   卡的是**它期间在干的重活** ✓：`srcdoc` 要**解析一整个文档**
-    //   （加上组件自己那段 JS ✓）✓ —— **全在主线程上** ✗，正好压在动画那 240ms 里 ✗。
-    //
-    //   所以：数据那趟网络**照旧立刻发** ✓（异步 ✓、不占主线程 ✓），
-    //   等的只是"把 iframe 塞进去"这一下 ✓ —— 挪到动画之后再干 ✓。
-    //   ⚠️ 代价说清：那一屏会先**空 240ms 左右**再出现组件 ✓ ——
-    //      换来的是"滑进来是顺的"✓（用户要的正是这个 ✓）。
-    afterAnim($('#compView'), () => {
-      // ⚠️ 那 240ms 里用户可能已经退出了 ✓ → 就别往一个不在的屏里塞 ✓
-      if (!$('#compView').classList.contains('on')) return;
-      ifr.srcdoc = inject + (d.html || '');
-      wrap.appendChild(ifr);
-    });
+    //   ★ 真正该修的**不是"什么时候塞"** ✗，是"**主线程忙的时候动画为什么跟着顿**" ✓：
+    //     那条动画是 `transform: translateX` ✓ —— 只要它**在合成器上跑** ✓，
+    //     主线程再忙也**影响不到它** ✓。做法在 `app.css`（`.ascreen.anim-*` 那条
+    //     `will-change: transform` ✓），不在这个地方 ✓。
+    //   再加这一屏的底色**立刻刷成那一格的颜色** ✓（见上面 ✓）→ 那段等待不是黑的 ✓。
 
     // ★ 这一屏**到此为止** ✗→✓（2026-10-07 晚上用户定的）——
     //   「里面不要有任何的提示和设置选项，也不要有什么取消保留，继续改组件
