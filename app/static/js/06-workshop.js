@@ -377,8 +377,24 @@
     const ifr = document.createElement('iframe');
     ifr.setAttribute('sandbox', 'allow-scripts');   // ★ 没有 allow-same-origin
     ifr.setAttribute('referrerpolicy', 'no-referrer');
-    ifr.srcdoc = inject + (d.html || '');
-    wrap.appendChild(ifr);
+    // ★★ **等推屏动画走完，再把它塞进去** ✗→✓（2026-10-11 用户：
+    //   「从组件收纳页进入某个组件时依旧会卡一下，很轻微但能感觉到」✓）。
+    //
+    //   卡的不是动画 ✗：那条动画动的是 `transform: translateX` ✓（GPU 合成 ✓、
+    //   不触发布局 ✓，是最便宜的一类 ✓）。
+    //   卡的是**它期间在干的重活** ✓：`srcdoc` 要**解析一整个文档**
+    //   （加上组件自己那段 JS ✓）✓ —— **全在主线程上** ✗，正好压在动画那 240ms 里 ✗。
+    //
+    //   所以：数据那趟网络**照旧立刻发** ✓（异步 ✓、不占主线程 ✓），
+    //   等的只是"把 iframe 塞进去"这一下 ✓ —— 挪到动画之后再干 ✓。
+    //   ⚠️ 代价说清：那一屏会先**空 240ms 左右**再出现组件 ✓ ——
+    //      换来的是"滑进来是顺的"✓（用户要的正是这个 ✓）。
+    afterAnim($('#compView'), () => {
+      // ⚠️ 那 240ms 里用户可能已经退出了 ✓ → 就别往一个不在的屏里塞 ✓
+      if (!$('#compView').classList.contains('on')) return;
+      ifr.srcdoc = inject + (d.html || '');
+      wrap.appendChild(ifr);
+    });
 
     // ★ 这一屏**到此为止** ✗→✓（2026-10-07 晚上用户定的）——
     //   「里面不要有任何的提示和设置选项，也不要有什么取消保留，继续改组件
