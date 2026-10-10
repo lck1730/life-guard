@@ -40,8 +40,7 @@ from . import idle, records as rec, reminders
 # ⚠️ `ensure_user` / `new_invite_code` **合并之后这里不再需要** ✗→✓：
 #    前者是"按需镜像用户行"的工具 ✓（现在用户表就是本地的 ✓，注册时建 ✓），
 #    后者是"本地摇邀请码"（现在只有建空间那一处摇 ✓，在 `routes_shell` 里 ✓）。
-from .auth import (PREVIEW_SCOPE, SESSION_COOKIE, current_user, decode_token,
-                   make_token, require_member)
+from .auth import (SESSION_COOKIE, current_user, decode_token, require_member)
 from .config import WALL_SLUG, settings
 from .db import (close_db, execute, execute_rc, fetch_all, fetch_one, init_db,
                  now)
@@ -49,7 +48,6 @@ from .hub import hub
 from .messages import current_status_for
 from .routes_auth import router as auth_router
 from .routes_groups import router as groups_router
-from .routes_internal import restart_watcher
 from .routes_internal import router as internal_router
 from .routes_media import router as media_router
 from .routes_shell import router as shell_router
@@ -73,9 +71,6 @@ async def lifespan(app: FastAPI):
     # 两个后台循环，都在我们自己的进程里：
     #  - 提醒：到点唤起一次发言（不用 Hermes 内部 cron，那套的投递是断的还会静默失败）
     #  - 空闲唤醒：隔一阵子给它一次"没人叫你，你也可以说点什么"的机会
-    # 第三个：**重启排队**。agent 在对话中间调 restart_backend 时，
-    # 直接重启会把它正在说的那一轮掐掉（用户那边就是"问了没回"）。
-    # 所以那个接口只排队，由这个循环挑"没人在跑"的时机动手。
     # ★ 启动时先收一遍"正在退出"的空间 ✓（2026-10-08）——
     #   那个收尾的后台任务活在进程里 ✓，重启就没了 ✓ →
     #   没这一步的话，"标记了退出、worker 也删完了"的空间会永远停在那儿 ✓。
@@ -86,7 +81,6 @@ async def lifespan(app: FastAPI):
     tasks = [
         asyncio.create_task(reminders.ticker_loop()),
         asyncio.create_task(idle.loop()),
-        asyncio.create_task(restart_watcher()),
         # ★ 工坊的「等子代理交付」✓（2026-10-07 深夜 ✓）——
         #   子代理的结果**只有下一轮才看得到** ✓，而工坊的下一轮只有用户说话才会来 ✓
         #   → 得有人替它开口 ✓。见 `routes_workshop.poke_loop` 那段 ✓。
@@ -1034,45 +1028,6 @@ async def component_delete(
              group_id, name, len(rows), len(wiped))
     return {"ok": True, "deleted": [int(r["version"]) for r in rows],
             "tasks_deleted": wiped}
-
-
-@app.get("/preview")
-async def preview(t: str = Query(default="")) -> Response:
-    """拿一张**只读**的临时门票打开这个 App —— 给 agent 那双眼睛用。
-
-    ## 为什么需要这个入口
-
-    agent 有 `browser_exec`：能开真浏览器、能截图、能用 `vision_analyze` 看自己
-    截的图（实测这条链是通的）。但它**没有用户密码**，打不开这个页面 —— 那就
-    等于没眼睛：写前端只能靠读代码猜，而前端的错九成只有真跑一遍才看得见。
-
-    ## 安全
-
-    票是**短时**（10 分钟）、**一次性换 cookie**、而且换来的会话带
-    `scope=preview` —— `auth.current_user` 会拒掉它的一切写操作。
-    所以它能看到真实界面和消息，**但不能冒你们的名发消息**。
-    """
-    # ⚠️ 验票走 `decode_token` ✓ —— 别自己 `jwt.decode` ✗（见那个函数的说明 ✓）
-    payload = decode_token(t)
-    if not payload:
-        return HTMLResponse("<meta charset='utf-8'><h1>403</h1>"
-                            "<p>这张预览票无效或已过期。重新调 app_preview 拿一张。</p>",
-                            status_code=403)
-    if payload.get("scope") != PREVIEW_SCOPE:
-        return HTMLResponse("<meta charset='utf-8'><h1>403</h1><p>这不是预览票。</p>",
-                            status_code=403)
-    resp = RedirectResponse("/", status_code=303)
-    resp.set_cookie(
-        SESSION_COOKIE,
-        make_token(int(payload["sub"]), scope=PREVIEW_SCOPE),
-        max_age=3600,          # 一小时够它把活干完
-        httponly=True,
-        samesite="lax",
-        path="/",
-    )
-    log.info("发了一张预览会话（user=%s）——只能看，不能改", payload["sub"])
-    return resp
-
 
 async def _user_from_token(token: str) -> dict | None:
     # ⚠️⚠️ **这一行就是 WebSocket 连不上的原因** ✗→✓ —— 2026-10-07。

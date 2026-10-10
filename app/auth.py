@@ -143,12 +143,6 @@ def verify_password_any(raw: str, stored: str) -> bool:
 verify_password = verify_password_any
 
 
-# 预览会话（给 agent 的眼睛用）。见 main.py 的 `/preview` 和
-# routes_internal.py 的 `/preview`：agent 有 browser_exec，能开浏览器能截图，
-# 但它不知道你们的密码——那就等于没眼睛。这边给它一张**短时、只读**的门票。
-PREVIEW_SCOPE = "preview"
-
-
 def decode_token(raw: str) -> dict | None:
     """验一张票：过了返回 payload ✓，无效/过期返回 None ✓。
 
@@ -176,20 +170,6 @@ def decode_token(raw: str) -> dict | None:
         return None
 
 
-def make_token(user_id: int, *, scope: str | None = None, minutes: int | None = None) -> str:
-    if minutes is not None:
-        exp = datetime.now(timezone.utc) + timedelta(minutes=minutes)
-    else:
-        exp = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expire_hours)
-    payload: dict = {"sub": str(user_id), "exp": exp}
-    if scope:
-        payload["scope"] = scope
-    # ⚠️ **用壳的密钥签** ✗→✓ —— 2026-10-07：原来用的是这个服务自己的 ✗，
-    #   于是签出来的票**自己人都验不过** ✓（`current_user` 拿壳的密钥验 ✓）
-    #   → agent 那张"眼睛"预览票兑换完立刻 401 ✓。
-    #   票是给**这个服务自己**用的（`scope=preview` ✓），但密钥必须和壳一致 ✓
-    #   —— 否则就是两套互不认账的票 ✓。
-    return jwt.encode(payload, _shell_secret(), algorithm="HS256")
 
 
 # ── ★ 会话票（"谁登录了"）✗→✓ 2026-10-08 合并那次 ────────────────────────
@@ -204,9 +184,6 @@ def make_token(user_id: int, *, scope: str | None = None, minutes: int | None = 
 #     ⚠️ 它是**签发那一刻的快照** ✗ —— 所以**不能拿它去覆盖库里的昵称** ✓
 #     （那个 bug 2026-10-06 踩过一次：改完名永远显示旧的 ✓）。
 #   · `exp` 720 小时 ✓（30 天 ✓）—— 手机上不用老登录 ✓。
-#
-# `scope=preview` 那张票是另一回事 ✓（agent 的"眼睛" ✓ 短时只读 ✓），
-# 走下面的 `make_token` ✓，别和这张混 ✓。
 SESSION_HOURS = int(getattr(settings, "session_hours", 0) or 720)
 
 
@@ -264,14 +241,6 @@ async def current_user(request: Request) -> dict:
     payload = decode_token(raw)
     if not payload:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "凭证无效或已过期")
-    # ★ 预览票**只能看**。它是给 agent 那双眼睛用的（开浏览器截图），
-    #   不是给它替你们发消息的——所以写操作一律拒掉。
-    #   这一条是这个入口敢开的前提：不给它这条限制，就等于让它能冒你们的名。
-    if payload.get("scope") == PREVIEW_SCOPE and request.method not in ("GET", "HEAD"):
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            "这是给你「看」的预览会话，不能改东西（发消息、改设置都不行）。",
-        )
     uid = int(payload["sub"])
     return await ensure_user(uid, (payload.get("nick") or "").strip())
 
