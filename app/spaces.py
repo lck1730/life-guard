@@ -105,12 +105,12 @@ async def check(profile: str) -> str | None:
     # 旧后端跑在 lifeguard 名下，`/root/.hermes` 就是它的家 ✓，所以它直接去看
     # profile 目录在不在 ✓。
     #
-    # 这个服务跑在 lgchat 名下 ✗ —— **它进不去 /root/.hermes** ✓（700 ✓），
+    # 这个服务跑在 lifeguard 名下 ✗ —— **它进不去 /root/.hermes** ✓（700 ✓），
     # 那是设计的一部分 ✓：它读不到别人工作区的记忆 ✗。
     #
     # 于是"这个空间能不能用"的判据换成：**有没有人把这份 key 交给我** ✓。
     #
-    #     /opt/lifeguard-chat/keys/<profile>     root:lgchat 640
+    #     /opt/lifeguard-chat/keys/<profile>     root:lifeguard 640
     #
     # 这条不只是"换个地方读" ✗ —— 它顺带把能力边界收紧了 ✓：
     # **它只能用被明确交给它的那些空间** ✓，多一个都不行 ✓。

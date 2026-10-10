@@ -183,10 +183,10 @@ async def _space_count(user_id: int) -> int:
 #
 # ## ★ 为什么是"排队"而不是"自己动手"
 #
-# 这件事要写 `/root/.hermes`（700 lifeguard ✓），所以它需要特权 ✓。
+# 这件事要写 `/root/.hermes`（700 hermes ✓），所以它需要特权 ✓。
 # 最直接的做法是在这里 `sudo` 一下 ✗ —— **2026-10-06 实测：不行** ✗。
 # （壳那边当时是 NoNewPrivileges / ProtectHome 挡住的 ✓；这个服务连那两个开关都不用开 ✓，
-#   因为它根本进不去 `/root`（`/root` 是 711 ✓、`.hermes` 是 700 lifeguard ✓）。）
+#   因为它根本进不去 `/root`（`/root` 是 711 ✓、`.hermes` 是 700 hermes ✓）。）
 #
 # 所以方向反过来：**我们只排队，不动手** ✓。
 #
@@ -197,7 +197,7 @@ async def _space_count(user_id: int) -> int:
 #
 # 代价是开通变成异步 ✓（约 5 秒 ✓，页面上本来就有"正在开通…"✓）。
 #
-# ⚠️ **队列目录的属主是 lgshell** ✗（那是壳建的 ✓）—— 合并之后写它的换成了 `lgchat` ✓
+# ⚠️ **队列目录的属主是 lgshell** ✗（那是壳建的 ✓）—— 合并之后写它的换成了 `lifeguard` ✓
 #    → 部署脚本必须把那个目录改成 `lgshell:lgcode 2775` ✓（见 deploy-chat.sh 里那条 ✓）。
 #    不改成 2775 的话，症状是"建空间永远卡在正在开通"✓，而 worker 那边一条日志都没有 ✓。
 PROVISION_WAIT_SECONDS = 180
@@ -665,8 +665,8 @@ async def rename_space(body: SpaceNameIn, request: Request) -> dict:
 #
 # ## 为什么是"两段"，而不是一把删干净
 #
-#   删 profile 那一步**只有 root 干得了** ✗（`/root/.hermes` 是 700 lifeguard ✓，
-#   而这个服务跑在 lgchat 名下 ✓）→ 它得走队列 ✓（和开通同一条路 ✓）。
+#   删 profile 那一步**只有 root 干得了** ✗（`/root/.hermes` 是 700 hermes ✓，
+#   而这个服务跑在 lifeguard 名下 ✓）→ 它得走队列 ✓（和开通同一条路 ✓）。
 #   而队列是**异步**的 ✓（几秒到几十秒 ✓），用户不能在那儿干等 ✓。
 #
 #   所以：

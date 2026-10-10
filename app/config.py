@@ -18,16 +18,14 @@ class Settings(BaseSettings):
     # 数据目录：SQLite 库 + 媒体文件
     data_dir: Path = Path("./data")
 
-    # ── 界面层：**下放给 agent 的那一块** ────────────────────────────────
+    # ── 界面层：原来"下放给 agent"的那一块 —— **2026-10-11 收回** ✗→✓ ────
     #
-    # 归服务用户所有，agent 可以自己往里写：换配色、换头像、放它做的组件。
+    # 用户重新划线：**agent 除了创意工坊的落点，其它一律不改** ✓。
+    # 所以 `ui/` 和 `app/` 一样归 `root:root` 只读 ✓ —— agent 写不了
+    # 配色/脚本/头像了 ✗（原来那三个内部接口也一并摘掉了 ✓，见 routes_internal.py）。
     #
-    # ⚠️ **这行原来写的是"核心逻辑（`app/` 下的后端代码、`static/index.html`）保持
-    # root 只读"——那是错的** ✗（2026-10-06 核实：服务器上 `app/` 归 lifeguard，
-    # 后端代码和那个壳它都写得了）。2026-10-04 用户把线重新划过：
-    # **只守"链路"，不守"文件"** —— 代码它随便改，改坏了 git 回滚、对讲机兜底；
-    # 真锁着的只剩两样，理由各不相同：`.venv`（运行时，坏了连自检都跑不起来）、
-    # SOUL.md + 插件（**规矩**，属于我们这边）。以 `deploy.sh` 的 `fix_owner` 为准。
+    # 历史（2026-10-04 → 2026-10-11）：那一段是"**只守链路、不守文件**" ✓ ——
+    # 代码随便 agent 改，改坏了 git 回滚 + 对讲机兜底。那套随 App 管家一起废了 ✓。
     #
     # **分界线是「改坏了的后果」，不是「是不是代码」**：
     #   · 改这里 → 最多难看 / 那个组件显示不出来；**文件删掉就回默认** ✓
@@ -78,7 +76,7 @@ class Settings(BaseSettings):
     def components_dir(self) -> Path:
         """**每个群自己的**组件仓库：`var/components/g<群号>/<名字>/`。
 
-        ⚠️ 权限是 **2750（`lgchat:lgcode`，组只读）** ✓ —— 由 `deploy-chat.sh` 建 ✓。
+        ⚠️ 权限是 **2750（`lifeguard:lgcode`，组只读）** ✓ —— 由 `deploy-chat.sh` 建 ✓。
         **agent 写不进这里** ✓，这正是"没确认过不许写"能真拦的前提 ✓：
         它手里有 `write_file`/bash ✓，只要这个目录它写得进 ✗，
         工具里那些校验就一行都不会执行 ✓（详见方案第七节 ✓）。
@@ -142,10 +140,10 @@ class Settings(BaseSettings):
 
     # ★ 和旧后端不一样的地方：**我们的钥匙串**。
     #
-    # 这个服务跑在 lgchat 名下 ✗ —— 进不去 /root/.hermes（700 ✓），
+    # 这个服务跑在 lifeguard 名下 ✗ —— 进不去 /root/.hermes（700 ✓），
     # 所以它不直接读各 Profile 的 .env ✗，而是读这儿：
     #
-    #     <这个目录>/<profile 名>     root:lgchat 640，内容就是那一行 key
+    #     <这个目录>/<profile 名>     root:lifeguard 640，内容就是那一行 key
     #
     # 由开通工作区的那一步抄进来 ✓（见 orchestrator/agent.py:_profile_api_key 的说明）。
     # **只放自己那几个工作区的 key** ✓ —— 这就是"它读不到别人的东西"在密钥这一层的落实 ✓。
@@ -156,14 +154,14 @@ class Settings(BaseSettings):
     # 因为**模型网关和 App 管家也在拿它验票** ✓（换路径 = 那两边全哑 ✓）。
     #
     # 只读 ✓：本服务在 `lgauth` 组里所以读得到 ✓，
-    # 而 agent（lifeguard 用户）不在那个组里 ✗ —— 它偷不到 ✓。
+    # 而 agent（hermes 用户）不在那个组里 ✗ —— 它偷不到 ✓。
     shell_jwt_secret: Path = Path("/etc/lifeguard-shell/jwt.secret")
 
     # ── 合并那次（2026-10-08）从壳搬过来的几项 ─────────────────────────
     #
     # 账号头像。**存文件不存库** ✓（库是"事实"、图是"附件" ✓ 混在一起备份和查数据都变笨 ✓）。
     # ⚠️ 搬家的代价：老文件在 `/opt/lifeguard-shell/var/avatars/`（700 lgshell ✓），
-    #    而这个服务跑在 lgchat 下 ✗ → **P10 切换时拷一份过来** ✓（旧的那份留着，
+    #    而这个服务跑在 lifeguard 下 ✗ → **P10 切换时拷一份过来** ✓（旧的那份留着，
     #    回滚时旧壳还要用它 ✓）。
     avatar_dir: Path = Path("./var/avatars")
 
@@ -321,7 +319,7 @@ class Settings(BaseSettings):
         self.ui_dir.mkdir(parents=True, exist_ok=True)
         # 组件那两个目录：**归 root 那份部署脚本建**（权限是 2750 / 2775，见 deploy-chat.sh）✓。
         # ⚠️ 这里**只保证"在"**，而且建不出来也**不拦服务启动** ✗→✓ ——
-        #    这一句跑在 `lgchat` 名下 ✓，而 `/opt/lifeguard-chat` 是 `root:root 755` ✓，
+        #    这一句跑在 `lifeguard` 名下 ✓，而 `/opt/lifeguard-chat` 是 `root:root 755` ✓，
         #    所以 `var/` 它**根本建不出来** ✗（真抛出来就是"服务起不来"✓，
         #    而症状会像"代码坏了"✗ —— 2026-10-07 差点这么干）。
         #    建不出来只是组件功能不可用 ✓ —— 那要吼一声，但不能把整个服务带走 ✓。

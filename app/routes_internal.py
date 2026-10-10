@@ -391,8 +391,8 @@ def _run(args: list[str], timeout: int = 120) -> tuple[int, str]:
 def _git(args: list[str], timeout: int = 60) -> tuple[int, str]:
     """跑一条 git 命令 —— **永远带上 `safe.directory`**（2026-10-07 修）。
 
-    为什么非带不可：这个仓库现在归 `lifeguard`（agent），
-    而**服务自己**跑在另一个用户下 -> git 认为"这不是我的仓库"，
+    为什么非带不可：这个仓库归 `root`（2026-10-11 起 —— agent 改不了代码了，
+    代码收归 root 只读 ✓），而**服务自己**跑在另一个用户下 -> git 认为"这不是我的仓库"，
     每条命令都 `fatal: detected dubious ownership`。
 
     实测出来的后果很阴：`snapshot` 好歹回了 `{"ok": false}`，

@@ -217,13 +217,13 @@ def _profile_api_key(profile: str) -> str:
     旧后端跑在 `lifeguard` 用户下，而 `/root/.hermes` 就是它的家目录 ✓，
     所以它直接读 `<profile>/.env` 就行。
 
-    这个服务跑在 `lgchat` 名下 ✗ —— **它根本进不去 `/root/.hermes`** ✓（700 ✓），
+    这个服务跑在 `lifeguard` 名下 ✗ —— **它根本进不去 `/root/.hermes`** ✓（700 ✓），
     而这正是我们想要的 ✓：**它读不到别人工作区的记忆和密钥** ✓。
 
     于是开通工作区的时候，由"开路的那一位"把它自己那一份 key
     **抄进这个目录** ✓：
 
-        /opt/lifeguard-chat/keys/<profile>     root:lgchat 640
+        /opt/lifeguard-chat/keys/<profile>     root:lifeguard 640
 
     只给"自己那几个工作区"的 key ✓，多一个都不给 ✓。
     """
