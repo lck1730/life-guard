@@ -96,7 +96,7 @@ async def _create_group(name: str, profile: str, owner_username: str | None) -> 
     )
     # （这里原本还会往 agent_state 插一行编排层状态。那张表已随判断闸一起删除。
     #   插件和技能也在这时候注册上——不注册的话那个空间的 agent 根本没工具可用。）
-    from . import records as _rec
+    from .core import records as _rec
 
     await _rec.ensure_builtin_kinds(gid)
 
