@@ -96,13 +96,10 @@
 
 <!-- 我的（数据由 JS 画 ✓ 和 `#agent` / `#diySet` 一个做法 ✓） -->
 <div class="screen ascreen" id="me"><div class="abody" id="meBody"></div></div>
-<div class="screen ascreen" id="meAccount"><div class="abody" id="meAccountBody"></div></div>
 <!-- 改资料（头像 + 昵称 ✓）—— 和管家、diy 小助手同一批 class ✓ -->
 <div class="screen ascreen" id="meEdit"><div class="abody" id="meEditBody"></div></div>
 <!-- 生活空间：改名 / 邀请码 / 退出该空间（用户 2026-10-08 定的三样 ✓） -->
-<div class="screen ascreen" id="space"><div class="abody" id="spaceBody"></div></div>
 <!-- 自我介绍（≤500 字 ✓，可空 ✓）—— 跟着每一轮进它脑子 ✓ -->
-<div class="screen ascreen" id="selfIntro"><div class="abody" id="selfIntroBody"></div></div>
 <!-- 别人的那一屏：头像+昵称（和我的、管家同构 ✓）+ 备注 ✓ -->
 <div class="screen ascreen" id="peer"><div class="abody" id="peerBody"></div></div>
 
@@ -228,7 +225,6 @@
        capture="environment" 才会直接唤起后置相机而不是相册 -->
   <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden>
   <input type="file" id="fileGallery" accept="image/*" hidden>
-  <input type="file" id="fileAvatar" accept="image/*" hidden>
 <!-- ★ 文件 / 音频（2026-10-08）✓ —— `accept` 只管"文件选择器默认显示什么" ✓，
      真正的白名单在服务端 ✓（这里放宽没有安全含义 ✓）。 -->
 <input type="file" id="fileDoc" hidden
@@ -270,7 +266,6 @@
      ＋ 进来先是这一屏 ✓：一个个图标 = 已经做过的组件（各自那条对话 ✓），
      外加一颗「新建组件」✓。点图标进**组件管理屏**（`#wsChat` ✓）。
      ⚠️ **这一屏不是对话本身** ✗ —— 对话在它上面那一屏 ✓（见 `#wsChat` ✓）。 -->
-<div class="screen ascreen" id="wsNav">
   <header class="sub">
     <button class="icon-btn back" id="wsNavBack" aria-label="返回">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none"

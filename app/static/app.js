@@ -926,10 +926,7 @@
     //    （用户报的"在组件聊天里点我的头像没反应"就是这条 ✓，见 CSS 那一段 ✓）。
     //    → 所以这一族要挪到**这里**（表的最前面）✓，不能再留在下面 ✗。
     if ($('#meEdit').classList.contains('on')) { closeMeEdit(); return; }
-    if ($('#meAccount').classList.contains('on')) { closeMeAccount(); return; }
-    if ($('#selfIntro').classList.contains('on')) { closeSelfIntro(); return; }
     if ($('#me').classList.contains('on')) { closeMe(); return; }
-    if ($('#space').classList.contains('on')) { closeSpace(); return; }
     if ($('#peer').classList.contains('on')) { closePeer(); return; }
     if ($('#diySet').classList.contains('on')) { closeDiySet(); return; }
     // ⚠️ **`#wsChat`（28）现在在 `#compView`（26）上面** ✗→✓（2026-10-09）——
@@ -938,7 +935,6 @@
     //    **隔着聊天把底下那个组件页关掉** ✓，屏幕上聊天纹丝不动 ✓。
     if ($('#wsChat').classList.contains('on')) { closeWsChat(); return; }
     if ($('#compView').classList.contains('on')) { closeComp(); return; }
-    if ($('#wsNav').classList.contains('on')) { closeWsNav(); return; }
     if ($('#workshop').classList.contains('on')) { closeWorkshop(); return; }
     if ($('#agentEdit').classList.contains('on')) { closeAgentEdit(); return; }
     if ($('#agent').classList.contains('on')) { closeAgentSettings(); return; }
@@ -2478,7 +2474,6 @@
   //   ⚠️ 去处看 `pickFor` ✗：群聊进 `pending` 队列 ✓、组件对话进 `wsPending`（单个 ✓）。
   $('#fileDoc').addEventListener('change', e => { pickAdd(e.target.files[0], 'file'); e.target.value = ''; });
   $('#fileAudio').addEventListener('change', e => { pickAdd(e.target.files[0], 'audio'); e.target.value = ''; });
-  $('#fileAvatar').addEventListener('change', e => { uploadAvatar(e.target.files[0]); e.target.value = ''; });
 
   // ★ 这个 ＋ 面板**两处共用** ✗→✓（2026-10-08）——
   //   用户定的：「组件聊天界面里，底部聊天框右边的照片还是要改成[主群聊]同款+，
@@ -2600,20 +2595,6 @@
   /** 看某个人的头像（放大）✓ —— 2026-10-07 用户："如果是群里其他人，
       则是查看其头像放大，点击旁边空白退出查看" ✓。
       没传过头像的人 → 给一个**大号的字** ✓，别让点按变成没反应 ✗。 */
-  const openAvatarBig = (name, path) => {
-    if (path) { openLightbox(shellURL(path)); return; }
-    $('#lightboxImg').hidden = true;
-    $('#lightboxImg').removeAttribute('src');
-    const tx = $('#lightboxTxt');
-    tx.textContent = String(name || '?').slice(0, 1);
-    tx.hidden = false;
-    $('#lightbox').classList.add('on');
-  };
-
-  // 点**周围空白**退出 ✓ —— 点图本身也一样退 ✓（一个头像而已 ✓，
-  // 不需要"点图放大、点空白退"那种二级交互 ✓）。
-  $('#lightbox').onclick = () => $('#lightbox').classList.remove('on');
-
   // ── 语音（按住说话，照微信）──────────────────────────────────────
   let recorder = null, chunks = [], recStart = 0, holding = false;
 
@@ -3074,27 +3055,6 @@
     const rm = $('#rowModels');
     if (rm) rm.style.display = (me && me.is_admin) ? '' : 'none';
   };
-
-  const uploadAvatar = async (file) => {
-    if (!file || !me) return;
-    const fd = new FormData();
-    fd.append('file', file);
-    try {
-      const r = await fetch('/api/auth/avatar', {
-        method: 'POST', body: fd, credentials: 'same-origin'
-      });
-      if (!r.ok) {
-        const d = await r.json().catch(() => ({}));
-        throw new Error(d.detail || '上传失败');
-      }
-      const data = await r.json();
-      if (data && data.avatar) {
-        me.avatar = data.avatar;
-        refreshGroup().then(() => toast('头像已更新'));
-      }
-    } catch (e) { toast(e.message || '头像上传失败'); }
-  };
-
   const promptText = (title, value, hint, onOk) => {
     const p = $('#sheetPanel');
     p.innerHTML = `<h3></h3><input class="field" id="sInput">
@@ -3570,159 +3530,6 @@
       }
     };
   };
-
-  // ── 生活空间：改名 / 邀请码 / 退出该空间 ──────────────────────────────
-  //
-  // 用户 2026-10-08 定的三样 ✓（原话：「进去后，会有以下几项：名称可改，
-  // 邀请码点击复制，以及红色的退出该空间，目前仅支持空间只有一个人时退出，
-  // 退出时删除服务器里对应的群聊记忆，二次防呆提示」✓）。
-  //
-  // ⚠️ **"能不能退出"由服务端算** ✗（`GET /api/workspaces/mine` 回 `alone` ✓）——
-  //    界面灰不灰只是体验 ✓，服务端在 `leave_space` 里**再判一次** ✓
-  //    （能被绕过的检查等于没有 ✓，这条是这个项目的老规矩 ✓）。
-  const openSpace = () => {
-    if (!$('#space').classList.contains('on')) pushScreen('space');
-    renderSpace();
-  };
-  const closeSpace = () => popScreen('space');
-
-  const renderSpace = async () => {
-    const body = $('#spaceBody');
-    body.textContent = '';
-    let d;
-    try {
-      d = await api('/workspaces/mine');
-    } catch (e) {
-      body.appendChild(mkel('div', 'err', (e && e.message) || '读不到空间'));
-      return;
-    }
-    const s = d && d.space;
-    if (!s) { body.appendChild(mkel('div', 'err', '你还没有生活空间')); return; }
-
-    // 卡片一：名字（点了改名 ✓ —— 和原来"群名称"那一行同一个手感 ✓）
-    const card = mkel('div', 'card');
-    card.appendChild(mkel('label', null, '名称'));
-    const ni = mkel('input', 'field');
-    ni.value = s.name || '';
-    ni.maxLength = 32;
-    const nerr = mkel('div', 'err', '');
-    const nsave = mkel('button', 'btn-save', '保存');
-    nsave.onclick = async () => {
-      const v = ni.value.trim();
-      if (!v) { nerr.textContent = '名字不能空着'; return; }
-      nsave.disabled = true;
-      try {
-        await api('/workspaces/rename', { method: 'POST', body: JSON.stringify({ name: v }) });
-        // ⚠️ 群聊顶栏那个名字也要跟着变 ✓（不然退回去还是旧的 ✓，用户会以为没保存 ✓）
-        try {
-          const b = await api('/groups/bootstrap?limit=1');
-          if (b.group) group = b.group;
-        } catch (e) { /* 刷不到就算了：下次开页会重新拉 ✓ */ }
-        renderHeader();
-        renderSettings();
-        toast('已保存');
-      } catch (e) { nerr.textContent = (e && e.message) || '没保存上'; }
-      nsave.disabled = false;
-    };
-    card.append(ni, nerr, nsave);
-    body.appendChild(card);
-
-    // 卡片二：邀请码（点了复制 ✓）+ 退出（红字 ✓）
-    const grp = mkel('div', 'grp');
-    const inv = mkel('button', 'row');
-    inv.append(mkel('span', 'rl', '邀请码'));
-    // ★ **满员了就显示"已满"而不是码** ✗→✓ —— 这就是用户说的"邀请码自动失效"在
-    //   界面上的那一半 ✓（另一半在服务端：满员时 join 直接 409 ✓，见 `join_space` ✓）。
-    //   码本身**不删** ✓：有人退出，名额自动回来 ✓（`full` 是每次算出来的 ✓）。
-    inv.append(mkel('span', 'act', s.full ? '空间已满' : (s.invite_code || '—')));
-    inv.onclick = () => {
-      if (s.full) { toast('空间已经满了，暂时进不来新人'); return; }
-      const code = s.invite_code || '';
-      if (!code) { toast('这个空间没有邀请码'); return; }
-      toast(copyText(code) ? '邀请码已复制' : '复制不了，手动记一下：' + code);
-    };
-    grp.appendChild(inv);
-    body.appendChild(grp);
-
-    // ⚠️ **不用 `data-act`** ✗ —— 那是设置页的委托选择器认的形状 ✓
-    //    （`$$('.item[data-act]')` ✓ 是全局的 ✓），挂一个它不认识的 act 上去
-    //    会让下一个人以为"这里有个分支、只是没写"✓。用自己的 class ✓。
-    const quit = mkel('div', 'item quitrow');
-    quit.appendChild(mkel('span', 'k danger', '退出该空间'));
-    // ⚠️ **点了走的是同一个函数** ✓（`confirmLeaveSpace` ✓）——
-    //    它自己会现问一次 `alone` 并说话 ✓，这里**不再判断一遍** ✗
-    //    （判两遍 = 迟早只改一处 ✓）。
-    quit.onclick = confirmLeaveSpace;
-    if (!s.alone) quit.style.opacity = '.45';
-    body.appendChild(quit);
-    if (!s.alone) {
-      // ⚠️ 同一句话，**两处必须一样** ✗（那一屏现在已经没入口了 ✓，
-      //    但留着旧措辞迟早绊人 ✓）
-      body.appendChild(mkel('div', 'tip', '当前人数超过1人，\n暂不支持退出'));
-    }
-    // ⚠️ 这一段原来**自己写了一遍**"二次确认 + 退出 + 重落地"✗→✓（2026-10-09）——
-    //    现在它和设置页那一行**共用** `confirmLeaveSpace` ✓
-    //    （上面那句 `quit.onclick = confirmLeaveSpace` 就是全部 ✓）。
-    //    两处各写一遍的下场是"只改一处" ✓（这个项目反复栽过 ✓）。
-
-    const swap = mkel('div', 'swap');
-    const b = mkel('b', null, '返回');
-    b.onclick = closeSpace;
-    swap.appendChild(b);
-    body.appendChild(swap);
-  };
-
-  // ── 自我介绍（≤500 字 ✓，可空 ✓）──────────────────────────────────
-  //
-  // ★ 用户 2026-10-08 定的 ✓（原话见 `#me` 里那一行 ✓）。
-  //   它跟着**每一轮**进它的系统提示（`_group_persona` ✓）→ 写完下一句话它就知道了 ✓，
-  //   不用等什么重建 ✓。
-  const openSelfIntro = () => {
-    if (!$('#selfIntro').classList.contains('on')) pushScreen('selfIntro');
-    renderSelfIntro();
-  };
-  const closeSelfIntro = () => popScreen('selfIntro');
-
-  const renderSelfIntro = () => {
-    const body = $('#selfIntroBody');
-    body.textContent = '';
-    const card = mkel('div', 'card');
-    card.appendChild(mkel('label', null, '自我介绍'));
-    const ta = mkel('textarea', 'field');
-    ta.maxLength = 800;          // ⚠️ 跟着 `SelfIntroIn` 一起改成 800 ✓（那一屏没入口 ✓，
-                                 //    但数不一致迟早绊人 ✓）
-    ta.placeholder = '想让管家知道点什么？比如你习惯什么时候起床、'
-                   + '喜欢什么、最近在忙什么。不写也行。';
-    ta.value = (me && me.self_intro) || '';
-    const count = mkel('div', 'count', '');
-    const sync = () => { count.textContent = ta.value.length + ' / 800'; };
-    ta.oninput = sync;
-    sync();
-    const err = mkel('div', 'err', '');
-    const save = mkel('button', 'btn-save', '保存');
-    save.onclick = async () => {
-      save.disabled = true;
-      try {
-        const out = await api('/me/self-intro', {
-          method: 'POST', body: JSON.stringify({ text: ta.value }),
-        });
-        me.self_intro = out.self_intro;
-        closeSelfIntro();
-        renderMe();               // 「我的」那一行的"已写/还没写"要跟着变 ✓
-        toast(out.self_intro ? '保存了，它下次开口就带着这个' : '擦掉了');
-      } catch (e) { err.textContent = (e && e.message) || '没保存上'; }
-      save.disabled = false;
-    };
-    card.append(ta, count, err, save);
-    body.appendChild(card);
-    const swap = mkel('div', 'swap');
-    const b = mkel('b', null, '取消');
-    b.onclick = closeSelfIntro;
-    swap.appendChild(b);
-    body.appendChild(swap);
-    setTimeout(() => { try { ta.focus(); } catch (e) {} }, 80);
-  };
-
   // ── 别人的那一屏：头像 + 昵称（和「我的」「管家」同构 ✓）+ 备注 ──────
   //
   // ★ 用户 2026-10-08 定的 ✓（原话见 `dispName` 上面那段 ✓）。
@@ -4051,60 +3858,6 @@
   });
 
   /** 改账号（用户名 / 密码）✓ —— 和「我的」同构的一屏 ✓。 */
-  const openMeAccount = () => {
-    if (!$('#meAccount').classList.contains('on')) pushScreen('meAccount');
-    renderMeAccount();
-  };
-  const closeMeAccount = () => popScreen('meAccount');
-  const renderMeAccount = () => {
-    const body = $('#meAccountBody');
-    body.textContent = '';
-    const card = mkel('div', 'card');
-    card.appendChild(mkel('label', null, '用户名'));
-    const ui = mkel('input', 'field');
-    ui.value = (me && me.username) || '';
-    ui.maxLength = 24;
-
-    card.appendChild(mkel('label', null, '当前密码'));
-    const cp = mkel('input', 'field');
-    cp.type = 'password';
-    cp.placeholder = '改用户名或密码时要填';
-    cp.autocomplete = 'current-password';
-
-    card.appendChild(mkel('label', null, '新密码'));
-    const np = mkel('input', 'field');
-    np.type = 'password';
-    np.placeholder = '不改就空着';
-    np.autocomplete = 'new-password';
-
-    const err = mkel('div', 'err', '');
-    const save = mkel('button', 'btn-save', '保存');
-    save.onclick = async () => {
-      const payload = { current_password: cp.value };
-      if (ui.value.trim() && ui.value.trim() !== me.username) payload.username = ui.value.trim();
-      if (np.value) payload.password = np.value;
-      if (!payload.username && !payload.password) { toast('没改什么'); return; }
-      save.disabled = true;
-      try {
-        const out = await api('/me', { method: 'PATCH', body: JSON.stringify(payload) });
-        me = { ...me, ...out };
-        closeMeAccount();
-        renderMe();
-        toast('已保存');
-      } catch (e) { err.textContent = (e && e.message) || '没保存上'; }
-      save.disabled = false;
-    };
-    card.append(ui, cp, np, err, save);
-    body.appendChild(card);
-    const swap = mkel('div', 'swap');
-    const b = mkel('b', null, '取消');
-    b.onclick = closeMeAccount;
-    swap.appendChild(b);
-    body.appendChild(swap);
-  };
-
-  // 刷新按钮：**光有按钮没有处理函数**就是又一个死按钮 ✗ ——
-  // （这一课刚从"改了名漏了调用方"那儿学过一次 ✗）。
   const _rb = $('#reloadBtn');
   if (_rb) _rb.onclick = () => location.reload();
 
@@ -4616,77 +4369,6 @@
             + '你这边改的不会丢，但两个人同时动它容易撞上');
     }
   };
-
-  // ── 导航屏（工坊的门口）──────────────────────────────────────────────
-  //
-  // ★ 2026-10-07 晚上用户定的：＋ 进来**先是这一屏** ✓ ——
-  //   「也是有一个导航界面，导航界面就是比较规整了，**按照顺序**展示了所有组件聊天的
-  //     入口，点击后就是组件聊天界面，然后还有个新建组件」✓。
-  //
-  // ⚠️ **是"规整"，不是"像个桌面"** ✗→✓ —— 我上一版做成了图标网格 ✓，
-  //   用户这一版说的是**按顺序一列一列排** ✓。跟右上角那个"容纳界面"**刻意不一样** ✓：
-  //   那个是给人看的（爱怎么摆怎么摆 ✓），这个是给人**用**的（一眼找到、顺序稳定 ✓）。
-  //
-  // ⚠️ 列的是**我自己的**对话 ✓（不是"这个群所有组件"✗）——
-  //   组件是全群共有的 ✓，但**对话是个人的** ✓（`workshop_tasks.user_id` ✓）。
-  //   别人做的东西在**群聊右上角**那一屏能看到、能预览 ✓，
-  //   但你从那儿点进对话时，开的是**你自己**的那条 ✓（见 `openTaskForSlug` ✓）。
-  //
-  // ⚠️ **还没做出组件的那种也列出来** ✗→✓ —— 不然它就**看不见**了 ✓：
-  //   既没法接着做、也没法删 ✓（那条对话就成了一个谁都够不着的孤儿 ✓）。
-  //   列出来标成"还没做什么" ✓，诚实 ✓。
-
-  // ⚠️⚠️ **这一屏（`#wsNav`）现在没有入口了** ✗→✓（2026-10-09）——
-  //    用户改的：「主群聊右上角的按钮进入的不再是导航页，而是新建组件的聊天界面」
-  //    「这样**省去了导航界面的麻烦**，完全靠上滑进入各自的编辑界面」✓。
-  //    所以：`openWsNav` / `closeWsNav` / `renderWsNav` 这一族**留着但没人调** ✓。
-  //  ⚠️ **为什么不连皮拔掉** ✗：它是 `#wsNav` 那一屏 + 顶栏那颗 diy 助手头像 +
-  //    `closeWsNav` 在 `__goBack` 里那一支 ✓，一共牵七八处 ✓ ——
-  //    而它现在**是死的、不占任何界面** ✓（没有任何路径能推到它 ✓），
-  //    删它的收益只是"文件短一点" ✗（风险却是"顺手删错一处"✓）。
-  //    哪天真要删，删干净这几处：`#wsNav` 的 HTML/CSS ✓、
-  //    `openWsNav/closeWsNav/renderWsNav/navNewRow/navRow` ✓、
-  //    `__goBack` 里那一支 ✓、`_OTHER_SCREENS` 里那一项 ✓、`#wsNavBack/#wsDiy` 的绑定 ✓。
-  //  ⚠️ **diy 小助手的设置没丢** ✓ —— 它还有一条路：**点组件对话里那张助手头像** ✓
-  //    （见 `addWsMsg` 里那句 `else openDiySet()` ✓），那是用户原来就定的入口 ✓。
-  const openWsNav = async () => {
-    // ⚠️ **先推屏、再画** ✗→✓ —— 画要发请求（几十毫秒 ✓）；
-    //    反过来的话那几十毫秒里这一屏是空的 ✓，看着像"点了没反应" ✓。
-    if (!$('#wsNav').classList.contains('on')) pushScreen('wsNav');
-    await renderWsNav();
-  };
-
-  const closeWsNav = () => popScreen('wsNav');
-
-  const renderWsNav = async () => {
-    const box = $('#wsNavBody');
-    let d;
-    try {
-      d = await api(`/workshop/${group.id}/tasks`);
-    } catch (e) {
-      box.textContent = '打不开：' + e.message;
-      return;
-    }
-    wsCur.tasks = d.tasks || [];
-    if (d.assistant) wsCur.assistant = d.assistant;
-    wsCur.editing = d.editing || {};
-    paintDiyAvatar();                         // 顶栏右上角那颗头像 ✓
-    box.innerHTML = '';                       // 下面全部走 createElement ✓
-    const list = document.createElement('div');
-    list.className = 'navlist';
-    list.appendChild(navNewRow());
-    wsCur.tasks.forEach(t => list.appendChild(navRow(t)));
-    box.appendChild(list);
-  };
-
-  /**
-   * 画**组件的图标** ✓ —— 它可能是 emoji ✓，也可能是一张**内联的小图** ✓。
-   *
-   * ★ 2026-10-07 深夜用户提的：「组件展览页的图标似乎只能是一种样式，没法用图片？
-   *   我让 diy 助手换张木鱼图它说换不了」✓。
-   *   现在 `icon` 允许是 `data:image/...;base64,...` ✓（收拾和大小上限在后端 ✓，
-   *   见 `routes_internal._icon_of` ✓）—— agent 能画 SVG ✓，转成 data URL 就是一张自带图 ✓。
-   */
   const setIcon = (el, icon) => {
     const v = String(icon || '');
     el.textContent = '';
@@ -4733,103 +4415,6 @@
     };
     probe.src = url;
   };
-
-  const navNewRow = () => {
-    const b = document.createElement('button');
-    b.className = 'navrow new';
-    const ic = document.createElement('span');
-    ic.className = 'ico';
-    ic.textContent = '＋';
-    const nm = document.createElement('span');
-    nm.className = 'nm';
-    nm.textContent = '新建组件';
-    b.append(ic, nm);
-    // ★ **先让他起个名字** ✗→✓（2026-10-07 晚上用户定的 ✓）：
-    //   「点击后会提示命名，后续也可以在右上角的组件管理界面重命名」✓。
-    //   ⚠️ 名字**不是白问的** ✓ —— 它会一路走到 `component_save` ✓
-    //      （用户起的名字优先于 agent 自己填的 ✓），也会出现在导航这一列上 ✓。
-    //      没有它的话，刚开的那些全是"还没起名" ✓（一排一模一样的行 ✓）。
-    b.onclick = () => openNameSheet({
-      heading: '它叫什么？',
-      initial: '',
-      cta: '开始做',
-      hint: '随便起一个你自己认得出的就行，以后随时能改。',
-      save: async (name) => {
-        // 名字**不是白问的** ✓ —— 它一路走到组件上 ✓（服务端以它为准 ✓），
-        // 也会出现在导航这一列上 ✓。失败的话把原因原样 toast 出来 ✓
-        // （服务端那句话是写给人看的 ✓，别拿别的字盖掉它 ✓）。
-        if (await wsNewTask('', name)) pushScreen('wsChat');
-      },
-    });
-    return b;
-  };
-
-  const navRow = (t) => {
-    const b = document.createElement('button');
-    b.className = 'navrow';
-    const ic = document.createElement('span');
-    // ★ **同一个图标** ✗→✓（2026-10-07 深夜，用户问的：
-    //   「还没做什么是啥意思，**为啥没有其他组件的那个标志**」✓）——
-    //   原来没做出组件的那种用的是另一个 emoji（✨）✓，
-    //   于是它**看着像另一种东西** ✓，而不是"一个还没做好的组件" ✗。
-    //   现在统一是组件图标 ✓，只是**淡一点** ✓（半透明 ✓）——
-    //   一眼仍能看出"它跟别的不一样" ✓，但不会以为是另一类 ✓。
-    ic.className = 'ico' + (t.slug ? '' : ' off');
-    // ⚠️ 没做出组件的那种**没有自己的图标** ✓ —— 给一个淡一点的默认 ✓
-    //    （`setIcon` 拿到空串会给 🧩 ✓，那正好 ✓）。
-    setIcon(ic, t.icon);
-    const col = document.createElement('span');
-    col.className = 'col';
-    const nm = document.createElement('span');
-    nm.className = 'nm';
-    nm.textContent = t.title || (t.slug || '还没起名');
-    col.appendChild(nm);
-    // ★ 这一行的第二行只说**两件事** ✓（"未固化"那句跟着整套去掉了 ✓）：
-    //   ① 谁正在改它 ✓（用户定的：要在导航上标注 ✓）
-    //   ② 它还没做出组件来 ✓ —— 这句话以前写的是"还没做什么" ✓，
-    //      ⚠️ 那三个字**说不清指的是什么** ✗（用户当场就问了 ✓）。
-    //      现在写全：**"还没做出组件"** ✓ —— 主语和结果都在里面 ✓。
-    const busy = t.slug ? (wsCur.editing || {})[t.slug] : null;
-    if (busy && busy.nickname) {
-      const s = document.createElement('span');
-      s.className = 'sub';
-      s.textContent = busy.nickname + ' 正在改…';
-      col.appendChild(s);
-    } else if (!t.slug) {
-      const s = document.createElement('span');
-      s.className = 'sub';
-      s.textContent = '还没做出组件';
-      col.appendChild(s);
-    }
-    // ★ **参与过这个组件的人的头像** ✓（用户定的：导航上每个组件右边标头像 ✓）。
-    //   ⚠️ 按 **slug** 取 ✓（`people` 是那个组件的参与者名单 ✓）——
-    //      不是"这条对话是谁的"✓（那永远只有你一个 ✓，就标不出什么来了 ✓）。
-    //
-    //   ⚠️ **顺序** ✗→✓（2026-10-07 深夜，用户看着截图报的：
-    //      「头像应该在组件右侧，> 左边，右对齐」✓）——
-    //      原来那一段**在这行代码的上头**就 `appendChild` 了 ✓，
-    //      于是最终顺序变成了 `头像, 图标, 名字, ›` ✓ ——
-    //      头像跑到了**最左边** ✗（先 append 的先排 ✓）。
-    //      现在统一在这一个 `append` 里按顺序给 ✓（从左到右就是看见的顺序 ✓）。
-    const avs = document.createElement('span');
-    avs.className = 'avs';
-    (t.people || []).slice(0, 4).forEach(p => {
-      const a = document.createElement('span');
-      a.className = 'av';
-      a.title = p.nickname || '';
-      paintZhi(a, shellURL(p.avatar), p.nickname || '?');
-      avs.appendChild(a);
-    });
-    const chev = document.createElement('span');
-    chev.className = 'chev';
-    chev.textContent = '›';
-    // 名字那一格 `flex:1` ✓ → 头像和 `›` 自然被推到**右边** ✓（右对齐 ✓）。
-    b.append(ic, col, avs, chev);
-    b.onclick = () => openTaskById(t.id);
-    return b;
-  };
-
-  /** 进「一条对话」✓。`from` = `'top'` 就从上面滑进来 ✓（下拉那条路 ✓）。 */
   const openTaskById = async (tid, from) => {
     if (!$('#wsChat').classList.contains('on')) pushScreen('wsChat', from);
     try {
@@ -5390,7 +4975,6 @@
           wsCur.title = (r.task && r.task.title) || name;
           setWsHead();
           await wsReloadTasks();
-          if ($('#wsNav').classList.contains('on')) renderWsNav();
           toast('改好了');
         },
       }));
@@ -5551,7 +5135,6 @@
       //   右上角那屏的格子名 ✓、以及 agent 下次 `component_list` 读到的名字 ✓
       //   （它读的就是同一个字段 ✓）。
       await refreshCurrent();
-      if ($('#wsNav').classList.contains('on')) renderWsNav();
       if ($('#workshop').classList.contains('on')) renderWorkshop();
       toast('改好了');
     },
@@ -5577,7 +5160,6 @@
   const closeDiySet = () => {
     diyFile = null;
     popScreen('diySet');
-    if ($('#wsNav').classList.contains('on')) renderWsNav();
   };
 
   /**
@@ -5714,7 +5296,6 @@
   //     · **2026-10-09：进"新建组件"的那条对话** ✓（导航屏整个不用了 ✓，
   //        见 `openNewCompChat` 那段 ✓）—— 用户原话：「省去了导航界面的麻烦」✓。
   $('#openWorkshop').onclick = openNewCompChat;
-  $('#wsNavBack').onclick = closeWsNav;
   // ★ diy 小助手：导航右上角那颗头像 → 设置屏 ✓（用户 2026-10-07 深夜定的 ✓）
   $('#wsDiy').onclick = openDiySet;
   $('#diyBack').onclick = closeDiySet;
