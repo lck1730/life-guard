@@ -225,6 +225,15 @@ class _NoStoreStatic(StaticFiles):
 # /ui/components/...（它做的组件）。归服务用户所有，它随时可以改。
 app.mount("/ui", _NoStoreStatic(directory=settings.ui_dir), name="ui")
 
+# ★ 2026-10-11：**样式和脚本也搬出 HTML 了** ✗→✓ ——
+#   `static/app.css`（1,422 行）+ `static/app.js`（5,896 行 ✓，那个 IIFE 原样 ✓），
+#   `index.html` 从 **7,857 行降到 ~540 行**（纯标记 ✓）。
+#
+#   ⚠️ 走 `_NoStoreStatic` 是**必须的、不是讲究** ✗ —— 界面是"改服务器文件 =
+#      用户重开 App 生效"的架构 ✓，外链的 js/css 一旦被 WebView 缓存住，
+#      改了不生效 ✓（这个坑这个项目反复踩过 ✓，见上面 `_NO_STORE` 那段 ✓）。
+app.mount("/static", _NoStoreStatic(directory=STATIC_DIR), name="static")
+
 
 @app.get("/health")
 async def health() -> dict:

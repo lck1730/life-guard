@@ -1,0 +1,1422 @@
+  :root, [data-theme="dark"] {
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b;
+    --text:#e6e8ee; --muted:#8b93a7; --line:#262b36;
+    --accent:#6ea8ff; --accent-bg:#1e3a5f; --on-accent:#07131f;
+    --agent:#9dd0aa; --danger:#ff6b6b;
+    /* 系统留白。**由网页自己做主**——原生壳只上报数字（window.__onInsets），
+       这里决定怎么用。这样调布局改网页就行，不用重装 App。
+       浏览器里（没有原生壳）退回 CSS 的 env()。 */
+    --inset-top: env(safe-area-inset-top, 0px);
+    --inset-bottom: env(safe-area-inset-bottom, 0px);
+    --kb: 0px;                    /* 仅浏览器下的键盘兜底，App 里原生已算进 inset-bottom */
+  }
+  [data-theme="light"] {
+    --bg:#f5f6fa; --panel:#ffffff; --panel2:#eef0f6;
+    --text:#14161c; --muted:#5a637a; --line:#dde1ea;
+    --accent:#2f6fd0; --accent-bg:#dce8fb; --on-accent:#ffffff;
+    --agent:#2f8a52; --danger:#c0392b;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; overscroll-behavior:none; }
+  body {
+    background:var(--bg); color:var(--text);
+    font:15px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  button { font:inherit; cursor:pointer; border:0; border-radius:10px; background:none; color:inherit; }
+  input,textarea { font:inherit; }
+
+  /* 每个界面都是固定铺满。用 dvh 而不是 vh：地址栏收起时不会留白 */
+  .screen { position:fixed; inset:0; height:100dvh; display:none; flex-direction:column; background:var(--bg); }
+  .screen.on { display:flex; }
+
+  /* ── 登录 ──（**照壳原来那一版** ✓ · 2026-10-09） */
+  #login { justify-content:center; align-items:center; padding:24px; }
+  #login .wrap { width:min(360px,100%); }
+  /* hero：卡片**外面**的大标题 + 一句广告词 ✓ */
+  #login .hero { text-align:center; margin:0 0 22px; }
+  #login .hero .t { font-size:26px; font-weight:600; letter-spacing:.5px; }
+  #login .hero .s { color:var(--muted); font-size:13.5px; margin-top:8px; }
+  #login .card { background:var(--panel); border:1px solid var(--line);
+                 border-radius:18px; padding:22px 20px; }
+  /* 每个输入框上面一个 label ✓（壳那一版就是这样 ✓，不靠 placeholder ✓） */
+  #login label { display:block; color:var(--muted); font-size:12.5px; margin:14px 0 6px; }
+  /* ⚠️ **`[hidden]` 要显式写** ✗→✓ —— 上面那句 `display:block` 会**压过**
+     `hidden` 那条属性规则 ✓（属性的优先级低于作者样式 ✓）→
+     登录态下"内测码 / 重复密码"两个 **label 会露出来**（输入框却是隐藏的 ✓）
+     —— 2026-10-09 渲染出来一眼看到的 ✓。 */
+  #login label[hidden], #login input[hidden] { display:none !important; }
+  #login label:first-child { margin-top:0; }
+  #login .btn-primary { margin-top:18px; }
+  #login .swap { margin-top:16px; text-align:center; }
+  #login .swap b { color:var(--accent); font-size:13.5px; font-weight:500; }
+
+  #login { justify-content:center; align-items:center; padding:24px; }
+  /* ⚠️ `#init` 和它**共用** ✓（2026-10-09：那两屏是平级的首启屏 ✓） */
+  #login .wrap, #init .wrap { width:min(360px,100%); padding:26px 22px; background:var(--panel);
+                 border:1px solid var(--line); border-radius:18px; }
+  /* ⚠️ hero 的大标题/小字也共用 ✓（`.t` / `.s` 就是登录那套 ✓）——
+     `#init` 只要写 `.hero` 就够了 ✓，不用另起一套 `.hero2` ✗（那个类已经删了 ✓）。 */
+  #login .hero .t, #init .hero .t { font-size:26px; font-weight:600; letter-spacing:.5px; }
+  /* ⚠️ **只有初始化这一屏小一档** ✗→✓（2026-10-10 用户：「欢迎使用生活管家，
+     字体略微小一些些」✓）—— 26 → 24px ✓。
+     ⚠️ 我**没动登录页**那个大标题（「生活管家」✓）—— 他这次点名的是这一句 ✓。
+        要是哪天觉得两屏该继续一样，把这条删掉就行 ✓（一处 ✓）。 */
+  #init .hero .t { font-size:24px; }
+  #login .hero .s, #init .hero .s { color:var(--muted); font-size:13.5px; margin-top:8px; }
+  /* ★ 2026-10-09 用户看了真机之后的两点 ✗→✓：
+       · 「继续使用请先这几个字**不太居中**」→ 光靠 `text-align:center` 不够稳 ✓
+         （它是**行内**居中 ✓，一旦那行自己有字距/尾随空格就会偏 ✓）→
+         改成**弹性盒子居中** ✓（`align-items:center` 管的是盒子 ✓，
+         跟字距没关系了 ✓），双保险 ✓。
+       · 「这三行之间**间距拉大一些**」→ 标题→副标题 8→16px ✓、副标题→按钮 24→40px ✓。 */
+  /* ★ 2026-10-09 用户看了真机之后的两点 ✗→✓：
+       · 「继续使用请先这几个字**不太居中**」→ 光靠 `text-align:center` 不够稳 ✓
+         （它是**行内**居中 ✓，一旦那行自己有字距/尾随空格就会偏 ✓）→
+         改成**弹性盒子居中** ✓（`align-items:center` 管的是盒子 ✓，
+         跟字距没关系了 ✓），双保险 ✓。
+       · 「这三行之间**间距拉大一些**」→ 标题→副标题 8→16px ✓、副标题→按钮 24→40px ✓。
+     ⚠️ 2026-10-09 同一天又撤回过一轮 ✗：那天我先按"三行等距 + 按钮收窄带＋"改了一版 ✓，
+        他看了说「得得…布局先恢复原样，**除了！**」✓ → 也就是**退回这一版** ✓
+        （「！」那个不还回去 ✓）。所以现在这个 16/40 和通栏按钮是**他定下来的样子** ✓，
+        别再自作主张去"优化"它 ✗。 */
+  /* ★ 2026-10-09 第三条（这一版是**他一条条点名要的** ✓）：
+       · 「三行间距一致」✓ → 副标题上边距和 hero 的下边距**写成同一个 22** ✓
+         （上一版是 16 / 40 ✗，一大一小 ✓）
+       · 「继续使用请先，字体加大一些」✓ → 13.5 → 15.5px ✓（标题 26，层级还在 ✓）
+       · 按钮：「蓝色字体、虚线框环绕、前有 +、虚线框紧凑、整体居中」✓
+     ⚠️ ⚠️ **这一颗按钮和早些时候我撤掉的那一版几乎一样** ✗ ——
+        那次是我自己顺手"优化"的 ✓（他说"先恢复原样"✓）；这次是他点名要的 ✓。
+        同样一个样子，**他提 = 做，我提 = 撤** ✓ —— 记住这个区别 ✓。 */
+  #init .hero { display:flex; flex-direction:column; align-items:center;
+                text-align:center; margin:2px 0 0; }
+  #init .hero .s { margin-top:22px; font-size:15.5px; }
+  /* ⚠️ **虚线框去掉了** ✗→✓（2026-10-10 用户：「把按钮虚线框去掉」✓）——
+     现在它是**一行蓝字**（前面带 ＋）✓：`border:none` + 透明底 ✓。
+     ⚠️ 内边距留着 ✓ —— 它是个**要点的东西** ✓，不靠边框也要有够大的手感 ✓；
+        `:active` 那层淡底色也留着 ✓（否则点下去一点反馈都没有 ✓）。 */
+  /* ⚠️ 字号 15.5 → **17.5** ✗→✓（2026-10-10 用户：「刚才那个界面的加入或新建一个
+     空间的字体再大些」✓）—— 它是这一屏**唯一的主行动** ✓，
+     比副标题（15.5）大一档、又明显小于标题（26）✓。 */
+  /* ⚠️⚠️ **这条规则原来写的是 `#init .btn-primary`** ✗→✓（2026-10-10 用户：
+     「加入空间按钮居中」✓）—— 而**表单里那颗按钮也在 `#init` 里面** ✓✓ →
+     它被这条一起改成了"没有底、蓝字、宽度贴字" ✗ → 结果是**一行靠左的蓝字** ✓。
+     → 只认**那一颗**（`#initGo` ✓）；表单那颗回到全局 `.btn-primary` ✓ ——
+       也就是**通栏实心、字居中** ✓，和登录页那颗「登录」**长得一样** ✓
+       （两屏本来就是平级的首启屏 ✓）。 */
+  #initGo { width:auto; margin:22px auto 0; padding:11px 18px;
+            background:none; border:none;
+            color:var(--accent); font-size:17.5px; font-weight:600;
+            border-radius:12px; box-shadow:none; }
+  #initGo:active { background:rgba(90,140,255,.10); }
+  #login .logo { width:64px;height:64px;border-radius:50%;background:var(--accent-bg);
+                 display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
+                 font-size:26px;color:var(--accent); }
+  #login h1 { margin:0 0 4px; font-size:20px; text-align:center; }
+  #login .sub { margin:0 0 22px; color:var(--muted); font-size:13px; text-align:center; }
+  .field { width:100%; padding:13px 14px; margin-bottom:10px; background:var(--panel2);
+           border:1px solid var(--line); border-radius:12px; color:var(--text); font-size:16px; }
+  .field:focus { outline:none; border-color:var(--accent); }
+  .btn-primary { width:100%; padding:14px; background:var(--accent); color:var(--on-accent);
+                 font-weight:600; font-size:16px; margin-top:6px; border-radius:12px; }
+  .btn-primary:disabled { opacity:.45; }
+  .err { color:var(--danger); font-size:13px; min-height:18px; margin-bottom:6px; text-align:center; }
+  /* 登录屏底下那行小切换（登录 ⇄ 注册）✓ —— 和 `.swap`（取消/保存那一行）同一个长相 ✓：
+     灰字、居中、不是按钮 ✓。 */
+  #login .swap { margin-top:14px; }
+  #login .swap b { color:var(--muted); font-size:13px; font-weight:400; }
+
+  /* ── 初始化：还没有生活空间的时候停在这一屏 ──────────────────────────
+     ★ 用户 2026-10-08 定的形状：
+       「居中写上"欢迎使用生活管家！继续使用请先"，然后 [新建或加入一个生活空间]
+         按钮放在下方」✓ —— 点它才浮出那张介绍卡 ✓。 */
+  /* ★ 2026-10-09 收拾这一屏 ✗→✓（用户：「比较朴素…简约大气又不会太简陋」✓）——
+     ⚠️ **和登录那一屏共用同一套**（`.wrap` 卡片 + `.hero .t/.s` ✓）：
+        它俩是**平级的首启屏** ✓（启动 → 登录 → 初始化 → 主群聊 ✓），
+        一个精装一个毛坯会显得像两个 App ✓。
+     ⚠️ 加的那些**都只有一层**：一层柔光 + 一点字距 ✓ ——
+        "大气"来自**留白和层级** ✓，不是来自堆装饰 ✗
+        （所以没有描边、没有阴影叠影、没有渐变字 ✓）。 */
+  #init { flex-direction:column; justify-content:center; align-items:center; padding:24px;
+          position:relative; }
+  /* 身后一层极淡的光晕 —— 纯黑背景上"有个中心" ✓（很淡，看不见边界才对 ✓） */
+  #init::before { content:''; position:absolute; inset:0; pointer-events:none;
+                  background:radial-gradient(60% 42% at 50% 40%,
+                              rgba(90,140,255,.10), rgba(0,0,0,0) 70%); }
+  #init .wrap { position:relative; }
+  /* ★ **表单浮起来的时候，这一屏自己的三行要藏掉** ✗→✓（2026-10-10 用户看截图：
+     「底部还有上一个页面的」✓）—— 卡片是 absolute ✓、hero 那一坨还留在原地 ✓ →
+     卡片一挪动就露出底下的「欢迎使用生活管家」✓，看着像**上一页没退干净** ✓。
+     ⚠️ 用 `visibility` 不是 `display` ✗：它只把字藏起来 ✓、
+        不重新排版 ✓（这一屏就一个 absolute 卡片 ✓，两者其实等价 ✓ ——
+        但 visibility 少一次重排 ✓，也不会让 `:focus` 之类中断 ✓）。 */
+  #init.formopen .wrap { visibility:hidden; }
+  /* 介绍卡：**居中浮起来**的一小块 ✓（用户："在这个界面居中浮空一个提示小框" ✓）。
+     它在同一屏里，不是另一屏 ✓ —— 所以用 absolute + 居中 ✓，不推屏 ✓。 */
+  /* ★★ 位置一共改了两轮，**这一版才是他要的** ✗→✓（2026-10-10）：
+     第一版 `top:50%`：按整个视口居中 ✓ → 键盘弹起来时**按钮压在键盘底下** ✗
+     第二版 `calc(48% - var(--inset-bottom)/2)`：跟着键盘让位 ✓ →
+       他看截图说「**高过头了**」+「**输入法展开不该影响卡片位置**」✗✗
+     → 现在：**一个静态的数**（`40%` ✓），键盘弹不弹它都不动 ✓。
+     ⚠️ 那为什么是 40% ✗：它是**按"键盘弹起来之后也得看得见"倒推的** ✓ ——
+       他手机上卡片约 448 高 ✓、键盘上沿在视口 64% 处 ✓ →
+       卡片的**下边**要落在 64% 以上 ✓ → 中点最高只能到 40% ✓；
+       再往上留几像素的余量 → 落在 38% ✓。
+     ⚠️ 用户 2026-10-10 在真机上看了说「这次对了，不过可以**略微往下调一点**」✓ →
+        **38% → 40%**（就是上面算出来的那个上限 ✓）—— 再往下，键盘弹起来时
+        **按钮的下边就会贴到键盘上沿** ✓（甚至压住几像素 ✓）。
+     ⚠️ 2026-10-10 再一轮：他说「还要再往下一些些」✓ → **40% → 43%** ✓。
+        ⚠️ 注意这个数已经**越过上面算的那个上限**了 ✓ —— 按估的高度，
+           键盘弹起来时按钮下边会**压住十几像素** ✓。
+           他试的时候留意一下：真被挡了，就把这个数收回来 ✓（一处，一个数 ✓）；
+           或者反过来——把「键盘一弹就把卡片临时抬上来」加回来 ✓
+           （但那就是他早先说的「输入法展开不该影响卡片位置」✗，二选一 ✓）。
+       ⚠️ 所以无键盘时它会比正中央**高出约 90px** ✓ —— 这是"不动"的代价 ✓，
+          也是他明确选的那个 ✓（"不该影响卡片位置"✓）。
+     ⚠️ 换台机器、换个字号（他那台的字体明显更大 ✓）卡片的实际高度会变 ✓，
+        这个数就得跟着调 ✓ —— 它是个**折中数**，不是算出来的恒等式 ✓。
+     ⚠️ `40` → **`38`**：按他那台算（卡片约 448 高 ✓、键盘上沿在 64% 处 ✓），
+        40% 会让卡片**下边正好贴在键盘上沿** ✗（差几像素就被切 ✓）→ 往上留一点 ✓。 */
+  #init .introcard { position:absolute; left:50%; top:43%;
+                     transform:translate(-50%,-50%);
+                     width:min(360px, calc(100% - 40px)); padding:24px 22px;
+                     background:var(--panel); border:1px solid var(--line);
+                     border-radius:18px; box-shadow:0 18px 50px rgba(0,0,0,.45);
+                     animation:popIn .2s cubic-bezier(.22,1,.36,1) both; }
+  #init .introcard h2 { margin:0 0 12px; font-size:17px; text-align:center; }
+  /* ★ 每个框头上那行小提示 ✓（和登录页那套 label 一个长相 ✓ —— 那边也是
+     "框上面写一行灰字" ✓，两屏是平级的首启屏 ✓）。 */
+  #init .introcard .fld { display:block; color:var(--muted); font-size:12.5px;
+                          margin:14px 0 6px; }
+  #init .introcard .fld:first-of-type { margin-top:2px; }
+  /* ⚠️ **被锁上的那个框要一眼看出来** ✗→✓（用户要"一个填了另一个不能填"✓）——
+     光 `disabled` 在深色底上几乎看不出来 ✓（看着还是"能点"的 ✓）→
+     降透明度 + 换光标 ✓，让它自己说"我现在不让填" ✓。 */
+  #init .introcard .field:disabled { opacity:.45; }
+  /* ⚠️ 表单里那行内嵌的红字**不用了** ✗→✓（用户 2026-10-10：「红字…不好看也不会
+     主动消失，应该悬浮一张卡片提示并且一会就消失」✓）→ 改成 `showNotice` ✓
+     （居中那张卡 ✓，3.6 秒自己淡出 ✓，不占版面 ✓、不把下面的东西顶下去 ✓）。 */
+  .notice.err { color:var(--danger); border-color:rgba(224,106,106,.45); }
+  #init .introcard p { margin:0 0 10px; color:var(--muted); font-size:14px; line-height:1.75; }
+  #init .introcard p b { color:var(--text); font-weight:600; }
+  #init .introcard .foot { margin:16px 0 0; color:var(--muted); font-size:12px; text-align:center; }
+  #init .introcard .sep { margin:18px 0 14px; border-top:1px solid var(--line); }
+  /* 「退出该空间」那一行：**居中、红字、没有箭头** ✓ ——
+     和设置页那条「退出登录」是同一个长相 ✓（那边靠 `[data-act="logout"]` ✓，
+     这一条用自己的 class ✓，免得混进那段委托里 ✓）。 */
+  #space .item.quitrow { justify-content:center; }
+  #space .item.quitrow .k { flex:0 0 auto; }
+  @keyframes popIn { from { opacity:0; transform:translate(-50%,-50%) scale(.92); }
+                     to   { opacity:1; transform:translate(-50%,-50%) scale(1); } }
+
+  /* ── 「我的」那一屏：数据由 JS 画（照 `#agent` / `#diySet` 的规矩 ✓）──
+     ⚠️⚠️ **这里原来有一条 `#me .abody, #meAccount .abody { padding:8px 0 24px; }`
+     —— 2026-10-09 删掉了** ✗→✓，它就是"顶部改两次都没生效"的真凶：
+
+     · 它是**按 id 写的** ✓（`#me .abody` = 一个 id + 一个 class ✓），
+       而通用那条 `.ascreen .abody`（两个 class ✓）**比它低一级** ✗ →
+       **它永远赢** ✓ → 「我的」顶上一直是那个写死的 **8px** ✗。
+     · 于是我改 `.ascreen .abody` 的 14 → 26 → 44 ✓ 三次，
+       **一次都没碰到这一屏** ✓ —— 用户看到的是"改了两次还是贴着状态栏" ✓
+       （他的原话：头像上边缘几乎贴着系统时间 ✓）。
+     · 它是 2026-10-08「我的」还是壳式整屏那会儿写的 ✓，
+       那会儿这一屏**确实**该是 8px 顶距 ✓；后来它变成"要被状态栏让位"的那一屏 ✓，
+       这条就该跟着改 ✓ —— **没人改，因为它藏在一个按 id 写的老选择器里** ✓。
+
+     → 现在**删掉它** ✓：这一屏和其它几屏一样，走 `.ascreen .abody` 那条
+       （`calc(var(--inset-top) + 44px)` 顶距 ✓、14px 左右 ✓、底部让 inset ✓）。
+     ⚠️ 教训：**改 CSS 之前先确认"赢的是哪一条"** ✗ ——
+        数值对不对是第二位 ✓，"这条规则到底有没有生效"才是第一位 ✓
+        （`getComputedStyle(...).paddingTop` 一句话就能回答 ✓）。 */
+
+  /* ── 聊天 ── */
+  header.top { background:var(--panel); border-bottom:1px solid var(--line);
+               /* ★ 左右内边距 **8px** ✓（原来 16px ✗）—— 2026-10-06 用户：
+                  "以 `<` 距离左侧的距离为基准……全都保持一致" ✓。
+                  设置页（`header.sub` ✓）一直是 8px ✓，这里也收成 8px ✓，
+                  两个顶栏的"边距"才是同一个数 ✓。
+                  左右都是 8px ✓ → **中间那块照旧居中** ✓（对称没破 ✓）。 */
+               padding:calc(var(--inset-top) + 12px) 8px 12px;
+               display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  /* 群名居中：左侧汉堡宽度靠一个等宽占位元素抵消，
+     否则 flex:1 会让标题在"剩余空间"里居中，视觉上是偏右的。 */
+  header.top .spacer { width:40px; flex-shrink:0; }
+  header.top .info { flex:1; min-width:0; text-align:center; }
+  header.top .gname { font-size:17px; font-weight:600; overflow:hidden;
+                      text-overflow:ellipsis; white-space:nowrap; }
+  header.top .status { display:flex; align-items:center; justify-content:center;
+                       gap:6px; font-size:12px; color:var(--muted); margin-top:2px; }
+  /* ⚠️ **必须显式盖回来** ✗ —— 上面那句是作者样式 ✓，
+     而 `[hidden]{display:none}` 只是浏览器默认样式 ✓ → 它赢不了 ✗。
+     少了这一条，"关掉待机"之后状态条**照样在**（只是里面没字 ✓）。
+     （同一个坑 `#qbar[hidden]` 那条注释里已经写过一次 ✓。） */
+  header.top .status[hidden] { display:none; }
+  /* 静息也是绿点——它一直在"窥屏"，用灰点会显得像离线 */
+  header.top .dot { width:7px;height:7px;border-radius:50%;background:var(--agent);flex-shrink:0; }
+  header.top .status.s-idle .dot { opacity:.6; }
+  header.top .status.s-thinking, header.top .status.s-typing { color:var(--agent); }
+  header.top .status.s-thinking .dot, header.top .status.s-typing .dot { background:var(--agent); }
+  header.top .status.s-lurking { color:var(--accent); }
+  header.top .status.s-lurking .dot { background:var(--accent); }
+  @keyframes pulse { 0%,100%{opacity:.35} 50%{opacity:1} }
+  header.top .status.s-thinking .dot, header.top .status.s-typing .dot { animation:pulse .7s infinite; }
+  .icon-btn { width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+              color:var(--muted); flex-shrink:0; font-size:20px; }
+  /* ☰ 往左挪一点点 ✓ —— 2026-10-06 用户："距离左边间距略微小一些，
+     **不要影响群昵称和关键状态的位置**" ✓。
+     ⚠️ **用 `transform`，不能用负 margin** ✗→✓ ——
+       负 margin 会**改变这个盒子的布局宽度** ✓ → 中间那块跟着偏 ✗
+       （上一轮那个 `margin-left:-8px` 就是这么把群名顶偏 4px 的 ✓，
+        用户一眼就看出来了 ✓）。
+       `transform` 只挪"画在哪儿"✓，**完全不参与布局** ✓
+       → 群名和状态条一个像素都不动 ✓，而 ☰ 自己往左 ✓。
+     这就是"要动一个东西、又不想动它的邻居"时的标准做法 ✓。 */
+  /* ── 三个图标对齐到同一个"离屏边的距离" ✓ ────────────────────────
+     用户 2026-10-06："以 `<` 距离左侧的距离为基准，刷新按钮距离右侧、
+     设置按钮距离左侧全都保持一致" ✓。
+
+     口径是**墨迹**（眼睛看到的那几笔 ✓），不是盒子 ✗ —— 盒子没人看得见 ✓。
+
+     基准 = 设置页那个 `<`：
+       内边距 8px ✓ + 盒子 40px、里面 SVG 22px 居中 → 里面让出 9px ✓
+       + 那笔 "<" 的墨迹在 24 格里从 8.5 开始（描边圆头再往外 1 ✓ = 7.5 ✓）
+       7.5 ÷ 24 × 22 = 6.875px
+       → **8 + 9 + 6.875 ≈ 23.9px** ✓ ← 这就是基准
+
+     ☰：墨迹从 24 格里的 6 开始（圆头 → 5 ✓）= 5 ÷ 24 × 22 = 4.58px
+       → 8 + 9 + 4.58 = 21.58 ✗ 比基准近 2.3px → **往右推 2.3px** ✓
+
+     ↻：用得是 Feather 那条 ✓，墨迹几乎顶满 24 格（右边 24 ✓），
+       而它画在 19px 的格子里 → 9.5px 的居中让位 + 0 = 9.5px
+       → 离右边 8 + 9.5 = 17.5 ✗ 比基准远 6.4px → **往左推 6.4px** ✓
+
+     ⚠️ **都用 `transform`，不用负 margin** ✗ —— 负 margin 会改布局宽度 ✓
+        → 中间那块跟着偏 ✗（上一轮那个 `-8px` 就是这么把群名顶偏 4px 的 ✓）。
+        `transform` 只挪"画在哪儿"✓，**不参与布局** ✓ → 群名和状态条一动不动 ✓。
+     ⚠️ 换了图标或改了尺寸，这三个数要**重算** ✓（算法就在上面 ✓）。 */
+  #openSettings { transform: translateX(2.3px); }     /* 墨迹 → 离左 23.9px ✓ */
+  #reloadBtn    { transform: translateX(-6.4px); }    /* 墨迹 → 离右 23.9px ✓ */
+  /* 创意工坊（右上角）—— 2026-10-07 加 ✓。
+     **墨迹跨度和 ☰ 一样**（24 格里 6..18 ✓，描边圆头再往外 1 ⇒ 5..19 ✓）
+     → 直接取它的**镜像** ✓：☰ 在左、往右推 2.3px ✓；这个在右、往左推 2.3px ✓。
+     ⚠️ **换了图标这个数要重算** ✗ —— 算法在下面那段注释里 ✓。 */
+  #openWorkshop { transform: translateX(-2.3px); }
+
+  /* 返回箭头是 SVG（见 HTML），这里只管对齐和颜色 */
+  .icon-btn.back { color:var(--text); }
+  .icon-btn.back svg { display:block; }
+  /* 设置页右上角那个刷新 ✓ —— **和左边的返回箭头同一个大小、同一个颜色** ✓。
+     原来写的是一个 `↻` 文字字符 ✗，两个毛病：
+       · 字形大小和 SVG 对不上 ✓（20px 的字，视觉上比 22px 的描边小一号 ✓）
+       · `.icon-btn` 默认是 `--muted` ✗，比左边那个 `--text` 淡一档 ✓
+     两下一夹，一眼就看出左右不对称 ✓（用户 2026-10-06 指的就是这个 ✓）。 */
+  .icon-btn.plain { color:var(--text); }
+  .icon-btn.plain svg { display:block; }
+
+  #msgs { flex:1; min-height:0; overflow-y:auto; padding:14px; display:flex;
+          flex-direction:column; gap:10px; -webkit-overflow-scrolling:touch; }
+  .empty { margin:auto; color:var(--muted); font-size:14px; text-align:center; }
+  .row { display:flex; gap:8px; max-width:84%; }
+  .row.mine { align-self:flex-end; flex-direction:row-reverse; }
+  .row.agent { max-width:92%; }
+  .av { width:34px;height:34px;border-radius:50%;flex-shrink:0;background:var(--panel2);
+        color:var(--muted); display:flex;align-items:center;justify-content:center;
+        font-size:13px;font-weight:600; }
+  .row.agent .av { background:var(--accent-bg); color:var(--agent); }
+  .wrap2 { min-width:0; }
+  .who { font-size:12px; color:var(--muted); margin-bottom:3px; padding-left:4px; }
+  .row.agent .who { color:var(--agent); }
+  .row.mine .who { text-align:right; padding-right:4px; }
+  .bubble { padding:9px 13px; border-radius:14px; background:var(--panel2);
+            word-break:break-word; white-space:pre-wrap; }
+  .bubble .at { color:var(--accent); font-weight:600; }
+  /* ★ **提到一个真的存在的组件 → 蓝色可点** ✗→✓（2026-10-07 深夜用户定的：
+     「只要是生活管家里聊天提到了某存在的组件，都标蓝色可跳转」✓）。
+     ⚠️ 判据是**这个群里到底有没有这个组件** ✓ —— 不是"消息里有没有那种字样" ✗：
+        没做出来的名字**不标** ✓（点了会 404 ✓，那比不标更糟 ✓）。 */
+  /* ⚠️ **不能限定在 `.bubble` 里** ✗→✓（用户报的：「主群里提示完成后组件名称
+     不是蓝色字体」✓）—— 那两条组件提示是**系统消息** ✓，住在 `.sysrow` 里 ✓，
+     而 `.sysrow` **不是气泡** ✗ → 写在 `.bubble .clink` 下**颜色根本不生效** ✓
+     （类加上了、点击也绑上了 ✓，就是**不变蓝** ✓ —— 所以看着像"没这个功能"✓）。 */
+  .clink { color:var(--accent); }
+  .row.mine .bubble { background:var(--accent-bg); border-bottom-right-radius:4px; }
+  /* 系统提示：居中、灰、无头像无气泡。
+     **故障通报必须一眼看出不是管家在说话**——混在气泡里的话，用户会以为
+     那是它说的一句怪话，故障就被掩盖过去了。 */
+  .sysrow { align-self:center; max-width:86%; font-size:12.5px; color:var(--muted);
+            background:var(--panel2); border-radius:10px; padding:6px 12px;
+            text-align:center; line-height:1.55; }
+  /* ★ 2026-10-09：**气泡上关掉系统的长按呼出 / 文字选择** ✗→✓。
+     用户报的：「长按后不仅出了卡片，还把系统的复制功能调出来了」✓ ——
+     要的是**只有我们那张卡片** ✓（"自由复制"那一项再自己去调复制 ✓）。
+     ⚠️ 这一条以前只写在注释里 ✗（"CSS 里把长按呼出和选择都关了"✓），
+        而**代码里根本没加** ✓ —— 注释和代码不一致，等于没有 ✓。 */
+  .row .bubble, .mkrow .mkbub { -webkit-touch-callout:none; user-select:none; }
+  /* ★ **点了「自由复制」的那一条：临时放开选择** ✗→✓（2026-10-09 用户第二次点这条 ✓）——
+     平时气泡不给选（上面那条 ✓，为了让我们的长按不被系统抢走 ✓），
+     而"自由复制"要的恰恰是**系统那套选择工具** ✓（框选 + 拖手柄 + 点"复制" ✓）。
+     所以只对**这一条**开口子 ✓（`.seltext` ✓，由 `freeCopyBubble` 加上 ✓）。
+     ⚠️ 三个属性**缺一不可** ✗：`user-select` 管"能不能选" ✓；
+        `-webkit-user-select` 是老 WebView 认的那个名字 ✓；
+        `-webkit-touch-callout` 管"长按能不能呼出系统那排东西" ✓
+        （不放开的话，他在框选里想重新长按反而呼不出菜单 ✓）。
+     ⚠️ **不要写成 `.bubble`** ✗（那就全放了 ✓）—— 长按会同时被系统和我们抢 ✓。 */
+  .row .bubble.seltext, .row .bubble.seltext *,
+  .mkrow .mkbub.seltext, .mkrow .mkbub.seltext * {
+    -webkit-user-select:text !important; user-select:text !important;
+    -webkit-touch-callout:default !important;
+  }
+  /* ★ **这个状态要自己看得出来** ✗→✓（2026-10-09：把底部那句提示撤了 ✓，
+     改由这一条自己的样子说 ✓）—— 一圈淡虚线 = "它现在是可以拖选的" ✓。
+     ⚠️ 用 `outline` 而不是 `border` ✗ —— border 会改尺寸 ✓（气泡会跳一下 ✓，
+        而且它在滚动列表里 ✓，跳一下很显眼 ✓）。 */
+  .row .bubble.seltext, .mkrow .mkbub.seltext {
+    outline:1px dashed var(--accent); outline-offset:2px;
+  }
+  /* ★ **盖上去之后，气泡里原来那层字要藏起来** ✗→✓（2026-10-09）——
+     ⚠️ 不藏的话屏幕上就有**两份字** ✗：文本框里那份 ✓ + 底下气泡里那份 ✓，
+        两者只要差一个像素（字体回退、换行位置 ✓）就会**看着像重影** ✓
+        （或者更糟：底下那份没被选中 ✓，看着像"选了一半" ✓）。
+     ⚠️ 藏的是**子元素**（`> *` ✓）—— 气泡自己不能藏 ✗：它的底色、圆角、
+        还有我刚加的那圈虚线边都在它自己身上 ✓。
+     ⚠️ 反正此刻**只有文本框该被看见** ✓（连引用条一起藏 ✓，
+        因为复制的内容里本来就不含它 ✓ —— 少一个它反而更诚实 ✓）。 */
+  .row .bubble.seltext > *, .mkrow .mkbub.seltext > * { visibility:hidden; }
+  /* ⚠️⚠️ **光藏元素不够** ✗→✓（2026-10-09 用户截图："点击自由复制后，字体还变花了"✓）——
+     纯文字那条消息在 DOM 里是**一个文本节点** ✗（不是元素 ✗），
+     上面那条 `> *` 只匹配**元素** ✓ → 底下那层字**根本没被藏住** ✓ →
+     屏幕上就是**两遍字** ✓（差一两个像素 ✓，所以是"花"的 ✓ 不是重影 ✓）。
+     → 再加一条：**把字变成透明** ✓（`color:transparent` ✓ 对文本节点也管用 ✓，
+       而且会被子元素继承 ✓ —— `!important` 是因为正文里的 `**粗体**`/`` `代码` ``
+       那些是**自己带颜色的元素** ✓，不压一下它们还会露出来 ✓）。
+     ⚠️ 这样"对齐差一两个像素"就**不再是问题**了 ✓ —— 屏幕上只剩文本框那一份字 ✓。 */
+  .row .bubble.seltext, .row .bubble.seltext *,
+  .mkrow .mkbub.seltext, .mkrow .mkbub.seltext * { color:transparent !important; }
+  /* ★ **盖在气泡上的那个真文本框** ✓（`freeCopyBubble` 建的那一个）——
+     它就是"两头能拖的光标 + 系统那排工具"唯一进得去的门 ✓（见那段注释 ✓）。
+     ⚠️ 它必须**看起来和气泡一模一样**：透明底 ✓、同样的字体行高内边距 ✓
+        （那几样是 JS 从气泡身上量出来写上去的 ✓）、同样的颜色 ✓ ——
+        差一点就会在屏幕上**多出一个白框** ✗（用户会以为界面坏了 ✓）。
+     ⚠️ z 57：小卡片(58)之下 ✓、弹层(50)之上 ✓ —— 和"长按那一族"同一条线 ✓。 */
+  #copyfield { position:fixed; z-index:57; margin:0; padding:0; resize:none;
+               overflow:hidden; border:0; outline:0; box-sizing:border-box;
+               background:transparent; -webkit-text-fill-color:currentColor;
+               -webkit-user-select:text; user-select:text; }
+  .row.agent .bubble { background:var(--panel); border:1px solid var(--line);
+                       border-left:3px solid var(--agent); border-bottom-left-radius:4px; }
+  .row:not(.mine):not(.agent) .bubble { border-bottom-left-radius:4px; }
+  .time { font-size:11px; color:var(--muted); margin-top:2px; padding:0 4px; }
+  .row.mine .time { text-align:right; }
+
+  /* 输入区：底部留出 safe area + 键盘高度 */
+  #composer { border-top:1px solid var(--line); background:var(--panel); flex-shrink:0;
+              padding:10px 12px calc(10px + var(--inset-bottom) + var(--kb)); }
+  /* 微信的排布：[语音] [输入框] [表情] [+ 或 发送]
+     有内容时发送按钮**替换掉** + ——这样右边永远只有两个图标，
+     输入框不会被挤扁（之前四个图标并排，占位文字都折行了）。 */
+  /* ⚠️ **`align-items:center`，不是 `flex-end`** ✗→✓ —— 2026-10-06 用户：
+     "保持在底部区域的垂直居中" ✓。
+        输入框 `min-height:42px` ✓，而按钮原来 36px ✓ + `flex-end` ✗
+        → 按钮贴着**行的底边** ✓ → 它的中心比输入框的中心**低 3px** ✗
+        → 看着就是"没对齐" ✓（不量的话很难说清是哪儿不对 ✓）。
+        改成居中之后 ✓：行高 = 两者里高的那个（42px ✓），
+        按钮在**这一行**里居中 ✓ —— 输入框长到两三行时，按钮仍然居中 ✓
+        （用户要的就是这个 "垂直居中" ✓，不是"贴底" ✗）。 */
+  #composerRow { display:flex; align-items:center; gap:4px; }
+
+  /* 输入框上方的「正在引用」条。引用是输入状态的一部分，不是消息的一部分——
+     所以它在输入区，发完就消失。 */
+  #qbar { display:flex; align-items:center; gap:8px; background:var(--panel2);
+          border:1px solid var(--line); border-radius:10px; padding:6px 10px;
+          margin-bottom:8px; }
+  #qbar[hidden] { display:none; }   /* 上面写了 display:flex，得显式盖回来 */
+  #qbar .qbody { min-width:0; flex:1; }
+  #qbar .qwho { color:var(--accent); font-size:12px; margin-bottom:2px; }
+  #qbar .qtext { color:var(--muted); font-size:13px; white-space:nowrap;
+                 overflow:hidden; text-overflow:ellipsis; }
+  /* 工坊那条引用条**用同一套 class** ✓（`.qbody` / `.qwho` / `.qtext` ✓）——
+     只是它是 `#wsQbar` ✓（两屏各有各的 ✓，形状一致 ✓，改一处两边一起变 ✓）。 */
+  #wsQbar { display:flex; align-items:center; gap:8px; background:var(--panel2);
+            border:1px solid var(--line); border-radius:10px; padding:6px 10px;
+            margin:0 12px 6px; }
+  #wsQbar[hidden] { display:none; }   /* 上面写了 display:flex，得显式盖回来 */
+  #wsQbar .qbody { min-width:0; flex:1; }
+  #wsQbar .qwho { color:var(--accent); font-size:12px; margin-bottom:2px; }
+  #wsQbar .qtext { color:var(--muted); font-size:13px; white-space:nowrap;
+                   overflow:hidden; text-overflow:ellipsis; }
+  #qbar .qx { background:none; border:none; color:var(--muted); font-size:15px;
+              cursor:pointer; padding:2px 4px; line-height:1; }
+
+  /* 气泡里的引用块（微信是气泡顶部一块浅灰，左侧不描边，整体比正文小一号） */
+  .quote { display:block; background:rgba(127,127,127,.16); border-radius:8px;
+           padding:6px 9px; margin-bottom:7px; font-size:12.5px; line-height:1.45;
+           cursor:pointer; max-width:100%; }
+  .quote .qwho { color:var(--accent); font-weight:600; margin-bottom:2px; }
+  .quote .qtext { color:var(--muted); white-space:nowrap; overflow:hidden;
+                  text-overflow:ellipsis; }
+  /* 点了引用条跳到原消息时闪一下，否则用户不知道跳到哪了 */
+  .row.flash .bubble { animation:qflash 1.1s ease-out; }
+  @keyframes qflash { 0%,100% { box-shadow:none }
+                      25% { box-shadow:0 0 0 3px var(--accent); } }
+  #text { flex:1; min-width:0; padding:10px 13px; background:var(--panel2);
+          border:1px solid var(--line); border-radius:16px; color:var(--text);
+          font-size:16px; resize:none; max-height:120px; min-height:42px; line-height:1.4; }
+  #text:focus { outline:none; border-color:var(--accent); }
+  /* ★ 底部这三个（语音/文字、表情、＋）**大一点点** ✓ —— 2026-10-06 用户：
+     "大小略微大一些些" ✓ → 36 → **40px** ✓（+11% ✓，正好和顶栏那几个一样大 ✓）。
+     40 也刚好落在输入框的 42px 里 ✓ → 居中的时候上下各留 1px ✓，不挤 ✓。 */
+  /* 待发附件条 ✓ —— 缩略图横排、可横向滚动、右上角一个 ✕ 能删 ✓。 */
+  #pendbar { display:flex; gap:8px; overflow-x:auto; padding:2px 0 8px; }
+  /* ⚠️ **必须显式盖回来** ✗ —— 上面那句是作者样式 ✓，
+     而 `[hidden]{display:none}` 只是浏览器默认样式 ✓ → 它赢不了 ✗。
+     （同一个坑，这个页面上这是第三回了 ✓：`#qbar`、`header.top .status`、这里 ✓。） */
+  #pendbar[hidden] { display:none; }
+  #pendbar .pend { position:relative; flex:none; }
+  #pendbar .pend img { width:64px; height:64px; border-radius:10px;
+                       object-fit:cover; display:block; }
+  /* 非图片（以后的文件 ✓）：不给缩略图，给一块写着文件名的方块 ✓ */
+  #pendbar .pend .fchip { width:64px; height:64px; border-radius:10px;
+                          background:var(--panel2); color:var(--muted);
+                          display:flex; align-items:center; justify-content:center;
+                          font-size:11px; line-height:1.3; padding:4px;
+                          text-align:center; word-break:break-all; overflow:hidden; }
+  #pendbar .pend .px { position:absolute; top:-6px; right:-6px; width:20px; height:20px;
+                       border-radius:50%; background:rgba(0,0,0,.68); color:#fff;
+                       font-size:12px; line-height:1; display:flex;
+                       align-items:center; justify-content:center; }
+  /* 有待发附件 → **发送按钮也要在** ✓（哪怕一个字没打 ✓）；
+     但 `+` 继续留着 ✓（还能再加一张 ✓）——
+     所以这是**另一个** class ✓，不去动 `hasText` ✓
+     （那个管的是"有字才把 + 换成发送" ✓，两件事别混 ✓）。 */
+  body.hasPending #send { display:flex; }
+
+  #composerRow .icon-btn { width:44px; height:44px; }
+  /* ★ 「表情」和「＋」**再大一点点** ✓ —— 2026-10-06 用户："表情和➕还可以再大些" ✓。
+     ⚠️ **只有这两个** ✗ —— 左边那个"语音/键盘"开关按用户的话**不动** ✓，
+        所以这里单独给 id ✓，不去改那条通用的 `.icon-btn` ✓
+        （改了的话三个一起变大 ✓，那不是他说的 ✓）。 */
+  #pickSticker, #pickMedia { width:48px; height:48px; }
+  /* 发送按钮：**一个实心圆 + 一枚纸飞机** ✓ —— 2026-10-06 用户：
+     "输入文字后的 + 被替换成的发送按钮优化一下显示，也做成 svg，好看些" ✓。
+     原来里面是一个 `➤` 文字字符 ✗ —— 和别处那三个一样的问题：
+     字形大小、形状都随字体 ✗，放在一个规整的圆里就显得"不齐" ✓。
+     现在换成 SVG ✓，大小和旁边那几个图标同一个量级 ✓
+     （圆 40、里面 20 ✓ —— 实心圆本来就该比描边图标**小一点点** ✓，
+       一样大的话会显得比它们重 ✗）。 */
+  /* ★ **不要那个蓝圆了** ✗→✓ —— 2026-10-06 用户："不要蓝色圆圈，只要里面的纸飞机 svg" ✓。
+     底色去掉 ✓，只留一枚**实心**的纸飞机（`--accent` 蓝 ✓）——
+     "这是个动作"这件事由**颜色**来说就够了 ✓，不需要再垫一个圆 ✗。
+     盒子仍然 44px ✓ —— 和旁边那三个**同一个盒子** ✓，
+     所以它们在一条线上对齐 ✓（去掉圆之后，对齐就是盒子的事 ✓）。
+     为什么这里是**实心**、别的都是描边 ✗：它是这一行里唯一的**主操作** ✓，
+     实心在 20 出头的大小上也比描边清楚 ✓。 */
+  #send { display:none; width:44px;height:44px;background:none;
+          color:var(--accent); align-items:center;justify-content:center;
+          flex-shrink:0; }
+  #send svg { display:block; }
+  /* 有文字：显示发送、藏起 + */
+  body.hasText #send { display:flex; }
+  body.hasText #pickMedia { display:none; }
+
+  /* 麦克风/键盘图标互斥显示 */
+  #modeToggle .ico-kbd { display:none; }
+  body.voiceMode #modeToggle .ico-mic { display:none; }
+  body.voiceMode #modeToggle .ico-kbd { display:block; }
+
+  /* 语音模式：输入框换成"按住说话" */
+  #holdTalk { display:none; flex:1; height:44px; border-radius:12px;
+              background:var(--panel2); border:1px solid var(--line);
+              color:var(--text); font-size:15px; user-select:none;
+              -webkit-user-select:none; touch-action:none; }
+  #holdTalk.rec { background:var(--danger); border-color:var(--danger);
+                  color:#fff; font-weight:600; }
+  body.voiceMode #text { display:none; }
+  body.voiceMode #holdTalk { display:block; }
+  /* 语音模式下不显示发送（松手即发） */
+  body.voiceMode.hasText #send { display:none; }
+  body.voiceMode.hasText #pickMedia { display:flex; }
+
+  /* 图片气泡 / 语音气泡 */
+  .bubble.media { padding:4px; background:transparent !important; border:0 !important; }
+  .bubble.media img { display:block; max-width:210px; max-height:280px;
+                      border-radius:12px; object-fit:cover; }
+  .row.agent .bubble.media { border-left:0 !important; }
+  .vmsg { display:flex; align-items:center; gap:8px; min-width:90px; cursor:pointer; }
+  .vmsg .bars { color:var(--accent); font-size:16px; }
+  .vmsg .dur { font-size:12px; color:var(--muted); }
+  .vsub { font-size:12px; color:var(--muted); margin-top:6px;
+          border-top:1px dashed var(--line); padding-top:6px; }
+
+  /* 大图查看 */
+  .lightbox { position:fixed; inset:0; background:#000; display:none;
+              align-items:center; justify-content:center; z-index:80; }
+  .lightbox.on { display:flex; }
+  .lightbox img { max-width:100%; max-height:100%; object-fit:contain; }
+  /* 没有传过头像的人点开放大 → 显示一个**大号的字** ✓，
+     而不是"点了没反应" ✗（那会让人以为那段代码坏了 ✓）。 */
+  .lightbox .bigletter { width:46vmin; height:46vmin; border-radius:50%;
+                         background:var(--panel2); color:var(--muted);
+                         display:flex; align-items:center; justify-content:center;
+                         font-size:20vmin; font-weight:600; }
+  .lightbox .bigletter[hidden] { display:none; }
+
+  /* ── 左右滑 → 引用 ✓（2026-10-07 用户："左滑右滑可以引用，有那种动态感" ✓）──
+     提示钉在**行原来那一边的边缘**上不动 ✓，行滑开就把那块地方**让出来** ✓
+     —— "动态感"就是从这儿来的 ✓（东西是从底下被挪出来的 ✓，不是凭空冒出来 ✓）。
+     ⚠️ 用 `left:0` / `right:0` + 反向 translate 把它**钉住** ✗：
+        它是行的子节点 ✓ → 行一平移它也跟着走 ✓ → 不反向抵消就永远压在行底下 ✗
+        （行是不透明的 ✓，等于看不见 ✓）。 */
+  /* ⚠️ 这里原来有 `.row.swiping` / `.swhint`（左右滑引用那个提示条 ✓）——
+     **2026-10-08 整个撤了** ✗→✓：引用改成长按 ✓，而横滑留给"进组件界面" ✓。
+     留着是死代码 ✓（而且下一个人会照着它去改一个不存在的手势 ✓）。 */
+
+  /* ★ 消息旁边的小卡片（长按气泡弹出来的 ✓，微信那种 ✓）
+     ⚠️ 容器**不盖住整个屏幕** ✗（`pointer-events:none` ✓）—— 盖住的话
+        手指就滚不动列表了 ✓；收起靠"点别处 / 滚动 / 返回键" ✓（见 JS ✓）。
+     z-index 58：在弹层(50)之上 ✓、确认框(60)之下 ✓ —— 和长按那一族保持一致 ✓。 */
+  /* ★ 文件卡片 / 音频条（2026-10-08）—— 群聊和组件对话**共用**这两种样子 ✓ */
+  .filecard { display:flex; align-items:center; gap:10px; min-width:190px; }
+  .filecard .fi { font-size:22px; line-height:1; flex-shrink:0; }
+  .filecard .fc { display:flex; flex-direction:column; min-width:0; flex:1; }
+  .filecard .fn { font-size:14px; overflow:hidden; text-overflow:ellipsis;
+                  white-space:nowrap; }
+  .filecard .fs { color:var(--muted); font-size:11.5px; margin-top:2px; }
+  .filecard .fo { color:var(--accent); font-size:13px; text-decoration:none;
+                  flex-shrink:0; padding:4px 2px; }
+  .audiobar { min-width:210px; }
+  .audiobar audio { width:100%; height:34px; display:block; }
+
+  .msgcard { position:fixed; inset:0; z-index:58; display:none; pointer-events:none; }
+  .msgcard.on { display:block; }
+  .msgcard .box { position:fixed; min-width:132px; background:var(--panel);
+                  border:1px solid var(--line); border-radius:12px; overflow:hidden;
+                  box-shadow:0 12px 32px rgba(0,0,0,.45); pointer-events:auto;
+                  animation:modalIn .14s cubic-bezier(.22,1,.36,1) both; }
+  .msgcard .mi { display:block; width:100%; padding:13px 18px; text-align:left;
+                 font-size:15px; color:var(--text); }
+  .msgcard .mi + .mi { border-top:1px solid var(--line); }
+  .msgcard .mi:active { background:var(--panel2); }
+  #wsChat .mkrow.swiping .swhint { position:absolute; top:50%; left:0;
+                                   transform:translateY(-50%);
+                                   display:flex; align-items:center; gap:4px;
+                                   color:var(--accent); font-size:13px; line-height:1;
+                                   white-space:nowrap; opacity:0; pointer-events:none; }
+
+  /* 头像上**不许选字** ✓ —— 长按头像的活儿是"@ 他" ✓，
+     让浏览器顺手把那个字选中了会显得很脏 ✓。 */
+  .av { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+
+  /* ⚠️ **横向不许滚** ✗ —— 滑动时提示会顶出行的边缘一点点 ✓，
+     不锁住的话列表会左右晃 ✓（那个比动画本身显眼得多 ✓）。 */
+  #msgs { overflow-x:hidden; }
+
+  /* @ 自动补全 */
+  #atMenu { position:absolute; left:12px; right:12px; bottom:100%;
+            margin-bottom:6px; background:var(--panel); border:1px solid var(--line);
+            border-radius:12px; overflow:hidden; display:none; max-height:190px; overflow-y:auto;
+            box-shadow:0 6px 24px rgba(0,0,0,.35); }
+  #atMenu.on { display:block; }
+  #atMenu .pick { display:flex; align-items:center; gap:10px; padding:12px 14px;
+                  border-bottom:1px solid var(--line); }
+  #atMenu .pick:last-child { border-bottom:0; }
+  #atMenu .pick .nm { flex:1; }
+  #atMenu .pick .hint { font-size:12px; color:var(--muted); }
+  #composer { position:relative; }
+
+  /* ── 设置 ── */
+  header.sub { background:var(--panel); border-bottom:1px solid var(--line);
+               padding:calc(var(--inset-top) + 10px) 8px 10px; display:flex; align-items:center; }
+  /* 和聊天页顶栏同样的做法：右侧放一个和返回键等宽的占位，
+     标题才能真正居中（否则是在"剩余空间"里居中，视觉偏左）。 */
+  header.sub .spacer { width:40px; flex-shrink:0; }
+  header.sub h2 { margin:0; font-size:17px; font-weight:600; flex:1; text-align:center; }
+  #settings .body { flex:1; min-height:0; overflow-y:auto;
+                    padding-bottom:calc(30px + var(--inset-bottom)); }
+
+  /* ── 动效：**四类，同类同一种** ✗→✓（2026-10-08 定的）────────────────
+     用户原话：「这次所有的界面都在一个服务上…因此界面之间的切换动效要有，
+     并且统一风格，这里并不是指全部用一种，而是你要自己想，
+     可以按照场景分为几个类别，同类别使用一种」✓。
+
+     ⚠️ 原来只有**一对**关键帧（`sheetIn/Out` = **从左**滑入滑出 ✗）——
+        那是按"抽屉"想的 ✓：打开设置页时聊天页留在底下 ✓，
+        像拉开一个抽屉 ✓。可合并之后"进设置页"和"进管家设置"
+        **都是同一件事了**（这一页里更深的一屏 ✓）→ 所以方向也该统一：
+        **新的从右边推进来、旧的往右边退回去** ✓（iOS 那种"往里走"的手感 ✓）。
+        聊天页照旧垫在底下 ✓，推进来的过程里看得见它 ✓（不然推一半后面是空的 ✗）。
+
+     四类：
+       ① **同层推入/推出** —— 设置 → 我的/管家/生活空间；工坊 → 导航 → 对话
+          （`pushScreen`/`popScreen` ✓，就是下面这两个关键帧 ✓）
+       ② **沉浸式横滑** —— 主群聊 ⇄ 组件界面：**跟手**，不是 CSS 动画 ✓（P7 ✓）
+       ③ **弹层/浮卡** —— `+` sheet 从底部上滑（沿用 ✓）、确认框淡入、
+          长按小卡片用 `popIn`（中心弹出 ✓，见上面那条 ✓）
+       ④ **首启整屏替换** —— 启动 → 登录 → 初始化 → 主群聊：**交叉淡入** ✓
+          （不加位移 ✓：那几条之间没有"深浅"关系 ✓，它们是**平级**的 ✓） */
+  #settings { z-index:10; }
+  @keyframes pushIn  { from { transform:translateX(100%); } to { transform:none; } }
+  @keyframes pushOut { from { transform:none; } to { transform:translateX(100%); } }
+  /* ★ **下拉进来的那一屏：从上方滑入** ✗→✓（2026-10-09 用户定的：
+     「下滑以编辑该界面，然后组件界面diy的聊天**从上面滑入**，动效丝滑」✓）。
+     ⚠️ 它是①那一类（推入/推出）的**同族** ✓，不是新的一类 ✓ ——
+        方向不同是因为**手势来的方向不同** ✓：右滑来的从右边进 ✓，
+        下拉来的就从上面进 ✓（"动效要说的是它从哪儿来"✓）。
+     退出去也顺着来路 ✓（往上收回 ✓）—— 见 `popScreen` 那张"这一屏是
+     怎么进来的"小表 ✓（`_dropSet` ✓）。 */
+  @keyframes dropIn  { from { transform:translateY(-100%); } to { transform:none; } }
+  @keyframes dropOut { from { transform:none; } to { transform:translateY(-100%); } }
+  /* ★ **从右上角弹出 / 收回右上角** ✗→✓（2026-10-09 用户定的：
+     「目前从群聊右上角进入时动效还是页面从上出现，退出时没动效，
+      应该改成**滑入滑出从右上角弹出以及收回右上角**那种动效」✓）。
+     ⚠️ 那是**群聊右上角那个按钮**走的那一条路 ✓（`pushScreen(id,'corner')` ✓）——
+        不是下拉那条 ✓（下拉是"从上往下"，见上面那对 ✓）。两者都属①那一类 ✓，
+        分的还是"手势/入口来的方向" ✓。
+     ⚠️ 起点**在屏幕外**（58% 横 + 58% 纵 ✓）—— 所以动画期间右边和下边会
+        露出底下那一屏 ✓，"弹出"的观感就是从这儿来的 ✓。 */
+  @keyframes cornerIn  { from { transform:translate(58%,-58%) scale(.9); opacity:0; }
+                         to   { transform:none; opacity:1; } }
+  @keyframes cornerOut { from { transform:none; opacity:1; }
+                         to   { transform:translate(58%,-58%) scale(.9); opacity:0; } }
+  #settings.anim-in  { animation:pushIn  .24s cubic-bezier(.22,1,.36,1); }
+  #settings.anim-out { animation:pushOut .18s cubic-bezier(.4,0,1,1) forwards; }
+  /* ④ 首启那几屏（登录/初始化/主群聊）—— `show()` 加 `fade` 用它 ✓ */
+  .screen.anim-fade  { animation:fadeIn .22s ease both; }
+
+  /* ══════════════════════════════════════════════════════════════════
+     管家设置的三屏（`.ascreen`：列表 / 改资料 / 编一档状态）。
+
+     版式**照壳的「我的」** ✓ —— 通栏圆角分组 ✓、行间一条细线 ✓、
+     `›` 22px `--muted` ✓。用户 2026-10-06 明确要求"一定要参考我的里的样式" ✓。
+
+     ⚠️ **每个选择器都套了 `.ascreen`** ✗→✓ ——
+        群聊页里已经有 `.row`（消息行 ✓）和 `.av`（气泡头像 ✓）了，
+        而壳那边没有这两个名字 ✓，所以它敢直接叫 `.row` ✓。
+        整块照搬会**串味** ✗（消息行会长到 50px 高 ✓）。
+        加一层前缀 = **结构上**互不干扰 ✓，不是靠"记得别重名" ✓。
+     ══════════════════════════════════════════════════════════════════ */
+  .ascreen { z-index:20; }
+  #agentEdit { z-index:21; }      /* 一层压一层 ✓：列表 < 改资料 ✓ */
+  .ascreen.anim-in  { animation:pushIn  .24s cubic-bezier(.22,1,.36,1); }
+  .ascreen.anim-out { animation:pushOut .18s cubic-bezier(.4,0,1,1) forwards; }
+  /* ★ 下拉来的那一屏（见上面 `dropIn` 那段 ✓）—— 进/出各一条 ✓ */
+  .ascreen.anim-drop { animation:dropIn  .26s cubic-bezier(.22,1,.36,1); }
+  .ascreen.anim-lift { animation:dropOut .2s  cubic-bezier(.4,0,1,1) forwards; }
+  /* ★ 右上角来的那一屏 —— 进/出各一条 ✓ */
+  .ascreen.anim-corner     { animation:cornerIn  .26s cubic-bezier(.22,1,.36,1); }
+  .ascreen.anim-corner-out { animation:cornerOut .2s  cubic-bezier(.4,0,1,1) forwards; }
+
+  /* ── 创意工坊（右上角那个入口）────────────────────────────────────────
+     三屏：工坊（#workshop，**只罗列组件**）+ 组件页（#compView，压在上面）
+     + 对话屏（#wsChat，从输入框的 ＋ 进 ✓）。
+     ⚠️ z-index 要**比 .ascreen 的 20 高** ✗ —— 工坊是从群聊进的独立去处 ✓，
+        和"管家"那三屏不是一层 ✓（但它进来的时候那三屏都是关着的 ✓，
+        高了只是保险 ✓）。
+
+     ★ 2026-10-07：**分区整个废掉了** ✗→✓（用户定的："不需要分实验区和
+       使用区，右上角点击进入就只是单纯地罗列组件" ✓）。理由他自己给了 ✓：
+       组件都在沙箱里、文件之间本来就隔离 ✓，分不分没有实际区别 ✓。
+       于是这一屏只剩一件事：**列出来** ✓（「未固化」那套 2026-10-07 深夜也去掉了 ✓）。
+       "做"和"改"都在别处（＋ 进的对话屏 / 组件页 ✓）。 */
+  #workshop { z-index:22; }
+  /* ⚠️ **`#compView` 要在 `#wsNav`（24）上面** ✗→✓（2026-10-07 深夜，用户报的：
+     「从组件聊天界面点上方组件名称跳转时，会直接到组件聊天导航页面，返回一下才是
+       组件界面」✓）。
+     原因：导航屏**还开着**（聊天就是从它进去的 ✓）—— 而组件的层级比它低 ✓ →
+     关掉聊天之后**露出的是导航** ✓，组件被压在底下 ✓ ✗。
+     一个固定值要同时满足两个方向 ✓：从导航进组件（要在它上面 ✓）、
+     从组件页那个图标进聊天（聊天要在组件上面 ✓，那是 25 一档 ✓）。 */
+  /* ★ 2026-10-08 合并那次新加的三屏（登录/初始化/我的）✓ —— z-index 的排法：
+        · `#login` / `#init` 是**根**（用 `show()` 整屏替换 ✓，不叠加 ✓）→ 1 和 2 ✓
+        · `#me` / `#meAccount` 是**压上去的**（从设置页进 ✓）→ 12 / 13 ✓
+          放在 `#settings`(10) 上面 ✓、`#agent`(20) 下面 ✓ ——
+          它们和管家那三屏不会同时开 ✓，档位只是留个次序 ✓。 */
+  /* ⚠️⚠️ **这六屏必须在工坊那一摞（22–29）上面** ✗→✓（2026-10-09 用户实测报的：
+     「在组件聊天界面点击我的头像，**不会立刻进去我的界面，没有反应**」✓）。
+     真因就是这一档 z-index ✗：`#me` 原来是 **12** ✓，而组件对话是 **28** ✓ →
+     推是推上去了 ✓（`#me` 的 `.on` 真的加上了 ✓），**但它排在对话底下** ✗ →
+     屏幕上什么都不变 ✓ —— 正是这个项目最怕的"点了没反应"型 ✓。
+     更坏的是它**留下了状态** ✗：`#me` 一直开着 →
+       · 组件页上"下滑进对话"**从此失效** ✓（手势第一句就问 `_OTHER_SCREENS` ✓，
+         `#me` 在里面 ✓ → 认不出这一屏 ✓）
+       · 返回时它比谁都晚被关 ✓ → 关完工坊那几屏，**露出的是「我的」** ✗
+         （用户报的"本该是主群聊，现在却是我的界面"✓）。
+     → 所以这几个"detail 屏"一律提到**工坊那一摞的最上面** ✓：
+       它们永远是"最上面那一屏" ✓（只会从设置页/我的/别人/工坊里推进来 ✓，
+       推上来就该盖住一切 ✓）。`#diySet`(29) 在它们下面一档 ✓（两者不会同时开 ✓）。 */
+  #me       { z-index:30; }
+  #meAccount{ z-index:31; }
+  #meEdit   { z-index:31; }   /* 和账号那一屏同档 ✓（不会同时开 ✓） */
+  #space    { z-index:30; }   /* 和 `#me` 同档 ✓ —— 它们不会同时开 ✓ */
+  #peer     { z-index:30; }   /* 同上 ✓ */
+  #selfIntro{ z-index:31; }   /* 从「我的」再进一层 ✓ */
+  /* 自我介绍那个多行框：`.field` 是给单行输入用的 ✓，多行要自己说清楚 ✓ */
+  #selfIntro textarea.field { min-height:150px; resize:none; line-height:1.6;
+                              font-family:inherit; }
+  #selfIntro .count { color:var(--muted); font-size:12.5px; text-align:right;
+                      margin:-2px 2px 4px; }
+  #init     { z-index:2; }
+  #compView { z-index:26; }
+  #wsNav    { z-index:24; }
+  /* ⚠️ **`#wsChat` 提到 28（原来 25）** ✗→✓（2026-10-09）——
+     用户定的：「在具体组件内时…下滑进入各自组件的编辑页，且返回时回到各自组件」✓。
+     也就是说**组件页要留在底下开着** ✓（以前是"先关组件页再推对话"✓，
+     因为 `#compView`（26）比 `#wsChat`（25）**高** ✗ → 不关就看不见对话 ✗）。
+     现在改成"聊天严格压在组件页上面" ✓ —— 那正是两个方向都成立的那个值 ✓
+     （从导航进组件：26 > 24 ✓；从组件进聊天：28 > 26 ✓）。
+     ⚠️ `#diySet` 必须跟着**再高一档** ✓（27 → 29）——
+        它原来只保证"比聊天高" ✓，聊天一挪它就压不住了 ✗
+        （症状是老毛病：点了头像，屏幕上什么都不变 ✓）。
+     ⚠️ `__goBack` 那个表要**照着新顺序**改 ✓（见它那段注释 ✓）。 */
+  #wsChat   { z-index:28; }
+  /* ⚠️ 下拉的提示条（见 JS 里 `showPullHint`）——
+     只在**收纳页/组件页**上浮现 ✓，所以它要压过这两屏（22 / 26 ✓）、
+     又必须在**聊天屏（28）之下** ✓（聊天一滑进来就该把它盖住 ✓）。
+     它 `pointer-events:none` ✓ —— 绝不抢手势 ✓。 */
+  #pullHint { position:fixed; left:50%; top:calc(var(--inset-top) + 10px);
+              transform:translate(-50%,-140%); opacity:0; z-index:27;
+              background:var(--panel2); border:1px solid var(--line);
+              color:var(--muted); font-size:13px; padding:8px 16px;
+              border-radius:999px; pointer-events:none; white-space:nowrap;
+              transition:color .15s, border-color .15s; }
+  /* ★ **横滑那一条竖着贴在右边** ✗→✓（2026-10-09 用户定的原话：
+     「主群聊左滑进创意工坊的时候，提示不能在最顶部啊，很违和，因为是左滑进去的，
+       **应该在最右侧，竖着**」✓）。
+     ⚠️ 他的理儿是对的 ✓：提示该**跟着手势的方向**站 ✓ ——
+        下拉是"从上往下"✓ 提示在最上面 ✓；左滑是"往左去"✓ 提示就该在**去的那个方向**上
+        （右边 ✓）✓。挂在顶上跟手势一点关系都没有 ✓。
+     `writing-mode:vertical-rl` = 竖排 ✓（中文竖排就从右往左读 ✓，正好贴右边 ✓）。 */
+  #pullHint.side { left:auto; right:10px; top:50%;
+                   writing-mode:vertical-rl; text-orientation:mixed;
+                   padding:16px 8px; letter-spacing:.06em; }
+  /* 拉满了：变色 ✓ —— "现在松手就进去" ✓（不给这个反馈的话，
+     用户不知道要拉多远 ✓，只会觉得"拉了没反应" ✓）。 */
+  #pullHint.ready { color:var(--accent); border-color:#35507a; }
+  /* ⚠️ **`#diySet` 原来没写 z-index** ✗→✓（2026-10-07 深夜，用户报的：
+     「导航界面点击右上角没有显示 diy 助手的界面」✓）——
+     它落在 `.ascreen` 的默认值（20）上 ✓，而它只可能从 `#wsNav`（24）进去 ✓ →
+     **推上来了，但排在导航屏底下** ✓ —— 屏幕上什么都不变 ✓，
+     看着像"点了没反应" ✓（最像坏掉的一种 ✓）。
+     ⚠️ **"它和 `#wsChat` 不会同时开"是错的** ✗→✓（2026-10-08 用户报的：
+     「在组件聊天界面，我点击 diy 助手头像没反应」✓）——
+     组件聊天里**点头像也进这一屏** ✓（那是用户定的"点头像进详情"✓），
+     于是两屏**确实会同时开着** ✓，而 `#wsChat`（25）在 DOM 里**排在它后面** ✗ →
+     同档时后者压前者 ✓ → 推上来了，屏幕上什么都不变 ✓ —— 和当初那个
+     "点了没反应"一模一样 ✓（同一个坑，从另一条边掉进来 ✓）。
+     所以它必须**比 `#wsChat` 高一档** ✓；`#compView` 是 26 ✓，
+     这两屏不会同时开 ✓，但留一档差更不容易再踩 ✓。 */
+  #diySet   { z-index:29; }    /* 见上面那段：聊天提到 28 → 它跟着到 29 ✓ */
+
+  /* 「＋ 做一个新的」—— 全宽、最显眼 ✓（它是这一屏的主行动 ✓） */
+  /* ★ 用户 2026-10-08：「新建组件距离上方距离小一些，目前有些空」✓ ——
+     把那一列整体往上收一点 ✓（`#wsNav .abody` 的顶距 ✓）。 */
+  #wsNav .abody { padding-top: calc(var(--inset-top) + 6px); }
+
+  #workshop .wsnew { display:flex; align-items:center; justify-content:center; gap:9px;
+                     width:100%; border:1px dashed #35507a; background:#0e1c30;
+                     color:var(--accent); border-radius:14px; padding:15px;
+                     font:inherit; font-size:16px; font-weight:600; }
+  #workshop .wsnew:active { background:#16233a; }
+
+  /* ★ 「组件容纳界面」= 一块**画布**（2026-10-07 晚上用户定的 ✓）——
+     用户的原话：「整个组件容纳界面就像一张纸」✓，
+     默认每个组件「上面是图标，下面是组件名称」✓（跟手机桌面上的应用一样 ✓），
+     但**不只有这一种** ✓ —— 组件自己可以声明占几格、什么底色 ✓（`spot` ✓）。
+
+     ⚠️ **格子是有固定高度的**（`grid-auto-rows` ✓）—— 不固定的话
+        "占两格"就没有意义了 ✓（行高会跟着内容自己涨 ✓，"大一点"看不出来 ✓）。
+     4 列：手机上每格约 78px 宽 ✓，放一个图标 + 两行字正好 ✓。 */
+  /* ★ 2026-10-08：这两屏的顶栏拆了 ✓ → body 要**自己顶到最上面** ✗→✓，
+     并且自己让开刘海/状态栏 ✓（原来是 `.abody` 跟着顶栏走的 ✓）。 */
+  #workshop .abody, #compView .cpwrap {
+    padding-top: calc(var(--inset-top) + 12px);
+    padding-bottom: calc(var(--inset-bottom) + 12px);
+  }
+  #workshop .canvas { display:grid; grid-template-columns:repeat(4, 1fr);
+                      grid-auto-rows:92px; gap:12px 10px; padding-top:6px; }
+  #workshop .cell { display:flex; flex-direction:column; align-items:center;
+                    justify-content:center; gap:7px; min-width:0;
+                    border-radius:18px; background:var(--panel2);
+                    border:1px solid transparent; padding:6px 4px;
+                    transition:transform .12s ease; }
+  #workshop .cell:active { transform:scale(.95); }
+  #workshop .cell .ico { font-size:29px; line-height:1; }
+  #workshop .cell .nm { font-size:12px; line-height:1.3; max-width:100%;
+                        text-align:center; overflow:hidden;
+                        display:-webkit-box; -webkit-line-clamp:2;
+                        -webkit-box-orient:vertical; word-break:break-word; }
+  /* ⚠️ 这里原来有一条「未固化」的小黄点 ✓ —— 2026-10-07 深夜跟着"固化"整套
+     一起删了 ✓（用户定的：组件聊天没有所谓的固化和非固化概念了 ✓）。 */
+
+  /* ── 调整模式（顶栏右上角那个按钮切的 ✓）────────────────────────────
+     用户定的：「这个界面的右上角是一个整体功能，点击后可以推动组件进行调整」✓。
+     ⚠️ 进了这个模式，**格子就不再是"点进去"的入口** ✓ ——
+        手指在那个位置是"按住拖着走" ✓，两种手势在同一个位置会打架 ✓。 */
+  /* ⚠️ `touch-action:none` **只在编辑态** ✓ —— 不写它的话，手指一动浏览器先拿去滚屏 ✓，
+     拖拽根本收不到几个 move 事件 ✓（表现是"拖不动，页面在滚动"✓）。
+     平时**绝对不能加** ✗：那一屏要能正常上下滚 ✓。 */
+  /* ★ 拖动（长按拎起来 ✓）—— 原来这几条挂在 `.editing`（"调整模式" ✓）上，
+     而**那个模式没有了** ✗→✓（2026-10-08）→ 改成挂在"正在被拖的那个"身上 ✓。
+     ⚠️ `touch-action:none` 是必须的 ✗：不写的话，浏览器会把"上下拖"当成
+        滚动列表 ✓ → 拖到一半页面跟着滚 ✓（看着像"拖飞了"✓）。 */
+  /* ⚠️ `touch-action` 从 `none` 改成 **`pan-y`** ✗→✓（2026-10-08 实测）——
+     `none` 会把**从格子上起手的纵向滚动**一起掐掉 ✓ → 组件多了就滚不动列表 ✗。
+     要挡的只有**横向**（右滑是"退出"✓）→ `pan-y` 正好 ✓。 */
+  #workshop .cell { touch-action:pan-y; }
+  #workshop .cell.drag { z-index:9; opacity:.92; transition:none;
+                         transform-origin:center; }
+  #workshop .cell.over { border-color:var(--accent); background:#16233a; border-radius:12px; }
+  #workshop .edithint { color:var(--muted); font-size:12.5px; text-align:center;
+                        padding:0 2px 10px; }
+  /* 「这个群还没有组件」那一句 ✓（只有收纳页用得到 ✓）。
+     ★ **2026-10-09 补成真的"居中"** ✗→✓ —— 用户 2026-10-08 的原话就是
+       「只会在界面**居中位置**提示」✓，而这段样式一直只是"顶上一块带内边距的字" ✗
+       （当时看不出来 ✓：收纳页上永远有「组件界面diy」那一格 ✓，这一句**根本轮不到露面** ✓）。
+       那一格撤掉之后 ✓，**新空间进来第一眼就是它** ✓ —— 现在它得看起来像
+       "这一屏是空的" ✓，而不是像"上面掉下来一行字" ✓。 */
+  #workshop .wsempty { color:var(--muted); text-align:center; line-height:1.9;
+                       font-size:14px; padding:0 18px;
+                       min-height:100%; display:flex; align-items:center;
+                       justify-content:center; }
+
+  /* ── 组件页：**纯预览**（2026-10-07 晚上改的）─────────────────────────
+     ★ 用户定的：这一屏「不要有任何的提示和设置选项」✓，
+       也**没有**保留/继续改/删除那几个按钮了 ✓（"界面就被压缩了"✓）——
+       那些全搬去了创意工坊的组件管理页 ✓。
+       只留**顶栏右上角一个图标** ✓，指向它在工坊里那条对话 ✓。 */
+  #compView .cpwrap { flex:1; min-height:0; margin:0 14px;
+                      border:1px solid var(--line); border-radius:14px;
+                      overflow:hidden; background:var(--bg); }
+  #compView iframe { width:100%; height:100%; border:0; display:block; }
+  /* 底下垫一点，免得预览框贴着屏底（没有按钮那一栏了 ✓，只能靠它 ✓） */
+  #compView .cpwrap { margin-bottom:calc(var(--inset-bottom) + 12px); }
+
+  /* ── 对话屏（工坊里的那段对话）───────────────────────────────────────
+     和群聊那屏**不是一套东西** ✓：这里是**你一个人对着它** ✓，
+     所以没有"该不该接话"那些东西 ✓ —— 只有消息、状态、输入框 ✓。
+
+     ★ 2026-10-07：入口从**群聊右上角**挪到了**输入框的 ＋** ✓（和 相册/拍摄 并列 ✓），
+       所以它现在是**从群聊直接进**的一屏 ✓（右上角那个还在 ✓，但那个只列组件 ✓）。
+       顶栏多两样：**切换对话**（≡ ✓）和 **⋯**（保留/删除 ✓）。 */
+  #wsChat .mkbody { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+                    padding:14px; display:flex; flex-direction:column; gap:10px; }
+  /* ★ 气泡旁边**带头像**（2026-10-07 深夜 ✓）—— 用户定的：
+     「组件聊天界面也需要有用户区别」✓。左边是小助手、右边是你 ✓
+     （和群聊那套一个朝向 ✓，不用重新学 ✓）。
+     ⚠️ 名字**只写在小助手那边** ✓ —— 你的名字你自己知道 ✓，
+        而它叫什么**是能改的** ✓（改了要立刻看得见 ✓）。 */
+  #wsChat .mkrow { display:flex; gap:8px; max-width:90%; align-items:flex-start; }
+  #wsChat .mkrow.mine { align-self:flex-end; flex-direction:row-reverse; }
+  #wsChat .mkrow .av { width:34px; height:34px; flex:0 0 34px; border-radius:10px;
+                       background:var(--panel2); color:var(--muted);
+                       display:flex; align-items:center; justify-content:center;
+                       font-size:14px; background-size:cover; background-position:center; }
+  #wsChat .mkrow .wrap2 { min-width:0; }
+  #wsChat .mkrow .who { font-size:11.5px; color:var(--muted); margin:0 3px 3px; }
+  #wsChat .mkbub { background:var(--panel); border-radius:14px; padding:9px 13px;
+                   white-space:pre-wrap; word-break:break-word; font-size:15px; }
+  #wsChat .mkrow.mine .mkbub { background:var(--accent-bg); }
+  #wsChat .mkrow.agent .mkbub { background:var(--panel2); }
+  /* 「问题 2/3」那个小标签 —— 让他一眼看见"还有几个" ✓（用户点名的可视化 ✓） */
+  #wsChat .qchip { display:inline-block; margin-right:7px; padding:1px 8px;
+                   border-radius:999px; font-size:12px; font-weight:600;
+                   color:var(--accent); border:1px solid #35507a; background:#0e1c30; }
+  #wsChat .mkbub b { color:#fff; font-weight:600; }
+  #wsChat .mkbub code { font-family:ui-monospace,Menlo,Consolas,monospace;
+                        font-size:13.5px; background:#0e1116; border:1px solid var(--line);
+                        border-radius:5px; padding:0 4px; }
+  /* 列表项前面那个小圆点（正文里的 `- …`） */
+  #wsChat .mli::before { content:'·'; color:var(--muted); margin-right:7px; font-weight:700; }
+  /* 开场那句提示：淡淡的一行，不是消息 */
+  #wsChat .mknote { color:var(--muted); font-size:13.5px; line-height:1.8;
+                    background:var(--panel); border:1px solid var(--line);
+                    border-radius:12px; padding:12px 14px; }
+  /* 顶栏中间那一块：组件名 + 下面一行状态 ✓（和群聊顶栏同一个位置 ✓）。 */
+  #wsChat .hmid { flex:1; min-width:0; display:flex; flex-direction:column;
+                  align-items:center; gap:1px; }
+  /* 名字是个**按钮** ✓（点了直达组件界面 ✓）—— 但长得和原来的标题一模一样 ✓，
+     不然"这里能点"会变成一条要学的规矩 ✗。 */
+  #wsChat .nmtap { background:none; border:0; padding:0; margin:0; color:inherit;
+                   font:inherit; font-size:17px; font-weight:600; max-width:100%;
+                   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #wsChat .nmtap[disabled] { color:inherit; }   /* 没得跳的那种：**照旧是标题** ✓ */
+  #wsChat .nmtap:not([disabled]):active { opacity:.6; }
+  /* ★ 状态：**组件名下面、居中** ✓（用户定的 ✓）。
+     ⚠️ 它说的是"这个组件在干什么" ✓ —— 所以两个状态要**分得开** ✓：
+        · 思考中 → 图标是转圈 ✓（短暂 ✓）
+        · 组件制作中 → 图标是**实心小锤子/方块**那种"在干活"的样子 ✓
+          （转圈和"思考"没区别 ✗，而这一个是**完全不同的性质** ✓：
+           那不是在等它想，是**子代理在写代码** ✓，可能十几分钟 ✓）。 */
+  #wsChat .wsstat { display:flex; align-items:center; gap:5px; max-width:100%;
+                    font-size:11.5px; color:var(--muted); line-height:1.3; }
+  #wsChat .wsstat[hidden] { display:none; }
+  #wsChat .wsstat i { width:11px; height:11px; flex:0 0 11px; border-radius:50%;
+                      border:1.8px solid var(--line); border-top-color:var(--accent);
+                      animation:spin .8s linear infinite; }
+  /* 「组件制作中」那一档：**不转圈，换成一个稳稳的点** ✓ ——
+     转圈的意思是"马上就好"✓，而那一段恰恰是**最久的** ✓；
+     更重要的是：转圈让两档看起来是同一件事的两种强度 ✗，
+     而它们其实一件是"等它说话"、一件是"它在干活" ✓。 */
+  #wsChat .wsstat.busy { color:var(--accent); }
+  #wsChat .wsstat.busy i { border:0; background:var(--accent); animation:pulse 1.4s infinite; }
+  #wsChat .mkfoot { flex:0 0 auto; display:flex; align-items:flex-end; gap:8px;
+                    padding:10px 12px calc(10px + var(--inset-bottom));
+                    border-top:1px solid var(--line); background:var(--panel); }
+  #wsChat textarea { flex:1; min-width:0; padding:10px 13px; background:var(--panel2);
+                     border:1px solid var(--line); border-radius:16px; color:var(--text);
+                     font:inherit; font-size:16px; resize:none; max-height:120px; line-height:1.4; }
+  #wsChat textarea:focus { outline:none; border-color:var(--accent); }
+  #wsChat .mksend { width:44px; height:44px; flex:0 0 auto; display:none;
+                    align-items:center; justify-content:center; color:var(--accent); }
+  /* ★ **右边那个按钮：有字就是发送、没字就是加图** ✗→✓（用户定的 ✓）——
+     两个都在 DOM 里 ✓，`syncWsSend` 按"输入框里有没有字"决定显示哪个 ✓
+     （和生活管家的 ＋ / 发送同一套做法 ✓）。 */
+  #wsChat .mkpick { width:44px; height:44px; flex:0 0 auto; display:flex;
+                    align-items:center; justify-content:center; color:var(--muted); }
+  /* 待发的那张图 —— 缩略图 + 一个 ✕ ✓（和生活管家的待发区一个意思 ✓） */
+  #wsChat .mkpend { flex:0 0 auto; display:flex; gap:8px; padding:8px 12px 0; }
+  #wsChat .mkpend[hidden] { display:none; }
+  #wsChat .mkpend .pv { position:relative; width:62px; height:62px; border-radius:10px;
+                        overflow:hidden; border:1px solid var(--line);
+                        background:var(--panel2); }
+  #wsChat .mkpend .pv img { width:100%; height:100%; object-fit:cover; display:block; }
+  #wsChat .mkpend .rm { position:absolute; top:-1px; right:-1px; width:20px; height:20px;
+                        border-radius:0 10px 0 10px; background:rgba(0,0,0,.62);
+                        color:#fff; font-size:12px; line-height:20px; text-align:center; }
+  /* 气泡里的图 ✓ —— 和小管家那边同一套尺寸规矩（max-width 别撑破气泡 ✓） */
+  #wsChat .mkbub.media { padding:6px; }
+  #wsChat .mkbub.media img { max-width:100%; border-radius:10px; display:block; }
+  #wsChat .mkbub .cap { white-space:pre-wrap; padding:7px 7px 3px; }
+
+  /* ── 导航屏（工坊的门口）─────────────────────────────────────────────
+     ★ 2026-10-07 晚上用户定的形状 ✗→✓：＋ 进来**先是这一屏** ✓ ——
+       「导航界面就是比较规整了，**按照顺序**展示了所有组件聊天的入口，
+         点击后就是组件聊天界面，然后还有个新建组件」✓。
+     ⚠️ **是"规整的列表"，不是"图标网格"** ✗→✓ —— 我上一版做成了网格 ✓，
+        用户这一版说的是按顺序排 ✓。和右上角那个"容纳界面"**刻意不一样** ✓：
+        那个是给人看的（爱怎么摆怎么摆 ✓），这个是给人**用**的 ✓
+        （顺序稳定、一眼找到、名字看得全 ✓）。 */
+  #wsNav .navlist { display:flex; flex-direction:column; gap:2px; }
+  #wsNav .navrow { display:flex; align-items:center; gap:12px; width:100%;
+                   background:none; border:0; border-radius:12px;
+                   padding:13px 10px; color:var(--text); font:inherit;
+                   font-size:16px; text-align:left; }
+  #wsNav .navrow:active { background:var(--panel2); }
+  #wsNav .navrow .ico { width:38px; height:38px; flex:0 0 38px; border-radius:11px;
+                        background:var(--panel2); display:flex; align-items:center;
+                        justify-content:center; font-size:20px; line-height:1; }
+  #wsNav .navrow .col { flex:1; min-width:0; }
+  #wsNav .navrow .nm { display:block; overflow:hidden; text-overflow:ellipsis;
+                       white-space:nowrap; }
+  #wsNav .navrow .sub { display:block; font-size:11.5px; margin-top:2px;
+                        color:var(--warn2,#d8b06a); }
+  #wsNav .navrow .chev { color:var(--muted); font-size:22px; line-height:1; }
+  /* ★ 参与过这个组件的人的头像（2026-10-07 深夜 ✓）—— 用户定的：
+     「对于每个组件，需要标注其由群里哪些用户参与构建，在导航界面，
+      每个组件的右侧标注头像」✓。
+     ⚠️ 叠着排（后一个压前一个的边 ✓）而不是并排铺开 ✓ ——
+        人一多（比如四个人都参与过 ✓）铺开会把名字挤没 ✓。 */
+  /* ⚠️ `flex:0 0 auto` = **别被挤** ✓ —— 名字再长，头像和 `›` 也保持原样 ✓
+     （名字那一格是 `flex:1` ✓，它先让 ✓）。 */
+  #wsNav .navrow .avs { display:flex; flex:0 0 auto; padding-right:6px; }
+  /* 还没做出组件的那种：**同一个图标、淡一点** ✓（见 `navRow` 那段 ✓）。 */
+  #wsNav .navrow .ico.off { opacity:.45; }
+  /* ★ 图标是**一张图**的时候 ✗→✓（2026-10-07 深夜 ✓）：铺满那个方块 ✓。
+     ⚠️ 用 `object-fit:cover` ✓ —— `contain` 会让方形的图四周留一圈缝 ✓，
+        在一列小方格里看着像"没对齐" ✓（那排图标就不再是一排了 ✓）。 */
+  .imgi img { width:100%; height:100%; object-fit:cover; border-radius:inherit;
+              display:block; }
+  #wsNav .navrow .avs .av { width:26px; height:26px; border-radius:8px;
+                            background:var(--panel2); color:var(--muted);
+                            display:flex; align-items:center; justify-content:center;
+                            font-size:11.5px; border:2px solid var(--bg);
+                            background-size:cover; background-position:center; }
+  #wsNav .navrow .avs .av + .av { margin-left:-9px; }
+  /* diy 小助手在导航右上角那个头像 ✓ */
+  #wsNav .icon-btn .diyav { width:30px; height:30px; border-radius:50%;
+                            background:var(--panel2); color:var(--muted);
+                            display:flex; align-items:center; justify-content:center;
+                            font-size:13px; background-size:cover;
+                            background-position:center; }
+  /* 「新建组件」那一行**跟别的不一样** ✓ —— 虚线框、加号、强调色 ✓。
+     它是这一屏唯一"不是东西"的入口 ✓，长得一样就找不着了 ✓。 */
+  #wsNav .navrow.new { border:1.5px dashed #35507a; color:var(--accent); }
+  #wsNav .navrow.new .ico { background:none; border:1.5px dashed #35507a;
+                            color:var(--accent); font-size:22px; }
+  #wsNav .navlist .navrow.new { margin-bottom:10px; }
+
+  /* 组件管理屏的标题：就是那个组件的名字 ✓。
+     ⚠️ 里面是**两个**元素 ✓，所以要自己摆平 —— `header.sub h2` 只管
+        "占满中间并居中" ✓，不负责里面怎么排 ✓。名字长短不一，**必须能缩** ✓
+        （群里做过的组件名可能是七八个字 ✓，撑不下就把右边的 ⋯ 顶出去 ✓）。 */
+  #wsChat .sub h2 { display:flex; align-items:center; justify-content:center;
+                    gap:7px; min-width:0; }
+  #wsChat .sub h2 .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* ⚠️ 这里原来有一条「未固化」的小牌子样式 ✓ —— 2026-10-07 深夜跟着"固化"
+     整套一起删了 ✓（用户定的：组件聊天没有所谓的固化和非固化概念了 ✓）。 */
+  /* ⚠️ 顶上那个数是**试出来的** ✓，只影响"没有顶栏"的那几屏
+     （我的 / 改资料 / 空间 / 别人 / 自我介绍 ✓），调它不会动到别处 ✓：
+       14px（原来那条按 id 写的老规则把它压住了 ✗，改它根本没生效 ✓）
+         → 44px（终于生效了 ✓，用户："我的终于恢复了，不过目前**稍微靠下**，
+                 **略微往上一些些**"✓）
+         → **30px**（现在这个 ✓）
+     ⚠️ 想再动就动这一个数 ✓ —— 它和状态栏高度是**相加**的 ✓
+        （`--inset-top` 由原生报进来 ✓），所以换台机器、换种刘海，
+        实际距离会跟着变 ✓，这个 30 是"**状态栏下面留多少空气**" ✓。 */
+  .ascreen .abody { flex:1; overflow-y:auto; overscroll-behavior:contain;
+                    padding:calc(var(--inset-top) + 30px) 14px calc(var(--inset-bottom) + 24px); }
+  /* ⚠️ **有顶栏的那几屏不用再让一次状态栏** ✗→✓（2026-10-09）——
+     `header.sub` 自己已经带 `padding-top: calc(var(--inset-top) + 10px)` ✓，
+     把上面那条再叠一次就是**顶栏下面多空出一条状态栏那么高** ✗（`#diySet` 就是这样 ✓）。
+     只有**没有顶栏**的那几屏（我的 / 改资料 / 空间 / 别人 … ✓）才需要自己让 ✓。 */
+  .ascreen > header.sub ~ .abody { padding-top:14px; }
+
+  .ascreen .sec { color:var(--muted); font-size:13px; padding:16px 4px 6px; }
+  .ascreen .grp { background:var(--panel); border-radius:14px; overflow:hidden;
+                  margin-bottom:8px; }
+  .ascreen .row { display:flex; align-items:center; gap:10px; width:100%; margin:0;
+                  /* ⚠️ **`max-width:none` 是必须的** ✗→✓ —— 2026-10-06 用户截图：
+                     三行右边没对齐、「点击编辑」悬在半空 ✓，**灰细线也短一截** ✓。
+                     两个症状是**同一个原因** ✓：群聊页里本来就有一条
+                       `.row { display:flex; gap:8px; max-width:84%; }`   ← 消息气泡行 ✓
+                     我写了 `.ascreen .row` ✓ 但只盖住**我写出来的**那几条属性 ✗，
+                     `max-width:84%` 照样生效 ✓ → 行只有 84% 宽 ✓
+                     → 后缀靠不了右 ✓，而**那条 border-top 的长度就是行宽** ✓ → 线也短 ✓。
+                     **"加了作用域前缀"不等于隔离干净** ✓ —— 挡不住你没写的 ✓。 */
+                  max-width:none;
+                  min-height:50px; padding:0 16px; background:none; border:0;
+                  border-radius:12px; color:var(--text); font:inherit; text-align:left; }
+  .ascreen .row + .row { border-top:1px solid var(--line); }
+  .ascreen .row:active { background:#1d2129; }
+  .ascreen .row .rl { flex:1; min-width:0; font-size:16px; line-height:1.3; }
+  .ascreen .row .rv { color:var(--muted); font-size:16px; line-height:1.3;
+                      max-width:52%; overflow:hidden; text-overflow:ellipsis;
+                      white-space:nowrap; }
+  .ascreen .row .go { color:var(--muted); font-size:22px; line-height:1; padding-left:2px; }
+  /* 右边那句「点击编辑」：**是个动作** ✓，所以用强调色 ✓
+     （和「＋ 新建或加入空间」同一个道理 ✓）。 */
+  .ascreen .row .act { color:var(--accent); font-size:15px; }
+  .ascreen .row.plain:active { background:var(--panel); }   /* 不能点的行别给反馈 ✗ */
+
+  /* 资料块（点它 = 进"改管家资料"那一屏 ✓） */
+  .ascreen .prof { background:var(--panel); border-radius:14px; display:flex;
+                   align-items:center; gap:14px; padding:18px 16px 16px;
+                   margin-bottom:8px; }
+  .ascreen .prof:active { background:#1d2129; }
+  .ascreen .prof .av { width:58px; height:58px; border-radius:10px; overflow:hidden;
+                       flex:none; background:#232833; color:var(--muted);
+                       font-size:24px; display:flex; align-items:center;
+                       justify-content:center; background-size:cover;
+                       background-position:center; }
+  .ascreen .prof .who { min-width:0; }
+  .ascreen .prof .who .n { font-size:19px; font-weight:600; line-height:1.25; }
+  .ascreen .prof .go { color:var(--muted); font-size:22px; line-height:1; margin-left:auto; }
+
+  /* ── 改资料那一屏：**照抄壳的「我的」进头像** ✓ ────────────────
+     那几条（`.avcard` / `.bigav` / `.tip` 的数值）是 2026-10-06
+     用户量着截图来回调出来的 ✓，别再自己发明 ✗。 */
+  .ascreen .card { background:var(--panel); border:1px solid var(--line);
+                   border-radius:16px; padding:18px; margin-bottom:12px; }
+  .ascreen .card.avcard { padding:30px 18px !important; }   /* 上下同一个值 ✓ */
+  .ascreen label { display:block; color:var(--muted); font-size:12.5px; margin:12px 0 6px; }
+  .ascreen .bigav { display:flex; justify-content:center; align-items:center;
+                    width:100%; margin:0 auto; padding:0; }
+  .ascreen .bigav .av { width:150px; height:150px; font-size:56px; cursor:pointer;
+                        overflow:hidden; display:flex; align-items:center;
+                        justify-content:center; border-radius:50%;
+                        background:#232833; color:var(--muted);
+                        background-size:cover; background-position:center; }
+  .ascreen .bigav .av img { width:100%; height:100%; object-fit:cover; display:block; }
+  /* 提示语：**在"头像下沿"和"卡片下沿"之间居中** ✓ —— margin-top 要等于卡片的下内边距 ✓ */
+  .ascreen .tip { color:var(--muted); font-size:12.5px; text-align:center; margin-top:30px; }
+  /* ★ 别人那一屏、头像下面的**名字** ✓（2026-10-09：用户要「大一些」✓）——
+     和管家/我的那两张资料卡里的名字**同一个字号** ✓（19px/600 ✓），
+     不是 `.tip` 那个"提示"的字号 ✗（12.5px 灰字 ✓ —— 名字不该看着像备注 ✓）。 */
+  .ascreen .pname { color:var(--text); font-size:19px; font-weight:600;
+                    text-align:center; margin-top:14px; line-height:1.25; }
+  /* ★ 性格那一块收起时：**一行**，右边一个 ›（2026-10-09 ✓） */
+  /* ★ **性格收起时的样子** ✗→✓（2026-10-09 用户定的原话：
+     「缩略展示**三行**，如果展示不完，第三行**有些半透明**，**末尾有 `...`**，
+       并且**展开按钮居中**，是方向向下的 `<`」✓）。
+     ⚠️ 三行封顶交给 `-webkit-line-clamp:3` ✓ —— 它**自带末尾那个 `…`** ✓。
+     ⚠️「第三行半透明」用 `mask-image` 从上往下淡出 ✓ —— **不能**用 `::after`
+        盖一层底色 ✗：盖的那层会把末尾的 `…` 一起吃掉 ✓（而 `…` 正是要留的 ✓），
+        而且那层底色还得跟着主题走 ✗（浅色主题下会变成一块黑 ✓）。 */
+  .ascreen .pbox .pt { display:-webkit-box; -webkit-box-orient:vertical;
+                       -webkit-line-clamp:3; overflow:hidden; white-space:normal; }
+  .ascreen .pbox .pt.fade {
+    -webkit-mask-image:linear-gradient(to bottom, #000 58%, rgba(0,0,0,.30));
+            mask-image:linear-gradient(to bottom, #000 58%, rgba(0,0,0,.30)); }
+  /* 展开那个手势：**居中、朝下** ✓ —— `›` 转 90° 就是一个朝下的尖 ✓ */
+  .ascreen .pbox .pmore { display:flex; justify-content:center; padding-top:8px; }
+  .ascreen .pbox .pmore .chev { color:var(--muted); font-size:20px; line-height:1;
+                                display:inline-block; transform:rotate(90deg); }
+  .ascreen .pbox .go { color:var(--muted); font-size:20px; line-height:1; flex-shrink:0; }
+  .ascreen .err { color:var(--danger); font-size:13px; min-height:18px; margin-top:10px; }
+  .ascreen .swap { margin-top:14px; text-align:center; color:var(--muted); font-size:13px; }
+  .ascreen .swap b { color:var(--accent); font-weight:600; }
+  .ascreen .btn-save { display:block; width:100%; padding:14px; background:var(--accent);
+                       color:var(--on-accent); font-weight:600; font-size:16px;
+                       border-radius:12px; }
+  .ascreen .btn-save:disabled { opacity:.45; }
+
+  /* ── 编一档状态：**底部弹层 + 三块板** ✓ ────────────────────────────
+     用户 2026-10-06 第二次提的：从整屏**改回下方的半屏** ✓
+     （"其实可以按照之前的从下方弹出半屏" ✓），并且**板块化** ✓
+     （"板块化会美观些" ✓）。
+
+        待机显示   = 板①开关 + 板②状态区/添加 + 板③轮换间隔
+        思考中     =          板②
+        保持沉默   = 板①开关 + 板②
+
+     `.sblk` 用 `--panel2` ✓ —— 弹层本身是 `--panel` ✓，
+     两块同色就"没有层次" ✗，深浅差一档才看得出是**分开的两块** ✓。
+     `.sheet .panel` 自带 18px 内边距 ✓ → 板子天然内缩 ✓。 */
+  .sblk { background:var(--panel2); border-radius:14px; overflow:hidden;
+          margin-bottom:10px; }
+  .sblk .hrow { display:flex; align-items:center; gap:12px;
+                padding:14px 16px; min-height:52px; }
+  .sblk .hrow .t { flex:1; font-size:16px; }
+  /* 区域 = **刚好三行** ✓（用户 2026-10-06："可以刚好展示完整三条" ✓）。
+     ⚠️ 行高要**写死**，不能用 `min-height` 猜 ✗ ——
+        上一版写的就是 `min-height:52px` ✓，而里面那个输入框
+        （padding 11 + 15px 的字 ✓）实际把行撑到了 ~55px ✗
+        → 3 行要 165 ✓，而区域只有 156 ✗ → **第三条被切掉一半** ✓。
+        `box-sizing:border-box` 让分隔线那 1px 也算在 56 里 ✓，
+        所以三行正好 168 ✓，一个像素不多不少 ✓。 */
+  .slist2 { max-height:168px; overflow-y:auto; }
+  .srow2 { display:flex; align-items:center; gap:8px; padding:0 12px;
+           height:56px; box-sizing:border-box; }
+  .srow2 + .srow2 { border-top:1px solid var(--line); }
+  /* ⚠️ 输入框用 `--panel` ✓（**比板子浅一档** ✓）—— 和板子同色就"看不出是个框" ✗ */
+  .srow2 input { flex:1; min-width:0; background:var(--panel); border:0;
+                 border-radius:9px; padding:11px 12px; color:var(--text);
+                 font:inherit; font-size:15px; }
+  .srow2 input:focus { outline:none; box-shadow:0 0 0 1px var(--accent); }
+  .srow2 .del { color:var(--muted); font-size:19px; line-height:1; padding:6px 8px; }
+  .srow2 .del:active { color:var(--danger); }
+  /* 「＋ 添加一条」：**居中蓝字** ✓ —— 它是个动作，不是一行数据 ✓
+     它在**板②里面** ✓（用户："第二个板块是两部分，一个是最多显示三条……的区域，
+     另一个是添加一条" ✓）—— 所以上面隔一条细线 ✓ 而不是单独一块 ✗。 */
+  .sblk .addline2 { display:block; width:100%; text-align:center; color:var(--accent);
+                    font-size:16px; padding:15px 0; border-top:1px solid var(--line); }
+  /* 轮换间隔：**就地一个输入框** ✓ —— 用户 2026-10-06：
+     "编辑方式就是一个一个输入框，右边单位，点击直接编辑输入框，不用额外的界面" ✓。
+     （原来是点一下弹 `promptText` ✓ —— 为一个数字跳一趟界面太重 ✓。） */
+  .sblk .intvrow { display:flex; align-items:center; gap:10px; width:100%;
+                   padding:14px 16px; min-height:52px; text-align:left; }
+  .sblk .intvrow .t { flex:1; font-size:16px; }
+  .sblk .intvrow input { width:66px; text-align:center; background:var(--panel);
+                         border:0; border-radius:9px; padding:10px 6px;
+                         color:var(--text); font:inherit; font-size:16px; }
+  .sblk .intvrow input:focus { outline:none; box-shadow:0 0 0 1px var(--accent); }
+  .sblk .intvrow .u { color:var(--muted); font-size:16px; }
+
+  /* ── 性格：**直奔一个文本框** ✓（用户："不要给管家的话，直接一个文本框" ✓）
+     平时只露**前两行** ✓，点开才展开编辑 ✓。 */
+  .ascreen .pbox { padding:14px 16px; font-size:15px; line-height:1.5;
+                   color:var(--text); white-space:pre-wrap; word-break:break-word;
+                   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+                   overflow:hidden; min-height:22px; }
+  .ascreen .pbox.empty { color:var(--muted); }
+  .ascreen .pwrap { display:flex; flex-direction:column; }
+  .ascreen .ptext { width:100%; min-height:150px; background:var(--panel2); border:0;
+                    border-radius:12px; padding:13px 14px; color:var(--text);
+                    font:inherit; font-size:15px; line-height:1.5; resize:vertical; }
+  .ascreen .ptext:focus { outline:none; box-shadow:0 0 0 1px var(--accent); }
+  .ascreen .pfoot { display:flex; align-items:center; gap:12px; padding:10px 16px 14px; }
+  .ascreen .pfoot .cnt { flex:1; color:var(--muted); font-size:12.5px; }
+  .ascreen .pfoot button { color:var(--accent); font-size:15px; font-weight:600; }
+
+  .item { display:flex; align-items:center; padding:16px 20px; background:var(--panel);
+          border-bottom:1px solid var(--line); gap:12px; }
+  .item .k { flex:1; }
+  .item .v { color:var(--muted); font-size:14px; max-width:55%; overflow:hidden;
+             text-overflow:ellipsis; white-space:nowrap; }
+  /* `›` —— **大一档** ✓（用户 2026-10-06："有点小，不太美观"）。
+     ⚠️ 颜色从 `--line` 改成 `--muted` ✗→✓：
+        `--line` 是**描边色**（`#262b36`）✓，拿它画箭头本来就偏暗 ✗
+        —— 这也正是"不太美观"的一半原因 ✓。
+        `--muted` 是次级文字色 ✓，和外面那一列"值"同色 ✓，是这类箭头的常规画法 ✓。
+     `line-height:1` 是必须的 ✓：不然 22px 的行高会把行撑高 ✓
+     （这行是 `padding:16px 20px` 撑的 ✓，不该被字撑 ✓）。 */
+  .item .chev { color:var(--muted); font-size:22px; line-height:1; }
+
+  /* 退出登录：**居中、红字、没有箭头** —— 和「我的」那一页保持一致 ✓。
+     它不是一个"条目"（没有值、没有去处），是一个动作 ✓；
+     跟在一列同样排版的条目后面，会看着像"还能点进去看点什么" ✗。 */
+  /* ★ 2026-10-09：「退出当前空间」也进这一套 ✓（用户原话：
+     「退出当前空间（红色字体居中在退出登录上面）」✓）——
+     它俩是同一种东西（都是"动作"、都没有去处 ✓），**长相必须一样** ✓，
+     位置一上一下紧挨着 ✓（用户就是这么要求的 ✓）。 */
+  /* ★ 2026-10-11 模型池那一屏（`#models`）—— 自己几个类 ✓，不动既有样式 ✓ */
+  .msec { padding:22px 18px 6px; color:var(--muted); font-size:13px; letter-spacing:.06em; }
+  .mitem, .mcard { display:flex; align-items:center; gap:10px; padding:13px 18px;
+                   background:var(--panel); border-bottom:1px solid var(--line); }
+  .mitem .k { flex:1; }
+  .mitem .v { color:var(--muted); }
+  .mitem .v.empty { opacity:.55; }
+  .mitem .chev { color:var(--muted); }
+  .mcard { flex-direction:column; align-items:stretch; gap:6px; }
+  .mcard .top { display:flex; align-items:center; gap:8px; }
+  .mcard .nm { flex:1; font-weight:600; }
+  .mcard .meta { color:var(--muted); font-size:12.5px; word-break:break-all; line-height:1.6; }
+  .mcard .acts { display:flex; gap:8px; margin-top:4px; }
+  .mbtn { padding:7px 13px; border-radius:9px; border:1px solid var(--line);
+          background:transparent; color:var(--text); font-size:13.5px; }
+  .mbtn.danger { color:#ff6b6b; }
+  .mbtn.pri { background:var(--text); color:var(--panel); border-color:transparent; }
+  .mdot { width:8px; height:8px; border-radius:50%; background:#888; flex:0 0 auto; }
+  .mdot.ok { background:#34c759; } .mdot.warn { background:#ffb020; } .mdot.bad { background:#ff453a; }
+  .mhint { padding:10px 18px; color:var(--muted); font-size:13px; line-height:1.75; }
+  .mhint.bad { color:#ff6b6b; }
+  .mform { padding:14px 18px; display:flex; flex-direction:column; gap:12px; }
+  .mform label { color:var(--muted); font-size:13px; }
+
+  .item[data-act="logout"], .item[data-act="leave"] { justify-content:center; }
+  .item[data-act="logout"] .k, .item[data-act="leave"] .k { flex:0 0 auto; }
+  .danger { color:var(--danger) !important; }
+  .seg { display:flex; gap:0; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .seg button { padding:7px 14px; font-size:13px; color:var(--muted); background:var(--panel2); }
+  .seg button.on { background:var(--accent); color:var(--on-accent); font-weight:600; }
+
+  /* ── 弹层 ── */
+  .sheet { position:fixed; top:0; right:0; left:0; bottom:calc(var(--inset-bottom) + var(--kb)); background:rgba(0,0,0,.6); display:none;
+           align-items:flex-end; z-index:50; }
+  .sheet.on { display:flex; }
+  .sheet .panel { width:100%; background:var(--panel); border-radius:18px 18px 0 0;
+                  padding:18px 18px; max-height:100%; overflow-y:auto; }
+  .sheet h3 { margin:0 0 14px; font-size:16px; }
+
+  /* 工坊那个 ⋯ 菜单 —— 它住在 `.sheet .panel` 里 ✓，
+     ⚠️ **不能借 `.ascreen .row` 那套** ✗（那一套是按 `.ascreen` 限定的 ✓，
+        弹层不是 `.ascreen` ✓）—— 借了就是"点了没样式、像一行光字" ✓。 */
+  /* ⚠️ **居中** ✓（用户 2026-10-07 深夜看着截图定的 ✓）——
+     原来靠左 ✓，他说要居中 ✓。底下那个「取消」本来就是居中的 ✓，
+     于是这一列从上到下就齐了 ✓。 */
+  .wsmenu { display:flex; flex-direction:column; }
+  .wsmenu button { width:100%; text-align:center; background:none; border:0;
+                   border-bottom:1px solid var(--line); padding:15px 4px;
+                   color:var(--text); font:inherit; font-size:15.5px; }
+  .wsmenu button:last-child { border-bottom:0; }
+  .wsmenu button:active { background:var(--panel2); }
+  /* 重命名那个输入框 —— 和群聊输入框同一套观感 ✓（16px 是**防 iOS 聚焦缩放**的 ✓） */
+  .rninput { width:100%; box-sizing:border-box; padding:12px 14px; margin-bottom:4px;
+             background:var(--panel2); border:1px solid var(--line); border-radius:12px;
+             color:var(--text); font:inherit; font-size:16px; }
+  .rninput:focus { outline:none; border-color:var(--accent); }
+  .rnhint { color:var(--muted); font-size:13px; line-height:1.7; margin:-6px 0 12px; }
+
+  /* ── 一个居中的确认框 ✓ ──────────────────────────────────────────────
+     ⚠️ **不用弹层那套** ✗（`.sheet` 是从底下升上来的 ✓，那是"选点什么"的姿势 ✓）：
+        确认是**打断**——它在问"你确定吗"✓，居中、盖住、两句话 ✓。
+     ⚠️ z-index 比弹层（50）高 ✓ —— 它是**在弹层上面**弹出来的 ✓
+        （点"删除"时弹层还没关干净 ✓）。 */
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.62); z-index:60;
+           display:none; align-items:center; justify-content:center; padding:34px; }
+  .modal.on { display:flex; }
+  /* ③ 弹层那一类：**中心弹出** ✓（和介绍卡、长按小卡片同一种手感 ✓）——
+     背景遮罩淡入 ✓，小框从 0.96 弹到 1 ✓。
+     ⚠️ 别用位移 ✗ —— 位移是"位置变了"的意思 ✓，而这个框**本来就在屏幕中间** ✓，
+        它只是"出现了" ✓。 */
+  @keyframes modalIn { from { opacity:0; transform:scale(.96); } to { opacity:1; transform:none; } }
+  .modal.on .box { animation:modalIn .16s cubic-bezier(.22,1,.36,1) both; }
+  .modal .box { width:100%; max-width:320px; background:var(--panel);
+                border:1px solid var(--line); border-radius:16px;
+                padding:20px 18px 14px; }
+  /* ⚠️ **确认框里的字也居中** ✗→✓（2026-10-09）——
+     原来标题和正文都是默认的**左对齐** ✓；这一版的正文都是**一句话**（短 ✓），
+     居中了才和上面那条提示条一个调子 ✓（用户刚连着要求过两次"居中"✓）。
+     ⚠️ 将来要是写**成段**的正文（好几段那种），左对齐更耐读 —— 那种情况再单独说 ✓。 */
+  .modal .box h4 { margin:0 0 9px; font-size:16.5px; font-weight:600;
+                   text-align:center; }
+  .modal .box p { margin:0 0 16px; color:var(--muted); font-size:14px; line-height:1.75;
+                  text-align:center; }
+  .modal .box .acts { display:flex; gap:10px; }
+  .modal .box .acts button { flex:1; padding:12px; border-radius:12px;
+                             font:inherit; font-size:15px; font-weight:600; }
+
+  /* ⚠️ diy 小助手的设置屏**没有自己的样式** ✓ —— 它整屏照抄
+     改管家资料那一屏（`.card.avcard` / `.bigav` / `.tip` / `.field` /
+     `.btn-save` / `.swap` ✓，都在 `.ascreen` 底下 ✓）。
+     ⚠️ **别在这儿另发明一套** ✗ —— 两屏一旦各有一套，改一边的间距
+        另一边不跟 ✓，而那是用户**看得见**的不一致 ✓。（原来那几条
+        `.diyhead` / `.diyav2` / `.diychange` 就是这么删掉的 ✓。） */
+
+  /* 「+」面板：微信那种横向网格 —— 圆角方块图标 + 下方小字 */
+  .plus-grid { display:flex; gap:16px; flex-wrap:wrap; }
+  .plus-item { display:flex; flex-direction:column; align-items:center; gap:8px;
+               width:68px; background:none; padding:0; }
+  .plus-item .ico { width:58px; height:58px; border-radius:16px; background:var(--panel2);
+                    display:flex; align-items:center; justify-content:center;
+                    color:var(--text); }
+  .plus-item .lbl { font-size:12px; color:var(--muted); }
+  .sheet .actions { display:flex; gap:10px; margin-top:16px; }
+  .sheet .actions button { flex:1; padding:13px; border-radius:12px; font-weight:600; }
+  .btn-ghost { background:var(--panel2); color:var(--text); }
+  .btn-solid { background:var(--accent); color:var(--on-accent); }
+  /* ★ **文字居中 + 限宽** ✗→✓（2026-10-09 用户：「感觉这个提示框里文字没有
+     居中对齐啊，强迫症犯了」✓）——
+     ⚠️ 原来只把**盒子**居中 ✓（`left:50% + translateX(-50%)` ✓），
+        盒子里的字是默认的**左对齐** ✗ → 短句看不出来 ✓，
+        一旦**折行**（比如「当前空间人数超过1人，暂不支持退出」✓）第二行就顶到左边 ✓，
+        看着就是"没居中" ✓。
+     ⚠️ `max-width` 一起加上 ✓：不留的话长句会**撑成一整条** ✓（贴着屏幕两边 ✓），
+        折在哪儿完全看屏幕宽度 ✓ —— 限了宽、再居中，折出来的两行才是匀的 ✓。 */
+  /* ⚠️⚠️ **居中的写法要换一个** ✗→✓（2026-10-09：用户「宽度宽一些，
+     能够将"人"纳入第一行」✓ —— 上一版还是折行 ✓）——
+     根子是老写法 `left:50% + translateX(-50%)`：**`left` 钉在正中、右边又没写** ✗ →
+     这个盒子的可用宽度只剩 `100vw - 50%`＝**半屏** ✓✓ → 所以它**只用了半屏就折行** ✓，
+     我加的那条 `max-width` 根本没轮到 ✗（上限比"可用宽度"还大 ✓）。
+     → 换成 `left:0; right:0; margin:auto; width:fit-content` ✓：
+       两边都放开 ✓，盒子按内容收缩 ✓、居中靠 `margin:auto` ✓，
+       真正能占到 `max-width` 那么宽 ✓（长句才会在限宽处折 ✓）。 */
+  /* ⚠️ white-space:pre-line ✗→✓（2026-10-09 用户：「第一行…第二行…居中对齐」✓）——
+     它让文案里写下的换行**真的断行** ✓（normal 会把换行当成空格吃掉 ✗），
+     别的行为不变 ✓（空格照样合并 ✓）→ 对**没有换行的那些提示**一点影响都没有 ✓。
+     ⚠️ 别在这条注释里写反引号 ✗ —— 同一段文字我在 JS 那边写过一次，
+        当场把 node --check 弄炸了 ✓（这个文件顶上就写着这个坑 ✓）。 */
+  .toast { position:fixed; left:0; right:0; bottom:90px; margin:0 auto;
+           width:fit-content; max-width:calc(100vw - 32px); text-align:center;
+           white-space:pre-line;
+           background:var(--panel2); border:1px solid var(--line); color:var(--text);
+           padding:10px 18px; border-radius:10px; font-size:14px; z-index:99;
+           opacity:0; transition:opacity .2s; pointer-events:none; }
+  .toast.on { opacity:1; }
+
+  /* ── 居中那张小卡片（**短暂**，几秒后自己没）✗→✓（2026-10-09）──────────
+     用户定的：「进入后在界面**居中**一个小卡片短暂提醒：上次退出时未做出组件，
+     已自动恢复」✓。
+     ⚠️ **和 `toast` 分开** ✗：toast 是屏幕**底下一条** ✓（那是"刚做了什么"的
+        回执 ✓），这个是屏幕**正中的一张卡** ✓（那是"进来的时候发生了什么"✓）——
+        位置和语气都不是一回事 ✓，混用会让人以为"它刚才说了句话" ✓。 */
+  .notice { position:fixed; left:50%; top:50%; z-index:97; pointer-events:none;
+            transform:translate(-50%,-50%) scale(.94);
+            background:var(--panel); border:1px solid var(--line); color:var(--text);
+            padding:14px 20px; border-radius:14px; font-size:14px; line-height:1.6;
+            max-width:78vw; text-align:center; opacity:0;
+            transition:opacity .22s, transform .22s; }
+  .notice.on { opacity:1; transform:translate(-50%,-50%) scale(1); }
+
+  /* ★ 「我的」那两张卡的形状（2026-10-09，照壳那版 `paintHome` ✓）——
+     资料卡是**横排**的 ✓（左头像 + 右「昵称 / @用户名」✓），
+     所以 `.who` 里多一行 `@用户名` ✓（`.u` ✓）。
+     ⚠️ `.prof` / `.av` / `.who` / `.n` 那几条**本来就有** ✓（管家、别人那两屏也用 ✓），
+        这里只补**`.u` 这一条** ✗（原来没有 ✓ —— 壳那版有 ✓）。 */
+  .ascreen .prof .who .u { color:var(--muted); font-size:12.5px; margin-top:3px;
+                           overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* ★ 编辑页顶上那个标题（「修改昵称」…）✓ —— 壳那版是卡片**上面**一个 hero 标题 ✓，
+     居中、比正文大一档 ✓。 */
+  .ascreen .mh { font-size:22px; font-weight:600; text-align:center;
+                 color:var(--text); margin:10px 0 20px; }
+
+  /* 开机占位。**为什么要它**：以前登录页是静态 HTML 里"默认显示"的那一屏，
+     而"到底登录了没"要打一次 /auth/me 才知道——那几百毫秒里，**明明是已登录的
+     用户也会看到登录页一闪而过** ✗ 很影响体验。
+     现在开局什么都不显示，只有一个转圈；**确认完状态再决定进哪一屏**。 */
+  #boot { position:fixed; inset:0; display:grid; place-items:center;
+          background:var(--bg); z-index:200; }
+  #boot[hidden] { display:none; }
+  #boot i { width:26px; height:26px; border-radius:50%;
+            border:2.5px solid var(--line); border-top-color:var(--accent);
+            animation:bootspin .8s linear infinite; }
+  @keyframes bootspin { to { transform:rotate(360deg); } }
