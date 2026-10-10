@@ -16,8 +16,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
-from .auth import current_user
-from .config import settings
+from ..auth import current_user
+from ..config import settings
 
 log = logging.getLogger("lifeguard.media")
 router = APIRouter(prefix="/api/media", tags=["media"])

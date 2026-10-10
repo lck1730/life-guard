@@ -548,7 +548,7 @@ async def _migrate_agent_status(conn: aiosqlite.Connection) -> None:
     （"同一份数据两处 = 迟早走岔" ✓，2026-10-06 那天栽过两次 ✓）。
     列本身留着不删 ✓：SQLite 删列要重建整张表 ✓，风险不值当 ✓。
     """
-    from .agent_status import DEFAULT_CONFIG, dumps, normalize
+    from .core.agent_status import DEFAULT_CONFIG, dumps, normalize
     try:
         async with conn.execute(
             """SELECT id, agent_status, agent_idle_pool, agent_pool_interval,

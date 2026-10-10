@@ -27,8 +27,8 @@ import sys
 
 from .auth import hash_password, new_invite_code
 from .db import close_db, execute, fetch_all, fetch_one, init_db, now  # noqa: F401
-from .spaces import check as check_space
-from .spaces import profile_dir
+from .core.spaces import check as check_space
+from .core.spaces import profile_dir
 
 
 async def _create_user(username: str, password: str, nickname: str) -> None:

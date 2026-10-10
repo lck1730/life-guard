@@ -15,11 +15,11 @@ from pydantic import BaseModel, Field
 
 log = logging.getLogger("lifeguard.groups")
 
-from .agent_status import clean_prompt, dumps
-from .auth import current_user, require_member
-from .config import settings
-from .db import execute, fetch_all, fetch_one, now
-from .messages import (
+from ..core.agent_status import clean_prompt, dumps
+from ..auth import current_user, require_member
+from ..config import settings
+from ..db import execute, fetch_all, fetch_one, now
+from ..core.messages import (
     agent_name_for,
     broadcast_group_update,
     create_message,
@@ -474,7 +474,7 @@ async def send_message(
     # ★ `audio`（用户**上传的音频文件** ✓）和 `voice`（按住说的 ✓）**走同一条路** ✓ ——
     #   对管家来说都是"一段话"，它不需要知道是录的还是传的 ✓。
     if body.msg_type in ("voice", "audio") and body.media_path and not (content or "").strip():
-        from .stt import transcribe
+        from ..core.stt import transcribe
 
         audio = settings.media_dir / body.media_path
         text = await transcribe(audio) if audio.exists() else None
@@ -496,7 +496,7 @@ async def send_message(
     #   ⚠️ pdf / word / excel **不读** ✗（要装解析库 ✓，见 `routes_media` 那段 ✓）→
     #      管家只知道文件名和大小 ✓，它会照实说"我打不开这个格式" ✓。
     if body.msg_type == "file" and body.media_path and not (content or "").strip():
-        from .routes_media import TEXT_EXTS
+        from .media import TEXT_EXTS
         p = (settings.media_dir / body.media_path).resolve()
         base = settings.media_dir.resolve()
         ok = p.is_relative_to(base) and p.suffix.lower() in TEXT_EXTS and p.is_file()
@@ -556,7 +556,7 @@ async def send_message(
 
     # 编排层在这里被唤醒（Phase 1 的核心）。延迟导入避免循环依赖。
     # 用 schedule 而非 await：不能让发送方一直等 agent 说完话。
-    from .orchestrator import schedule
+    from ..agent import schedule
 
     schedule(msg)
     return msg

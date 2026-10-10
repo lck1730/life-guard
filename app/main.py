@@ -36,7 +36,7 @@ from fastapi.staticfiles import StaticFiles
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-from . import idle, records as rec, reminders
+from .core import idle, records as rec, reminders
 # ⚠️ `ensure_user` / `new_invite_code` **合并之后这里不再需要** ✗→✓：
 #    前者是"按需镜像用户行"的工具 ✓（现在用户表就是本地的 ✓，注册时建 ✓），
 #    后者是"本地摇邀请码"（现在只有建空间那一处摇 ✓，在 `routes_shell` 里 ✓）。
@@ -44,21 +44,21 @@ from .auth import (SESSION_COOKIE, current_user, decode_token, require_member)
 from .config import WALL_SLUG, settings
 from .db import (close_db, execute, execute_rc, fetch_all, fetch_one, init_db,
                  now)
-from .hub import hub
-from .messages import current_status_for
+from .core.hub import hub
+from .core.messages import current_status_for
 # ★ 2026-10-11：**模型服务并进来了** ✓ —— 它现在是这个 App 的两块：
 #   · `/v1/*`  给 Hermes 当模型端点（每次模型调用都从这儿过 ✓）
 #   · `/api/models/*`  换模型的界面（**管理员专属** ✓）
 #   见 `chat/app/models/__init__.py`（那里写了合并的取舍和代价 ✓）。
 from .models.proxy import router as models_proxy_router
 from .models.routes import router as models_router
-from .routes_groups import router as groups_router
-from .routes_internal import router as internal_router
-from .routes_media import router as media_router
-from .routes_shell import router as shell_router
-from .routes_shell import sweep_leaving as shell_router_sweep
-from .routes_workshop import poke_loop
-from .routes_workshop import router as workshop_router
+from .api.groups import router as groups_router
+from .api.internal import router as internal_router
+from .api.media import router as media_router
+from .api.shell import router as shell_router
+from .api.shell import sweep_leaving as shell_router_sweep
+from .api.workshop import poke_loop
+from .api.workshop import router as workshop_router
 
 logging.basicConfig(
     level=logging.INFO,

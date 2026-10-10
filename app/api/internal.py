@@ -34,14 +34,14 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
-from .config import WALL_SLUG, settings
-from . import records as rec
-from . import reminders as rem
-from .db import execute, fetch_all, fetch_one, now
-from .messages import create_message
+from ..config import WALL_SLUG, settings
+from ..core import records as rec
+from ..core import reminders as rem
+from ..db import execute, fetch_all, fetch_one, now
+from ..core.messages import create_message
 # ⚠️ 这里**只 import 函数**，而且放函数外用 ✓ —— routes_workshop 不 import 本模块 ✓，
 #    所以没有环 ✓。
-from .routes_workshop import push_workshop_status, start_waiting, stop_waiting
+from .workshop import push_workshop_status, start_waiting, stop_waiting
 
 log = logging.getLogger("lifeguard.internal")
 

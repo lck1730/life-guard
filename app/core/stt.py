@@ -19,7 +19,7 @@ from pathlib import Path
 
 import httpx
 
-from .config import settings
+from ..config import settings
 
 log = logging.getLogger("lifeguard.stt")
 

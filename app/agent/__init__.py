@@ -18,7 +18,7 @@ import logging
 from typing import Any
 
 from ..config import settings
-from ..messages import (
+from ..core.messages import (
     AGENT_STATUS_LURKING,
     AGENT_STATUS_THINKING,
     agent_name_for,
@@ -28,7 +28,7 @@ from . import agent as agent_client
 from . import buffer as ctx_buffer
 from . import gate
 
-log = logging.getLogger("lifeguard.orchestrator")
+log = logging.getLogger("lifeguard.agent")
 
 # 每个群同时只允许一个 agent turn 在跑。并发触发会让 agent 对着自己
 # 刚说的话再回一遍（自问自答）。

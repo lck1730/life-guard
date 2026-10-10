@@ -13,7 +13,7 @@ import json
 import re
 from typing import Any
 
-from .db import execute, fetch_all, fetch_one, now
+from ..db import execute, fetch_all, fetch_one, now
 from .hub import hub
 
 # 管家在 App 里的默认显示名（没配群级昵称时用它）

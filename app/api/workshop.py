@@ -58,12 +58,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 
-from .auth import current_user, require_member
-from .config import WALL_SLUG, settings
-from .db import execute, execute_rc, fetch_all, fetch_one, now
-from .hub import hub
-from .messages import _quote
-from .orchestrator.agent import (
+from ..auth import current_user, require_member
+from ..config import WALL_SLUG, settings
+from ..db import execute, execute_rc, fetch_all, fetch_one, now
+from ..core.hub import hub
+from ..core.messages import _quote
+from ..agent.agent import (
     _group_profile,
     _image_parts,
     _looks_like_leaked_reasoning,
@@ -135,7 +135,7 @@ async def push_workshop_status(group_id: int, state: str,
                           "data": {"group_id": group_id, "task_id": int(task_id),
                                    "state": state}})
         return
-    from .messages import group_member_ids
+    from ..core.messages import group_member_ids
     try:
         await hub.broadcast(await group_member_ids(group_id),
                             {"type": "ws_status",
@@ -813,7 +813,7 @@ async def _assert_open(group_id: int) -> None:
 async def tasks_list(group_id: int, user: dict = Depends(current_user)) -> dict:
     # ★ 先保证「组件收纳页」那条**一定在** ✓（2026-10-09）——
     #   它不靠谁去点才出现 ✓：谁打开创意工坊，它就已经在列表里了 ✓。
-    from .main import _ensure_wall_task
+    from ..main import _ensure_wall_task
     await _ensure_wall_task(group_id)
     """我这些对话 ✓ + 默认该打开哪一条（**最近动过的那个** ✓）+ 助手信息 ✓。
 

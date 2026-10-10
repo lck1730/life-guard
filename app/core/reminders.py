@@ -29,7 +29,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from .db import execute, fetch_all, fetch_one, now
+from ..db import execute, fetch_all, fetch_one, now
 
 log = logging.getLogger("lifeguard.reminders")
 
@@ -77,7 +77,7 @@ def _next_fire(fire_at: int, repeat_daily: int, ts: int) -> int:
 
 async def _fire(r: dict) -> None:
     """唤起一次 agent 发言。延迟导入避免和编排层循环依赖。"""
-    from .orchestrator import agent as agent_client
+    from ..agent import agent as agent_client
 
     pending = [{
         "group_id": r["group_id"],

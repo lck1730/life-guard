@@ -24,11 +24,11 @@ from typing import Any, AsyncIterator
 
 import httpx
 
-from ..agent_status import clean_prompt, normalize, pick
+from ..core.agent_status import clean_prompt, normalize, pick
 from ..config import settings
 from ..db import fetch_all, fetch_one
-from ..spaces import profile_dir
-from ..messages import (
+from ..core.spaces import profile_dir
+from ..core.messages import (
     AGENT_STATUS_IDLE,
     AGENT_STATUS_LURKING,
     AGENT_STATUS_SILENT,

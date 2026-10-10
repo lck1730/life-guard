@@ -35,8 +35,8 @@ import logging
 import random
 import time
 
-from .config import settings
-from .db import fetch_all
+from ..config import settings
+from ..db import fetch_all
 
 log = logging.getLogger("lifeguard.idle")
 
@@ -64,7 +64,7 @@ def _in_window(hour: int) -> bool:
 async def _wake(group_id: int) -> None:
     """唤起它一次。**must_speak=False**——它完全可以决定不吭声，
     硬逼它说话就变成"为了冒泡而冒泡"，那正是要避免的。"""
-    from .orchestrator import agent as agent_client
+    from ..agent import agent as agent_client
 
     pending = [{
         "group_id": group_id,

@@ -41,7 +41,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from .auth import (
+from ..auth import (
     SESSION_COOKIE,
     SESSION_HOURS,
     hash_password,
@@ -50,8 +50,8 @@ from .auth import (
     new_uuid,
     verify_password_any,
 )
-from .config import settings
-from .db import execute, execute_rc, fetch_all, fetch_one, now
+from ..config import settings
+from ..db import execute, execute_rc, fetch_all, fetch_one, now
 
 log = logging.getLogger("lifeguard.shell")
 
@@ -132,7 +132,7 @@ async def _clear_failures(username: str) -> None:
 #       （它还会拦预览票的写操作 ✓）。
 #     · 这里这个 —— 给**这个文件里**那些返回"账号资料"的接口用 ✓（多查几列 ✓）。
 async def _me(request: Request) -> dict | None:
-    from .auth import decode_token   # 本地 import：避免和 auth 的模块级循环 ✓
+    from ..auth import decode_token   # 本地 import：避免和 auth 的模块级循环 ✓
 
     raw = request.cookies.get(SESSION_COOKIE) or ""
     payload = decode_token(raw)
@@ -586,7 +586,7 @@ async def create_space(body: SpaceNewIn, request: Request) -> dict:
 
     # ② 开通完了才校验"我们真拿到这把钥匙了" ✓（就是 `spaces.check` ✓）。
     #    走到这儿还不过，说明开通那一步**没做全** ✓ —— 那是要看见的错误 ✓，不是可以忽略的 ✓。
-    from .spaces import check as check_space
+    from ..core.spaces import check as check_space
     problem = await check_space(profile)
     if problem:
         log.error("开通跑完了但校验没过（uuid=%s）：%s", uuid, problem)
@@ -602,7 +602,7 @@ async def create_space(body: SpaceNewIn, request: Request) -> dict:
     # ④ 内置的记录类型（记账那一种 ✓）先登记上。
     #    不登记它也能自愈（`record_kinds` 会自动补 ✓），但没必要让它撞一次 ✓。
     #    （这条原来在生活管家那条 `POST /api/groups` 里 ✓，那条路 2026-10-08 删了 ✓。）
-    from . import records as rec
+    from ..core import records as rec
     await rec.ensure_builtin_kinds(gid)
 
     return {"uuid": uuid, "name": name, "profile": profile,

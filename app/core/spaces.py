@@ -30,8 +30,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .config import settings
-from .db import fetch_one
+from ..config import settings
+from ..db import fetch_one
 
 # Hermes 的全局家目录。**不能拿来当记忆空间**：所有没指定 profile 的入口
 # （CLI、cron、其它适配器）都会落到那里，等于把我们的群和别的东西混在一份记忆里。

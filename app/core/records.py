@@ -48,7 +48,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from .db import execute, fetch_all, fetch_one, now
+from ..db import execute, fetch_all, fetch_one, now
 
 log = logging.getLogger("lifeguard.records")
 
