@@ -103,11 +103,6 @@ class Settings(BaseSettings):
     # 用 `tools/publish-apk.sh` 往这儿放东西，别手工拷贝。
     releases_dir: Path = Path("./releases")
 
-    # 这个后端自己的地址。只用来生成"给 agent 眼睛用"的预览链接
-    # （见 routes_internal 的 /preview）——浏览器要打的必须是**真能连上的地址**，
-    # 所以这里是 127.0.0.1，不是对外的 WireGuard 地址。
-    app_base_url: str = "http://127.0.0.1:8720"
-
     # JWT
     jwt_secret: str = "dev-only-change-me"
     jwt_algorithm: str = "HS256"
@@ -183,28 +178,10 @@ class Settings(BaseSettings):
     # 空间邀请码 / 内测码的长度（和壳一致 ✓）。
     invite_code_len: int = 8
 
-    # ── 自己这边的三条“家底”（2026-10-07 修）─────────────────────────
-    #
-    # ⚠️ 它们原来**全是从旧后端抄来的** ✗，在新家里**一条都不对** ✗，
-    #    而且失败得**很安静** ✓（详见 `routes_internal.py` 里 APP_ROOT 那段）：
-    #
-    #     · venv    —— 抄的是 `APP_ROOT/.venv` ✗，而真 venv 是**复用的**
-    #                  `/opt/lifeguard/.venv` ✓（见 systemd 单元的 `ExecStart=` ✓）
-    #     · 日志    —— 抄的是 `lifeguard.log` ✗，而 `StandardOutput=append:`
-    #                  指向的是 `chat.log` ✓
-    #     · 服务名  —— `systemctl is-active lifeguard` ✗（旧后端的名字 ✓）
-    #
-    #   放成配置项、而不是在代码里就地改死 ✓：将来换个部署位置就只动这一处 ✓。
-    venv_python: Path = Path("/opt/lifeguard/.venv/bin/python")
-    log_file: Path = Path("/opt/lifeguard-chat/chat.log")
-    service_name: str = "lifeguard-chat"
-
     # 壳的地址：进工作区时问它"这人真在这个空间里吗" ✓（带用户自己的票去问 ✓）。
     # 见 auth.py / main.py 里那段说明 —— 这样不需要第二套内部凭证 ✓。
     shell_base_url: str = "http://127.0.0.1:8730"
 
-    # 本服务自己的地址（保留给别的用途；图片不再走 URL，见 orchestrator/agent.py）
-    self_base_url: str = "http://127.0.0.1:8720"
     # 每轮最多带几张图。内联 base64 会让请求体变大，得有个上限。
     max_images_per_turn: int = 3
 

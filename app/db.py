@@ -109,28 +109,9 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, id);
 
--- ⚠️ **已停用（2026-10-03）。表留着，但没有任何代码读写它。**
---
--- 它曾经是"按群隔离的记忆"，存在的理由是 Hermes 内置的 MEMORY.md/USER.md 是
--- Profile 级单文件、所有群共用一份、会把一个群的私事泄露到另一个群。
---
--- 那个理由已经不成立了：一个群 ⇄ 一个 profile 空间现在是**硬约束**
--- （见 db.py 的 _ensure_profile_unique + app/spaces.py），Hermes 自己的记忆
--- 天然按群隔离，而且是**活的**（有字符预算、有 curator 后台整理），
--- 这张表是死的（只追加，不整理/不总结/不去重/不衰减）。
--- 两套并存还会打架：实测模型会先写我们的表、再写内置记忆，同一件事两个地方。
---
--- 为什么不 DROP：里面的数据已经迁进各空间的 USER.md / MEMORY.md，
--- 但 DROP 是不可逆的，而这张表躺在那里不占什么。确认没问题之后随时可以删。
-CREATE TABLE IF NOT EXISTS group_memory (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    content    TEXT    NOT NULL,
-    created_by INTEGER,                  -- 谁让记的（可空：agent 自己判断该记）
-    created_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_gmemory_group ON group_memory(group_id, id DESC);
 
+-- ⚠️ 2026-10-11：`group_memory` 和 `ledger_entries` 的**建表语句删了** ✓
+--   （数据还在库里 —— 只删 DDL、不 DROP ✓；它们早就没人读写 ✓）。
 -- ── 泛用的结构化记录（取代了专用的 ledger_entries）────────────────────
 --
 -- 形状是 `kind + fields(JSON)`：一张表承载所有"要能查、能算、能画图"的东西。
@@ -201,19 +182,6 @@ CREATE TABLE IF NOT EXISTS reminders (
 );
 CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(enabled, fire_at);
 
--- 旧的账本表。数据已迁进 records(kind='bookkeeping')，代码不再读写它。
--- 保留是因为 DROP 不可逆；确认没问题后随时可以删。
-CREATE TABLE IF NOT EXISTS ledger_entries (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    user_id    INTEGER,                  -- 谁花的/谁记的
-    amount     REAL    NOT NULL,         -- 正数=支出，负数=收入
-    category   TEXT,
-    note       TEXT,
-    spent_at   INTEGER NOT NULL,         -- 发生时间（可被 agent 指定为"昨天"等）
-    created_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_ledger_group ON ledger_entries(group_id, spent_at DESC);
 
 -- ── 创意工坊：用户做的组件 ──────────────────────────────────────────────
 --
