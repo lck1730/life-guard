@@ -587,6 +587,10 @@ _HTML_EXT_RULES = (
     (_RE_PATH_ABS,  "里面用了站点内的绝对路径（src=/… 或 href=/…）"),
 )
 
+#: 上面那五条的**原话** ✓ —— 拿来当集合用，
+#: 判断"这条是不是外链类"就查集合，别去猜字符串长什么样 ✗。
+_HTML_EXT_REASONS = frozenset(why for _, why in _HTML_EXT_RULES)
+
 
 def _validate_component_html(html: str) -> str:
     """导入前校验 ✓ —— 返回**空串 = 通过** ✓，返回原因 = 不通过 ✗。
@@ -1001,8 +1005,15 @@ async def components_save(body: ComponentSaveIn) -> dict:
     #   拦在落地这一步 ✓：它拿到一句具体原因 ✓，**自己改一版再交付** ✓。
     why = _validate_component_html(html)
     if why:
-        return {"ok": False, "error": "里面用了取不到的外部资源 —— " + why + "。"
-                                 "把那个东西**内联进这一个文件**再交一次。"}
+        # ⚠️ **别给所有原因套一句「外部资源」** ✗→✓（2026-10-12 实测）——
+        #   同一个校验还会报「太大了」「找不到 html 或 body 标签」✓，
+        #   那些跟外链无关 ✓。套错了它就去改一个不存在的东西 ✗（白烧一轮 ✓），
+        #   而内联这条路的正文一直在它手里 ✓ —— 它迭代得比走文件那会儿勤 ✓，
+        #   所以这句帽子错一次，就多废一轮 ✓。
+        if why in _HTML_EXT_REASONS:
+            why = ("里面用了取不到的外部资源 —— " + why
+                   + "。把那个东西**内联进这一个文件**再交一次。")
+        return {"ok": False, "error": why}
 
     # 版本号**服务端自增** ✓ —— 不接受 agent 传 ✗（它会数错自己做过几版 ✓）
     prev = await fetch_one(
