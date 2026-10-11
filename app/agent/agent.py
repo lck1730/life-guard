@@ -188,44 +188,41 @@ _SILENT_MARKERS = {"[silent]", "silent", "no_reply", "[静默]", "静默", "[沉
 _LEAKED_REASONING_MARKS = ("<dots_function_call>", "<invoke name", "</invoke>", "<parameter name")
 
 
-#: ★ **"这段像是在自言自语"的开头** ✗→✓（2026-10-11 用户：
-#:   「思考泄露是主要的不良体验来源」✓）。
+#: ★★ **思考泄漏的形状** ✗→✓（2026-10-11 用户：「思考泄露是主要的不良体验来源」）。
 #:
-#: ⚠️ 这是**第二个形状** ✗ —— 上面那几个 marks 认的是"工具调用文本" ✓，
-#:    而这次漏出去的是一整段**英文推理** ✓。Hermes 的日志写得很清楚：
-#:      `Reasoning-only clean stop (246 chars) — returning the reasoning as the final response`
-#:    也就是：模型这一轮**正文是空的、只有推理** ✓，
-#:    Hermes 有个兜底把推理**提升成最终回复** ✓（它的注释说那是给某些推理解析器兜底的 ✓），
-#:    我们照单全收 → 用户就看见一段自言自语 ✓。
+#: ⚠️ 来路（已核实）：模型这一轮**正文是空的、只有推理** ✓，
+#:    Hermes 有个兜底把推理**提升成最终回复** ✓（它的注释说那是给某些推理解析器
+#:    兜底的 ✓），我们照单全收 → 用户就看见一段自言自语 ✓。
+#:    （Hermes 自己打的日志：`Reasoning-only clean stop — returning the reasoning
+#:     as the final response` ✓。）
 #:
-#: ⚠️ **收得很窄** ✗ —— 宁可漏，不可错杀：只在**句首**认（`startswith` ✓），
-#:    不是"文中出现过" ✓。漏判的后果是"偶尔漏出去一段"✓；
-#:    错杀的后果是"一句正常的话被吞掉"✗ —— 前者轻得多 ✓。
-_LEAKED_THINKING_OPENERS = (
-    "the user is asking", "the user wants", "the user said", "the user seems",
-    "the user just", "i should ", "i need to ", "i'll ", "i will ",
-    "let me ", "looking at", "since the user", "the question is",
-    "so i ", "now i ", "okay, ", "alright, i", "i don't have a ",
-)
+#: ⚠️⚠️ **第一版是按"思考口吻的开头词"判的，输了** ✗ ——
+#:    我列了一串（`The user is asking…` / `I should…` / `Let me…` ✓），
+#:    结果它下一次的开头是 **`The reminder is set for 5 minutes from now…`** ✗
+#:    —— 不在表里 ✓，那一次两条又**全漏** ✓。
+#:    **枚举开头词是个输定的游戏** ✓：它写什么开头都有可能 ✓。
+#:
+#: ★ 第二版改成看**形状** ✓（实测三次泄漏 · 消息 172 / 176 / 177 是同一个样子）：
+#:     开头一个**很长的非中文块**（172 / **1585** / 243 字符 ✓），
+#:     **后面跟着中文** ✓ —— 那后面才是要说的话 ✓。
+#:   判据就一句：**开头那个非中文块够长 → 那不是给他的，切掉** ✓。
+#:
+#: ⚠️ **只看开头** ✗ —— 不碰**文中**的英文块 ✓
+#:    （回复里贴一段代码、引一句英文都在中间 ✓，不该动 ✓）。
 
 #: 中文字（含扩展区）—— 用来判断"从哪儿开始才是在跟他说话" ✓
 _CJK_RE = re.compile(r"[㐀-䶿一-鿿豈-﫿]")
 
 
-#: ⚠️ **两道长度闸** ✗→✓（写完先拿真数据跑了一遍，才发现少了它们）——
-#:   一段"我在想什么"是**长句** ✓；而下面这两种都是**正常回答**，不能误伤 ✗：
-#:     · `I'll 帮你查一下` / `Looking at 这个表…` —— 开头确实像英文口吻 ✓，
-#:       但**后面紧跟中文** ✓ → 那是他在跟你说话，不是在想 ✓
-#:     · `I should let you know the file is missing.` —— 一句正常的英文回复 ✓，
-#:       整条没中文 ✓ → 不该被吃成空 ✗
-#:   ⚠️ **宁可漏、不可错杀** ✓：漏了只是"偶尔漏出去一段"✓；
-#:      错杀了是"一句正常的话被吞掉"✗ 或者更糟 —— 变成"这轮没跑通" ✓。
-_HEAD_MIN_CHARS = 20      # 有中文时：前面那段要够长，才算"一段计划"
-_ALL_THINKING_MIN = 60    # 整条没中文时：更严 —— 一整段自言自语才是这个长度
+#: 开头那段非中文长过这个数，就算"挂在回答前面的自言自语" ✓。
+#: ⚠️ 30 是拿真数据卡出来的 ✓：正常回复里开头夹的英文（`I'll`、`Looking at` ✓）
+#:    远不到这个数 ✓；而三次泄漏是 172 / 1585 / 243 ✓ —— 中间空得很开 ✓。
+_HEAD_MIN_CHARS = 30
 
-
-def _opens_like_thinking(s: str) -> bool:
-    return s.strip()[:120].lower().startswith(_LEAKED_THINKING_OPENERS)
+#: ⚠️ **整条一个中文字都没有** 时更保守 ✓ —— 那种情况"翻译"和"自言自语"
+#:   **分不清** ✗ → 门槛抬到 200 ✓：一句正常的英文回复过不了 ✓（放过 ✓），
+#:   而一整段自言自语轻易就过 ✓。
+_ALL_NONCJK_MIN = 200
 
 
 def _strip_leaked_thinking(text: str) -> str:
@@ -236,10 +233,8 @@ def _strip_leaked_thinking(text: str) -> str:
       整条丢掉再补一轮 = 把一句好话扔了 ✓ + 多花一次调用 ✓ +
       下一轮它很可能又这么来一次 ✓。**切掉前面那段，好话原样留下** ✓。
 
-    ⚠️ 判据**两条同时成立才动手** ✗：
-      ① 开头是"我在想"的口吻（英文）✓
-      ② 后面出现了中文 ✓ —— 也就是"他从某个字开始才是在跟你说话" ✓
-         对一个中文用户，**开口先来一段英文计划**是不正常的 ✓。
+    ⚠️ 判据只有一个 ✓：**开头那段非中文够长** ✗→✓
+      （第一版还要求"开头像思考口吻"✗ —— 那是个输定的游戏 ✓，见上面那段注释 ✓）。
 
     ⚠️ **它和 `_looks_like_leaked_reasoning` 是两件事** ✗：
       那道管"**整条都不是人话**"（→ 补一轮 ✓）；
@@ -251,12 +246,10 @@ def _strip_leaked_thinking(text: str) -> str:
         return t
     m = _CJK_RE.search(t)
     if m is None:
-        # 整条一个中文字都没有。
-        # ⚠️ 它**可能**真是在用英文回（放过 ✓）—— 只有**又像自言自语、又够长**，
-        #    才当"这轮没说出话来"（空串 ✓ → 走"这轮没跑通"那条兜底 ✓）。
-        return "" if (len(t) >= _ALL_THINKING_MIN and _opens_like_thinking(t)) else t
+        # 整条一个中文字都没有 —— 分不清是"翻译"还是"自言自语" ✗ → 门槛抬高 ✓
+        return "" if len(t) >= _ALL_NONCJK_MIN else t
     head = t[:m.start()].strip()
-    if len(head) >= _HEAD_MIN_CHARS and _opens_like_thinking(head):
+    if len(head) >= _HEAD_MIN_CHARS:
         # ⚠️ **切掉的那段要记一笔** ✓ —— 切错了得能查。
         #    这是整条链上**唯一一处"改它说的话"**的地方 ✓，
         #    所以原文必须进日志 ✓（这个项目为"静默改坏"栽过 ✓）。
