@@ -855,10 +855,36 @@
   //:      ⚠️ 这个值同时决定"提示条走到满格要拉多远" ✓ —— 它俩是同一个数 ✓，
   //:      改它同时改两件事（阈值 + 那根条的行程 ✓），别只按"阈值"想 ✓。
   const PULL_TRIG = 144;
+  //: ★ **右滑引用**的阈值 ✓（2026-10-11 用户：「将引用变为右滑消息」）——
+  //:   ⚠️ 比左滑那个(96) **小得多** ✗ —— 它们不是一类动作 ✓：
+  //:      左滑是**换一整个界面** ✓（要拉得够、要那条跟手提示走满格 ✓）；
+  //:      右滑是**给这条消息挂个引用** ✓（一次干脆的短划 ✓，要拉 96px 手很累 ✓）。
+  //:   ⚠️ 它同时是"行跟手时能走多远"的**上限** ✓（拖到这儿就顶住 ✓）——
+  //:      和左滑那个数一个道理 ✓：改它**同时改两件事**（阈值 + 行程 ✓），
+  //:      别只按"阈值"去调 ✓。
+  const QUOTE_TRIG = 56;
   let pgSw = null;
+  //: 跟手那一下正在挪的是哪一行 ✓ —— 松手 / 取消 / 被别的手势接管，
+  //: **都得把它收回原位** ✓（留一行歪在那儿，比什么都不做更让人犯嘀咕 ✓）。
+  let qDragRow = null;
 
+  /** 把跟手那行收回原位 ✓（三条路都走它 ✓：松手 ✓、取消 ✓、换一行 ✓）。 */
+  const _endQuoteDrag = () => {
+    const r = qDragRow;
+    qDragRow = null;
+    if (!r) return;
+    r.classList.remove('swiping', 'quoteready');
+    // ⚠️ 给一段**短回弹** ✓ —— 直接"啪"地归位太生硬 ✓，
+    //    而且那一段正好是"我刚才那下没够"的收尾 ✓。
+    r.style.transition = 'transform .17s cubic-bezier(.22,1,.36,1)';
+    r.style.transform = '';
+  };
+
+  // ⚠️ `#msgcard` 从这一串里**去掉了** ✗→✓（2026-10-11）—— 那张长按小卡片整个删了 ✓。
+  //    留着它**不会报错** ✓（`$(s)` 是 null ✓、`.some` 直接跳过 ✓），
+  //    但那就是**一个永远为假的判断** ✓ —— 下一个人读到会以为"世上还有这么个东西" ✓。
   const _overlayOn = () =>
-    ['#msgcard', '#sheet', '#modal'].some(s => $(s) && $(s).classList.contains('on'));
+    ['#sheet', '#modal'].some(s => $(s) && $(s).classList.contains('on'));
 
   //: 除了这三屏之外，**其余任何一屏开着就不认手势** ✓（用户 2026-10-09：
   //: 「[组件沙箱]界面，只有在主群聊时右滑才出现，不能到处出现」✓）。
@@ -944,13 +970,31 @@
     const x = ev.touches[0].clientX, y = ev.touches[0].clientY;
     // ① 贴边的滑动归系统 ✓
     if (x < SW_EDGE || x > window.innerWidth - SW_EDGE) { pgSw = null; return; }
-    pgSw = { x0: x, y0: y, dir: '', d: 0 };
+    // ★ **起手按着的是哪一条消息** ✗→✓（2026-10-11）—— 右滑引用要用它 ✓。
+    //   ⚠️ 必须**在这一刻**抓 ✗ —— 等判出方向再去 `closest` 就晚了 ✓：
+    //      那会儿手指已经移开 ✓，`ev.target` 是**那一刻手指底下那个元素** ✓
+    //      （早就不是刚按下去那一条了 ✓，最常见的是滑到了隔壁行 ✓）。
+    const row = ev.target && ev.target.closest
+      ? ev.target.closest('#msgs .row[data-id], #wsMsgs .mkrow[data-id]') : null;
+    pgSw = { x0: x, y0: y, dir: '', d: 0, row };
   }, { passive: true });
 
   document.addEventListener('touchmove', (ev) => {
     if (!pgSw) return;
     const p = ev.touches[0];
     const dx = p.clientX - pgSw.x0, dy = p.clientY - pgSw.y0;
+    // ⚠️ **正在拖选文字 → 这根本不是滑动手势** ✗→✓（2026-10-11）——
+    //   气泡现在**可以选中**了 ✓（长按出系统那套 ✓，见 app.css 那段 ✓），
+    //   而"按住选完、再拖两头那个手柄"**也是一次横向 move** ✓ →
+    //   不判的话：拖手柄会把右滑点亮 ✓ → 下面 `preventDefault` ✓ →
+    //   **手柄当场拖不动** ✓ —— 一项新功能把另一项弄坏 ✓，
+    //   而且症状离真因极远 ✗（"复制的时候选不中"✓，谁会怀疑到手势引擎头上 ✓）。
+    //   ⚠️ 必须判在**每一次还没定方向的 move** 上 ✗ —— 不能只在 `touchstart` 判 ✓：
+    //      选区是**长按之后**才冒出来的 ✓，那会儿这个手势早就开始了 ✓。
+    if (!pgSw.dir) {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed) { pgSw = null; hidePullHint(); return; }
+    }
     if (!pgSw.dir) {
       if (Math.abs(dx) < SW_MIN2 && Math.abs(dy) < SW_MIN2) return;
       // ② 方向要**明确**才认 ✓（斜着划不算 ✓）
@@ -959,8 +1003,19 @@
       else { pgSw = null; hidePullHint(); return; }
       // ③ 这一屏上这个方向有没有意义？没有就把手势丢掉 ✓（免得吃掉正常滚动 ✓）
       const s = _whichScreen();
+      // ⚠️ 工坊那条对话**不在这三屏里** ✓（它在 `_OTHER_SCREENS` 里 ✓ → `s` 是空 ✓）——
+      //    所以右滑引用要**单独问一句** ✓（`#wsChat` 开着没有 ✓）。
+      const wsOn = $('#wsChat').classList.contains('on');
       const ok = (pgSw.dir === 'L' && s === 'chat')
               || (pgSw.dir === 'R' && (s === 'wall' || s === 'comp'))
+              // ★ **右滑引用** ✗→✓（2026-10-11）—— 两个条件**缺一不可** ✓：
+              //   ① 屏幕是群聊 / 工坊那条对话 ✓
+              //   ② **起手按着的是一条消息** ✓（`pgSw.row` ✓）
+              //   ⚠️ 少了② 的话：在**顶栏、输入框、空白处**右滑也会被认下 ✓ →
+              //      `preventDefault` 吃掉那一下 ✓、松手又什么都没发生 ✓
+              //      —— 用户在那些地方右滑本来是有用的（比如选字 ✓），
+              //      被我们白白吞掉 ✓。**认了就得给个交代** ✓，给不出就别认 ✓。
+              || (pgSw.dir === 'R' && !!pgSw.row && (s === 'chat' || wsOn))
               || (pgSw.dir === 'D' && ((s === 'wall' && _wallAtTop()) || s === 'comp'));
       if (!ok) { pgSw = null; hidePullHint(); return; }
       // ★ **手里正拎着一个格子**（长按 ≥450ms 之后在拖动换位置 ✓）→ 别认下拉 ✗→✓
@@ -984,6 +1039,22 @@
     //    而且"退出"是往回走 ✓ 不需要一句"继续滑"来鼓励 ✓。
     if (pgSw.dir === 'D') showPullHint(_pullHintText('D'), dy, PULL_TRIG, false);
     else if (pgSw.dir === 'L') showPullHint(_pullHintText('L'), -dx, SW_TRIG, true);
+    // ★ **右滑那一条：行跟着手走一点** ✗→✓（2026-10-11）——
+    //   ⚠️ **不跟手是不行的** ✗：右滑是个"短划" ✓，划完手指就抬了 ✓，
+    //      中间没有任何反馈的话，用户根本分不清"我是划了还是滚了一下"✓
+    //      （这个项目最烦的"做了像没做"✓）。
+    //   ⚠️ 跟**一半不到**、而且**封顶** ✓ —— 走到 `QUOTE_TRIG` 就顶住不再走 ✓：
+    //      再走就会把行推出屏幕 ✓（而那时候他其实已经可以松手了 ✓）。
+    //   ⚠️ 那条跟手提示（`#pullHint`）**不给它** ✗ —— 那是给"换一个界面"用的 ✓
+    //      （要拉得够、要那句话催他接着拉 ✓）；引用是**一次短划** ✓，
+    //      在屏幕边上再浮出一行字，重得不相称 ✓。反馈由**行自己**给 ✓。
+    else if (pgSw.dir === 'R' && pgSw.row) {
+      if (qDragRow !== pgSw.row) { _endQuoteDrag(); pgSw.row.style.transition = 'none'; qDragRow = pgSw.row; }
+      const d = Math.max(0, Math.min(QUOTE_TRIG, dx));
+      qDragRow.classList.add('swiping');
+      qDragRow.classList.toggle('quoteready', d >= QUOTE_TRIG);
+      qDragRow.style.transform = d ? `translateX(${d}px)` : '';
+    }
   }, { passive: false });
 
   const _endSwipe = () => {
@@ -993,7 +1064,22 @@
     //    松手那一刻就该没 ✓（留着会变成"我刚才是不是滑过头了"这个疑问 ✓）。
     //    原来只在 `'D'` 那条分支里收 ✓ → 左滑也加提示之后就会**留在屏幕上** ✗。
     hidePullHint();
+    // ⚠️ **跟手那行无论成不成都要收回原位** ✓ —— 见 `_endQuoteDrag` 那段 ✓。
+    _endQuoteDrag();
     if (!s || !s.dir) return;
+    // ★ **右滑 = 引用手里那条** ✗→✓（2026-10-11 用户：「将引用变为右滑消息」）——
+    //   排在最前面 ✓：它和下面几条**按屏幕互斥** ✓（有 `row` 就一定是消息列表 ✓），
+    //   写在最前头最不容易看错 ✓。
+    if (s.dir === 'R' && s.row) {
+      if (Math.abs(s.dx || 0) >= QUOTE_TRIG) {
+        // ⚠️ **群聊和工坊各一套引用状态** ✗（`pendingQuote` vs `wsQuote` ✓）——
+        //    按这一行属于哪个列表分 ✓。两条对话**可能同时开着** ✓
+        //    （组件页底下压着群聊 ✓），认错了就是"在这儿滑、引用条出现在那儿"✓。
+        if (s.row.closest('#wsMsgs')) quoteWsMsg(Number(s.row.dataset.id));
+        else quoteChatMsg(Number(s.row.dataset.id));
+      }
+      return;
+    }
     if (s.dir === 'D') {
       if ((s.dy || 0) >= PULL_TRIG) openCompChat();
       return;
@@ -1006,7 +1092,9 @@
     if (s.dir === 'R' && scr === 'wall') { closeWorkshop(); return; }
   };
   document.addEventListener('touchend', _endSwipe);
-  document.addEventListener('touchcancel', () => { pgSw = null; hidePullHint(); });
+  // ⚠️ 取消（来电、系统抢手势…）也要**把那行收回原位** ✓ —— 不然它会**永远歪着** ✓
+  //    （`touchend` 不一定会来 ✓，这种"少一个事件"的坑这个项目栽过 ✓）。
+  document.addEventListener('touchcancel', () => { pgSw = null; hidePullHint(); _endQuoteDrag(); });
 
   /**
    * **下拉 → 进这条对话** ✓（收纳页和单个组件页都走这里 ✓）。

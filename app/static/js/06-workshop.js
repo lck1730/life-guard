@@ -1145,32 +1145,31 @@
     $('#wsPick').style.display = typed ? 'none' : 'flex';
   };
 
-  // ── 长按消息 → 同一张小卡片 ✓（2026-10-08 改）────────────────────────
+  // ── 长按 → **交给系统**；引用 → **右滑** ✗→✓（2026-10-11）──────────────
   //
-  // ★ 原来这边也是"左右滑引用" ✓（和群聊同一套判据 ✓）。现在两处一起改成
-  //   **长按弹小卡片** ✓（用户定的形状 ✓，见群聊那边那一大段 ✓）。
+  // ★ 和群聊那边**同一条规矩**（用户：「长按消息不再有小卡片，就是默认系统的
+  //   复制行为」✓、「将引用变为右滑消息」✓）—— **两处必须一起改** ✗：
+  //   同一条消息在两个地方长按出不同的结果，是最难解释的一种 ✓。
   //
-  // ⚠️ **这边照旧不做 @** ✗ —— 原来的理由还在 ✓：这里只有你和助手两个人 ✓，
-  //    @ 谁都是它 ✓，做了只会往输入框塞一个没意义的例子 ✓。
-  //    现在长按**空出来了** ✓，但空着是对的 ✓（卡片里那两项就是这边要的全部 ✓）。
-  $('#wsMsgs').addEventListener('touchstart', (ev) => {
-    const row = ev.target.closest && ev.target.closest('.mkrow[data-id]');
-    if (!row) return;
-    cancelPress();
-    pressFired = false;
-    pressTimer = setTimeout(() => {
-      pressTimer = null;
-      pressFired = true;
-      openMsgCard(row, {
-        get: (r) => _wsById.get(Number(r.dataset.id)),
-        quote: (m) => { wsQuote = m; setWsQuoteBar(); $('#wsText').focus(); },
-      });
-    }, PRESS_MS);
-  }, { passive: true });
-  $('#wsMsgs').addEventListener('touchmove', cancelPress, { passive: true });
-  $('#wsMsgs').addEventListener('touchend', cancelPress);
-  $('#wsMsgs').addEventListener('touchcancel', cancelPress);
-  $('#wsMsgs').addEventListener('scroll', closeMsgCard, { passive: true });
+  // ⚠️ **长按那个监听整个删了** ✗ —— 群聊那边还留着一个（头像 → @ 他 ✓），
+  //   而这边**连 @ 都不做** ✓：这里只有你和助手两个人 ✓，@ 谁都是它 ✓，
+  //   做了只会往输入框塞一个没意义的例子 ✓ → 一个监听都不需要 ✓。
+  //   ⚠️ **不要为了"对称"在这边补一个空监听** ✗ —— 系统那套是由 CSS 打开的
+  //      （见 app.css 那段 ✓），JS 这边**本来就该什么都不做** ✓。
+
+  /** ★ **把工坊里一条消息变成引用** ✓ —— 右滑那条手势的落点（见 `05-settings.js` ✓）。
+   *
+   *  ⚠️ **工坊的引用状态和群聊是两套** ✗（`wsQuote` vs `pendingQuote` ✓）——
+   *    这里只动工坊那一套 ✓：两条对话**可能同时开着** ✓
+   *    （组件页底下压着群聊 ✓），碰错了就是"在 A 里滑了一下、引用条出现在 B 上"✓。
+   */
+  const quoteWsMsg = (id) => {
+    const m = _wsById.get(Number(id));
+    if (!m) return;
+    wsQuote = m;
+    setWsQuoteBar();
+    $('#wsText').focus();
+  };
 
   /**
    * 顶栏那个 ⋯ —— 用户 2026-10-07 晚上定的两件事：**删除组件**、**重命名组件** ✓

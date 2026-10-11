@@ -345,62 +345,37 @@
   .sysrow { align-self:center; max-width:86%; font-size:12.5px; color:var(--muted);
             background:var(--panel2); border-radius:10px; padding:6px 12px;
             text-align:center; line-height:1.55; }
-  /* ★ 2026-10-09：**气泡上关掉系统的长按呼出 / 文字选择** ✗→✓。
-     用户报的：「长按后不仅出了卡片，还把系统的复制功能调出来了」✓ ——
-     要的是**只有我们那张卡片** ✓（"自由复制"那一项再自己去调复制 ✓）。
-     ⚠️ 这一条以前只写在注释里 ✗（"CSS 里把长按呼出和选择都关了"✓），
-        而**代码里根本没加** ✓ —— 注释和代码不一致，等于没有 ✓。 */
-  .row .bubble, .mkrow .mkbub { -webkit-touch-callout:none; user-select:none; }
-  /* ★ **点了「自由复制」的那一条：临时放开选择** ✗→✓（2026-10-09 用户第二次点这条 ✓）——
-     平时气泡不给选（上面那条 ✓，为了让我们的长按不被系统抢走 ✓），
-     而"自由复制"要的恰恰是**系统那套选择工具** ✓（框选 + 拖手柄 + 点"复制" ✓）。
-     所以只对**这一条**开口子 ✓（`.seltext` ✓，由 `freeCopyBubble` 加上 ✓）。
-     ⚠️ 三个属性**缺一不可** ✗：`user-select` 管"能不能选" ✓；
-        `-webkit-user-select` 是老 WebView 认的那个名字 ✓；
-        `-webkit-touch-callout` 管"长按能不能呼出系统那排东西" ✓
-        （不放开的话，他在框选里想重新长按反而呼不出菜单 ✓）。
-     ⚠️ **不要写成 `.bubble`** ✗（那就全放了 ✓）—— 长按会同时被系统和我们抢 ✓。 */
-  .row .bubble.seltext, .row .bubble.seltext *,
-  .mkrow .mkbub.seltext, .mkrow .mkbub.seltext * {
-    -webkit-user-select:text !important; user-select:text !important;
-    -webkit-touch-callout:default !important;
+  /* ★★ **气泡长按 → 出系统那套** ✗→✓（2026-10-11 用户：
+     「长按消息不再有小卡片，就是默认系统的复制行为」✓）。
+
+     ⚠️ **这是一次行为回退，说清楚** ✗ —— 2026-10-08 那次是**故意**关掉它的 ✓
+        （理由是"长按要让给我们那张卡片"✓，卡片里有「自由复制」和「引用」两项 ✓）；
+        现在卡片**整个不要了** ✓（引用改成右滑 ✓，见 `05-settings.js` ✓）→
+        把长按**原样还给浏览器** ✓：长按出系统那排（选中 + 复制/全选/搜索 ✓）✓。
+
+     ⚠️ 三个属性**缺一不可** ✗（就是当初关掉的那三个 ✓，对着开回来 ✓）：
+        · `user-select` 管"能不能选" ✓
+        · `-webkit-user-select` 是老 WebView 认的那个名字 ✓
+        · `-webkit-touch-callout` 管"长按能不能呼出系统那排东西" ✓
+          （不放开的话：字选上了、那排菜单出不来 ✓ —— 那是最像"坏了"的一种 ✓）
+
+     ⚠️ **要连子元素一起开**（`*` ✓）—— 气泡正文里的 `**粗体**` / `` `代码` ``
+        那种是**自带颜色的子元素** ✓，只开父级的话那几段还是选不中 ✓。 */
+  .row .bubble, .row .bubble *,
+  .mkrow .mkbub, .mkrow .mkbub * {
+    -webkit-user-select:text; user-select:text;
+    -webkit-touch-callout:default;
   }
-  /* ★ **这个状态要自己看得出来** ✗→✓（2026-10-09：把底部那句提示撤了 ✓，
-     改由这一条自己的样子说 ✓）—— 一圈淡虚线 = "它现在是可以拖选的" ✓。
-     ⚠️ 用 `outline` 而不是 `border` ✗ —— border 会改尺寸 ✓（气泡会跳一下 ✓，
-        而且它在滚动列表里 ✓，跳一下很显眼 ✓）。 */
-  .row .bubble.seltext, .mkrow .mkbub.seltext {
-    outline:1px dashed var(--accent); outline-offset:2px;
+  /* ⚠️ **图片 / 文件 / 音频那种"整块"仍然不给选** ✗ —— 它们里面**没有字可选** ✓，
+     放开之后唯一的效果是**长按弹出系统那个图片菜单** ✓（存图片 / 打开图片 ✓）——
+     那条路和刚加的「保存到相册」按钮**是同一件事的第二个入口** ✓，
+     两个入口存到**两个地方**（那个进相册 ✓、系统那个看各家 ROM ✓），
+     只会让人问"我到底存哪去了" ✓。**存图片走灯箱那个按钮** ✓（它还会回你一句存哪了 ✓）。 */
+  .row .bubble.media, .row .bubble.media *,
+  .mkrow .mkbub.media, .mkrow .mkbub.media * {
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none;
   }
-  /* ★ **盖上去之后，气泡里原来那层字要藏起来** ✗→✓（2026-10-09）——
-     ⚠️ 不藏的话屏幕上就有**两份字** ✗：文本框里那份 ✓ + 底下气泡里那份 ✓，
-        两者只要差一个像素（字体回退、换行位置 ✓）就会**看着像重影** ✓
-        （或者更糟：底下那份没被选中 ✓，看着像"选了一半" ✓）。
-     ⚠️ 藏的是**子元素**（`> *` ✓）—— 气泡自己不能藏 ✗：它的底色、圆角、
-        还有我刚加的那圈虚线边都在它自己身上 ✓。
-     ⚠️ 反正此刻**只有文本框该被看见** ✓（连引用条一起藏 ✓，
-        因为复制的内容里本来就不含它 ✓ —— 少一个它反而更诚实 ✓）。 */
-  .row .bubble.seltext > *, .mkrow .mkbub.seltext > * { visibility:hidden; }
-  /* ⚠️⚠️ **光藏元素不够** ✗→✓（2026-10-09 用户截图："点击自由复制后，字体还变花了"✓）——
-     纯文字那条消息在 DOM 里是**一个文本节点** ✗（不是元素 ✗），
-     上面那条 `> *` 只匹配**元素** ✓ → 底下那层字**根本没被藏住** ✓ →
-     屏幕上就是**两遍字** ✓（差一两个像素 ✓，所以是"花"的 ✓ 不是重影 ✓）。
-     → 再加一条：**把字变成透明** ✓（`color:transparent` ✓ 对文本节点也管用 ✓，
-       而且会被子元素继承 ✓ —— `!important` 是因为正文里的 `**粗体**`/`` `代码` ``
-       那些是**自己带颜色的元素** ✓，不压一下它们还会露出来 ✓）。
-     ⚠️ 这样"对齐差一两个像素"就**不再是问题**了 ✓ —— 屏幕上只剩文本框那一份字 ✓。 */
-  .row .bubble.seltext, .row .bubble.seltext *,
-  .mkrow .mkbub.seltext, .mkrow .mkbub.seltext * { color:transparent !important; }
-  /* ★ **盖在气泡上的那个真文本框** ✓（`freeCopyBubble` 建的那一个）——
-     它就是"两头能拖的光标 + 系统那排工具"唯一进得去的门 ✓（见那段注释 ✓）。
-     ⚠️ 它必须**看起来和气泡一模一样**：透明底 ✓、同样的字体行高内边距 ✓
-        （那几样是 JS 从气泡身上量出来写上去的 ✓）、同样的颜色 ✓ ——
-        差一点就会在屏幕上**多出一个白框** ✗（用户会以为界面坏了 ✓）。
-     ⚠️ z 57：小卡片(58)之下 ✓、弹层(50)之上 ✓ —— 和"长按那一族"同一条线 ✓。 */
-  #copyfield { position:fixed; z-index:57; margin:0; padding:0; resize:none;
-               overflow:hidden; border:0; outline:0; box-sizing:border-box;
-               background:transparent; -webkit-text-fill-color:currentColor;
-               -webkit-user-select:text; user-select:text; }
   .row.agent .bubble { background:var(--panel); border:1px solid var(--line);
                        border-left:3px solid var(--agent); border-bottom-left-radius:4px; }
   .row:not(.mine):not(.agent) .bubble { border-bottom-left-radius:4px; }
@@ -598,21 +573,23 @@
   .audiobar { min-width:210px; }
   .audiobar audio { width:100%; height:34px; display:block; }
 
-  .msgcard { position:fixed; inset:0; z-index:58; display:none; pointer-events:none; }
-  .msgcard.on { display:block; }
-  .msgcard .box { position:fixed; min-width:132px; background:var(--panel);
-                  border:1px solid var(--line); border-radius:12px; overflow:hidden;
-                  box-shadow:0 12px 32px rgba(0,0,0,.45); pointer-events:auto;
-                  animation:modalIn .14s cubic-bezier(.22,1,.36,1) both; }
-  .msgcard .mi { display:block; width:100%; padding:13px 18px; text-align:left;
-                 font-size:15px; color:var(--text); }
-  .msgcard .mi + .mi { border-top:1px solid var(--line); }
-  .msgcard .mi:active { background:var(--panel2); }
-  #wsChat .mkrow.swiping .swhint { position:absolute; top:50%; left:0;
-                                   transform:translateY(-50%);
-                                   display:flex; align-items:center; gap:4px;
-                                   color:var(--accent); font-size:13px; line-height:1;
-                                   white-space:nowrap; opacity:0; pointer-events:none; }
+  /* ── 右滑引用：跟手 + "松手就引用" ✗→✓（2026-10-11 用户：「将引用变为右滑消息」）──
+     ⚠️ **这块地方原来就是干这个的** ✓（2026-10-07 那版「左右滑可以引用，有那种动态感」✓），
+        2026-10-08 跟着长按卡片一起撤了 ✓（当时的理由是"横滑要腾给进组件界面"✓）——
+        现在引用搬回横滑 ✓，方向改成**只往右** ✓（往左那条永远归"进收纳页"✓，不抢 ✓）。
+
+     ⚠️ **行要跟着手指走一点点** ✗ —— 完全不跟手的话，"滑了但不知道滑到没有" ✓
+        （这个项目最烦的那种"做了像没做"✓）。位移由 JS 给（见 `05-settings.js` ✓）：
+        走一半、封顶在阈值上 ✓。
+     ⚠️ **"松手就成了"这件事由气泡自己说** ✓：过了阈值给它描一圈淡虚线 ✓。
+        描**气泡**而不是描行 ✗ —— 行比气泡宽一截 ✓，
+        描行看着像"选中了整个列表项"✓，不是"引用这一条"✓。
+     ⚠️ 用 `outline` 不用 `border` ✗ —— border 会改尺寸 ✓，
+        在一张正在跟着手滑的列表里，尺寸一变就是"跳一下" ✓。 */
+  .row.swiping, .mkrow.swiping { will-change:transform; }
+  .row.quoteready .bubble, .mkrow.quoteready .mkbub {
+    outline:1px dashed var(--accent); outline-offset:2px;
+  }
 
   /* 头像上**不许选字** ✓ —— 长按头像的活儿是"@ 他" ✓，
      让浏览器顺手把那个字选中了会显得很脏 ✓。 */

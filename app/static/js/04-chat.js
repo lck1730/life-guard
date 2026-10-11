@@ -319,7 +319,10 @@
       // 点管家头像 → 管家设置 ✓（2026-10-06 用户要的 ✓）
       av.onclick = (ev) => {
         ev.stopPropagation();
-        if (pressFired) return;         // 长按引用那一下 ✓，不是点头像 ✓
+        // ⚠️ 措辞改过 ✗→✓（2026-10-11）：原来写的是"长按**引用**那一下"✓ ——
+        //    引用早就不在长按上了 ✓（现在长按头像是 @ 他 ✓、引用是右滑 ✓）。
+        //    留着旧说法，下一个人会照着它去找一个不存在的"长按引用"✓。
+        if (pressFired) return;         // 长按那一下 ✓，不是点头像 ✓
         openAgentSettings();
       };
     } else {
@@ -456,19 +459,23 @@
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
   };
 
-  // ── 长按：头像 → @ 他；气泡 → 小卡片（复制 / 引用）✗→✓（2026-10-08）──
+  // ── 长按：头像 → @ 他；气泡 → **什么都不做**（交给系统）✗→✓（2026-10-11）──
   //
-  // ★ 用户这次定的形状（原话）：「引用的触发回归长按消息，长按消息时会在消息旁边
-  //   弹出一个小卡片，里面暂时有，自由复制和引用，自由复制就是小卡片收起，
-  //   调用系统复制功能，点击引用就是正常引用，小卡片不是在底部，而是在消息旁边，
-  //   类似微信」✓。
+  // ★ 用户这次定的（原话）：「长按消息不再有小卡片，就是默认系统的复制行为」✓。
   //
-  // ⚠️ **这是一次行为回退，得说清楚** ✗：2026-10-07 那次是**故意**把气泡上的长按
-  //    让给浏览器的 ✓（长按选中文字 → 系统那套自由复制 ✓）。现在收回来自己处理 ✓
-  //    —— 换来的是"复制整条 + 引用"两个明确动作 ✓（卡片第一项仍然叫"自由复制"✓，
-  //    只是从"选几个字"变成"复制整条"✓）。用户要的就是这个 ✓。
-  //    代价：气泡里**选不中单个字**了 ✓ —— 所以 CSS 里把长按呼出和选择都关了 ✓
-  //    （`-webkit-touch-callout:none` / `user-select:none` ✓，见气泡那条 ✓）。
+  // ⚠️ **这条改过三次，把来路写清楚** ✗（不然下次又绕回来）：
+  //     · 2026-10-07：长按**让给浏览器** ✓（选中文字 → 系统那套自由复制 ✓）
+  //     · 2026-10-08：**收回来自己处理** ✓ —— 弹一张小卡片（自由复制 / 引用 ✓），
+  //       为此把 CSS 里气泡的选择整个关掉了 ✓
+  //     · 2026-10-11（现在）：**卡片整个不要了** ✓ —— 回到第一天那个样子 ✓。
+  //   之所以现在能回去：**引用搬到了右滑** ✓（见 `05-settings.js` ✓），
+  //   长按这条不用再替它扛着了 ✓。
+  //
+  // ⚠️ 下面那个分支里**故意什么都不做** ✗ —— 看着像"把代码删空了" ✓，
+  //    其实**这个空就是那个功能本身** ✓：气泡的 CSS 已经把
+  //    `user-select` / `-webkit-touch-callout` 打开了 ✓（见 app.css 那段 ✓），
+  //    长按自然就出系统那排（选中 + 复制/全选/搜索 ✓），拦不拦都一样 ✓。
+  //    ⚠️ **别在这儿补 `preventDefault`** ✗ —— 补了就等于又把它关回去 ✓。
   const onPressStart = (e) => {
     if (!e.target.closest) return;
     const row = e.target.closest('#msgs .row[data-id]');
@@ -479,12 +486,9 @@
     pressTimer = setTimeout(() => {
       pressTimer = null;
       pressFired = true;
-      if (onAvatar) atFromRow(row);       // 头像 → @ 他 ✓（这一条没变 ✓）
-      // ★ **这一条刚点过"自由复制"** → 它的长按**归系统** ✓（2026-10-09）——
-      //   系统那排（复制/全选/搜索…）就是他此刻要的东西 ✓，
-      //   我们再弹一张卡片只会挡着它 ✓（而且他也没法"再复制一次" ✓）。
-      else if (row.querySelector('.bubble.seltext')) { /* 让给系统 ✓ */ }
-      else openMsgCard(row);              // 气泡 → 小卡片 ✓
+      // ★ **只剩头像这一条了** ✓ —— 它不是"消息那张卡片" ✓，
+      //   而且 @ 这件事**没有别的手势替得了** ✓（右滑已经被引用占了 ✓）。
+      if (onAvatar) atFromRow(row);
     }, PRESS_MS);
   };
 
@@ -499,234 +503,34 @@
     toast('已 @ ' + nm);
   };
 
-  // ── ⚠️ **左右滑引用整个撤了** ✗→✓（2026-10-08）────────────────────────
+  // ── ★ **引用：右滑一条消息** ✗→✓（2026-10-11 用户：「将引用变为右滑消息」）──
   //
-  //   它在这儿待过两天（判据、阻尼、"↩ 引用"那个提示条 ✓，都挺好看 ✓），
-  //   但它**和用户要的东西冲突** ✗：
-  //     · 引用改成长按了 ✓ → 这个手势就没人用了 ✓
-  //     · 更关键的是**横滑要腾出来** ✓ ——「组件界面」是**左滑进、右滑出** ✓（P7 ✓），
-  //       而消息级的横滑会跟它抢同一个方向 ✓（同一个手指、同一个屏幕 ✓）。
-  //   ⚠️ 所以这一条**不能单独上线** ✗：撤掉它就必须同时把长按卡片接上 ✓
-  //      （不然"引用"这个功能会消失 ✓）—— 这就是这两件事绑在一次的原因 ✓。
+  //   它 2026-10-07 在这儿待过两天 ✓（判据、阻尼、"↩ 引用"那条提示都挺好看 ✓），
+  //   2026-10-08 撤掉换成了长按卡片 ✓ —— 当时的理由是"横滑要腾给进组件界面"✓。
+  //   现在长按那条不要了 ✓ → 引用搬回横滑 ✓，但**只往右** ✓：
+  //     · 往**左**永远归「进组件界面」✓（2026-10-09 用户点名"不能到处出现"✓）——
+  //       一左一右**方向相反** ✓，所以两边**不抢** ✓（这是它能回来住下的前提 ✓）。
+  //     · 往**右**在群聊上**本来是空的** ✓（引擎里那条只认 wall/comp ✓，也就是"往回退"✓），
+  //       现在归引用 ✓。
   //
-  //   （`.swhint` / `.swiping` 那几条 CSS 也一起删了 ✓ —— 留着是死代码 ✓。）
+  //   ⚠️ 具体实现在**不在这儿** ✗ —— 它接进了 `05-settings.js` 那台手势引擎 ✓
+  //      （左滑进收纳页、下拉进对话、"继续左滑…"那条跟手提示，**全在那一处** ✓）。
+  //      "手势的大脑"只能有一台 ✓ —— 两处各接一套，迟早互相抢 ✓，
+  //      或者只有一处知道"屏幕上现在是什么"✓（这个项目为"同一件事两处实现"栽过好几次 ✓）。
+  //      这边只出两样 ✓：`quoteChatMsg`（把一条消息变成引用 ✓），
+  //      以及 `.row` 上那点跟手位移要用的类名 ✓。
 
-  // ── 消息旁边的小卡片（微信那种 ✓）────────────────────────────────────
-  //
-  // 定位：贴着气泡 ✓，优先放**上面** ✓，上面放不下翻到下面 ✓，
-  //       水平跟着气泡中线走、再夹进视口 ✓。
-  // 收起：点别处 ✓、滚动 ✓、安卓返回键 ✓（`__goBack` ✓）。
-  //
-  // ⚠️ 它**不是从底部弹的** ✗ —— 用户点名了这一点 ✓（底部弹的是 `+` 那个 sheet ✓，
-  //    两件事没关系 ✓）。
-  let msgCardM = null;          // 卡片正对着哪条消息 ✓（复制/引用要用 ✓）
-  let msgCardOpenedAt = 0;      // 刚弹出来的那一瞬间，别被"紧接着那次 click"关掉 ✓
-
-  const closeMsgCard = () => {
-    const c = $('#msgcard');
-    if (!c || !c.classList.contains('on')) return;
-    c.classList.remove('on');
-    msgCardM = null;
-  };
-
-  // ⚠️ **收起的三条路**（用户没点名 ✓，但不开就是"卡片关不掉"✗）：
-  //    点别处 ✓、滚动 ✓、返回键（`__goBack` ✓）。
-  //
-  //    ⚠️ 用"刚弹出来 350ms 内不关"来挡长按那一下**自带的 click** ✗→✓ ——
-  //       长按触发之后浏览器仍会补一次 click ✓（和头像那个 `pressFired` 是同一个现象 ✓）。
-  //       用时间窗比用标志位稳 ✓：不依赖两个事件的先后 ✓。
-  document.addEventListener('click', (ev) => {
-    // ★ **点别处（或者点那一段文字自己）→ 自由复制那个状态就结束** ✗→✓
-    //   （2026-10-09 用户定的：「**复制完或者点击空白后，自由复制状态就改结束了**」✓）
-    //   ⚠️ 放在这一支里是因为**它的判据正好是"点在别处"** ✓（点卡片里不算 ✓）。
-    //      它比下面那个"关卡片"的判断**更宽** ✓ —— 卡片早就关了的时候，
-    //      这个状态还挂着 ✓，正是上一版"再也弹不出小卡片"的成因 ✓。
-    // ⚠️ **那个复制文本框里的一下也不算"点别处"** ✗→✓ —— 他要在里面
-    //    **按住、拖两头的光标** ✓；那几下都会冒泡成 click ✓ →
-    //    不豁免的话，**一碰就把它自己收掉了** ✗（那这功能就没法用了 ✓）。
-    if (ev.target.closest && (ev.target.closest('#msgcard') ||
-                              ev.target.closest('#copyfield'))) return;
-    endFreeCopy();
-    const c = $('#msgcard');
-    if (!c || !c.classList.contains('on')) return;
-    if (Date.now() - msgCardOpenedAt < 350) return;
-    closeMsgCard();
-  }, true);
-  $('#msgs').addEventListener('scroll', () => { closeMsgCard(); endFreeCopy(); }, { passive: true });
-  // ★ **他点了系统那排的"复制"** → 这一趟就完事了 ✓（收尾 ✓）。
-  //   ⚠️ 这是"复制完了"唯一的可观测信号 ✓ —— 系统那排工具是**它自己**的 ✓，
-  //      我们既叫不出来也收不回去 ✓，只能等这个 `copy` 事件 ✓
-  //      （点"全选""搜索"那几个不会有 ✓，那种情况归"点别处/滚动"那两条 ✓）。
-  document.addEventListener('copy', () => { endFreeCopy(); });
-
-  const openMsgCard = (row, opts) => {
-    const m = opts && opts.get ? opts.get(row) : _msgs.get(Number(row.dataset.id));
-    if (!m) return;
-    msgCardOpenedAt = Date.now();
-    // ⚠️ **把上一条"交给系统选择"的状态收回来** ✗→✓（2026-10-09）——
-    //    那一条现在长按归系统 ✓（见 `freeCopyBubble` 和 `onPressStart` 里那一支 ✓）；
-    //    不收的话，他复制完 A、又长按 B 弹出卡片 ✓，而 A 从此**永远弹不出卡片** ✗
-    //    （只剩"系统选择"一种行为 ✓ —— 那种"某条消息跟别的不一样"最难解释 ✓）。
-    $$('#msgs .bubble.seltext').forEach(x => x.classList.remove('seltext'));
-    const card = $('#msgcard'), box = card.querySelector('.box');
-    msgCardM = m;
-    box.textContent = '';
-    const mk = (label, fn) => {
-      const b = mkel('button', 'mi', label);
-      b.onclick = () => { closeMsgCard(); fn(); };
-      return b;
-    };
-    // ⚠️ 允许调用方**自己给两项** ✓ —— 组件格子那个卡片用的是同一套壳 ✓
-    //    （同一个组件、同一套定位 ✓），它要的两项是「和它对话」而不是复制/引用 ✓。
-    //    不给 `items` 就是默认那两项 ✓（消息那边 ✓）。
-    if (opts && opts.items) {
-      opts.items.forEach(([label, fn]) => box.appendChild(mk(label, fn)));
-      msgCardPlace(row, card, box, opts);
-      return;
-    }
-    box.appendChild(mk('自由复制', () => freeCopyBubble(row)));
-    box.appendChild(mk('引用', () => {
-      if (opts && opts.quote) opts.quote(m); else setQuote(m);
-    }));
-
-    msgCardPlace(row, card, box, opts);
-  };
-
-  /**
-   * ★ **「自由复制」= 在气泡上盖一个真的文本框** ✗→✓（2026-10-09 第三次改这条 ✓）。
+  /** ★ **把一条消息变成"引用"** ✗→✓（2026-10-11）—— 右滑那条手势唯一的落点 ✓。
    *
-   *   他截图上看到的：点完之后**只有一层高亮** ✓ —— 两头没有可以拖的光标 ✗、
-   *   系统那排工具也没出来 ✗，原话「**现在啥也不是**」✓。
-   *
-   *   ⚠️ **为什么高亮有、手柄没有** ✗（这次是实测出来的，不是猜 ✓）：
-   *      `user-select:text` + 程序化 `Selection` 只让浏览器**把字画成选中** ✓；
-   *      而"两头那两个可以拖的光标 + 复制/全选那排"是**安卓给"正在编辑的
-   *      文本框"画的东西** ✓ —— 它只跟着**表单控件**走 ✗，对普通元素的选中
-   *      **一个手柄都不给** ✓（上一版就是这么凉的 ✓）。
-   *
-   *   → 所以做法换成：**在气泡上面盖一个真的 `<textarea>`** ✓，
-   *     里面的字和气泡里一模一样 ✓（同一套字体/行高/内边距/颜色 ✓，透明底 ✓），
-   *     `focus()` 之后整段选中 ✓ → 安卓就把它当"一个正在编辑的输入框" ✓ →
-   *     **两头的手柄 + 系统那排自己就出来了** ✓✓（这次是它**该**出现的场合 ✓）。
-   *
-   *   ⚠️ `inputmode="none"` 是**必须的** ✗ —— 不写的话，focus 一个可编辑文本框
-   *      会把**软键盘顶上来** ✓（屏幕直接废一半 ✓）。它只说"别弹键盘" ✓，
-   *      不影响选中和手柄 ✓。
-   *   ⚠️ 盖的位置 = **气泡那一段的矩形** ✓；点别处 / 滚动 / 复制完 / 按返回
-   *      都要收掉 ✓（同一个 `endFreeCopy` ✓）—— 它是 `position:fixed` 的 ✓，
-   *      不收就会**跟着屏幕不动** ✗：列表一滚，它就"浮"在别处 ✓。
+   *  ⚠️ 找不到就**什么都不做** ✗ —— 右滑引用的是**手里那条** ✓；
+   *    万一 `_msgs` 里没有它（理论上不会 ✓），宁可没反应 ✓，
+   *    也不能引用到"上一条碰过的消息"✓（那种错他根本没法察觉 ✓）。
    */
-  const freeCopyBubble = (row) => {
-    const bub = row.querySelector('.bubble') || row;
-    // 文字**不含引用条** ✓ —— 引用条是"上一句是什么"的提示 ✓，
-    // 不是这条消息的内容 ✓（连它一起复制出来，粘到别处就是一堆莫名其妙的字 ✓）。
-    const text = [...bub.childNodes]
-      .filter(n => !(n.nodeType === 1 && n.classList && n.classList.contains('quote')))
-      .map(n => n.textContent).join('').trim();
-    if (!text) return;                       // 空的（纯图片那种）→ 别开 ✓
-    endFreeCopy();
-    // ★★ **颜色必须在「藏字」之前量** ✗→✓（2026-10-09 用户报的：
-    //   「为啥字体是黑色，**光标不选中时，其他文字直接看不见了**」✓）
-    //   ⚠️ 因为「藏字」那一招就是**把这一条的字变成透明** ✓
-    //     （`color:transparent !important` ✓，见 CSS 那段 ✓）——
-    //     而我把这一步放在了**量颜色之前** ✗ → `getComputedStyle` 量到的
-    //     是 `rgba(0,0,0,0)` ✓✓ → 原样抄给文本框 ✓ → **文本框里的字是透明的** ✗ →
-    //     屏幕上只剩「被选中那一段」（选区自己有底色 ✓）看得见 ✓
-    //     —— 他描述得一字不差 ✓。**先量、后改** ✓，这条对任何「量了再动手」都成立 ✓。
-    const r = bub.getBoundingClientRect();
-    const cs = getComputedStyle(bub);
-    const ta = document.createElement('textarea');
-    ta.id = 'copyfield';
-    ta.value = text;
-    ta.readOnly = false;                     // ⚠️ **不能设 readonly** ✗ —— 只读的
-                                             //    文本框在有些 WebView 上**不给手柄** ✓
-                                             //    （那正是我们要的东西 ✓）；键盘靠
-                                             //    `inputmode=none` 挡 ✓，不靠只读 ✓。
-    ta.setAttribute('inputmode', 'none');
-    ta.setAttribute('spellcheck', 'false');
-    ta.setAttribute('autocapitalize', 'off');
-    ta.setAttribute('autocomplete', 'off');
-    ta.style.left = Math.round(r.left) + 'px';
-    ta.style.top = Math.round(r.top) + 'px';
-    ta.style.width = Math.round(r.width) + 'px';
-    ta.style.height = Math.round(r.height) + 'px';
-    // 把气泡那身字**原样搬过来** ✓ —— 差一点都会看出来（多出一个白框就完了 ✓）
-    ta.style.font = cs.font;
-    ta.style.lineHeight = cs.lineHeight;
-    ta.style.padding = cs.padding;
-    ta.style.borderRadius = cs.borderRadius;
-    ta.style.color = cs.color;
-    // ⚠️ **`-webkit-text-fill-color` 才是 WebKit 里真正决定字色那个** ✗→✓ ——
-    //    只写 `color` 的话可能被别处的 fill 盖住 ✓（本页里就有一条 ✓，见 CSS ✓）。
-    ta.style.webkitTextFillColor = cs.color;
-    ta.style.textAlign = cs.textAlign;
-    // ★★ **`getComputedStyle` 返回的东西是「活的」** ✗→✓（2026-10-09，第二次栽在这条上）——
-    //   上面那句 `const cs = getComputedStyle(bub)` 只是**拿了个句柄** ✓，
-    //   真正读 `.color` 是在**下面这几行** ✗ —— 而那会儿我**已经把 `.seltext`
-    //   加上了** ✓（那一加就把字变透明 ✓，见 CSS ✓）→ 读出来的还是**透明** ✗✓
-    //   （所以我"把测量挪到前面"那一版**一点用没有** ✓：挪的是**取句柄**那一步 ✗）。
-    //   → 现在把 `classList.add('seltext')` 挪到**所有样式都抄完之后** ✓：
-    //     它只影响气泡自己的观感 ✓（虚线边 / 藏字 ✓），不影响版面 ✓
-    //     （`outline` 不占位置 ✓），所以晚一点加完全等价 ✓。
-    document.body.appendChild(ta);
-    bub.classList.add('seltext');            // 一圈虚线边 = 它现在在可复制状态 ✓
-    // ⚠️ 焦点+全选：**这是"叫出手柄"的全部** ✓（顺序不能反 ✓）。
-    // ⚠️⚠️ **一次不够** ✗→✓（2026-10-09 用户实测："也没出现光标啊，必须手点一下才可以"✓）——
-    //    刚 append 的元素**还没排过版** ✓，有些 WebView 这一下不吃焦点 ✗
-    //    → 光标不出来 ✓、手柄当然也不出来 ✓，得他自己点一下才成 ✓。
-    //    所以：**先强制一次排版** ✓，再聚焦一次 ✓；
-    //    然后**隔一帧再补一次** ✓（那一帧之后元素是真的在屏幕上了 ✓）。
-    const grab = () => {
-      try {
-        ta.focus({ preventScroll: true });
-        ta.setSelectionRange(0, ta.value.length);
-      } catch (e) { /* 叫不出来也还留着可长按的状态 ✓ —— 他按住那段字照样能出 ✓ */ }
-    };
-    void ta.offsetHeight;                 // ★ 强制排版（就这一行治"光标不出来"✓）
-    grab();
-    setTimeout(grab, 60);                 // ★ 再补一枪 ✓
-    // 焦点一走（点别处）→ 收掉 ✓
-    ta.onblur = () => setTimeout(() => { if (document.activeElement !== ta) endFreeCopy(); }, 0);
+  const quoteChatMsg = (id) => {
+    const m = _msgs.get(Number(id));
+    if (m) setQuote(m);
   };
 
-  /**
-   * **结束"自由复制"那个状态** ✓ —— 用户原话：
-   *   「复制完或者**点击空白后，自由复制状态就改结束了**」✓。
-   *
-   *   ⚠️ 上一版**漏了这一半** ✗：状态挂上就再也没摘过 ✓ →
-   *      那条消息**从此长按只出系统那排、再也不出我们的小卡片** ✗。
-   *   ⚠️ 所以三件事一起做 ✓：收掉那个文本框 ✓、摘掉虚线边 ✓、
-   *      清掉浏览器那层高亮 ✓（只收文本框不清选择的话，屏幕上还留着一片蓝 ✗）。
-   */
-  const endFreeCopy = () => {
-    const f = $('#copyfield');
-    if (f) f.remove();
-    let any = false;
-    $$('#msgs .bubble.seltext, .mkrow .mkbub.seltext').forEach(el => {
-      el.classList.remove('seltext');
-      any = true;
-    });
-    if (any) {
-      try { window.getSelection().removeAllRanges(); } catch (e) { /* 没有就算了 ✓ */ }
-    }
-  };
-
-  /** 把小卡片摆到**锚点旁边** ✓（默认锚点是气泡 ✓，可以指定别的 ✓）。 */
-  const msgCardPlace = (row, card, box, opts) => {
-    card.classList.add('on');
-    const sel = (opts && opts.anchorSel) || '.bubble';
-    const anchor = row.querySelector(sel) || row;
-    const r = anchor.getBoundingClientRect();
-    const cw = box.offsetWidth, ch = box.offsetHeight;
-    let left = r.left + r.width / 2 - cw / 2;
-    left = Math.max(8, Math.min(left, window.innerWidth - cw - 8));
-    let top = r.top - ch - 10;
-    if (top < 8) top = Math.min(r.bottom + 10, window.innerHeight - ch - 8);
-    box.style.left = Math.round(left) + 'px';
-    box.style.top = Math.round(top) + 'px';
-  };
-
-  window.__closeMsgCard = closeMsgCard;
 
   $('#msgs').addEventListener('touchstart', onPressStart, { passive: true });
   // 手指一动就是在滚动，不是长按——**必须取消** ✓，否则滑列表会到处误弹 ✓
