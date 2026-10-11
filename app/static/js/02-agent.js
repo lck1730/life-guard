@@ -505,6 +505,11 @@
     //   原来它不在这个表里 ✗ → 返回键落到原生那个"再滑一次退出 App" ✓ →
     //   用户的感觉是"进退两难" ✓（他报的就是这个 ✓）。
     if ($('#init').classList.contains('on')) { location.href = '/login'; return; }
+    // ★ **模型池那一屏** ✗→✓（2026-10-11）—— 它从设置页推出来 ✓，
+    //   排在**设置之前** ✓（从哪进来就按哪儿的顺序退 ✓，和别的屏一个规矩 ✓）。
+    //   ⚠️ 原来这一支**没有** ✗ —— 在模型页按返回会**落到设置页那一支** ✓，
+    //     把设置关掉 ✓ → 用户看到的是"退多了" ✓（本该回到设置，结果回到了群聊 ✓）。
+    if ($('#models').classList.contains('on')) { popScreen('models'); return; }
     if ($('#settings').classList.contains('on')) { closeSettings(); return; }
     // ⚠️ `#login` / `#init` **刻意不列在这儿** ✗ —— 它们是**根屏** ✓：
     //   在它们上面按返回键，该走原生那条"再滑一次退出 App" ✓。
