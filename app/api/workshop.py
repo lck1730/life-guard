@@ -83,6 +83,7 @@ from ..agent.agent import (
     _group_profile,
     _image_parts,
     _looks_like_leaked_reasoning,
+    _strip_leaked_thinking,
     _stream_completion,
     diy_session_id_for,
     diy_persona,
@@ -762,6 +763,12 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
         #      而工坊**从来没接上** ✗ —— 于是这种"天书"会被原样当成回答存下来 ✓，
         #      用户看到的就是一坨工具调用 ✓（正是他贴的那段 ✓）。
         #   → 补一轮，让它**直接说话** ✓（和群聊同一句话 ✓，改一处两边一起变 ✓）。
+        # ★ **先切掉挂在回答前面的自言自语** ✗→✓（2026-10-11，和群聊那条同一个函数 ✓）——
+        #   ⚠️ 工坊这边**一样会中** ✗：模型只产推理、正文空的时候，
+        #      Hermes 会把推理提升成最终回复 ✓，而它不分你是哪条会话 ✓。
+        #   ⚠️ 放在 `_looks_like_leaked_reasoning` **之前** ✓ —— 先切、再判 ✓
+        #      （切完还是天书的话，那道照样兜住 ✓）。
+        answer = _strip_leaked_thinking(answer)
         if answer and _looks_like_leaked_reasoning(answer):
             log.warning("工坊：这一轮只吐出了思考过程（用户看到的是天书），补一轮 ✓ "
                         "group=%s task=%s", group_id, task_id)

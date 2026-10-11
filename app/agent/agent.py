@@ -188,6 +188,71 @@ _SILENT_MARKERS = {"[silent]", "silent", "no_reply", "[静默]", "静默", "[沉
 _LEAKED_REASONING_MARKS = ("<dots_function_call>", "<invoke name", "</invoke>", "<parameter name")
 
 
+#: ★ **"这段像是在自言自语"的开头** ✗→✓（2026-10-11 用户：
+#:   「思考泄露是主要的不良体验来源」✓）。
+#:
+#: ⚠️ 这是**第二个形状** ✗ —— 上面那几个 marks 认的是"工具调用文本" ✓，
+#:    而这次漏出去的是一整段**英文推理** ✓。Hermes 的日志写得很清楚：
+#:      `Reasoning-only clean stop (246 chars) — returning the reasoning as the final response`
+#:    也就是：模型这一轮**正文是空的、只有推理** ✓，
+#:    Hermes 有个兜底把推理**提升成最终回复** ✓（它的注释说那是给某些推理解析器兜底的 ✓），
+#:    我们照单全收 → 用户就看见一段自言自语 ✓。
+#:
+#: ⚠️ **收得很窄** ✗ —— 宁可漏，不可错杀：只在**句首**认（`startswith` ✓），
+#:    不是"文中出现过" ✓。漏判的后果是"偶尔漏出去一段"✓；
+#:    错杀的后果是"一句正常的话被吞掉"✗ —— 前者轻得多 ✓。
+_LEAKED_THINKING_OPENERS = (
+    "the user is asking", "the user wants", "the user said", "the user seems",
+    "the user just", "i should ", "i need to ", "i'll ", "i will ",
+    "let me ", "looking at", "since the user", "the question is",
+    "so i ", "now i ", "okay, ", "alright, i", "i don't have a ",
+)
+
+#: 中文字（含扩展区）—— 用来判断"从哪儿开始才是在跟他说话" ✓
+_CJK_RE = re.compile(r"[㐀-䶿一-鿿豈-﫿]")
+
+
+def _opens_like_thinking(s: str) -> bool:
+    return s.strip()[:120].lower().startswith(_LEAKED_THINKING_OPENERS)
+
+
+def _strip_leaked_thinking(text: str) -> str:
+    """把**挂在回答前面的那段自言自语**切掉 ✓；整条都是自言自语就返回空串 ✓。
+
+    ⚠️ **为什么是"切"、不是"丢掉重来"** ✗ —— 实测那次：自言自语后面
+      **跟着一句完全正常的回答** ✓（「好啊，发吧。不过我这边没有存什么图…」✓）。
+      整条丢掉再补一轮 = 把一句好话扔了 ✓ + 多花一次调用 ✓ +
+      下一轮它很可能又这么来一次 ✓。**切掉前面那段，好话原样留下** ✓。
+
+    ⚠️ 判据**两条同时成立才动手** ✗：
+      ① 开头是"我在想"的口吻（英文）✓
+      ② 后面出现了中文 ✓ —— 也就是"他从某个字开始才是在跟你说话" ✓
+         对一个中文用户，**开口先来一段英文计划**是不正常的 ✓。
+
+    ⚠️ **它和 `_looks_like_leaked_reasoning` 是两件事** ✗：
+      那道管"**整条都不是人话**"（→ 补一轮 ✓）；
+      这道管"**人话前面挂了半段自言自语**"（→ 切掉就行 ✓）。
+      调用顺序是**先切、再判** ✓ —— 切完还是天书的话，那道照样兜住 ✓。
+    """
+    t = (text or "").strip()
+    if not t:
+        return t
+    m = _CJK_RE.search(t)
+    if m is None:
+        # 整条一个中文字都没有。
+        # ⚠️ 它**可能**真是在用英文回（罕见 ✓ 放过）——
+        #    只有确定是"我在想"的口吻，才当"这轮没说出话来"（空串 ✓）。
+        return "" if _opens_like_thinking(t) else t
+    head = t[:m.start()].strip()
+    if head and _opens_like_thinking(head):
+        # ⚠️ **切掉的那段要记一笔** ✓ —— 切错了得能查。
+        #    这是整条链上**唯一一处"改它说的话"**的地方 ✓，
+        #    所以原文必须进日志 ✓（这个项目为"静默改坏"栽过 ✓）。
+        log.warning("切掉了一段挂在回答前面的自言自语（%d 字）：%.150s", len(head), head)
+        return t[m.start():].strip()
+    return t
+
+
 def _looks_like_leaked_reasoning(text: str) -> bool:
     return any(m in text for m in _LEAKED_REASONING_MARKS)
 
@@ -393,6 +458,15 @@ async def _group_persona(group_id: int) -> str:
         "SELECT agent_user_prompt FROM groups WHERE id = ?", (group_id,)) or {}
     ).get("agent_user_prompt"))
 
+    # ★★ **"上网查"这一条挪过位置** ✗→✓（2026-10-11）——
+    #   原来它写在**"做不了、别去试"**那一栏 ✓，而事实是**它一直有个能用的
+    #   `web_search`** ✓（`platform_toolsets.api_server` 里有 `web` ✓，
+    #   我们自己开的 ✓）。实测它 1.7 秒就查回了西安的天气 ✓ ——
+    #   也就是说：**那条清单和事实是反的** ✗。
+    #   ⚠️ 教训写在这儿，别再犯：**能力边界要用"有没有这个工具"来划** ✗ ——
+    #      写一句"你做不了"是拦不住一个手边就有工具的东西的 ✓
+    #      （它照样试了，而且成了 ✓）。用户 2026-10-11 定了：**留着** ✓。
+    #
     # ★ **他给你设的性格**（原来是「给管家的话」✓，界面上一直就叫「性格」✓）——
     #   ⚠️ 空的时候**要如实说"还没有"** ✗→✓，不能整段不出现 ✓：
     #      "没设过"和"设过但没说"是两件事 ✓；而且用户要的正是
@@ -431,9 +505,9 @@ async def _group_persona(group_id: int) -> str:
         "· **提醒** —— 到点我来跟你说 ✓\n"
         "· **聊天** —— 陪他们说话、接话、出主意 ✓\n"
         "· **看图** —— 他们发的图你看得见 ✓\n"
+        "· **上网查** —— 天气、新闻、查个什么东西都行 ✓\n"
         "\n"
         "## 现在做不了的（**别去试** ✗）\n"
-        "· 上网查资料 —— 还没弄好，先不接 ✓\n"
         "· 打电话、开别的 App 这类外部动作 —— 不支持 ✓\n"
         "· 生成图片 / 视频 / 语音 —— 还得看模型，先不接 ✓\n"
         "· **写代码、做界面** —— 那是**创意工坊里「diy 助手」的活** ✓，\n"
@@ -933,6 +1007,11 @@ async def run_turn(
         return
 
     text = "".join(collected).strip()
+
+    # ★ **先把"挂在回答前面的那段自言自语"切掉** ✗→✓（见 `_strip_leaked_thinking` 那段 ✓）。
+    #   ⚠️ 顺序是**先切、再判** ✗ —— 切完如果整条还是天书，
+    #      下面那道 `_looks_like_leaked_reasoning` 照样会兜住 ✓。
+    text = _strip_leaked_thinking(text)
 
     # ★ **只吐了思考？补一轮"只说结论"。**
     # 见文件上方 `_LEAKED_REASONING_MARKS` 那段说明：这是 Hermes 故意放行的
