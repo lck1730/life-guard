@@ -28,6 +28,7 @@ import logging
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -511,6 +512,145 @@ async def send_image(body: SendImageIn) -> dict:
 # 所以收尾这一步**不能靠会话推** ✗ —— 票里存着群号 ✓，从票拿 ✓。
 # 这一步顺手把"子代理认不出群"那个风险整个绕开了 ✓。
 
+
+#: 一版 HTML 的上限 ✓ —— 和 `components_save` 收暂存文件时**同一个数** ✗✓。
+#: ⚠️ 改这里要一起改 `main.py` 的 `component_render` 里那个截断 ✗ ——
+#:    它是读文件的兜底 ✓，不在同一个模块 ✓。
+_HTML_MAX = 400_000
+
+
+#: ★ 导入的**硬校验** ✗→✓ —— 用户 2026-10-11：「导入新版本时需要先经过校验，
+#:   校验成功才能应用，校验失败会让 diy 助手提示导入数据不可用」。
+#:
+#: ⚠️ **必须在这里判，不能只靠前端** ✗ —— 这个接口认的是登录 + 成员 ✓，
+#:    绕过去就是**把一段 HTML 直接写进组件仓库** ✓，而组件会被
+#:    **渲染到群里每一个人的手机上** ✓（沙箱不透明源 ✓，所以不是执行注入 ✓，
+#:    但一份写满外链的页面会让每个成员的组件页变白 ✗）。
+#:
+#: 三条，都是「过了就一定没问题」的 ✓ —— 不做靠不住的静态推断 ✗：
+#:   ① 非空 + 大小上限
+#:   ② 有 `<html>` 或 `<body>` —— 没有的就是一段散文本 ✓，渲染出来一块白 ✗
+#:   ③ **自包含** —— 组件跑在 `sandbox="allow-scripts"` 的 iframe 里 ✓（不透明源 ✓），
+#:      外部资源**一个都取不到** ✓。所以外链不是"可能失效"，是**一定失效** ✓。
+#:      从网上抄一份 HTML 是最容易踩的 ✗（`<script src="cdn…">` 满天飞 ✗）。
+#
+# 每条**分别报出来** ✗→✓ —— 用户看到的是"哪一条不行" ✓，不是"数据不可用" ✗。
+# ⚠️ 这些正则是**故意的宽** ✗：只认属性值里的外链 ✓，不猜正文里提到的网址 ✓
+#   （一份组件的说明文字里提个网址，不该被当成外链 ✗）。
+#: 每条一个，分别报出来 ✓（见 `_HTML_EXT_RULES` 那段 ✓）。
+# ⚠️ 全部**只认属性值** ✗ —— 正文里提到一个网址，不该被当成外链 ✗。
+# 反斜杠用 B() 拼出来 ✓ —— 不写裸转义，省得被传输层改坏 ✗。
+B = chr(92).__add__
+_QC = "'" + '"'                       # 两种引号，同一个字符类
+_WS = B("s")
+_SRC = "src" + B("b") + _WS + "*?="
+_HREF = "href" + B("b") + _WS + "*?="
+_VOPEN = _WS + "*?[" + _QC + "]"      # = 之后的空白 + 开引号
+_PR = "//" + "([^" + _QC + "/]|" + "$)"          # 协议相对：//，且后面不是又一个 /
+_ABS = "/" + "(?![/" + _QC + "])"               # 绝对路径：/，且不是 //
+_REMOTE = "(?:" + "https?:" + "|" + _PR + ")"   # 两种"指向外面"的开头
+
+#: ⚠️ 每条规则都是**两段独立分支** ✗→✓ —— 不写成"先匹配属性名、再匹配值"
+#:   这种共用 `_ATTR` 的形状 ✗：`|` 是**正则的或**，一旦把它塞进外层分组，
+#:   分组会在第一个 `=` 之后就闭合，整条就变成另一个意思了 ✗（实测过，
+#:   连 `src='/static/a.png'` 都会被误判成外部地址 ✗）。
+#:   分支独立，`https?:` 和 `//` 各跟自己那支属性走 ✓。
+_RE_LINK_CSS = re.compile("<link" + _WS + "*?rel" + _WS + "*?=" + _WS + "*?["
+                          + _QC + "]stylesheet", re.I)
+_RE_SCRIPT_SRC = re.compile("<script" + _WS + "*?" + _SRC + _VOPEN, re.I)
+_RE_IMPORT = re.compile("@import", re.I)
+_RE_URL_ABS = re.compile(_SRC + _VOPEN + _REMOTE + "|" + _HREF + _VOPEN
+                         + _REMOTE, re.I)
+_RE_PATH_ABS = re.compile(_SRC + _VOPEN + _ABS + "|" + _HREF + _VOPEN + _ABS,
+                          re.I)
+
+_HTML_EXT_RULES = (
+    (_RE_LINK_CSS,  "里面链了外部样式表（link rel=stylesheet）"),
+    (_RE_SCRIPT_SRC, "里面引了外部脚本（script src=…）"),
+    (_RE_IMPORT,    "CSS 里有 @import"),
+    (_RE_URL_ABS,   "里面用了外部地址（http:// 或 //）"),
+    (_RE_PATH_ABS,  "里面用了站点内的绝对路径（src=/… 或 href=/…）"),
+)
+
+
+def _validate_component_html(html: str) -> str:
+    """导入前校验 ✓ —— 返回**空串 = 通过** ✓，返回原因 = 不通过 ✗。
+
+    ⚠️ **只判断"这份能不能在这个沙箱里跑"** ✗，不判断"好不好看" ✗ ——
+       后者不是校验能给的 ✓，让 diy 助手去说 ✓。
+    """
+    h = (html or "").strip()
+    if not h:
+        return "导入的内容是空的"
+    if len(h) > _HTML_MAX:
+        return ("太大了（" + str(len(h)) + " 字符，上限 "
+                + str(_HTML_MAX) + "）。拆小一点，或者只导出那一部分。")
+    if "<html" not in h.lower() and "<body" not in h.lower():
+        return "这不是一份完整的页面（找不到 html 或 body 标签）"
+    for pat, why in _HTML_EXT_RULES:
+        if pat.search(h):
+            return why
+    return ""
+
+
+#: **一个组件在仓库里只留几版** ✓ —— 用户 2026-10-11：
+#:   「单纯为了回档，只需要留最新的两个版本，加上当前用的统共三个版本，这是默认的」✓。
+#:   ⚠️ **别做成可配置** ✗ —— 上限的意义就是"不用再想" ✓；做成开关就变成了
+#:   每个群各自一个数字，然后很快就有人问"为什么我的是五个" ✗。
+_VERSIONS_KEEP = 3
+
+
+#: ⚠️ **删盘之前先删库** ✗→✓ —— 反过来（先删盘、再删库）如果删库失败，
+#:   仓库里少了一版而库还说它有 ✓ → 列表是从库读的 ✓ →
+#:   用户点进去是一个**空组件** ✗（比多留一个盘上目录糟得多 ✗）。
+#:   删库先失败的话，盘上多留个目录 ✓ —— 那是**多留**，不是丢东西 ✓。
+#:   ⚠️ 库删了、盘删失败 = 留个死目录 ✓：版本号只增 ✓ →
+#:      那个版本号不会再来 ✓，所以它**不影响任何功能** ✓。
+async def _prune_component_versions(group_id: int, slug: str,
+                                    keep: int = _VERSIONS_KEEP) -> list[int]:
+    """只留**最新的** `keep` 版 ✓，老的连库带盘一起收掉 ✓。
+
+    返回被收掉的版本号（空 = 本来就没超 ✓）。
+    ⚠️ 只该在**刚落成一版**的时候顺手收一次 ✓ —— 别拿它当"清理工具" ✗：
+       它会**真的删文件** ✓。
+    """
+    rows = await fetch_all(
+        "SELECT version FROM components WHERE group_id = ? AND slug = ?"
+        " ORDER BY version DESC",
+        (group_id, slug))
+    if len(rows) <= keep:
+        return []
+    out = []
+    for r in rows[keep:]:
+        ver = int(r["version"])
+        await execute(
+            "DELETE FROM components WHERE group_id = ? AND slug = ? AND version = ?",
+            (group_id, slug, ver))
+        d = settings.components_dir / ("g" + str(group_id)) / slug / ("v" + str(ver))
+        if d.is_relative_to(settings.components_dir) and d.is_dir():
+            shutil.rmtree(d, ignore_errors=True)
+        out.append(ver)
+    if out:
+        log.info("组件收版本：群 %s 的 %s 只留最新 %d 版，收了 v%s",
+                 group_id, slug, keep, out)
+    return out
+
+
+#: 收掉版本号之后，告诉 diy 助手一句什么 ✗→✓。
+#:
+#: ⚠️ **这句话是必要的** ✗ —— 用户 2026-10-11 原话：「导入成功后也要让 diy 助手感知，
+#:   以防下次修改发现不对会疑惑」✓。版本被收掉是**同一类**的事：
+#:   它要是还记着「上面那版可以退回去」✓，转头就去找一个已经不存在的版本 ✗，
+#:   然后它自己也会犯迷糊 ✗。所以**每次真正收掉东西的时候**，把它说出口 ✓。
+def _pruned_note(pruned: list[int]) -> str:
+    if not pruned:
+        return ""
+    return ("（仓库只留最新 " + str(_VERSIONS_KEEP) + " 版 ✓，"
+            "更早的 v" + "、v".join(str(v) for v in pruned)
+            + " 已经收掉了 —— **别跟他说这些版本还能退回去** ✗，"
+            "想要留一份就让他点导出 ✓。）")
+
+
 class ComponentConfirmIn(BaseModel):
     group_id: int
     slug: str = Field(min_length=1, max_length=32)
@@ -734,9 +874,19 @@ async def components_save(body: ComponentSaveIn) -> dict:
         return {"ok": False, "error": "暂存文件读不出来：" + str(exc)}
     if not html.strip():
         return {"ok": False, "error": "暂存文件是**空的** —— 让子代理真的写点东西进去。"}
-    if len(html) > 400_000:
+    if len(html) > _HTML_MAX:
         return {"ok": False,
                 "error": "太大了（" + str(len(html)) + " 字符，上限 40 万）。拆小一点。"}
+    # ★ **导出的那道校验，普通落地也走一遍** ✗→✓ —— 同一个规则、同一个说法
+    #   （见 `_validate_component_html` 那段 ✓）。理由：
+    #   组件跑在 `sandbox="allow-scripts"` 的 iframe 里 ✓，**外部资源一个都取不到** ✓
+    #   → 子代理要是抄了一份带 CDN 的 HTML，那一版会**在每个成员的手机上变白** ✗，
+    #   而它自己不知道 ✗（它写完就交付了 ✓，不会再去看渲染结果 ✓）。
+    #   拦在落地这一步 ✓：它拿到一句具体原因 ✓，**自己改一版再交付** ✓。
+    why = _validate_component_html(html)
+    if why:
+        return {"ok": False, "error": "里面用了取不到的外部资源 —— " + why + "。"
+                                 "把那个东西**内联进这一个文件**再交一次。"}
 
     # 版本号**服务端自增** ✓ —— 不接受 agent 传 ✗（它会数错自己做过几版 ✓）
     prev = await fetch_one(
@@ -797,6 +947,13 @@ async def components_save(body: ComponentSaveIn) -> dict:
         (group_id, slug, int((nxt or {}).get("p") or 0), int(time.time())))
     await execute("UPDATE component_tickets SET used_at = ? WHERE token = ?",
                   (int(time.time()), body.token))
+    # ★ **只留最新三版** ✗→✓ —— 用户 2026-10-11 定的：
+    #   「单纯为了回档，只需要留最新的两个版本，加上当前用的统共三个」✓。
+    #   ⚠️ 不给他"指定保留某一版" ✗ —— 那个口子一开，就等于没有上限了 ✗；
+    #      想要永久留一份，走**导出** ✓（导出的是他手里的文件，不在仓库里 ✓）。
+    #   所以这里就是**每次落成都收一次** ✓：新做的组件不会超 ✓（返回空列表 ✓），
+    #   只有改到第四版的时候才会真的收掉一版 ✗。
+    pruned = await _prune_component_versions(group_id, slug)
     try:
         handle.unlink(missing_ok=True)       # 认领完把暂存文件收掉 ✓（免得越攒越多 ✓）
     except OSError:
@@ -826,7 +983,8 @@ async def components_save(body: ComponentSaveIn) -> dict:
     else:
         line = f"做了一个新组件：「{want_title}」，快去看看吧～"
     await _say_system(group_id, nick + line)
-    log.info("组件落成：群 %s 的 %s v%s", group_id, slug, version)
+    log.info("组件落成：群 %s 的 %s v%s" + ("（顺手收掉 v%s）" if pruned else ""),
+             group_id, slug, version, pruned)
     return {"ok": True, "slug": slug, "version": version, "state": "draft",
             "title": want_title,
             # ⚠️ 这段话是**写给模型看的** ✓ —— 2026-10-07 深夜跟着"固化"整套改过 ✗→✓：
@@ -835,7 +993,7 @@ async def components_save(body: ComponentSaveIn) -> dict:
             #    不存在的东西 ✓）。现在只说事实：做好了、能用了 ✓。
             "note": ("已经做好了 ✓ —— 他随时能在创意工坊里看到它、也能让你接着改 ✓。"
                      "**别提「固化 / 保留 / 未固化」这些词** ✗（界面上没有这套概念了 ✓）。"
-                     + said)}
+                     + said + _pruned_note(pruned))}
 
 
 @router.post("/components/list", dependencies=[Depends(require_internal_token)])

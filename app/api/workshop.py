@@ -444,6 +444,32 @@ async def _void_tickets(task_id: int) -> int:
     return int(n or 0)
 
 
+async def _register_turn(group_id: int, task_id: int,
+                         coro: "asyncio.Coroutine") -> "asyncio.Task":
+    """把一轮**登记成「在跑」** ✓，并挂好"跑完摘掉"的回调 ✓。
+
+    ⚠️ **`_running` 的写入口只有这一处** ✗✓（掐掉走 `_abort` ✓）——
+       两处各写一遍登记逻辑，早晚有一处**漏掉 `add_done_callback`** ✗
+       → 那一轮永远"还在跑" ✗ → `_busy` 一直返回真 ✓ →
+       **整个群的工坊永久锁死** ✗（没人能再开一条对话 ✗）。
+       所以 poke 那一路也走这个 ✓，**别自己写一遍** ✗。
+
+    ⚠️ 回调**只摘自己那一条** ✗ —— 期间换过任务的话，`_running` 里已经是新的了 ✓，
+       这时候摘会把**新那条**误判成"没在跑" ✓。
+    """
+    task = asyncio.create_task(coro)
+    _running[group_id] = (int(task_id), task)
+
+    def _done(t: "asyncio.Task", _key: int = group_id,
+              _task: "asyncio.Task" = task) -> None:
+        cur = _running.get(_key)
+        if cur and cur[1] is _task:
+            _running.pop(_key, None)
+
+    task.add_done_callback(_done)
+    return task
+
+
 async def _abort(group_id: int, user_id: int) -> int | None:
     """掐掉正在跑的那一轮 ✓，返回被掐的任务号（没在跑就是 None ✓）。
 
@@ -668,12 +694,8 @@ async def poke_loop() -> None:
                 w["next_at"] = now() + w["gap"]
                 # ★ **登记在跑** ✗→✓ —— 不然下一圈（10 秒后 ✓）又会来问一遍 ✓，
                 #   两轮叠上去 ✓（`_busy` 看的就是这张表 ✓）。
-                task = asyncio.create_task(
-                    _run_turn(gid, uid, w["task_id"], _POKE_TEXT, poke=True))
-                _running[gid] = (w["task_id"], task)
-                task.add_done_callback(
-                    lambda t, k=gid: _running.pop(k, None)
-                    if _running.get(k, (None, None))[1] is t else None)
+                _register_turn(gid, w["task_id"],
+                               _run_turn(gid, uid, w["task_id"], _POKE_TEXT, poke=True))
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001
@@ -846,6 +868,93 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
         await _touch(task_id)
         await _push(user_id, {"type": "ws_message", "data": row})
 
+
+
+
+#: ★ **导入成功后顶它一下** ✓ —— 用户 2026-10-11：「导入成功后也要让 diy 助手感知，
+#:   以防下次修改发现不对会疑惑」。
+#:
+#: ⚠️ **它必须真知道** ✗ —— 光在对话里留一句"导入了一版"不够 ✗：
+#:    它下次动手改的时候读的是**它自己的上下文** ✓，而那一版是**用户绕开它**写进去的 ✓
+#:    （不经过子代理、不经过票 ✓）。不顶它一下，它就会"按上次的印象"改 ✗
+#:    —— 而那正是这个 App 里最常说的那句"以为改了其实没改" ✗。
+_POKE_IMPORT_TEXT = """（系统提示：有个人在组件界面手动**导入了一版** ✓ —— 现在这一版**不是你做的** ✓。
+看清楚再动：
+  · **先读一遍现在这版**（`component_note` / `component_list`）再动手 ✗ ——
+    别按你上次的印象改 ✗（你上次的印象是**上一版** ✓，而这一版是外面换进来的 ✓）。
+  · 回一句短的告诉用户你看过了 ✓ —— 一两句就够 ✓，别复述代码 ✗。"""
+
+
+async def poke_component_task(group_id: int, slug: str,
+                              text: str = _POKE_IMPORT_TEXT) -> bool:
+    """顶一下**这个组件那条对话** ✓，让 diy 助手知道发生了什么 ✓。
+
+    ⚠️ **走 `poke=True` 那一路** ✗✓（和"等子代理交付"同一个形状）：
+       不记成用户消息 ✓（库里只留它回的那一句 ✓），
+       而且 poke 轮**不逐字推** ✓（整条落库、整条推 ✓）
+       → 那条系统提示**不会出现在屏幕上** ✗✓（用户不该看到"系统提示"这种字 ✓）。
+
+    ⚠️ **拿群级锁排队** ✗✓ —— 群里那一轮还在跑的话，这一轮排在它后面 ✓。
+       这样它读到的是**已经落成的那一版** ✓；不排队的话，
+       它可能在旧的一轮还没收尾时就读 ✗ → 读到的是旧状态 ✗。
+
+    返回 True = 真的顶了 ✓；False = 这条组件**没有对话** ✗（不硬造 ✓ ——
+       造一条空的对话进去，比安静地不做更奇怪 ✗）。
+    """
+    row = await fetch_one(
+        "SELECT id, user_id FROM workshop_tasks"
+        " WHERE group_id = ? AND slug = ? ORDER BY id LIMIT 1",
+        (group_id, slug))
+    if not row:
+        log.info("工坊：群 %s 的 %s 没有对话，导入那件事没人可顶（不硬造）",
+                 group_id, slug)
+        return False
+    if _busy(group_id):
+        # ★ 和「等交付」那个循环同一个规矩 ✓（见 `poke_loop` 里 `_busy` 那支 ✓）——
+        #   一轮正在跑的时候别把 `_running` 覆盖掉 ✗：那会让**正在跑的那一轮**
+        #   永远不被摘掉 ✓，这个群的工坊从此一直显示"忙" ✗。
+        log.info("工坊：群 %s 这一轮正在跑，导入那件事**顶不动**（等下一轮）",
+                 group_id)
+        return False
+    tid = int(row["id"])
+    _register_turn(
+        group_id, tid,
+        _run_turn(group_id, int(row["user_id"]), tid, text, poke=True))
+    await _touch(tid)
+    log.info("工坊：群 %s 的 %s —— 导入之后顶了那条对话（task=%s）",
+             group_id, slug, tid)
+    return True
+
+
+async def note_component_task(group_id: int, slug: str, text: str) -> bool:
+    """往这个组件**那条对话**里直接写一句**助手的话** ✓，**不发起模型回合** ✓。
+
+    ⚠️ **导入失败走这一路，不走 poke** ✗→✓ —— 用户 2026-10-11 要的是
+      「校验失败会让 diy 助手提示导入数据不可用」✓：**那句话得原样落在屏上** ✓，
+      一个字都不许改 ✗。让模型转述不行 ✗：
+        · 它可能说成别的（"数据好像有点问题"✓ 之类的）✗；
+        · 更糟的是 poke 轮**本来就设计成可以 `[SILENT]`** ✓（`_run_turn` 那段 ✓）
+          → 整件事被吞掉 ✗，而"校验失败"恰恰是最不该被吞掉的一句 ✗。
+
+    ⚠️ **写进对话就等于它知道** ✗→✓ —— 它下次动手改读的是**这段历史** ✓，
+      所以"导入失败"这件事它一样是知道的 ✓（不占模型回合，但不在上下文之外 ✗）。
+
+    返回 False = 这条组件**没有对话** ✗（同 `poke_component_task`：不硬造 ✓）。
+    """
+    row = await fetch_one(
+        "SELECT id, user_id FROM workshop_tasks"
+        " WHERE group_id = ? AND slug = ? ORDER BY id LIMIT 1",
+        (group_id, slug))
+    if not row:
+        log.info("工坊：群 %s 的 %s 没有对话，这句没人可写（不硬造）",
+                 group_id, slug)
+        return False
+    tid = int(row["id"])
+    await _save(group_id, int(row["user_id"]), tid, "agent", text)
+    await _touch(tid)
+    log.info("工坊：群 %s 的 %s 里直接写了一句（task=%s，不发起模型回合）",
+             group_id, slug, tid)
+    return True
 
 # ── diy 小助手（头像 + 昵称）────────────────────────────────────────────
 #
@@ -1243,21 +1352,10 @@ async def task_say(group_id: int, task_id: int, body: TaskSayIn,
     await _touch(row["id"])
     await _push(user["id"], {"type": "ws_message", "data": msg})
 
-    key = group_id
-    task = asyncio.create_task(_run_turn(
-        group_id, user["id"], row["id"], text,
-        msg_type=kind, media_path=body.media_path or None, quote=q))
-    _running[key] = (int(row["id"]), task)
-
-    def _done(t: asyncio.Task, _key: int = key,
-              _task: asyncio.Task = task) -> None:
-        # 只摘自己那一条 ✓ —— 期间换过任务的话，`_running` 里已经是别人的了 ✓，
-        # 这时候摘会把**新那条**误判成"没在跑" ✓。
-        cur = _running.get(_key)
-        if cur and cur[1] is _task:
-            _running.pop(_key, None)
-
-    task.add_done_callback(_done)
+    _register_turn(
+        group_id, row["id"],
+        _run_turn(group_id, user["id"], row["id"], text,
+                  msg_type=kind, media_path=body.media_path or None, quote=q))
     return {"ok": True, "message": msg}
 
 

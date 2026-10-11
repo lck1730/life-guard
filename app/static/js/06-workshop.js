@@ -508,7 +508,12 @@
     //      不是安全边界 ✓（边界在服务端 ✓）。
     const isWall = wsCur.slug === WALL_SLUG;
     const more = $('#wsMore');
-    if (more) more.style.visibility = isWall ? 'hidden' : '';
+    // ★ 2026-10-11：组件页那条**也开了 ⋯** ✗→✓ —— 用户改了主意 ✓（原话：
+    //   「组件页面统计，新增右上角三个点，和普通组件聊天比没有删除功能，
+    //    重名的加上吧，自由度高一些，反正只是显示」✓）。
+    //   差别不在「有没有 ⋯」上 ✓，在**菜单里有什么**上 ✓ ——
+    //   组件页没有「删除组件」✓（服务端那道闸门还在 ✓，见 `component_delete` ✓）。
+    if (more) more.style.visibility = '';
     // ★ 名字**点不动** ✓ —— 点它的意思是"去看这个组件" ✓，而它**不是一个组件** ✓
     //   （点进去会是一个空白的沙箱页 ✓，那比不可点更让人犯嘀咕 ✓）。
     t.disabled = !wsCur.slug || isWall;
@@ -1181,12 +1186,10 @@
    *（它得同时定 slug ✓，那是目录名 ✓）。那种对话只有"删掉这次对话"✓。
    */
   const openWsMenu = async () => {
-    // ★ **「组件界面diy」那条没有 ⋯** ✗→✓（2026-10-09 用户定的：
-    //   「组件界面diy的界面，没有右上角三个点，没有重命名，没有删除组件，
-    //    啥都没有，默认不可编辑，只能编辑界面」✓）。
-    //   按钮已经藏了 ✓（见 `setWsHead` ✓），这一句是**防"从别处按到它"** ✓
-    //   （它是个 async 函数 ✓，将来多一条调用点也不会漏 ✓）。
-    if (wsCur.slug === WALL_SLUG) return;
+    // ★ 组件页（`wall`）那条**也开 ⋯** 了 ✗→✓ —— 2026-10-09 那轮把它整个关掉的
+    //   规矩，用户 2026-10-11 改了主意 ✓（「自由度高一些，反正只是显示」✓）。
+    //   差别只有一条：**没有「删除组件」** ✓ —— 服务端那道闸门也没撤 ✓
+    //   （`component_delete` 对 `wall` 照样报 403 ✓）。
     await wsReloadTasks();
     const t = wsCur.tasks.find(x => Number(x.id) === Number(wsCur.task));
     const p = $('#sheetPanel');
@@ -1209,9 +1212,42 @@
 
     // ★ 2026-10-07 深夜：原来这里还有「保留这一版 / 取消保留」两项 ✗→✓ ——
     //   用户定了「组件聊天没有所谓的固化和非固化概念了」✓，一起删掉了 ✓。
-    //   现在这个菜单就**两件事**：重命名 ✓、删除 ✓（用户点名的那两件 ✓）。
+    //   2026-10-11 又加了两项：**导出 / 导入** ✓（用户点名的 ✓），
+    //   于是现在是**重命名 ✓、导出 ✓、导入 ✓、删除**（组件页少一条删除 ✓）。
     if (t && t.slug) {
-      mk('重命名', () => openRenameSheet(t.slug, t.title || ''));
+      // ★ 组件页（`wall`）的**重命名要改两处** ✗→✓ —— 名字住在**两个地方** ✓：
+      //   对话上（`workshop_tasks.title` ✓ —— 顶栏上写的那个 ✓）和
+      //   组件上（`components.title` ✓ —— 收纳页 / 组件界面上写的那个 ✓）。
+      //   各改一处就会出现"两个地方各叫各的"✗。改名本来就是「反正只是显示」✓，
+      //   那就**两处都改成同一个** ✓。
+      //   ⚠️ 对话那个改了**不回滚** ✓ —— 两个都是显示名 ✓，第二个没跟上
+      //   顶多是一处暂时没同步 ✓，比"用户点了保存、什么都没变"好得多 ✓。
+      const isWallChat = t.slug === WALL_SLUG;
+      mk('重命名', () => {
+        if (!isWallChat) return openRenameSheet(t.slug, t.title || '');
+        openNameSheet({
+          heading: '重命名',
+          initial: t.title || '',
+          cta: '保存',
+          save: async (name) => {
+            const r = await api(`/workshop/${group.id}/tasks/${wsCur.task}/title`,
+                                { method: 'PATCH', body: JSON.stringify({ title: name }) });
+            wsCur.title = (r.task && r.task.title) || name;
+            try {
+              await api(`/components/${WALL_SLUG}/rename?group_id=${group.id}`,
+                        { method: 'POST', body: JSON.stringify({ title: name }) });
+            } catch (e) { toast('名字改好了（组件那一份没跟上）'); return; }
+            await refreshCurrent();
+            if ($('#workshop').classList.contains('on')) renderWorkshop();
+            toast('改好了');
+          },
+        });
+      });
+      // ★ **导出 / 导入** ✗→✓（2026-10-11 用户定的）——
+      //   「每个组件存三份」的上限一加上 ✓，"想留一份"就只能**出仓库**了 ✓，
+      //   这两个入口就是那个口子 ✓。
+      mk('导出当前版本', () => wsExport(t.slug));
+      mk('导入新版本', () => wsImport(t.slug));
       // ★ 「删除组件等于删除对话」✓ —— 所以删的是**整块**（不传版本号 ✓），
       //   服务端会把文件、所有版本、这条对话一起收掉 ✓。
       // ⚠️ **`danger=true` 那个参数原来漏了** ✗→✓（2026-10-07 深夜，用户看着截图
@@ -1224,24 +1260,30 @@
       //   菜单里那一行**干干净净三个字** ✓，点下去才弹框 ✓。
       //   ⚠️ **先把菜单关了再弹** ✓ —— 不关的话那个从底下升上来的菜单
       //      会**压在确认框下面** ✓（z-index 虽然够 ✓，但视觉上是两层东西叠着 ✓）。
-      mk('删除组件', async () => {
-        closeSheet();
-        const ok = await confirmBox({
-          title: '删除组件',
-          // ★ 措辞照用户 2026-10-10 的原话 ✓（他看截图说的 ✓）——
-          //   原来那句「删掉之后…都会没，撤不回来」是我写的 ✓，他换成这一句 ✓。
-          body: '将会删除这个组件以及这个对话',
-          ok: '删除',
-          danger: true,
-        });
-        if (!ok) return;
-        try {
-          await api(`/components/${encodeURIComponent(t.slug)}?group_id=${group.id}`,
-                    { method: 'DELETE' });
-        } catch (e) { toast('没删掉：' + e.message); return; }
-        toast('删了');
-        backToWall();
-      }, true);
+      // ★ **组件页（`wall`）没有这一条** ✗→✓（2026-10-11 用户定的：
+      //   「和普通组件聊天比没有删除功能」✓）。
+      //   ⚠️ **服务端那道闸门也没撤** ✓ —— `component_delete` 对 `wall`
+      //   照样报 403 ✓（它是唯一能改组件界面外观的入口 ✓）。
+      if (!isWallChat) {
+        mk('删除组件', async () => {
+          closeSheet();
+          const ok = await confirmBox({
+            title: '删除组件',
+            // ★ 措辞照用户 2026-10-10 的原话 ✓（他看截图说的 ✓）——
+            //   原来那句「删掉之后…都会没，撤不回来」是我写的 ✓，他换成这一句 ✓。
+            body: '将会删除这个组件以及这个对话',
+            ok: '删除',
+            danger: true,
+          });
+          if (!ok) return;
+          try {
+            await api(`/components/${encodeURIComponent(t.slug)}?group_id=${group.id}`,
+                      { method: 'DELETE' });
+          } catch (e) { toast('没删掉：' + e.message); return; }
+          toast('删了');
+          backToWall();
+        }, true);
+      }
     } else {
       // ★ **还没做出组件的也能改名** ✗→✓（2026-10-07 深夜，用户问的：
       //   「还没做出组件为啥连重命名都没有」✓）。
@@ -1404,6 +1446,72 @@
     p.appendChild(acts);
     openSheet();
     setTimeout(() => inp.focus(), 120);      // 省一次点击 ✓（和别的弹层一个做法 ✓）
+  };
+
+  /** 把一份文本当**文件下载**下来 ✓（手机 WebView 上唯一可靠的方式 ✓）。 */
+  const downloadText = (filename, text, mime) => {
+    const url = URL.createObjectURL(new Blob([text], { type: mime }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // ⚠️ **晚一拍再收回 URL** ✗ —— 点击之后下载是异步起头的 ✓，
+    //    立刻 `revokeObjectURL` 有机会把那次下载掐断 ✓。
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  /** ⋯ 里的**导出当前版本** ✓ —— 把一个 HTML 文件交到用户手里 ✓。 */
+  const wsExport = async (slug) => {
+    closeSheet();
+    let text, ver;
+    try {
+      const r = await fetch(`/api/components/${encodeURIComponent(slug)}?group_id=${group.id}`,
+                            { credentials: 'same-origin' });
+      if (!r.ok) { toast('没拿到：' + (await r.text())); return; }
+      text = await r.text();
+      ver = (JSON.parse(text) || {}).version;
+    } catch (e) { toast('没拿到：' + e.message); return; }
+    downloadText(`${slug}-v${ver || 'latest'}.html`, text,
+                 'text/html;charset=utf-8');
+    toast('导出了一份文件');
+  };
+
+  /** ⋯ 里的**导入新版本** ✓ —— 挑一份文件，当**新一版**落进仓库 ✓。 */
+  const wsImport = (slug) => {
+    closeSheet();
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = '.html,.htm,text/html';
+    inp.onchange = async () => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      // ⚠️ **40 万字符** 和后端那个上限对齐 ✓ —— 不先拦一道的话，
+      //    手机上读一个几十兆的 HTML 到内存里 ✓，然后才被服务端拒掉 ✗。
+      if (f.size > 400000) {
+        toast('太大了（40 万字符以内）');
+        return;
+      }
+      const text = await f.text();
+      try {
+        const d = await api(`/components/${encodeURIComponent(slug)}/import?group_id=${group.id}`,
+                            { method: 'POST', body: JSON.stringify({ html: text }) });
+        toast('导入成功：现在是 v' + d.version);
+        // ★ 顶一下之后**把这条对话重新拉一遍** ✓ —— 服务端往里面写了句提示 ✓
+        //   （或者忙的时候没写上 ✓），两种情况都靠这一次刷新看到 ✓。
+        await refreshCurrent();
+      } catch (e) {
+        // ⚠️ **服务端原话直接给出来** ✗ —— 它说的是"哪一条不行" ✓
+        //    （缺 html/body ✓、引了外部脚本 ✓…），不是笼统的"数据不可用"✗。
+        toast('导入失败：' + e.message);
+        // 失败的时候服务端**也在对话里留了一句** ✓（不发起模型回合 ✓），
+        //   拉一遍让人看见 ✓。
+        await refreshCurrent().catch(() => {});
+      }
+      inp.value = '';
+    };
+    inp.click();
   };
 
   /** ⋯ 里的重命名 ✓ —— 「重命名会同步所有地方」✓（用户 2026-10-07 晚上定的 ✓）。 */
