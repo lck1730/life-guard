@@ -89,6 +89,9 @@ async def v1_proxy(path: str, request: Request):
         "Authorization": f"Bearer {chosen.get('api_key') or ''}",
         "Content-Type": request.headers.get("content-type", "application/json"),
         "Accept": request.headers.get("accept", "*/*"),
+        # ★★ **明确跟上游要"别压缩"** ✗→✓（2026-10-11 抓到的一个影响面很大的 bug）——
+        #   见下面 `aiter_bytes` 那段 ✓。两条一起上，哪条都别单靠 ✓。
+        "Accept-Encoding": "identity",
     }
 
     client = httpx.AsyncClient(timeout=TIMEOUT)
@@ -104,7 +107,25 @@ async def v1_proxy(path: str, request: Request):
 
     async def stream():
         try:
-            async for chunk in up.aiter_raw():
+            # ★★ **`aiter_raw` → `aiter_bytes`** ✗→✓（2026-10-11）
+            #
+            #   ⚠️ **`aiter_raw()` 给的是"原样字节"，httpx 不解压** ✗ ——
+            #      而 httpx 默认会跟上游说 `Accept-Encoding: gzip` ✓ →
+            #      上游**压缩**了响应 ✓ → 我们原样转给 Hermes ✓，
+            #      **却没有把 `Content-Encoding` 一起带上** ✗（回包的头只带了 content-type ✓）
+            #      → 对面以为那是明文 ✓ → 当 utf-8 读 ✗ →
+            #      `'utf-8' codec can't decode byte 0x8b in position 1` ✓✓
+            #      （`1f 8b` 正是 gzip 的魔数 ✓）。
+            #
+            #   ⚠️ **为什么平时没炸** ✗：群聊那条走的是 **SSE 流式** ✓，
+            #      而上游一般**不压** `text/event-stream` ✓ → 一路没事 ✓。
+            #      **所有非流式的调用都会中** ✗ —— 2026-10-11 是"看图"（vision）
+            #      第一个撞上的 ✓（它走非流式 ✓，而且用的正是我们这条网关 ✓）。
+            #
+            #   `aiter_bytes()` 会**按 `Content-Encoding` 自己解** ✓（而且是流式解、
+            #   不攒整包 ✓）→ 我们转发出去的永远是**解压后的明文** ✓，
+            #   和回包上的头（不带 content-encoding ✓）也就自洽了 ✓。
+            async for chunk in up.aiter_bytes():
                 yield chunk
         finally:
             await up.aclose()
