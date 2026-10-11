@@ -584,12 +584,6 @@ def _slug_ok(slug: str) -> bool:
     return bool(re.match(r"^[a-z0-9][a-z0-9-]{0,31}$", slug or ""))
 
 
-def _brief_name(task_title: str | None, slug: str) -> str:
-    """开工那条消息里**管它叫什么** ✓（见下面那段 ✓）：
-    用户开做时起的名字优先 ✓ —— 那是他认得出来的名字 ✓；没有就用英文 slug ✓。
-    """
-    return (task_title or "").strip() or slug
-
 
 async def _say_system(group_id: int, text: str, *, no_link: bool = False) -> None:
     """往**主群聊**放一条系统消息。
@@ -638,10 +632,9 @@ async def components_confirm(body: ComponentConfirmIn) -> dict:
     #      （组件做不出来比"票没绑上"严重得多 ✓）。
     task_id = body.task_id
     wait_uid = None
-    said_name = ""
     if task_id:
         row = await fetch_one(
-            "SELECT id, user_id, title FROM workshop_tasks WHERE id = ? AND group_id = ?",
+            "SELECT id, user_id FROM workshop_tasks WHERE id = ? AND group_id = ?",
             (int(task_id), body.group_id))
         if not row:
             log.warning("组件开工：任务号 %s 不属于群 %s，按没给处理",
@@ -649,7 +642,6 @@ async def components_confirm(body: ComponentConfirmIn) -> dict:
             task_id = None
         else:
             wait_uid = int(row["user_id"])
-            said_name = str(row["title"] or "")
     await execute(
         "INSERT INTO component_tickets(token, group_id, slug, brief, handle,"
         " created_at, expires_at, task_id) VALUES(?,?,?,?,?,?,?,?)",
@@ -659,25 +651,15 @@ async def components_confirm(body: ComponentConfirmIn) -> dict:
         #    过期了它只会看到一句「重新确认一次」✓ —— 那一轮就白干了 ✗。
         #    票是**一次性**的 ✓（用掉就作废 ✓），所以放宽时限不多出风险 ✓。
         (token, body.group_id, slug, body.brief.strip(), handle, ts, ts + 7200, task_id))
-    prev = await fetch_one(
-        "SELECT COALESCE(MAX(version), 0) AS v FROM components"
-        " WHERE group_id = ? AND slug = ?", (body.group_id, slug))
-    next_version = int((prev or {}).get("v") or 0) + 1
-
-    # 干活之前先把话说出去 —— **这是"开工"那一条** ✓
-    #
-    # ★ 文案是用户 2026-10-07 深夜定的 ✗→✓：
-    #   「开始做**组件v*：【功能简单介绍/修改简单介绍】30 字以内**」✓
-    #   ⚠️ **名字用哪来的** ✗：这一刻组件**还不存在** ✓（第 ③ 步只是拿票 ✓，
-    #      落成在第 ⑤ 步 ✓）。能用的有两个 ✓：用户开做时起的名字 ✓
-    #      （`workshop_tasks.title` ✓）和 agent 定的 slug ✓。
-    #      → **优先用户起的那个** ✓（那是他认得出来的名字 ✓），没有就用 slug ✓。
-    #   ⚠️ **版本号是"下一版"** ✓ —— `max(version)+1` ✓（改一个已有的组件时是 v2 ✓，
-    #      而他得知道这一版是在改旧的 ✓，不是从头做一个 ✓）。
-    await _say_system(body.group_id,
-                      "开始做「" + _brief_name(said_name, slug) + "」组件 v"
-                      + str(next_version) + "：" + body.brief.strip()[:30],
-                      no_link=True)
+    # ★ **不发"开工"那条了** ✗→✓（2026-10-11 用户定：只提示一次，落在**做成**那一刻 ✓）。
+    #    理由写在这儿，免得下一个人觉得漏了又加回来 ✗：
+    #    · 它唯一的用处是让人知道"在做" ✓ —— 那个由下面的 `push_workshop_status`
+    #      推的"正在做"状态承担 ✓；而且真正该提示的时候，已经是在工坊里拦人 ✓。
+    #    · 少一条就少一条**特殊路径** ✓ —— `_say_system(no_link=True)` 那个标记
+    #      **就是为它存在的** ✗（那时组件还不存在，名字真存在 → 标蓝会跳到旧版 ✓），
+    #      它没了，那个特例也一并退场 ✓。
+    #    · 文案里那句"下一版是 v几"需要 `max(version)+1` ✓ —— 那整段查询跟着删了 ✓
+    #      （真正的版本号在 `components_save` 里现算 ✓，那边才是权威 ✓）。
     # ⚠️ **"正在做"这个状态由服务端在准确的那一刹那推出** ✗→✓ ——
     #    因为它没法从流里看出来 ✓（我们只取正文 ✓，不看工具事件 ✓）。
     #    而这一刻服务端**知道** ✓（就是子代理该上场的时候 ✓）。
