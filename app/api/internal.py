@@ -499,18 +499,33 @@ async def send_image(body: SendImageIn) -> dict:
 #
 #   ① **没确认过不许写** ✓ —— 用户在工作坊里确认之前，**世界上不存在可用的票** ✓。
 #      写入必须带票 ✓，票只能一次 ✓、30 分钟过期 ✓。这是真的能拦的 ✓。
-#   ② **必须由子代理写** ✓ —— ⚠️ **服务端证明不了** ✗，能保证的是**形状** ✓：
-#      `save` **只收 handle（服务端发出去的暂存路径）** ✓、**不收正文** ✓ ——
-#      于是"在主对话里直接拼一大坨 HTML 塞进来"这条路**在接口层不存在** ✓。
-#      至于那个文件到底是谁写的 —— 靠 skill 约定 + 主对话看不到正文来保证 ✓。
-#      **不假装它是硬校验** ✗（假装了，将来坏了会以为是代码问题 ✓）。
+#   ② **形状对** ✓ —— 长度、自包含（不引外链）、有 html/body ✓（`_validate_component_html`）。
+#      这是硬校验 ✓，报错里说的是具体原因 ✓。
+#
+# ## 正文现在从参数来 ✗→✓（2026-10-12）
+#
+# 原来 `save` **只收 handle（服务端发出去的暂存路径）、不收正文** ✓ ——
+# 目的是把"在主对话里直接拼一大坨 HTML"这条路**在接口层堵死** ✓。
+#
+# 那条路当初是**接口层不存在** ✓，现在**通了** ✗ —— 用户 2026-10-12 定的：
+# 派子代理当初是为了**让组件之间隔离** ✓，而会话已经按任务一条一条隔开了 ✓，
+# 那个理由没了 ✓。**直接自己做**就行 ✓，派不派是它自己的选择。
+#
+# ⚠️ **不是硬校验** ✗ —— "谁写的"服务端照样证明不了（现在连来路都分不清 ✓）。
+#    别把这一段当成闸门 ✗，它就是一道形状校验 ✓。
+#
+# ⚠️ **为什么当初要靠子代理**（记在这儿，免得被当成多此一举又推回去 ✗）：
+#    正文走文件是为了**不进主对话的上下文** ✓。那个担心被**任务级会话隔离**解决了 ✓ ——
+#    正文只留在这一条会话里，别的任务、别的会话都看不到 ✓。
 #
 # ## 为什么 save 的群号从票反查
 #
-# 真正写文件的是**子代理** ✓，而它的会话标识里**没有群号** ✓
+# 子代理的会话标识里**没有群号** ✓
 # （2026-10-07 实测：子代理的会话 id 形如 20261007_115135_5b1a85 ✓）。
 # 所以收尾这一步**不能靠会话推** ✗ —— 票里存着群号 ✓，从票拿 ✓。
 # 这一步顺手把"子代理认不出群"那个风险整个绕开了 ✓。
+# （`html` 走参数之后，这一条对"自己写"那条路**不再需要** ✓，但留着不动 ✗
+#  —— 两条路共用同一个收口，别分叉 ✓。）
 
 
 #: 一版 HTML 的上限 ✓ —— 和 `components_save` 收暂存文件时**同一个数** ✗✓。
@@ -662,12 +677,22 @@ class ComponentConfirmIn(BaseModel):
 
 
 class ComponentSaveIn(BaseModel):
-    #: ⚠️ **只有票** ✗ —— 不收正文、不收群号、不收版本号 ✓（见上面那段 ✓）。
+    #: ⚠️ **不收群号、不收版本号** ✓（群号从票反查 ✓、版本服务端自增 ✓）。
+    #:
+    #: ★ **`html` 是正文的主路** ✗→✓（2026-10-12）——
+    #:    它自己写完 HTML 直接带过来 ✓，不必先落一个暂存文件。
+    #:    之所以当初绕开正文走文件：想把它排除在**主对话的上下文**之外 ✓。
+    #:    那个担心后来被**会话隔离**解决了（一条任务一条会话 ✓）——
+    #:    正文留在这一条会话里，别的会话、别的任务都看不到 ✓。
+    #:    ⚠️ 长度**不在这里限** ✗ —— 交给下面那句 `_HTML_MAX`，
+    #:       好让报错还是原来那句人话（带字符数 ✓），而不是 Pydantic 的一句参数错。
     token: str = Field(min_length=8, max_length=80)
     title: str = Field(default="", max_length=40)
     icon: str = Field(default="", max_length=8)
     note: str = Field(default="", max_length=8000)
     data: dict[str, Any] | None = None
+    #: 正文本身（默认路径 ✓）—— 空着就走暂存文件那条（派子代理写的 ✓）。
+    html: str = ""
     #: ★ 它**在"组件容纳界面"里怎么展示** ✓（2026-10-07 晚上用户定的 ✓）：
     #: 「每次组件创意时，都要问的一件事是如何在组件容纳界面展示」✓。
     #: 形状 `{"kind":"tile","w":1,"h":1,"tint":"#22334d"}` ✓ ——
@@ -913,9 +938,11 @@ async def components_confirm(body: ComponentConfirmIn) -> dict:
     log.info("组件开工：群 %s 的 %s（票 %s…）", body.group_id, slug, token[:8])
     return {
         "ok": True, "token": token, "slug": slug, "handle": handle,
-        "next": ("把这个 handle 原样交给子代理，让它把**整份 HTML 写进那个文件**"
-                 "（单文件、不引外部资源）。它写完只回一句结论。"
-                 "然后你调 component_save，**带上这张 token**，并把 title/icon/note/data 填上。"
+        "next": ("写好后调 `component_save`，**带上这张 token**，并把 `html`（正文）、"
+                 "title、icon、note、data、spot 填上 —— **正文直接放在 `html` 里** ✓，"
+                 "不用写文件、也不用派谁去写 ✓。"
+                 "（`handle` 那个路径只在你决定派子代理的时候才用得上 ✓ —— "
+                 "那种情况把它原样交给子代理，让它写进去。）"
                  "⚠️ token 和 handle 一个字都别改，原样传。"),
     }
 
@@ -943,16 +970,26 @@ async def components_save(body: ComponentSaveIn) -> dict:
     group_id = int(row["group_id"])          # ★ 群号**从票反查** ✓，不从会话推 ✓
     slug = str(row["slug"])
     handle = Path(str(row["handle"] or ""))
-    if not handle.is_file():
+    # ★ **正文有两条来路，一个收口** ✗→✓（2026-10-12）：
+    #    ① **它自己写**（默认 ✓）—— `html` 直接带在调用里 ✓。
+    #       这是主路 ✓：不依赖任何文件系统，也不需要谁去"交付" ✓。
+    #    ② **暂存文件**（留给派子代理的那条 ✓）—— 原来的路，留着 ✓。
+    #       只有它没带 `html` 的时候才去看那个文件 ✗。
+    inline = (body.html or "").strip()
+    if inline:
+        html = inline
+    elif not handle.is_file():
         return {"ok": False,
-                "error": ("暂存文件还不存在 —— 子代理**还没把 HTML 写进去**。"
-                          "先让它写完（它回来说写好了），再调这个。")}
-    try:
-        html = handle.read_text(encoding="utf-8", errors="replace")
-    except OSError as exc:
-        return {"ok": False, "error": "暂存文件读不出来：" + str(exc)}
-    if not html.strip():
-        return {"ok": False, "error": "暂存文件是**空的** —— 让子代理真的写点东西进去。"}
+                "error": ("这次**没有正文** —— 要么直接把 HTML 放在 `html` 字段里"
+                          "（推荐 ✓，不用绕文件），要么先让子代理把暂存文件写好"
+                          "（它还没写进去 → 先等它回来说写好了，再调这个）。")}
+    else:
+        try:
+            html = handle.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            return {"ok": False, "error": "暂存文件读不出来：" + str(exc)}
+        if not html.strip():
+            return {"ok": False, "error": "暂存文件是**空的** —— 让子代理真的写点东西进去。"}
     if len(html) > _HTML_MAX:
         return {"ok": False,
                 "error": "太大了（" + str(len(html)) + " 字符，上限 40 万）。拆小一点。"}
