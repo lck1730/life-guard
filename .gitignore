@@ -6,6 +6,10 @@ provision/
 #   不排除的话它们会被这个仓库跟踪 ✓，而 App 管家那套"存档/回滚"会去提交它们 ✗
 #   （`routes_internal.py` 的自动提交是无差别的 ✓）。
 var/
+# ★ 2026-10-11：群头像是**用户上传的用户数据** ✗→✓ —— 不该进这个仓 ✓
+#   注意：g3.jpg / diy-g3.jpg 提交得太早、**已经被跟踪了**，这条只管新增的（g5.jpg 那类）
+#   gitignore 不会把已跟踪的文件排除掉，那两个要单独 `git rm --cached` 才走得掉。
+ui/avatars/
 .env
 *.log
 __pycache__/
