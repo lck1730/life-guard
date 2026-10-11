@@ -321,15 +321,37 @@ async def image_path(body: ImageIn) -> dict:
     if not full.exists():
         return {"ok": False, "error": "图片文件不在了（可能被清理过）"}
 
+    # ★★ **回的是字节，不是路径** ✗→✓（2026-10-11 实测发现这条路是断的）
+    #
+    # ⚠️ **原来这里回的是一个本地绝对路径** ✓，叫 agent 把它交给 `vision_analyze` ✓ ——
+    #    而 **agent 读不到那个路径** ✗：媒体目录在 `/opt/lifeguard-chat/data/` 底下 ✓，
+    #    而 `data/` 是 **700、归 lifeguard** ✓，agent 跑在 `hermes` 名下 ✓ →
+    #    权限链断在那一层 ✓（实测 `sudo -u hermes test -r <那张图>` → 读不到 ✓）。
+    #    也就是说：**"回忆某张历史图片"这个能力，从分账号那天起就是哑的** ✗ ——
+    #    它拿到一个读不了的路径，`vision_analyze` 一开就报错 ✓。
+    #    （⚠️ 只影响"回忆旧图" ✓；**你当场发的那张它看得见** ✓ ——
+    #      那条路是把图**内联成 base64** 塞进请求的 ✓，不经过文件系统 ✓。）
+    #
+    # ⚠️ **修的时候别去给 agent 开"读文件"的口子** ✗ —— 那会把我上面说的那层
+    #    **文件系统隔离整个拆掉** ✓（现在它读不到任何群的任何媒体 ✓，那是硬闸 ✓）。
+    #    反着来：**由我们把字节给它** ✓。插件那边拿到 base64 之后**写进自己的空间** ✓
+    #    （插件跑在 hermes 名下 ✓，写自己的地方当然可以 ✓），再把那个路径交给
+    #    `vision_analyze` ✓ —— 隔离一点没松，只是把"谁去取"换了个方向 ✓。
+    #
+    # ⚠️ **`path` 这个字段就不给了** ✗ —— 与其给一个**读不了的路径** ✓
+    #    （下一个人还会照着它去试 ✓，就像原来那样 ✓），不如干脆不给 ✓。
+    ext = Path(str(row["media_path"])).suffix.lower() or ".jpg"
+    mime = {".png": "image/png", ".webp": "image/webp",
+            ".gif": "image/gif"}.get(ext, "image/jpeg")
     return {
         "ok": True,
         "message_id": row["id"],
-        "path": str(full),
+        "ext": ext,
+        "mime": mime,
+        "data_b64": base64.b64encode(full.read_bytes()).decode("ascii"),
         "size_bytes": full.stat().st_size,
         "sender": row["sender_nickname"] or "某人",
         "at": time.strftime("%Y-%m-%d %H:%M", time.localtime(row["created_at"])),
-        "hint": ("要看清内容，把这个 path 传给 vision_analyze（它的 question 参数问你想知道的）。"
-                 "想让它更准就把你真正关心的事写进 question，别只问「这是什么」。"),
     }
 
 
