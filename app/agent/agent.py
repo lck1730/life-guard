@@ -277,13 +277,23 @@ def _strip_leaked_thinking(text: str) -> str:
     #    所以原文必须进日志 ✓（这个项目为"静默改坏"栽过 ✓）。
     log.warning("抠掉了 %d 段不是给他看的文字（共 %d 字）：%.200s",
                 len(cut), sum(len(c) for c in cut), " ｜ ".join(cut[:3]))
-    return "".join(out).strip()
+    # ⚠️ 丢一个换行、可能连着丢 → 收成一行一个 ✓（别留一串空行 ✗）
+    return re.sub(r"\n[ \t]*\n+", "\n", "".join(out)).strip()
 
 
 def _keep_or_drop(out: list[str], cut: list[str], chunk: str) -> None:
-    """一段非中文：够长就记进 `cut`（丢掉 ✓），否则原样留着 ✓。"""
+    """一段非中文：够长就记进 `cut`（丢掉 ✓），否则原样留着 ✓。
+
+    ⚠️ **丢掉的位置要留一个换行** ✗→✓（拿真数据试出来的）——
+      不留的话，**抠掉英文之后剩下的中文碎片会粘成一句** ✓：
+        `多云` + 抠掉 + `多云转阴小到中雨` + 抠掉 + `明天西安多云…`
+        → 读出来是「多云**多云转阴小到中雨**明天西安多云」✗
+      —— 每个字都在，但**读着像坏了** ✓（比原来那坨英文还让人犯嘀咕 ✓）。
+      留个换行，它们至少**各占一行** ✓，看得出是分开的 ✓。
+    """
     if len(chunk.strip()) >= _NONCJK_MIN_CHARS:
         cut.append(chunk.strip())
+        out.append("\n")
     else:
         out.append(chunk)
 
