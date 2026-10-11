@@ -746,6 +746,85 @@ async def _maker_nickname(task_id: Any) -> str:
     return str((row or {}).get("nickname") or "").strip()
 
 
+async def _participants_nicks(task_id: Any) -> list[str]:
+    """**这一版是谁一起做的** ✓ —— 上一次报过「做好了」之后，
+    在这条对话里**发过话的成员** ✓（2026-10-12，用户定的）：
+
+      「如果一次组件做成/修改之前有多个成员参与，应该把所有参与成员都标上，
+        标完后状态清楚，下次谁修改标谁」✓。
+
+    ⚠️ **和 `workshop._participants_all` 不是一回事** ✗——别混：
+       那个是**导航那一行右边那几个头像** ✓，判据是「给这个组件**开过对话**」、
+       而且**从有到无全算**（历史累积 ✓，界面上要的是"这组件是谁做的"）✗；
+       这个是**主群聊那条通知里念谁** ✓，判据是「发过话」✗、
+       而且**只算报完之后**（要的是"这一版谁动了手"✓）。
+       两套判据不一样是对的 ✗ —— 一个是履历、一个是回执 ✗。
+
+    ⚠️ **只算「上一次报完之后」发话的人** ✗→✓ —— 判据是
+       `workshop_tasks.notified_at` ✓（上一次落成时写进去的 ✓）。
+       不加这一刀的话，第一次参与的人会**每一版都被念一遍** ✗
+       → 通知退化成"每次念一遍全员"✗，和「下次谁修改标谁」正好相反 ✗。
+    ⚠️ **NULL = 从没报过** ✗→✓ —— 老对话补出来就是 NULL ✓，
+       按「**从这条对话一开始就算**」处理 ✓。
+       猜成「只有最后一个人」比说全了糟 ✗ —— 那是编 ✗。
+    ⚠️ **按谁先开口排** ✓（`MIN(created_at)` ✓）—— 不是按字母、也不是按用户 id ✓。
+       一句里念出来的顺序，得是**说话的顺序** ✓。
+    ⚠️ **只数 `sender_type='user'` 的话** ✗ —— 助手自己说的**不算参与** ✗
+       （poke 轮、静默轮那一堆都是它说的 ✓，全算进去就又变成"每次念全员"✗）。
+    票上没有任务号（迁移前的老票 ✓）就返回空 ✓ → 调用方退回老话术 ✗✓。
+    """
+    if not task_id:
+        return []
+    t = await fetch_one(
+        "SELECT COALESCE(notified_at, 0) AS since FROM workshop_tasks WHERE id = ?",
+        (int(task_id),))
+    since = int((t or {}).get("since") or 0)
+    rows = await fetch_all(
+        "SELECT user_id, MIN(created_at) AS first_at FROM workshop_messages"
+        " WHERE task_id = ? AND sender_type = 'user' AND created_at > ?"
+        " GROUP BY user_id ORDER BY first_at ASC", (int(task_id), since))
+    ids = [int(r["user_id"]) for r in rows]
+    if not ids:
+        return []
+    marks = ",".join("?" * len(ids))
+    us = await fetch_all(f"SELECT id, nickname FROM users WHERE id IN ({marks})", ids)
+    by_id = {int(u["id"]): str(u["nickname"] or "").strip() for u in us}
+    out: list[str] = []
+    for uid in ids:                      # ⚠️ 保序：谁先开口谁在前 ✓
+        n = by_id.get(uid) or ""
+        if n:
+            out.append(n)
+    return out
+
+
+def _join_names(nicks: list[str]) -> str:
+    """把一串昵称拼成**能直接接在动词前面**的那串 ✓。
+
+      「看看🐷做了一个新组件…」/「看看🐷和二狗改了…」/「A、B和大象改了…」✓。
+    ⚠️ **最后一个用「和」收尾** ✗→✓ —— 「A、B、C改了」读起来像漏了一个人 ✗；
+       「A、B和C改了」一眼看出是三个人 ✓。
+    """
+    nicks = [n for n in nicks if n]
+    if not nicks:
+        return ""
+    if len(nicks) == 1:
+        return nicks[0]
+    return "、".join(nicks[:-1]) + "和" + nicks[-1]
+
+
+async def _mark_notified(task_id: int) -> None:
+    """把「报过了」这一刻记下来 ✓ —— 下一版就只算**这次之后**发话的人 ✓。
+
+    ⚠️ **必须在通知真的发出去之后才调** ✗→✓ —— 反过来的话，
+       `_say_system` 抛错（数据库抽风 ✓）时水位线已经被推进了 ✗，
+       而**一句都没发到主群聊** ✗ → 这批人**永远不念** ✗
+       （丢通知，而且是**静默丢** ✗ —— 正是这个项目最怕的那种 ✗）。
+    """
+    await execute(
+        "UPDATE workshop_tasks SET notified_at = ? WHERE id = ?",
+        (int(now()), int(task_id)))
+
+
 async def _say_system(group_id: int, text: str, *, no_link: bool = False) -> None:
     """往**主群聊**放一条系统消息。
 
@@ -975,14 +1054,28 @@ async def components_save(body: ComponentSaveIn) -> dict:
     #    所以「记账」里的「」是**普通文字** ✓，名字本身照样标蓝可点 ✓。
     #    （这条注释 2026-10-07 写的结论是错的 ✗，当时按"引号会被一起吃掉"记的 ✓。）
     #
-    # ⚠️ **「谁」从票 → 任务 → 用户反查** ✓（`task_id` 在票上 ✓）：
-    #    拿不到就是老票（迁移前派出去的 ✓）→ 退回不带人的旧话术 ✓，不猜 ✓。
-    nick = await _maker_nickname(task_id)
+    # ⚠️ **「谁」念的是「这一版参与的人」，不是「这条对话的主人」** ✗→✓（2026-10-12 ✓）——
+    #   群共享之后，一个组件做成 / 改好之前可能有**好几个成员**都在这条对话里说过话 ✓
+    #   → 把**他们都标上** ✓（用户原话：「把所有参与成员都标上，
+    #     标完后状态清楚，下次谁修改标谁」✓）。
+    #   判据见 `_participants_nicks` ✓ —— 只算**上一次报完之后**发话的 ✓。
+    #
+    # ⚠️ **一个都取不到就退回老话术** ✗→✓：
+    #   · 老票（迁移前派出去的 ✓，票上没有任务号 ✓）
+    #   · 或者**这次报完之后没人再发过话**（例如 poke 轮自己触发的落版 ✓）
+    #   两种都不猜名字 ✗ —— 编一个"某某"出来比不带人糟 ✗（那是编事实 ✗）。
+    nicks = await _participants_nicks(task_id)
+    nick = _join_names(nicks)
+    if not nick:
+        nick = await _maker_nickname(task_id)
     if slug == WALL_SLUG or version > 1:
         line = f"改了「{want_title}」，快去看看吧～"
     else:
         line = f"做了一个新组件：「{want_title}」，快去看看吧～"
     await _say_system(group_id, nick + line)
+    # ⚠️ **通知真的发出去之后**才把水位线推进 ✗→✓ —— 见 `_mark_notified` 那段 ✓。
+    if task_id:
+        await _mark_notified(task_id)
     log.info("组件落成：群 %s 的 %s v%s" + ("（顺手收掉 v%s）" if pruned else ""),
              group_id, slug, version, pruned)
     return {"ok": True, "slug": slug, "version": version, "state": "draft",

@@ -512,15 +512,25 @@ async def _abort(group_id: int, user_id: int) -> int | None:
 _WS_SELECT = """
 SELECT m.id, m.group_id, m.user_id, m.task_id, m.sender_type, m.msg_type,
        m.content, m.media_path, m.media_meta, m.reply_to, m.created_at,
-       -- 引用的是**本表**的另一条 ✓（工坊里就你和助手两个人，
-       -- 所以昵称只有两种：你、或者助手 ✓ —— 助手那个名字是**可改的** ✓，
-       -- 由前端按 `wsCur.assistant.name` 现取 ✓，这里给个标记就行 ✓）
-       q.id           AS quote_id,
-       q.sender_type  AS quote_sender_type,
-       q.msg_type     AS quote_msg_type,
-       q.content      AS quote_content
+       -- ★ **群里另一个人发的话也要认得出是谁** ✓（2026-10-12）——
+       --   对话改成群共享之后，一条对话里可能有好几个人 ✓。
+       --   不 join 出来的话前端只有 `sender_type='user'` 可判 ✓，
+       --   而"这条是不是**我自己**发的"只有比 `user_id` 才知道 ✗
+       --   → 于是 B 看 A 发的，被画成了 B 自己发的 ✗（用户实测报的 ✓）。
+       --   头像一起带 ✓（没头像时前端用首字兜 ✓，和群聊同一个路子 ✓）。
+       u.nickname   AS user_nickname,
+       u.avatar     AS user_avatar,
+       -- 引用的是**本表**的另一条 ✓ —— 昵称同样要 join ✓：
+       -- 引用的那条可能是**另一个人**发的（见上面那段 ✓）。
+       q.id                    AS quote_id,
+       q.sender_type           AS quote_sender_type,
+       q.msg_type              AS quote_msg_type,
+       q.content               AS quote_content,
+       qu.nickname             AS quote_sender_nickname
 FROM workshop_messages m
+LEFT JOIN users u ON u.id = m.user_id
 LEFT JOIN workshop_messages q ON q.id = m.reply_to
+LEFT JOIN users qu ON qu.id = q.user_id
 """
 
 
@@ -546,14 +556,24 @@ def _greeting(ts: int | None = None) -> str:
 
 
 def _ws_msg(row: dict[str, Any], assistant_name: str) -> dict[str, Any]:
-    """一条工坊消息 → 前端要的形状 ✓（**和群聊那条同一个形状** ✓）。"""
+    """一条工坊消息 → 前端要的形状 ✓（**和群聊那条同一个形状** ✓）。
+
+    ⚠️ **只补助手那个名字** ✓ —— 人是**真名** ✓（从 `users` join 出来的
+       `user_nickname` / `quote_sender_nickname` ✓），**不改** ✗
+       （和群聊那条同一个道理 ✓：引用、发出去的字都要用真名 ✗）。
+    助手那个名字是**群级设置、随时能改** ✓，所以现算 ✓。
+    """
     out = dict(row)
     out["media_meta"] = _load_json(row.get("media_meta"))
     out["quote"] = _quote(row) if row.get("quote_id") else None
     if out["quote"]:
-        # 引用条上的"谁"——工坊里就两个人 ✓，助手那个名字是群级设置 ✓。
-        out["quote"]["sender_nickname"] = (
-            assistant_name if out["quote"].get("sender_type") == "agent" else "你")
+        # ⚠️ **只在它是助手的时候改** ✗→✓（2026-10-12）——
+        #   原来一律写 "你" ✗，那是「对话里只有你和我」那套 ✓。
+        #   群共享之后，引用的那条可能是**群里另一个人**发的 ✗
+        #   → 引用条上就写着"你" ✗（其实是你自己没说过这话 ✗）。
+        #   人的名字 `_quote` 已经从 `quote_sender_nickname` 填好了 ✓，不用动 ✓。
+        if out["quote"].get("sender_type") == "agent":
+            out["quote"]["sender_nickname"] = assistant_name
     return out
 
 

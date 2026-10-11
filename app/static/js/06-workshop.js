@@ -930,13 +930,23 @@
   let wsPending = null;      // {file, url}
   let wsQuote = null;        // {id, sender_type, msg_type, content}
 
+  /** 引用条上的「谁」—— **三种可能** ✓（2026-10-12 ✓）：
+      · 小助手 ✓（名字是群级设置、随时能改 ✓，所以每次现取 ✓）
+      · **我** · **群里另一个人** ✓（各自的真昵称 ✓）
+      ⚠️ 原来只判 `sender_type`、人的那一支一律写「你」✗ ——
+         那是「这条对话里只有你和我」那套 ✓。
+         对话改成**群共享**之后，被引用的那条可能是**另一个人**发的 ✗
+         → 引用条上写着「你」✗（其实是你自己没说过那句话 ✗）。 */
+  const wsQuoteWho = (q) => q.sender_type === 'agent'
+    ? (wsCur.assistant.name || 'diy 小助手')
+    : ((q && q.sender_nickname) || '某人');
+
   /** 气泡里那块引用条 ✓ —— 和群聊那份**同一套 class** ✓（`.quote` ✓）。 */
   const buildWsQuoteEl = (q) => {
     const el = document.createElement('div');
     el.className = 'quote';
     const who = document.createElement('div'); who.className = 'qwho';
-    who.textContent = q.sender_type === 'agent'
-      ? (wsCur.assistant.name || 'diy 小助手') : '你';
+    who.textContent = wsQuoteWho(q);
     const tx = document.createElement('div'); tx.className = 'qtext';
     tx.textContent = q.msg_type === 'image' ? '[图片]' : (q.content || '');
     el.append(who, tx);
@@ -950,8 +960,7 @@
     const el = $('#wsQbar');
     if (!el) return;
     if (!wsQuote) { el.hidden = true; return; }
-    $('#wsQwho').textContent = wsQuote.sender_type === 'agent'
-      ? (wsCur.assistant.name || 'diy 小助手') : '你';
+    $('#wsQwho').textContent = wsQuoteWho(wsQuote);
     $('#wsQtext').textContent = wsQuoteText(wsQuote);
     el.hidden = false;
   };
@@ -993,37 +1002,59 @@
       wsCur.seen[m.id] = 1;
     }
     const box = $('#wsMsgs');
-    const mine = m.sender_type === 'user';
+    // ⚠️ **「这条是不是我自己发的」要拿 `user_id` 比** ✗→✓（2026-10-12，用户实测报的）——
+    //   对话改成**群共享**之后，一条对话里可能有**好几个成员**发的话 ✓。
+    //   原来只判 `sender_type === 'user'` ✗，于是群里另一个人打开这条对话时，
+    //   **别人发的那条也被当成「我发的」** ✗，而且错得很像坏了：
+    //   · 画在**我这一侧** ✗
+    //   · 挂的是**我的头像、我自己的昵称** ✗（用户原话：
+    //     「群里谁发的就是谁发的，不该混淆」✓）
+    //   · 而且**头顶不挂名字** ✗ —— 因为名字"只挂在它那边"，
+    //     那一侧正好被算成了「我的」✗ → 谁发的**彻底看不出来** ✗
+    //   和群聊那边**同一个判据** ✓（`04-chat.js` 的 `m.sender_id === me.id` ✓）。
+    const isUser = m.sender_type === 'user';
+    const mine = isUser && m.user_id != null && !!me && m.user_id === me.id;
+    const peer = isUser && !mine;          // 群里另一个人发的 ✓
     // ⚠️ 长按要回头找这条消息的完整信息 ✓（引用用 ✓）—— 和群聊那边同一张表 ✓。
     if (m && m.id != null) _wsById.set(m.id, m);
     const row = document.createElement('div');
     row.className = 'mkrow ' + (mine ? 'mine' : 'agent');
     if (m && m.id != null) row.dataset.id = String(m.id);
     // ★ 头像（2026-10-07 深夜 ✓）—— 用户定的「组件聊天界面也需要有用户区别」✓。
-    //   你那边用**你自己的头像** ✓（和群聊里同一张 ✓，一眼认得出是自己 ✓）；
-    //   它那边用小助手那张 ✓（没设就是一个首字 ✓）。
+    //   三方各自那张图 ✓：我 → 我自己的 ✓；群里另一个人 → **他自己的** ✓
+    //   （2026-10-12 ✓）；小助手 → 它那张 ✓。没头像时都是一个首字兜 ✓。
+    //   ⚠️ **成员的头套用 `shellURL`** ✗→✓ —— 用户头像住在壳那边 ✓，
+    //      小助手那张住在本服务的 `/ui/` 下 ✓（见 `paintZhi` 那段 ✓）；
+    //      拼错了就是"取不到、只剩一个首字"✗，看着永远像"还没设置"✗。
     const av = document.createElement('div');
     av.className = 'av';
     if (mine) paintZhi(av, shellURL(me && me.avatar), (me && me.nickname) || '我');
+    else if (peer) paintZhi(av, shellURL(m.user_avatar), m.user_nickname || '?');
     else paintZhi(av, wsCur.assistant.avatar, wsCur.assistant.name || '助');
     // ★ **点头像进详情** ✗→✓（用户定的："比如点击头像进入详情啊"✓）——
     //   和群聊那边**同一条去向** ✓：它 → **小助手的设置** ✓（名字头像都在这儿改 ✓）；
-    //   你 → 回壳的「我的」 ✓（那才是"你自己的详情" ✓，这儿没有第二份 ✓）。
+    //   我 → 回壳的「我的」 ✓（那才是"你自己的详情" ✓，这儿没有第二份 ✓）；
+    //   群里另一个人 → **他的那一屏** ✓（可设备注 ✓）—— 和群聊那个头像同款 ✓。
     // ⚠️ 回壳时**要带上 `'wsChat'`** ✗→✓（2026-10-08）—— 带上了，
     //   从「我的」按返回才会**回到这条对话** ✓；不带的话回的是群聊首页 ✗
     //   （用户原话："点击自己头像进入我的，但是返回的却是生活管家聊天界面"✓）。
     av.onclick = (ev) => {
       ev.stopPropagation();
-      if (mine) openMe(); else openDiySet();
+      if (mine) openMe();
+      else if (peer) openPeer(m.user_id);
+      else openDiySet();
     };
     const wrap = document.createElement('div');
     wrap.className = 'wrap2';
     if (!mine) {
-      // ⚠️ 名字**只挂在它那边** ✓ —— 你的名字你自己知道 ✓，
-      //    而**它叫什么随时能改** ✓（改了要立刻看得见 ✓）。
+      // ⚠️ 名字**只挂在不属于我的那些气泡上** ✓ ——
+      //   我自己的名字我自己知道 ✓；
+      //   别人的名字**必须写出来** ✓（否则分不清是谁发的 ✗）；
+      //   小助手那个名字**随时能改** ✓，所以每次现取 ✓。
       const who = document.createElement('div');
       who.className = 'who';
-      who.textContent = wsCur.assistant.name || 'diy 小助手';
+      who.textContent = peer ? (m.user_nickname || '?')
+                             : (wsCur.assistant.name || 'diy 小助手');
       wrap.appendChild(who);
     }
     const b = document.createElement('div');

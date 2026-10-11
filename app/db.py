@@ -333,7 +333,16 @@ CREATE TABLE IF NOT EXISTS workshop_tasks (
     --    ② （原来还有一条：计"未固化"额度时好分清两种对话 ✓ —— 那道闸
     --        2026-10-07 深夜跟着"固化"整套撤了 ✓，这条用途也就没了 ✓）
     --       —— 不然改一个已保留的组件会白占一个名额 ✓（那是用户最烦的那种拦 ✓）。
-    slug       TEXT
+    slug       TEXT,
+    -- ★ **上一次在主群聊里报过「做好了 / 改好了」的那一刻** ✓（2026-10-12 ✓）。
+    --   它只干一件事：算「**这一版是谁一起做的**」✓。
+    --   落成时把**这一刻之后发过话的成员**全标出来 ✓，再把这条推进到此刻 ✓
+    --   → 下一版就只算**报过之后**发话的人 ✓（用户定的
+    --     「标完后状态清楚，下次谁修改标谁」✓）。
+    --   ⚠️ **NULL = 从没报过** ✗→✓ —— 老对话补出来就是 NULL ✓，
+    --      按「**从这条对话一开始就算**」处理（`COALESCE(…, 0)` ✓）。
+    --      猜成「只有最后一个人」比说全了糟 ✗ —— 那是编 ✗。
+    notified_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_workshop_tasks
     ON workshop_tasks(group_id, user_id, updated_at DESC);
@@ -513,6 +522,9 @@ _MIGRATIONS: list[tuple[str, str, str]] = [
     ("workshop_tasks", "title", "TEXT"),
     # 在等子代理交付（见 SCHEMA 里那段 ✓）—— 落库是为了**重启后能捡回来** ✓。
     ("workshop_tasks", "awaiting", "INTEGER"),
+    # 「上一次在主群聊里报过做好了」的那一刻（见 SCHEMA 里那段 ✓）。
+    # 老对话补出来是 NULL ✓ = 从没报过 ✓ = 按「从一开始就算」处理 ✓。
+    ("workshop_tasks", "notified_at", "INTEGER"),
     # 这一版在"容纳界面"里怎么展示（见 SCHEMA 里那段 ✓）。
     ("components", "spot_json", "TEXT"),
     # 工坊聊天的图片和引用（2026-10-07 深夜，见 SCHEMA 里那段 ✓）。
