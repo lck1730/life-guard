@@ -403,7 +403,7 @@ def session_id_for(group_id: int) -> str:
     return f"lifeguard-group-{group_id}"
 
 
-def diy_session_id_for(group_id: int, user_id: int, task_id: int) -> str:
+def diy_session_id_for(group_id: int, task_id: int) -> str:
     """创意工坊那条会话 —— **一条任务一条** ✓。
 
     ⚠️ **每用户一条** 是不够的 ✗→✓（2026-10-07 改）。原来只带 uid，
@@ -418,8 +418,14 @@ def diy_session_id_for(group_id: int, user_id: int, task_id: int) -> str:
       （见 `routes_workshop._my_tasks` ✓），两个人看的是**同一条对话** ✓，
       那就必须是**同一条历史** ✗✓：一个组件的来龙去脉写在一条线里，
       换个人接着改，前面的话才在 ✓。
-      参数还留着 `user_id`（调用方在传 ✓），但**不进这个 id** ✗ ——
-      进了就是又变回一人一条，等于白改 ✓。
+      ⚠️ **连参数也删了** ✗→✓（2026-10-12）—— 2026-10-11 那次改的时候
+      我只删了 id 里的用户号 ✓，参数留着没删 ✓，而 `workshop.py` 的两个调用处
+      已经按「不带 user_id」在传了 ✗ →
+      **整个工坊从此每一轮都在这一行抛 TypeError** ✗，
+      又被 `_run_turn` 的 `try` 吞成一句「（这一轮没跑通…）」✗
+      —— `py_compile`、preflight、import 检查全都不看**参数个数** ✗，
+      只有真跑一轮才撞得见 ✗。少一个参数比留一个废参数安全得多 ✓：
+      留着的这个谁都想不起来要传 ✗，删了之后传多了当场就报错 ✓。
 
     ⚠️ **session key 不改** ✓ —— 见 `session_key_for` ✓：
        共用它 = **记忆**是同一份 ✓（它能想起主群聊里说过什么 ✓ ——

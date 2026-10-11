@@ -444,9 +444,18 @@ async def _void_tickets(task_id: int) -> int:
     return int(n or 0)
 
 
-async def _register_turn(group_id: int, task_id: int,
-                         coro: "asyncio.Coroutine") -> "asyncio.Task":
+def _register_turn(group_id: int, task_id: int,
+                   coro: "asyncio.Coroutine") -> "asyncio.Task":
     """把一轮**登记成「在跑」** ✓，并挂好"跑完摘掉"的回调 ✓。
+
+    ⚠️ **这是个**同步**函数** ✗→✓（2026-10-12 修的真 bug）——
+       它里面没有 `await` ✓，全是同步动作（`create_task` + 写字典 + `add_done_callback`）✓。
+       我一度写成 `async def` ✓，而三处调用都**没 `await`** ✗ →
+       协程对象被创建又丢弃 ✓ → `create_task` 从没执行 ✓ → **那一轮根本没跑** ✗。
+       症状是：HTTP 已经 200 ✓、用户消息也画上了 ✓，屏幕上是「我说了话，它没回」✗。
+       **`py_compile` 和 preflight 都过不去这种** ✗，Python 只给一条 RuntimeWarning ✗
+       （`coroutine '_register_turn' was never awaited` ✓）—— 所以那道断言加在了调用处 ✓。
+       **别再给它加回 `async`** ✗。
 
     ⚠️ **`_running` 的写入口只有这一处** ✗✓（掐掉走 `_abort` ✓）——
        两处各写一遍登记逻辑，早晚有一处**漏掉 `add_done_callback`** ✗
@@ -1356,6 +1365,28 @@ async def task_say(group_id: int, task_id: int, body: TaskSayIn,
         group_id, row["id"],
         _run_turn(group_id, user["id"], row["id"], text,
                   msg_type=kind, media_path=body.media_path or None, quote=q))
+
+    # ⚠️ **登记没生效就当场说一声** ✗→✓ —— 2026-10-12 用户实测踩到的：
+    #   「新建了一个记账组件的聊天，我提了需求它不理我」✗。
+    #   那一轮**根本没跑** ✓，可 HTTP 已经 200 了 ✓、用户消息也画上了 ✓
+    #   → 屏幕上就是「我说了话，它没回」✗，而且**没有任何报错** ✓。
+    #   根因是 `_register_turn` 被我写成 `async def` 而这里没 `await` ✓
+    #   → 协程被创建又丢弃 ✓ → `create_task` 从没执行 ✓ → `_run_turn` 也没人消费 ✓。
+    #   **`py_compile`、preflight、import 检查全部看不出来** ✗，
+    #   Python 只给一条 RuntimeWarning ✗（`coroutine '_register_turn' was never awaited` ✓）。
+    #   所以光靠检查发现不了 —— 只能在这里留一道断言 ✓：
+    #   把「静默不答」换成「当场说一声」✓。前者能查，后者只能猜 ✗。
+    reg = _running.get(group_id)
+    if not reg or int(reg[0]) != int(row["id"]) or reg[1].done():
+        log.error("工坊：群 %s 任务 %s 那一轮**没登记上** —— HTTP 已 200，用户那句话没人接",
+                  group_id, row["id"])
+        try:
+            warn = await _save(group_id, user["id"], row["id"], "agent",
+                               "（这一轮没跑起来 —— 你刚才那句话还没人接，再发一遍试试。）")
+            await _push(user["id"], {"type": "ws_message", "data": warn})
+        except Exception:
+            log.exception("工坊：连「没跑起来」那句提示都写不进去（群 %s 任务 %s）",
+                          group_id, row["id"])
     return {"ok": True, "message": msg}
 
 
