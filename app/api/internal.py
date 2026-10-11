@@ -84,7 +84,16 @@ async def records_add(body: RecordAddIn) -> dict:
         # 抛 HTTP 错误的话工具那边只会拿到"后端返回 400"，模型看到的是一句
         # 它既看不懂也修不了的话——它接下来就会开始乱试别的工具（踩过）。
         return {"ok": False, "error": err}
-    return {"ok": True, "record": record}
+    # ★★ **回空壳，不回那条记录** ✗→✓（2026-10-11 用户：
+    #   「id 漏了…说创建了"××"类型的记录，这个按理也不该说，只说记住了就好」✓）。
+    #
+    # ⚠️ **它说漏的东西，全是我们递给它的** ✗ —— 实测它把 `id=1` 报给了用户 ✓，
+    #    那串 id 就是从这儿来的 ✓。**光在提示词里写"别说"是没用的** ✗
+    #    （这条已经实证过一次 ✓），**别给它可说的东西**才是闸门 ✓。
+    #
+    # ⚠️ **id 它真的不需要** ✗：要改/删**先 `record_query` 拿** ✓（那一步本来就有 ✓，
+    #    也正是"不许凭印象报数字"那条要求的 ✓）。加完这一条就结束了 ✓。
+    return {"ok": True}
 
 
 class RecordUpdateIn(BaseModel):
@@ -172,7 +181,10 @@ async def records_define(body: KindDefineIn) -> dict:
     err = await rec.define_kind(body.group_id, body.kind, body.schema_)
     if err:
         return {"ok": False, "error": err}
-    return {"ok": True, "kind": body.kind}
+    # ★ **同样不回空壳** ✗→✓ —— `kind` 是**它自己刚传进来的** ✓，
+    #   回显一遍没有半点信息量 ✓，却给了它一句"我建了个什么"可以复述 ✓
+    #   （用户原话：「说创建了"××"类型的记录，这个按理也不该说」✓）。
+    return {"ok": True}
 
 
 # ── 主动往群里说话 ────────────────────────────────────────────────────
@@ -242,8 +254,15 @@ async def reminders_add(body: ReminderAddIn) -> dict:
     if fire_at is None:
         return {"ok": False, "error": "要给个时间：fire_at（unix 秒）、in_minutes（几分钟后）、"
                                       "或者 hour+minute（几点，配 repeat_daily 就是每天）。"}
-    rid = await rem.add(body.group_id, body.text, int(fire_at), repeat_daily=body.repeat_daily)
-    return {"ok": True, "id": rid, "fire_at": int(fire_at),
+    await rem.add(body.group_id, body.text, int(fire_at), repeat_daily=body.repeat_daily)
+    # ★ **不回 `id`、也不回 `fire_at`** ✗→✓（2026-10-11，同上面两条）——
+    #   · `id` 是内部编号 ✓，说给用户听毫无意义 ✓（要取消先 `reminder_list` ✓）
+    #   · `fire_at` 是 **unix 秒** ✗ —— 实测它**拿去自己换算、还算错了** ✓，
+    #     然后把那句错话+一串推理讲给了用户听 ✓（"返回的时间是 10 月 11 号…"✗）。
+    #     我们自己算好给他就行 ✓，别把生料丢给他去加工 ✓。
+    # ⚠️ `when`（人话时间 ✓）**留着** ✓ —— 他要跟用户核对"定在什么时候" ✓，
+    #    而且那是**我们算好的**✓，他不用再动脑子 ✓。
+    return {"ok": True,
             "when": time.strftime("%Y-%m-%d %H:%M", time.localtime(int(fire_at)))}
 
 
