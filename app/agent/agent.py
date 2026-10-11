@@ -412,14 +412,21 @@ def diy_session_id_for(group_id: int, user_id: int, task_id: int) -> str:
     做 A 时说过的话，在做 B 的时候还在上下文里 ✓。
 
     带上任务号之后**真的分开了** ✓。插件那边的 `_SESSION_RE` 是 `search` ✓，
-    `…-diy-u2-t7` 照样解析出群号 ✓（任务号另有一个正则 ✓，见插件 ✓）。
+    `…-diy-t7` 照样解析出群号 ✓（任务号另有一个正则 ✓，见插件 ✓）。
+
+    ★ **2026-10-11：不带用户号了** ✗→✓ —— 对话变成**群共享**之后
+      （见 `routes_workshop._my_tasks` ✓），两个人看的是**同一条对话** ✓，
+      那就必须是**同一条历史** ✗✓：一个组件的来龙去脉写在一条线里，
+      换个人接着改，前面的话才在 ✓。
+      参数还留着 `user_id`（调用方在传 ✓），但**不进这个 id** ✗ ——
+      进了就是又变回一人一条，等于白改 ✓。
 
     ⚠️ **session key 不改** ✓ —— 见 `session_key_for` ✓：
        共用它 = **记忆**是同一份 ✓（它能想起主群聊里说过什么 ✓ ——
        用户点名的"同一份 profiles 是对的"就在这儿 ✓），
        而**历史是按任务分开的** ✓。
     """
-    return f"lifeguard-group-{group_id}-diy-u{user_id}-t{int(task_id)}"
+    return f"lifeguard-group-{group_id}-diy-t{int(task_id)}"
 
 
 def session_key_for(group_id: int) -> str:

@@ -97,27 +97,30 @@ router = APIRouter(prefix="/api/workshop", tags=["workshop"])
 #: ⚠️ 合成一把的话，做组件那几分钟**主群完全不理人** ✓ ——
 #:    用户会以为坏了 ✓（那正是最不该在"做个新东西"时发生的事 ✓）。
 #:    代价是同一个 profile 上可能同时跑两个 turn ✓ —— 但那本来就是 Hermes 支持的 ✓。
-_diy_locks: dict[tuple[int, int], asyncio.Lock] = {}
+#
+# ★ **2026-10-11：键从 `(群, 人)` 改成 `(群)`** ✗→✓ —— 对话变成群共享之后
+#    （见 `_my_tasks` / `_own_task` ✓），一把锁必须管住**整个群** ✓：
+#    不然两个人各自持着自己的锁 ✓，同一条对话里就能同时跑两轮 ✗。
+_diy_locks: dict[int, asyncio.Lock] = {}
 
-#: 「现在哪条任务在跑」—— 每 `(群, 用户)` 至多一条 ✓。
+#: 「现在哪条任务在跑」—— 每个**群**至多一条 ✓。
 #:
 #: ⚠️ **判断"忙不忙"看这里，不看锁** ✗→✓（2026-10-07）：
 #:    切换时要 `cancel()` ✓，而锁是在被掐掉的那个协程**退栈的过程中**才放的 ✓ ——
 #:    中间那几毫秒锁还锁着 ✓。拿锁当判据的话，用户切过去一张嘴就被告知
 #:    「它手上还有活」✓ —— 而它明明已经被掐了 ✗（"明明成功了却像失败" ✓）。
 #:    这里一 `pop` 就立刻不忙 ✓，锁只负责把两个 `_run_turn` 串起来 ✓。
-_running: dict[tuple[int, int], tuple[int, asyncio.Task]] = {}
+_running: dict[int, tuple[int, asyncio.Task]] = {}
 
 
-def _lock_for(group_id: int, user_id: int) -> asyncio.Lock:
-    key = (group_id, user_id)
-    if key not in _diy_locks:
-        _diy_locks[key] = asyncio.Lock()
-    return _diy_locks[key]
+def _lock_for(group_id: int) -> asyncio.Lock:
+    if group_id not in _diy_locks:
+        _diy_locks[group_id] = asyncio.Lock()
+    return _diy_locks[group_id]
 
 
-def _busy(group_id: int, user_id: int) -> bool:
-    item = _running.get((group_id, user_id))
+def _busy(group_id: int) -> bool:
+    item = _running.get(group_id)
     return bool(item) and not item[1].done()
 
 
@@ -139,24 +142,17 @@ async def push_workshop_status(group_id: int, state: str,
       带上任务号之后，前端只认**自己正在看的**那条 ✓ ——
       别人在做组件时不会在他屏幕上闪一行 ✓。
 
-    ⚠️ 拿不到任务号时**退回广播** ✓ —— 那是迁移前的老路径 ✓（票里没记是谁派的 ✓）。
-      工坊页对未知/无关的推送本来就忽略 ✓，所以退回去是安全的 ✓，只是多推几条 ✓。
+    ★ **2026-10-11：改回广播，任务号留着** ✗→✓ ——
+      对话变成**群共享**之后（见 `_my_tasks` / `_own_task` ✓），
+      "做好了"这件事**不属于开它的那个人** ✓ —— 群里有谁开着这条对话，
+      谁都应该看得见 ✓。带上任务号，前端只认**自己正在看的**那条 ✓，
+      多余的几条它本来就忽略 ✓（多推几条，不多闪几行 ✓）。
     """
-    uid = None
-    if task_id:
-        row = await fetch_one("SELECT user_id FROM workshop_tasks WHERE id = ?",
-                              (int(task_id),))
-        uid = int(row["user_id"]) if row else None
-    if uid:
-        await _push(uid, {"type": "ws_status",
-                          "data": {"group_id": group_id, "task_id": int(task_id),
-                                   "state": state}})
-        return
     from ..core.messages import group_member_ids
     try:
         await hub.broadcast(await group_member_ids(group_id),
                             {"type": "ws_status",
-                             "data": {"group_id": group_id, "task_id": None,
+                             "data": {"group_id": group_id, "task_id": task_id,
                                       "state": state}})
     except Exception:  # noqa: BLE001
         log.debug("工坊状态推送失败 group=%s", group_id, exc_info=True)
@@ -177,12 +173,13 @@ async def _own_task(group_id: int, user_id: int, task_id: int) -> dict:
        而不是"查出来再判"✗：查出来再判的话，那个 `if` 漏了就是泄露 ✓）。
     """
     row = await fetch_one(
-        # ★ 「组件收纳页」那条**对所有人开放** ✓（它是群共用的 ✓，见 `_my_tasks` ✓）；
-        #    别的对话照旧只看自己的 ✓ —— 这条判据要和列表那边**一致** ✗✓
-        #    （一边列出来、另一边 404，用户看到的是"点了没反应" ✗）。
-        "SELECT * FROM workshop_tasks WHERE id = ? AND group_id = ?"
-        "   AND (user_id = ? OR slug = ?)",
-        (int(task_id), group_id, user_id, WALL_SLUG))
+        # ★ **2026-10-11：这个群的所有对话都对这个群开放** ✗→✓ ——
+        #   原来只放 `wall` 那一格 ✓（"组件收纳页是群共用的"✓），
+        #   现在组件对话也是 ✓（用户：组件属于群，不属于开它的那个人 ✓）。
+        #   ⚠️ 判据要和 `_my_tasks` 那边**一致** ✗✓（一边列出来、另一边 404，
+        #   用户看到的是"点了没反应" ✗）。
+        "SELECT * FROM workshop_tasks WHERE id = ? AND group_id = ?",
+        (int(task_id), group_id))
     if not row:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "没有这条对话")
     return dict(row)
@@ -219,12 +216,14 @@ async def _my_tasks(group_id: int, user_id: int) -> list[dict]:
         "       (SELECT c.title FROM components c WHERE c.task_id = t.id"
         "         ORDER BY c.version DESC LIMIT 1) AS title"
         "  FROM workshop_tasks t"
-        # ★ 2026-10-09：**「组件收纳页」那条对谁都在** ✗→✓ ——
-        #   它是这个群的一件东西 ✓，不是"谁开的对话" ✗（用户：「应该在创意工坊里
-        #   默认存在」✓）。别的对话照旧只看自己的 ✓。
-        " WHERE t.group_id = ? AND (t.user_id = ? OR t.slug = ?)"
+        # ★ **这个群的全部对话都列** ✗→✓（2026-10-11）——
+        #   原来只放 `wall` 那一格 ✓（「组件收纳页应该在创意工坊里默认存在」✓），
+        #   现在组件对话也是 ✓（组件属于群，不属于开它的那个人 ✓）。
+        #   ⚠️ `user_id` 参数**留着不删** ✓ —— 调用方都还传着 ✓，
+        #   而且它现在只表示"是谁开的" ✓（`_participants` 头像那排还靠它 ✓）。
+        " WHERE t.group_id = ?"
         " ORDER BY t.updated_at DESC, t.id DESC",
-        (group_id, user_id, WALL_SLUG))
+        (group_id,))
     # 每个 slug 现在的标题 —— 一次查完 ✓（对话一多，逐个查就是 N+1 ✓）
     # ⚠️ 一次查完 ✓（对话一多，逐个查就是 N+1 ✓）——
     #    **顺手把 icon 也带回来** ✓：导航那一行左边那个图标就是它 ✓，
@@ -306,7 +305,7 @@ async def _participants_all(group_id: int) -> dict[str, list[dict]]:
 
 def _busy_task(group_id: int, task_id: int) -> bool:
     """这一轮是不是**正在跑** ✓（内存里那张表，见 `_running` ✓）。"""
-    for (gid, _uid), (tid, task) in _running.items():
+    for gid, (tid, task) in _running.items():
         if gid == group_id and tid == task_id and not task.done():
             return True
     return False
@@ -331,30 +330,60 @@ async def _doing_for(group_id: int, user_id: int) -> dict | None:
     ⚠️ 名字取**组件名**（`components.title` ✓）—— 用户那句说的是"正在[组件名称]" ✓；
       还没落成组件时退回**对话名** ✓（就是他开做时起的那个 ✓）。
     """
-    item = _running.get((group_id, user_id))
+    item = _running.get(group_id)
     if not item or item[1].done():
         return None
     tid = int(item[0])
     row = await fetch_one(
+        # ⚠️ **连"是谁在做"一起查** ✗→✓（2026-10-11）：
+        #   群共享之后，正在做的可能是**别人** ✓ —— 挡人那句得写清楚是谁 ✗✓。
+        #   ⚠️ `slug IS NULL` 是**"新建"**的标志 ✓（slug 到落成那一刻才写上去 ✓）
+        #      → 两个动词不一样：「正在修改…」/「正在新建组件…」✓（用户给的原话 ✓）。
         "SELECT t.id,"
-        "       COALESCE(t.slug, '')  AS slug,"
+        "       t.user_id AS owner_id,"
+        "       t.slug AS slug,"
         "       COALESCE(t.title, '') AS task_title,"
         "       COALESCE((SELECT c.title FROM components c"
         "                  WHERE c.group_id = t.group_id AND c.slug = t.slug"
-        "                  ORDER BY c.version DESC LIMIT 1), '') AS comp_title"
+        "                  ORDER BY c.version DESC LIMIT 1), '') AS comp_title,"
+        "       COALESCE((SELECT u.nickname FROM users u"
+        "                  WHERE u.id = t.user_id), '') AS owner_nickname"
         "  FROM workshop_tasks t WHERE t.id = ?",
         (tid,))
     if not row:
         return None
     what = str(row["comp_title"] or "").strip() or str(row["task_title"] or "").strip()
-    return {"task_id": tid, "slug": str(row["slug"] or ""), "title": what}
+    return {
+        "task_id": tid,
+        "slug": str(row["slug"] or ""),
+        "title": what,
+        # 对话主人（不是"这一轮按回车的人"✓ —— 拿不到发送者身份，见 internal._maker_nickname ✓）
+        "owner_id": int(row["owner_id"]),
+        "owner_nickname": str(row["owner_nickname"] or "").strip(),
+        # 有 slug = 在改现成的 ✓；没有 = 在做一个全新的 ✓
+        "is_new": not str(row["slug"] or "").strip(),
+    }
 
 
-async def _blocked_message(group_id: int, doing: dict) -> str:
-    """那句提示 ✓ —— **照用户给的原话写** ✓（「…正在[组件名称]，不能分心哦」✓）。"""
-    name = (await _assistant(group_id))["name"]
+async def _blocked_message(group_id: int, doing: dict, viewer_id: int) -> str:
+    """那句提示 ✓ —— **照用户 2026-10-11 给的原话写** ✓，**分两种人**：
+
+      · **是别人在做** → 「{他的昵称}正在修改「{组件}」，待会再来吧～」
+                         「{他的昵称}正在新建组件「{组件}」，待会再来吧～」
+      · **是自己开了两条** → 「{diy 助手名}正在忙「{组件}」，不能分心哦～」
+
+      ⚠️ 判"是不是自己"用**对话主人**（`owner_id` ✓），不是"这一轮谁按的回车"✓ ——
+         我们没拿发送者身份这条路（工具调用不带 ✓）。够准：同一条对话里
+         同时按回车的也只有一个人 ✓（`_running` 一整个群只有一条 ✓）。
+    """
     what = doing.get("title") or "一个组件"
-    return f"{name}正在「{what}」，不能分心哦"
+    if int(doing.get("owner_id") or 0) == int(viewer_id):
+        name = (await _assistant(group_id))["name"]
+        return f"{name}正在忙「{what}」，不能分心哦"
+    nick = doing.get("owner_nickname") or ""
+    verb = "正在新建组件" if doing.get("is_new") else "正在修改"
+    head = (nick + " " if nick else "")
+    return f"{head}{verb}「{what}」，待会再来吧～"
 
 
 async def _editing_map(group_id: int) -> dict[str, dict]:
@@ -366,7 +395,7 @@ async def _editing_map(group_id: int) -> dict[str, dict]:
     """
     out: dict[str, dict] = {}
     live = [(k, v) for k, v in _running.items()
-            if k[0] == group_id and not v[1].done()]
+            if k == group_id and not v[1].done()]
     if not live:
         return out
     ids = [v[0] for _, v in live]
@@ -426,7 +455,7 @@ async def _abort(group_id: int, user_id: int) -> int | None:
        所以只发信号、不等它 ✓：它自己会在下一个 await 点退栈 ✓，
        连接跟着关掉 ✓（Hermes 那边下一次往流里写就会发现 ✓）。
     """
-    key = (group_id, user_id)
+    key = group_id
     item = _running.pop(key, None)
     if not item:
         return None
@@ -633,7 +662,7 @@ async def poke_loop() -> None:
                     continue
                 if now() < w["next_at"]:
                     continue
-                if _busy(gid, uid):
+                if _busy(gid):
                     w["next_at"] = now() + 15          # 它在忙 ✓，等会儿再说 ✓
                     continue
                 w["gap"] = min(120, int(w["gap"] * 1.6))   # 退让 ✓
@@ -642,9 +671,9 @@ async def poke_loop() -> None:
                 #   两轮叠上去 ✓（`_busy` 看的就是这张表 ✓）。
                 task = asyncio.create_task(
                     _run_turn(gid, uid, w["task_id"], _POKE_TEXT, poke=True))
-                _running[(gid, uid)] = (w["task_id"], task)
+                _running[gid] = (w["task_id"], task)
                 task.add_done_callback(
-                    lambda t, k=(gid, uid): _running.pop(k, None)
+                    lambda t, k=gid: _running.pop(k, None)
                     if _running.get(k, (None, None))[1] is t else None)
         except asyncio.CancelledError:
             raise
@@ -663,8 +692,8 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
         它会说"我没看到图" ✓，而那和引用那个 bug 是**同一个形状** ✓
         （数据在、但没人告诉它 ✓，见 `_render_transcript` 那段 ✓）。
     """
-    key = (group_id, user_id)
-    async with _lock_for(group_id, user_id):
+    key = group_id
+    async with _lock_for(group_id):
         # ⚠️ **进锁之后再登记** ✗→✓ —— 反过来的话，等锁的那几毫秒里
         #    `_running` 已经是新的了 ✓，而旧的那条刚被 `_abort` 摘掉 ✓ ——
         #    中间会出现"以为在跑，其实没在跑"的窗口 ✓。
@@ -693,7 +722,7 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
             async for piece in _stream_completion(
                 group_id, text, images, profile,
                 system=system,
-                session_id=diy_session_id_for(group_id, user_id, task_id),
+                session_id=diy_session_id_for(group_id, task_id),
                 # ★ **工坊这条要用 diy 那一档模型** ✗→✓（2026-10-07 深夜 ✓）——
                 #   不写的话它跟着 profile 的默认走 ✓ = `chat` ✓ = **dots** ✗ ✓，
                 #   而 dots 是那个老报错的 ✓（用户报的"diy 怎么在用 dots"就是这个 ✓）。
@@ -790,7 +819,7 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                 async for piece in _stream_completion(
                     group_id, nudged, images, profile,
                     system=system,
-                    session_id=diy_session_id_for(group_id, user_id, task_id),
+                    session_id=diy_session_id_for(group_id, task_id),
                     role="diy",
                 ):
                     fixed.append(piece)
@@ -933,7 +962,7 @@ async def tasks_list(group_id: int, user: dict = Depends(current_user)) -> dict:
             # ★ **哪个组件正被人改着** ✓（用户定的：「如果有个组件某个用户正在创建
             #   和修改，需要在导航界面标注上」✓）。键是 slug ✓。
             "editing": await _editing_map(group_id),
-            "busy": _busy(group_id, user["id"]),
+            "busy": _busy(group_id),
             # ★ **正在做哪条** ✗→✓（2026-10-11）—— 前端要在**推屏之前**
             #   就知道该不该挡 ✓（不然后端拒了才弹提示 ✓，用户会看见
             #   那一屏**推进来又退回去** ✓ —— 那是这个项目最怕的"点了像坏了"✓）。
@@ -968,10 +997,29 @@ async def tasks_new(group_id: int, body: TaskNewIn | None = None,
     doing = await _doing_for(group_id, user["id"])
     if doing:
         return {"ok": False, "busy": True, "doing": doing,
-                "error": await _blocked_message(group_id, doing)}
+                "error": await _blocked_message(group_id, doing, user["id"])}
     want = (body.slug if body else "").strip().lower()
     if want and not _SLUG_OK.match(want):
         want = ""                       # 形状不对就当没给 ✓（不拦，当"做一个新的" ✓）
+    # ★ **一个组件只有一条对话** ✗→✓（2026-10-11）—— 对话群共享之后，
+    #   再插一条同 slug 的行就是**同一个组件两条对话** ✗：
+    #   `component_spots` 那条路、`_task_payload`、组件页的「继续改」都假设
+    #   一个 slug 只对应一条线 ✓（`main.py` 的组件接口也是查 `LIMIT 1` ✓）。
+    #   两条并排存在的话，谁"看见"哪一条就看运气 ✗。
+    #   所以：已经有了就**直接回那条** ✓，不新建 ✗。
+    if want:
+        ex = await fetch_one(
+            "SELECT id FROM workshop_tasks WHERE group_id = ? AND slug = ?"
+            " ORDER BY id LIMIT 1",
+            (group_id, want))
+        if ex:
+            tid = int(ex["id"])
+            log.info("工坊新任务：群 %s 用户 %s 想给 %s 开新对话 → 复用已有的 id=%s",
+                     group_id, user["id"], want, tid)
+            return {"ok": True,
+                    "task": await _task_payload(group_id, user["id"], tid),
+                    "messages": [],
+                    "assistant": await _assistant(group_id)}
     ts = now()
     got = (body.title if body else "").strip()[:40] if body else ""
     tid = await execute(
@@ -1067,7 +1115,7 @@ async def task_open(group_id: int, task_id: int,
         log.info("工坊占用：群 %s 用户 %s 正在做任务 %s，挡下打开 %s",
                  group_id, user["id"], doing["task_id"], task_id)
         return {"ok": False, "busy": True, "doing": doing,
-                "error": await _blocked_message(group_id, doing)}
+                "error": await _blocked_message(group_id, doing, user["id"])}
     await _touch(row["id"])
     # 历史走 `_WS_SELECT` ✓ —— 图片、引用、谁发的都在里面 ✓，
     # 前端才能用**同一段代码**画气泡 ✓（见 `_ws_msg` 那段 ✓）。
@@ -1101,7 +1149,7 @@ async def task_open(group_id: int, task_id: int,
             #   切走再切回来、退出重进、刷新，push 早就过去了 ✓
             #   → 那三秒里屏幕上是空的 ✓（"组件制作中"看不见了 ✓，而它明明还在做 ✓）。
             "making": _is_waiting(group_id, user["id"], int(task_id)),
-            "busy": _busy(group_id, user["id"])}
+            "busy": _busy(group_id)}
 
 
 @router.post("/{group_id}/tasks/{task_id}/stop")
@@ -1130,7 +1178,7 @@ async def task_stop(group_id: int, task_id: int,
     doing = await _doing_for(group_id, user["id"])
     if not doing or int(doing["task_id"]) != int(task_id):
         return {"ok": True, "stopped": None, "task_id": int(task_id),
-                "busy": _busy(group_id, user["id"])}
+                "busy": _busy(group_id)}
     killed = await _abort(group_id, user["id"])
     msg = None
     if killed:
@@ -1140,7 +1188,7 @@ async def task_stop(group_id: int, task_id: int,
         #   不补一句的话，对话里就是"我说了话，它什么都没回" ✓。
         msg = await _save(group_id, user["id"], killed, "agent", "（这一轮被你停掉了）")
     return {"ok": True, "stopped": killed, "task_id": int(task_id),
-            "message": msg, "busy": _busy(group_id, user["id"])}
+            "message": msg, "busy": _busy(group_id)}
 
 
 @router.post("/{group_id}/tasks/{task_id}/chat")
@@ -1184,7 +1232,7 @@ async def task_say(group_id: int, task_id: int, body: TaskSayIn,
     #
     # ⚠️ 而且是**当场说清楚**，不是排队 ✗→✓ —— 排队的话用户看到的是
     #    "我说话了，它没理我" ✓，过一会儿它突然回一句**上一个**的答案 ✓。
-    if _busy(group_id, user["id"]):
+    if _busy(group_id):
         return {"ok": False, "busy": True,
                 "error": ("它手上还有一个在做（要么在问你，要么在等那个小助手写完）。"
                           "**等这一轮完了再说**；真要停就按上面那个「停掉这一轮」。")}
@@ -1196,13 +1244,13 @@ async def task_say(group_id: int, task_id: int, body: TaskSayIn,
     await _touch(row["id"])
     await _push(user["id"], {"type": "ws_message", "data": msg})
 
-    key = (group_id, user["id"])
+    key = group_id
     task = asyncio.create_task(_run_turn(
         group_id, user["id"], row["id"], text,
         msg_type=kind, media_path=body.media_path or None, quote=q))
     _running[key] = (int(row["id"]), task)
 
-    def _done(t: asyncio.Task, _key: tuple[int, int] = key,
+    def _done(t: asyncio.Task, _key: int = key,
               _task: asyncio.Task = task) -> None:
         # 只摘自己那一条 ✓ —— 期间换过任务的话，`_running` 里已经是别人的了 ✓，
         # 这时候摘会把**新那条**误判成"没在跑" ✓。
@@ -1228,7 +1276,14 @@ async def task_delete(group_id: int, task_id: int,
     await require_member(group_id, user["id"])
     await _assert_open(group_id)
     row = await _own_task(group_id, user["id"], task_id)
-    running = _running.get((group_id, user["id"]))
+    # ⚠️ **「组件收纳页」这条不许删** ✗→✓（2026-10-11 补上 —— 代码里一直是缺的 ✗）：
+    #   删了它，那个界面就**再没有人能改了** ✓（`_ensure_wall_task` 只在
+    #   组件列表被拉的时候补建 ✓，靠它兜底不牢 ✗）。
+    #   ⚠️ 这条**只挡这一条** ✓ —— 别的对话照旧能删 ✓。
+    if str(row.get("slug") or "") == WALL_SLUG:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "「组件收纳页」这条不能删。")
+    running = _running.get(group_id)
     if running and running[0] == int(task_id) and not running[1].done():
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
                             "这条正在做，删不了。先切到别的对话，再回来删。")

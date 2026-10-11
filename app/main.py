@@ -865,17 +865,23 @@ async def component_render(
     # ★ 这一版是**哪条对话**做出来的（2026-10-07 ✓）—— 「继续改」靠它回到
     #   当初那条对话 ✓（不然每次点"继续改"都是一条全新的、什么都不记得的对话 ✓）。
     #
-    # ⚠️ **只在自己那条上返回** ✗→✓ —— 组件是全群共有的 ✓，但**对话是个人的** ✓。
-    #    别人做的那一版，`task_id` 指向的是**他的**对话 ✓ ——
-    #    照原样返回的话，前端会拿它去 `open` ✓，而那个接口按 `user_id` 查 ✓，
-    #    结果是个 404 ✓（用户看到"打不开"✗，而这本来该走"开条新的"✓）。
-    #    所以这里就查清楚 ✓：不是我的，返回 None ✓，前端去开一条新的 ✓。
+    # ★ **2026-10-11：谁都能回那条对话** ✗→✓（不再"只在自己那条上返回"）。
+    #   对话变成**群共享**之后（`routes_workshop._own_task` 只认 `group_id` ✓），
+    #   这个组件的来龙去脉就**只有一条线** ✓ —— 任何人点「继续改」都进**同一条** ✓，
+    #   前面那个人说的话才在上下文里 ✓。
+    #
+    #   原来的判法是：`task_id` 指的不是**当前用户**的那条就返回 None ✗ →
+    #   前端去开一条**新的** ✓。那正是"一人一条"造成的结果：
+    #   同一个组件在群里长出**好几个人各一条**的对话，互相看不见对方说过什么 ✗。
+    #
+    #   现在只认**同一个群** ✓（挡住跨群串门 ✓）；那条对话被删了（404）
+    #   就返回 None ✓，前端照旧走"开条新的"✓ —— 降级路径不变 ✓。
     task_id = row["task_id"] if "task_id" in row.keys() else None
     mine = None
     if task_id:
         own = await fetch_one(
-            "SELECT id FROM workshop_tasks WHERE id = ? AND group_id = ? AND user_id = ?",
-            (int(task_id), group_id, user["id"]))
+            "SELECT id FROM workshop_tasks WHERE id = ? AND group_id = ?",
+            (int(task_id), group_id))
         mine = int(own["id"]) if own else None
     return {"name": name, "version": int(row["version"]), "state": row["state"],
             "title": str(row["title"] or name),

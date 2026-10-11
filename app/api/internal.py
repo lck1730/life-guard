@@ -585,6 +585,27 @@ def _slug_ok(slug: str) -> bool:
 
 
 
+async def _maker_nickname(task_id: Any) -> str:
+    """**这条组件是谁做出来的** ✓（对话主人的昵称 ✓）。
+
+    链是 `component_tickets.task_id` → `workshop_tasks.user_id` → `users.nickname` ✓。
+    票上没有任务号（迁移前的老票 ✓）就返回空串 ✓ —— 调用方退回不带人的话术 ✗✓：
+    猜一个"某某"出来比不说糟 ✓（那等于编事实 ✗）。
+
+    ⚠️ **它说的是"这条对话的主人"** ✓，不一定是按下"开工"的那个人 ✓ ——
+       群共享之后，另一个人也能在这条对话里接着做 ✓。
+       我们拿不到"发那条消息的人"（工具调用不带发送者身份 ✗）→ 记对话主人 ✓，
+       比没有准 ✓。
+    """
+    if not task_id:
+        return ""
+    row = await fetch_one(
+        "SELECT u.nickname FROM workshop_tasks t"
+        "  JOIN users u ON u.id = t.user_id"
+        " WHERE t.id = ?", (int(task_id),))
+    return str((row or {}).get("nickname") or "").strip()
+
+
 async def _say_system(group_id: int, text: str, *, no_link: bool = False) -> None:
     """往**主群聊**放一条系统消息。
 
@@ -785,12 +806,26 @@ async def components_save(body: ComponentSaveIn) -> dict:
     if task_id:
         await stop_waiting(int(task_id))
     await push_workshop_status(group_id, "done", int(task_id) if task_id else None)
-    # ★ 文案是用户 2026-10-07 深夜定的 ✗→✓：
-    #   「[组件名称]做完了，快去看看吧。」✓
-    #   ⚠️ **名字两侧的「」不要** ✓ —— 客户端会把**名字本身**标成蓝色可点 ✓
-    #      （见 `renderContent` 那段 ✓），再加引号就变成"蓝引号包着黑字" ✓，
-    #      看着像没生效 ✓。
-    await _say_system(group_id, want_title + "做完了，快去看看吧。")
+    # ★ **只有一条通知，落在落成那一刻** ✓ —— 「开工」那条 2026-10-11 删了
+    #   （用户定的：从两条收到一条 ✓）。文案也是他给的 ✓，三个变体：
+    #
+    #     新做（v1 且不是组件页）→「{谁}做了一个新组件：「{名字}」，快去看看吧～」
+    #     改现成的              →「{谁}改了「{名字}」，快去看看吧～」
+    #     改组件页              →「{谁}改了「{名字}」，快去看看吧～」
+    #
+    # ⚠️ **名字两侧的「」要留** ✗→✓（这里 2026-10-11 又改回来了）：
+    #    `renderContent` 是**按子串**扫名字的 ✓（不是整段匹配 ✓）——
+    #    所以「记账」里的「」是**普通文字** ✓，名字本身照样标蓝可点 ✓。
+    #    （这条注释 2026-10-07 写的结论是错的 ✗，当时按"引号会被一起吃掉"记的 ✓。）
+    #
+    # ⚠️ **「谁」从票 → 任务 → 用户反查** ✓（`task_id` 在票上 ✓）：
+    #    拿不到就是老票（迁移前派出去的 ✓）→ 退回不带人的旧话术 ✓，不猜 ✓。
+    nick = await _maker_nickname(task_id)
+    if slug == WALL_SLUG or version > 1:
+        line = f"改了「{want_title}」，快去看看吧～"
+    else:
+        line = f"做了一个新组件：「{want_title}」，快去看看吧～"
+    await _say_system(group_id, (nick + " " if nick else "") + line)
     log.info("组件落成：群 %s 的 %s v%s", group_id, slug, version)
     return {"ok": True, "slug": slug, "version": version, "state": "draft",
             "title": want_title,
