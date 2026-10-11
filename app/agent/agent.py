@@ -212,6 +212,18 @@ _LEAKED_THINKING_OPENERS = (
 _CJK_RE = re.compile(r"[㐀-䶿一-鿿豈-﫿]")
 
 
+#: ⚠️ **两道长度闸** ✗→✓（写完先拿真数据跑了一遍，才发现少了它们）——
+#:   一段"我在想什么"是**长句** ✓；而下面这两种都是**正常回答**，不能误伤 ✗：
+#:     · `I'll 帮你查一下` / `Looking at 这个表…` —— 开头确实像英文口吻 ✓，
+#:       但**后面紧跟中文** ✓ → 那是他在跟你说话，不是在想 ✓
+#:     · `I should let you know the file is missing.` —— 一句正常的英文回复 ✓，
+#:       整条没中文 ✓ → 不该被吃成空 ✗
+#:   ⚠️ **宁可漏、不可错杀** ✓：漏了只是"偶尔漏出去一段"✓；
+#:      错杀了是"一句正常的话被吞掉"✗ 或者更糟 —— 变成"这轮没跑通" ✓。
+_HEAD_MIN_CHARS = 20      # 有中文时：前面那段要够长，才算"一段计划"
+_ALL_THINKING_MIN = 60    # 整条没中文时：更严 —— 一整段自言自语才是这个长度
+
+
 def _opens_like_thinking(s: str) -> bool:
     return s.strip()[:120].lower().startswith(_LEAKED_THINKING_OPENERS)
 
@@ -240,11 +252,11 @@ def _strip_leaked_thinking(text: str) -> str:
     m = _CJK_RE.search(t)
     if m is None:
         # 整条一个中文字都没有。
-        # ⚠️ 它**可能**真是在用英文回（罕见 ✓ 放过）——
-        #    只有确定是"我在想"的口吻，才当"这轮没说出话来"（空串 ✓）。
-        return "" if _opens_like_thinking(t) else t
+        # ⚠️ 它**可能**真是在用英文回（放过 ✓）—— 只有**又像自言自语、又够长**，
+        #    才当"这轮没说出话来"（空串 ✓ → 走"这轮没跑通"那条兜底 ✓）。
+        return "" if (len(t) >= _ALL_THINKING_MIN and _opens_like_thinking(t)) else t
     head = t[:m.start()].strip()
-    if head and _opens_like_thinking(head):
+    if len(head) >= _HEAD_MIN_CHARS and _opens_like_thinking(head):
         # ⚠️ **切掉的那段要记一笔** ✓ —— 切错了得能查。
         #    这是整条链上**唯一一处"改它说的话"**的地方 ✓，
         #    所以原文必须进日志 ✓（这个项目为"静默改坏"栽过 ✓）。
