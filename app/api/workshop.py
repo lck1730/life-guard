@@ -382,8 +382,7 @@ async def _blocked_message(group_id: int, doing: dict, viewer_id: int) -> str:
         return f"{name}正在忙「{what}」，不能分心哦"
     nick = doing.get("owner_nickname") or ""
     verb = "正在新建组件" if doing.get("is_new") else "正在修改"
-    head = (nick + " " if nick else "")
-    return f"{head}{verb}「{what}」，待会再来吧～"
+    return f"{nick}{verb}「{what}」，待会再来吧～"
 
 
 async def _editing_map(group_id: int) -> dict[str, dict]:

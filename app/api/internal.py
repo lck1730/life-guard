@@ -825,7 +825,7 @@ async def components_save(body: ComponentSaveIn) -> dict:
         line = f"改了「{want_title}」，快去看看吧～"
     else:
         line = f"做了一个新组件：「{want_title}」，快去看看吧～"
-    await _say_system(group_id, (nick + " " if nick else "") + line)
+    await _say_system(group_id, nick + line)
     log.info("组件落成：群 %s 的 %s v%s", group_id, slug, version)
     return {"ok": True, "slug": slug, "version": version, "state": "draft",
             "title": want_title,
