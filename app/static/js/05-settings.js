@@ -16,15 +16,33 @@
   const mHint = (t, bad) => mkel('div', 'mhint' + (bad ? ' bad' : ''), t);
   const mBtn = (t, cls, fn) => { const b = mkel('button', 'mbtn' + (cls ? ' ' + cls : ''), t); b.onclick = fn; return b; };
 
+  // ★ 2026-10-12 极客风：动作按钮只要 SVG 图标 ✓（字挪进 aria-label / title ✓）。
+  //   线条图标，stroke=currentColor —— 颜色跟着按钮类走（删 = danger 红 ✓）。
+  const M_ICON = {
+    test: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 12 7 12 10 5 14 19 17 12 22 12"/></svg>',
+    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+    del:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
+    chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 5 16 12 9 19"/></svg>',
+  };
+  const mSvg = (name) => { const s = mkel('span', 'chev'); s.innerHTML = M_ICON[name]; return s; };
+  const mIconBtn = (icon, label, cls, fn) => {
+    const b = mkel('button', 'mbtn icon' + (cls ? ' ' + cls : ''));
+    b.innerHTML = M_ICON[icon];
+    b.setAttribute('aria-label', label); b.title = label;
+    b.onclick = fn;
+    return b;
+  };
+
   // 状态点：没测过 / 通 / 不稳 / 不通 —— **和原来那个界面同一套口径** ✓
+  // `tag` = 右上角那块 ASCII 状态牌 ✓（[OK] / [!!] / [ERR] / [??] ✓）
   const mStateOf = (c) => {
-    if (!c.test) return { cls: '', text: '还没测过' };
+    if (!c.test) return { cls: '', tag: '[??]', text: '还没测过' };
     const t = c.test;
-    if (!t.ok) return { cls: 'bad', text: '不通 · ' + (t.error || '').slice(0, 42) };
+    if (!t.ok) return { cls: 'bad', tag: '[ERR]', text: '不通 · ' + (t.error || '').slice(0, 42) };
     const ms = t.connect_ms ? ' · ' + t.connect_ms + 'ms' : '';
-    if (t.tools) return { cls: 'ok', text: '通 ✓ 调工具 ' + (t.tools_hits || '') + ms };
-    if (t.tools_any) return { cls: 'warn', text: '调工具不稳 ' + (t.tools_hits || '') + ms };
-    return { cls: 'warn', text: '调不了工具 ' + (t.tools_hits || '') + ms };
+    if (t.tools) return { cls: 'ok', tag: '[OK]', text: '通 ✓ 调工具 ' + (t.tools_hits || '') + ms };
+    if (t.tools_any) return { cls: 'warn', tag: '[!!]', text: '调工具不稳 ' + (t.tools_hits || '') + ms };
+    return { cls: 'warn', tag: '[!!]', text: '调不了工具 ' + (t.tools_hits || '') + ms };
   };
 
   const renderModels = async () => {
@@ -49,14 +67,14 @@
       const row = mkel('div', 'mitem');
       row.appendChild(mkel('span', 'k', M_LABEL[k]));
       row.appendChild(mkel('span', 'v' + (r.name ? '' : ' empty'), r.name || '还没选'));
-      row.appendChild(mkel('span', 'chev', '›'));
+      row.appendChild(mSvg('chev'));
       row.onclick = () => pickRole(k);
       body.appendChild(row);
     });
 
     // ② 模型池
     body.appendChild(mSec('模型池'));
-    if (!d.configs.length) body.appendChild(mHint('池子是空的 —— 点右上角「＋」加一个。'));
+    if (!d.configs.length) body.appendChild(mHint('池子是空的 —— 点右上角加一个。'));
     d.configs.forEach(c => body.appendChild(mCard(c)));
 
     // ③ 上下文长度
@@ -73,13 +91,14 @@
     const st = mStateOf(c);
     top.appendChild(mkel('span', 'mdot ' + st.cls));
     top.appendChild(mkel('span', 'nm', c.name || '(没名字)'));
+    top.appendChild(mkel('span', 'mtag ' + st.cls, st.tag));
     box.appendChild(top);
-    box.appendChild(mkel('div', 'meta', (c.model || '') + ' · ' + (c.base_url || '')));
-    box.appendChild(mkel('div', 'meta', st.text + (c.has_key ? ' · key …' + (c.key_tail || '') : ' · 没填 key')));
+    box.appendChild(mkel('div', 'meta', (c.model || '') + ' @ ' + (c.base_url || '')));
+    box.appendChild(mkel('div', 'meta', st.text + (c.has_key ? ' · key:…' + (c.key_tail || '') : ' · key:未填')));
     const acts = mkel('div', 'acts');
-    acts.appendChild(mBtn('测一下', '', () => testModel(c.id)));
-    acts.appendChild(mBtn('改', '', () => editForm(c)));
-    acts.appendChild(mBtn('删', 'danger', () => delModel(c)));
+    acts.appendChild(mIconBtn('test', '测一下', '', () => testModel(c.id)));
+    acts.appendChild(mIconBtn('edit', '改', '', () => editForm(c)));
+    acts.appendChild(mIconBtn('del', '删', 'danger', () => delModel(c)));
     box.appendChild(acts);
     return box;
   };
