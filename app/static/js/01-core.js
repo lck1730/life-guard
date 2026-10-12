@@ -133,15 +133,17 @@
   // ⚠️ **聚焦一个输入框之后，把它滚进看得见的地方** ✗→✓（2026-10-09 用户定的：
   //   「展开后，顺便打开了编辑，此时**输入法也该顶起**」✓）——
   //   键盘一弹起来会把那一屏压矮 ✓，而刚展开的那个文本框往往正好在**键盘底下** ✗。
-  //   ⚠️ 只管**能滚的那几屏**（`.abody` ✓，管家那几屏就是 ✓）；
-  //      两个聊天的输入框不在 `.abody` 里 ✓，它们走上面那条"键盘留白"的路 ✓。
+  //   ⚠️ 只管**能滚的那几屏**（`.abody` ✓，管家那几屏就是 ✓；
+  //      2026-10-12 补上 `#modelsBody` ✗→✓ —— 模型池的「上下文长度」输入框
+  //      也在滚动体里、也在键盘底下 ✗，同一条路 ✓）；
+  //      两个聊天的输入框不在这些里面 ✓，它们走上面那条"键盘留白"的路 ✓。
   //   ⚠️ 弹层（`#sheetPanel`）有它自己那套 ✓（就在下面 ✓），不在这儿重复管 ✗。
   document.addEventListener('focusin', (ev) => {
     const t = ev.target;
     if (!t || !t.tagName) return;
     if (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA') return;
     if (t.closest('#sheetPanel')) return;
-    if (!t.closest('.abody')) return;
+    if (!t.closest('.abody, #modelsBody')) return;
     // ⚠️ 延后 300ms：键盘的升降有动画 ✓，立刻滚算的是**旧高度** ✓（不准 ✓）。
     setTimeout(() => {
       try { t.scrollIntoView({ block: 'center' }); } catch (e) { /* 滚不动就算了 ✓ */ }
