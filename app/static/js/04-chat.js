@@ -666,6 +666,7 @@
             if (r) r.remove();
             wsCur.streaming = null;
           }
+          wsCur.streamBuf = '';
           setWsStatus('idle');
         }
         addWsMsg(d);
@@ -691,14 +692,20 @@
             if (row) row.remove();
             wsCur.streaming = null;
           }
+          wsCur.streamBuf = '';
           return;
         }
-        const piece = d.delta || '';
+        // ★ 2026-10-12：**边流边渲染** ✗→✓（用户：「流式响应，代码渲染搬上来」✓）——
+        //   原来是 `textContent +=` ✗ → 流式全程都是一堆 `**` 和 ``` 的原文 ✗，
+        //   落地那一刻才"刷"地变好看 ✗。现在每一片都重跑一遍 `fillBubble` ✓ ——
+        //   粗体、代码块**边长边成形** ✓，气泡尾巴上带个光标 ✓（`.streaming` ✓）。
+        wsCur.streamBuf = (wsCur.streamBuf || '') + (d.delta || '');
         if (!wsCur.streaming) {
-          if (!piece.trim()) return;          // 还全是空白 ✓ → 等有字再开 ✓
+          if (!wsCur.streamBuf.trim()) { wsCur.streamBuf = ''; return; }  // 还全是空白 ✓ → 等有字再开 ✓
           wsCur.streaming = addWsMsg({ sender_type: 'agent', content: '' });
+          wsCur.streaming.classList.add('streaming');
         }
-        wsCur.streaming.textContent += piece;
+        fillBubble(wsCur.streaming, wsCur.streamBuf);
         const box = $('#wsMsgs'); box.scrollTop = box.scrollHeight;
       }
       else if (pkt.type === 'ws_status') {

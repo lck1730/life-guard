@@ -450,7 +450,7 @@
   //: `assistant` = diy 小助手的名字和头像 ✓（气泡上要用 ✓）。
   const wsCur = { task: null, slug: '', title: '',
                   assistant: { name: 'diy 小助手', avatar: '' },
-                  streaming: null, seen: {}, tasks: [] };
+                  streaming: null, streamBuf: '', seen: {}, tasks: [] };
 
   //: 这条对话里的消息，按 id 存一份 ✓ —— **左右滑引用**要回头找它的完整信息 ✓
   //: （滑动拿到的是 DOM 行 ✓，而行里只有个 id ✓）。和群聊的 `_msgs` 同一个用途 ✓。
@@ -540,6 +540,7 @@
     wsCur.title = t.title || '';
     if (d.assistant) wsCur.assistant = d.assistant;
     wsCur.streaming = null;
+    wsCur.streamBuf = '';
     wsCur.seen = {};
     // ⚠️ **换对话要把输入状态清干净** ✗→✓ —— 待发的图和引用都是**这条对话**的事 ✓：
     //    带到另一条去，用户会看到"我明明没选那张图"✓（而它其实是从上一条跟过来的 ✓）。
@@ -894,29 +895,102 @@
     if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
   };
 
+  // ★ 2026-10-12：**代码块搬上来了** ✗→✓（用户：「代码渲染搬上来吧」✓）——
+  //   diy 小助手张口就是代码 ✓，原来 ``` 围栏只会原样躺成一堆反引号 ✗。
+  //   切成一段段：普通文字走原来那套（粗体/行内代码/问题标签/列表 ✓），
+  //   代码段画成**终端窗口**（三个窗点 + 语言名 + 复制按钮 ✓）。
+  //   ⚠️ **流式半途围栏没闭合** ✓ —— 最后那段没等来回合 ``` 的也当代码画 ✓，
+  //      不然流式全程代码都以纯文本漏着、闭合那一刻才"跳变" ✗。
+  const MC_ICON = {
+    dots: '<svg viewBox="0 0 38 10" width="38" height="10"><circle cx="5" cy="5" r="4" fill="#ff5f57"/><circle cx="19" cy="5" r="4" fill="#febc2e"/><circle cx="33" cy="5" r="4" fill="#28c840"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    done: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 9.5 18 20 6.5"/></svg>',
+  };
+  const splitCode = (text) => {
+    const fence = '\x60\x60\x60';    // ⚠️ 别写裸反引号 ✗（部署闸会剥字符串 ✓，见 fmtInline ✓）
+    const out = [];
+    let rest = String(text == null ? '' : text);
+    while (rest) {
+      const i = rest.indexOf(fence);
+      if (i < 0) { out.push({ t: 'text', body: rest }); break; }
+      const head = rest.slice(0, i).replace(/\n+$/, '');
+      if (head) out.push({ t: 'text', body: head });
+      rest = rest.slice(i + 3);
+      const nl = rest.indexOf('\n');
+      const j = rest.indexOf(fence);
+      if (j < 0) {                   // 没闭合：第一行当语言名、剩下都是代码 ✓
+        const lang = nl < 0 ? rest.trim() : rest.slice(0, nl).trim();
+        out.push({ t: 'code', lang, body: nl < 0 ? '' : rest.slice(nl + 1) });
+        break;
+      }
+      const hasLang = nl >= 0 && nl < j;
+      out.push({ t: 'code',
+                 lang: hasLang ? rest.slice(0, nl).trim() : '',
+                 body: (hasLang ? rest.slice(nl + 1, j) : rest.slice(0, j)).replace(/\n$/, '') });
+      rest = rest.slice(j + 3).replace(/^\n/, '');
+    }
+    return out;
+  };
+
+  /** 一块代码 → 一个终端窗口 ✓（全程 createElement/textContent ✓，模型写的字不进 innerHTML ✓）。 */
+  const mkCodeCard = (lang, body) => {
+    const card = document.createElement('div');
+    card.className = 'mcode';
+    const head = document.createElement('div');
+    head.className = 'mchead';
+    const dots = document.createElement('span');
+    dots.className = 'mcdots';
+    dots.innerHTML = MC_ICON.dots;              // 静态 SVG ✓（不是模型写的 ✓）
+    head.appendChild(dots);
+    const lg = document.createElement('span');
+    lg.className = 'mclang';
+    lg.textContent = lang || 'code';
+    head.appendChild(lg);
+    const cp = document.createElement('button');
+    cp.className = 'mccopy';
+    cp.setAttribute('aria-label', '复制代码');
+    cp.innerHTML = MC_ICON.copy;
+    cp.onclick = (ev) => {
+      ev.stopPropagation();
+      // `copyText` = 05-settings.js 里那个老办法 ✓（clipboard API 在 http 下是哑的 ✓）
+      const ok = copyText(body);
+      if (!ok) { toast('复制不了 —— 长按自己选'); return; }
+      cp.innerHTML = MC_ICON.done; cp.classList.add('done');
+      setTimeout(() => { cp.innerHTML = MC_ICON.copy; cp.classList.remove('done'); }, 1600);
+    };
+    head.appendChild(cp);
+    const pre = document.createElement('pre');
+    pre.className = 'mcbody';
+    pre.textContent = body;
+    card.append(head, pre);
+    return card;
+  };
+
   const fillBubble = (el, text) => {
     el.textContent = '';
-    const lines = String(text == null ? '' : text).split('\n');
-    lines.forEach((line, i) => {
-      if (i) el.appendChild(document.createElement('br'));
-      const q = line.match(/^\s*\[问\s*([0-9]{1,2}\/[0-9]{1,2}|追问)\]\s*(.*)$/);
-      if (q) {
-        const chip = document.createElement('span');
-        chip.className = 'qchip';
-        chip.textContent = /^[0-9]/.test(q[1]) ? ('问题 ' + q[1]) : '追问';
-        el.appendChild(chip);
-        fmtInline(el, q[2]);
-        return;
-      }
-      const li = line.match(/^\s*[-*]\s+(.*)$/);
-      if (li) {
-        const dot = document.createElement('span');
-        dot.className = 'mli';
-        el.appendChild(dot);
-        fmtInline(el, li[1]);
-        return;
-      }
-      fmtInline(el, line);
+    splitCode(text).forEach((part) => {
+      if (part.t === 'code') { el.appendChild(mkCodeCard(part.lang, part.body)); return; }
+      part.body.split('\n').forEach((line, i) => {
+        if (i) el.appendChild(document.createElement('br'));
+        const q = line.match(/^\s*\[问\s*([0-9]{1,2}\/[0-9]{1,2}|追问)\]\s*(.*)$/);
+        if (q) {
+          const chip = document.createElement('span');
+          chip.className = 'qchip';
+          chip.textContent = /^[0-9]/.test(q[1]) ? ('问题 ' + q[1]) : '追问';
+          el.appendChild(chip);
+          fmtInline(el, q[2]);
+          return;
+        }
+        const li = line.match(/^\s*[-*]\s+(.*)$/);
+        if (li) {
+          const dot = document.createElement('span');
+          dot.className = 'mli';
+          el.appendChild(dot);
+          fmtInline(el, li[1]);
+          return;
+        }
+        fmtInline(el, line);
+      });
     });
   };
 
