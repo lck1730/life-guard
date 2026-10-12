@@ -946,13 +946,11 @@
   /* 列表项前面那个小圆点（正文里的 `- …`） */
   #wsChat .mli::before { content:'·'; color:var(--muted); margin-right:7px; font-weight:700; }
 
-  /* ★ 2026-10-12 极客风三件套：代码块 = 终端窗口 ✓ · 流式光标 ✓ · 点阵底 ✓
-     （用户：「diy 助手聊天设计成极客风，代码渲染搬上来」✓）
+  /* ★ 2026-10-12 极客风两件套：代码块 = 终端窗口 ✓ · 流式光标 ✓
+     （用户：「diy 助手聊天设计成极客风，代码渲染搬上来」✓；点阵底 2026-10-12 撤了 ✓）
      ⚠️ 代码块在**浅色主题下也是深色** ✓ —— 终端就该是黑的 ✓（故意的 ✓）。
      ⚠️ 全程用 `--mono` ✓（models 屏挂 :root 的那个 ✓），`fillBubble` 那边
         `mkCodeCard` 全 createElement/textContent ✓，模型写的字不进 innerHTML ✓。 */
-  #wsChat .mkbody { background-image:radial-gradient(circle, var(--line) 1px, transparent 1.4px);
-                    background-size:26px 26px; }
   #wsChat .mkrow.agent .mkbub { border:1px solid var(--line); }
   /* 流式中的气泡尾巴上带个光标 —— "还在长" ✓（落地那帧摘掉 ✓，见 04 那段 ✓） */
   @keyframes mblink { 50% { opacity:0; } }
