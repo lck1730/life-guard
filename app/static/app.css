@@ -1300,7 +1300,12 @@
         图标按钮 ✓。`--mono` 挂 :root（不挂 #models）—— 因为这些类也会出现在
         底部弹层 `#sheetPanel` 里（挑用途 / 改模型 ✓），那不在 `#models` 里面 ✓。 */
   :root { --mono: ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace; }
-  #models .body { background-image:radial-gradient(circle, var(--line) 1px, transparent 1.4px);
+  /* ★ 2026-10-12 补上滚动 ✗→✓ —— 原来 `#models .body` 一直没写 overflow，
+     内容超出就溢出到屏外摸不到（上下文长度那块就是这么丢的 ✓）。
+     照 `#settings .body` 那套：flex:1 + min-height:0 + overflow-y:auto ✓。 */
+  #models .body { flex:1; min-height:0; overflow-y:auto;
+                  padding-bottom:calc(30px + var(--inset-bottom));
+                  background-image:radial-gradient(circle, var(--line) 1px, transparent 1.4px);
                   background-size:26px 26px; }
   #models h2 { font-family:var(--mono); }
   #models h2::after { content:"▍"; margin-left:2px; color:var(--agent);
