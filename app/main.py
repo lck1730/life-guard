@@ -54,6 +54,7 @@ from .models.proxy import router as models_proxy_router
 from .models.routes import router as models_router
 from .api.groups import router as groups_router
 from .api.internal import (_HTML_MAX, _prune_component_versions,
+                           _records_spec,
                            _validate_component_html, router as internal_router)
 from .api.media import router as media_router
 from .api.shell import router as shell_router
@@ -853,8 +854,11 @@ async def component_render(
         spec = json.loads(row["data_json"] or "{}") or {}
     except Exception:  # noqa: BLE001
         spec = {}
-    if "records" in spec:
-        spec_r = spec.get("records") or {}
+    # ⚠️ **认两种写法** ✗→✓（2026-10-12 白天那次）—— 见 `_records_spec` ✓：
+    #   扁平的 `{"kind": "bookkeeping", "days": 90}` 以前是**静默地空手交出去** ✗
+    #   → 组件一片空白 ✗ → 它只当"是我 HTML 的 bug"，白烧一整天 ✗。
+    spec_r = _records_spec(spec)
+    if spec_r is not None:
         try:
             days = int(spec_r.get("days") or 30)
             data["records"] = await rec.query(
@@ -864,6 +868,9 @@ async def component_render(
         except Exception:  # noqa: BLE001
             log.exception("组件 %s 取数据失败", name)
             data["records"] = {"error": "数据没取到"}
+    elif spec:      # 声明了但我们一样都取不到 → 别静默交空白 ✗
+        log.warning("组件 %s v%s 的 data 声明取不到任何东西：%s",
+                    name, row["version"], row["data_json"])
 
     # ★ 这一版是**哪条对话**做出来的（2026-10-07 ✓）—— 「继续改」靠它回到
     #   当初那条对话 ✓（不然每次点"继续改"都是一条全新的、什么都不记得的对话 ✓）。

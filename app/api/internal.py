@@ -538,6 +538,50 @@ async def send_image(body: SendImageIn) -> dict:
 #:    它是读文件的兜底 ✓，不在同一个模块 ✓。
 _HTML_MAX = 400_000
 
+#: 组件 `data` 里**服务端能取到的只有这一个数据源** ✗。
+#: 别的都取不到 ✓ —— 而取不到**不等于报错了** ✗，是**静默地空手交出去** ✗。
+_DATA_SOURCES = ("records",)
+
+
+# 从一份 `data` 声明里取出「records 那份」✗→✓ —— 认两种写法 ✓。
+#
+# ⚠️ **扁平那一份也必须认** ✗→✓（2026-10-12 白天它白烧一整天）——
+#    正的是 `{"records": {"kind": "bookkeeping", "days": 90}}` ✓；
+#    它老写成扁平的 `{"kind": "bookkeeping", "days": 90}` ✗。
+#    而服务端以前只在**有 records 这一层**的时候才去查库 ✓
+#    → 扁平那份静默地变成空数据 → 组件里一片空白 ✗。
+#    它看不见，只当"是我 HTML 的 bug" → 硬编码快照、加轮询、写 30KB 诊断版 ✗。
+#    **形状写错不该让整个组件白屏** —— 认下来 ✓。
+def _records_spec(spec: Any) -> dict[str, Any] | None:
+    if not isinstance(spec, dict):
+        return None
+    if isinstance(spec.get("records"), dict):
+        return spec["records"]
+    if isinstance(spec.get("kind"), str):
+        return spec                     # 扁平：整份就是 records ✓
+    return None
+
+
+# `data` 声明**要了我们给不了的东西**时返回一句 ✗，认得下来就 None ✓。
+#
+# ⚠️ **要在落地这一步拦** ✗ —— 不拦的话它写完就交差了 ✓，
+#    而组件会在**每个成员的手机上**显示成空白 ✓，而它永远看不见 ✗。
+def _data_problem(spec: Any) -> str | None:
+    if spec is None or spec == {} or spec == []:
+        return None                      # 不声明 = 不要数据，正常 ✓
+    if not isinstance(spec, dict):
+        return "data 得是一个对象（现在传的是「" + str(type(spec).__name__) + "」）"
+    if "records" in spec and not isinstance(spec["records"], dict):
+        return ("data 里 records 得是一个对象（现在传的是「"
+                + str(type(spec["records"]).__name__) + "」）")
+    if _records_spec(spec) is not None:
+        return None
+    got = ", ".join(sorted(str(k) for k in spec)) or "空对象"
+    return ("这份 data 里**没有一个我们能取的东西**（你写的是：" + got + "）\n"
+            "服务端认得的数据源**只有 records** ✗ —— "
+            "形状：{\"records\": {\"kind\": \"bookkeeping\", \"days\": 30}}\n"
+            "⚠️ **别省掉 records 那一层** ✗ —— 省了就等于没声明，组件里就是空的 ✓。")
+
 
 #: ★ 导入的**硬校验** ✗→✓ —— 用户 2026-10-11：「导入新版本时需要先经过校验，
 #:   校验成功才能应用，校验失败会让 diy 助手提示导入数据不可用」。
@@ -1040,6 +1084,17 @@ async def components_save(body: ComponentSaveIn) -> dict:
                    + "。把那个东西**内联进这一个文件**再交一次。")
         return {"ok": False, "error": why}
 
+    # ★ **`data` 声明在落地这一步也验一道** ✗→✓（2026-10-12 白天那次）——
+    #   声明错了**不会报错** ✗，是渲染的时候静默地交一份空数据 ✓ →
+    #   组件在**每个成员的手机上**一片空白 ✗，而它已经交差了、看不见 ✗。
+    #   不拦这条，它就只能靠"用户说空白了"才知道 ✗ —— 那等于让它盲写一天 ✓。
+    prob = _data_problem(body.data)
+    if prob:
+        return {"ok": False, "error": ("这份 `data` 声明**取不到数据** —— " + prob
+                                       + "\n⚠️ 组件跑在沙箱里，**它自己取不到数据** ✓"
+                                       " → 声明写错就是**一片空白** ✗。"
+                                       "改对 `data` 再交一次就行 ✓"
+                                       "（**HTML 没问题，不用重写 HTML** ✓）。")}
     # 版本号**服务端自增** ✓ —— 不接受 agent 传 ✗（它会数错自己做过几版 ✓）
     prev = await fetch_one(
         "SELECT COALESCE(MAX(version), 0) AS v FROM components WHERE group_id = ? AND slug = ?",
