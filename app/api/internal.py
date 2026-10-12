@@ -518,6 +518,11 @@ async def send_image(body: SendImageIn) -> dict:
 #    正文走文件是为了**不进主对话的上下文** ✓。那个担心被**任务级会话隔离**解决了 ✓ ——
 #    正文只留在这一条会话里，别的任务、别的会话都看不到 ✓。
 #
+# ⚠️ **2026-10-12 上午把它彻底关掉了**：`components_confirm` 不再回那个文件路径 ✗。
+#    只要接口上还回一个路径，它就一定会被当成"交付物"转给子代理 ✓ ——
+#    而子代理写不进、主对话读不到，两头都堵 ✓。
+#    所以正文的来路**只剩一条**（`html` 字段）✓；`handle` 那个分支只留给**老票** ✓。
+#
 # ## 为什么 save 的群号从票反查
 #
 # 子代理的会话标识里**没有群号** ✓
@@ -880,8 +885,13 @@ async def _say_system(group_id: int, text: str, *, no_link: bool = False) -> Non
 async def components_confirm(body: ComponentConfirmIn) -> dict:
     """**用户在工作坊里确认了细节** → 发一张票 + 开一个暂存文件。
 
-    ⚠️ 票和 handle 都**由服务端生成** ✓ —— 主对话只是把它们转给子代理 ✓。
-       `brief` 存进票里 ✓：子代理的 brief 就有了**权威来源** ✓，
+    ⚠️ **票是唯一的交付物** ✗→✓（2026-10-12）—— 正文走 `html` 字段 ✓。
+       ⚠️ **不再发暂存文件** ✗ —— 原来那张 `handle` 路径是"派子代理去写"的唯一接口 ✓，
+       而子代理**拿不到父会话没有的工具**（`api_server` 不给 `file`/`terminal` ✓）
+       → 它写不进去，主对话也读不到 → 只能靠 `vision_analyze` 去"看"一个
+       根本没被写进去的 HTML（2026-10-12 上午就卡在这儿，来回七轮，文件一直是空的 ✓）。
+       **不发那个路径，就没有那条路** ✗。
+       `brief` 存进票里 ✓：派子代理的 brief 就有了**权威来源** ✓，
        主对话不必"凭记忆复述用户要什么" ✓（子代理看不到会话 ✓）。
     """
     await _assert_group(body.group_id)
@@ -892,7 +902,12 @@ async def components_confirm(body: ComponentConfirmIn) -> dict:
                           "而且要用英文（比如 bookkeeping-panel，不要用中文）。"
                           "起一个说得清它干嘛的英文短名。")}
     token = secrets.token_hex(16)
-    handle = str(settings.staging_dir / (token + ".html"))
+    # ⚠️ **不再发暂存文件** ✗→✓（2026-10-12 上午那次卡死的直接原因）—— `handle` 一律留空 ✓。
+    #   那个文件是**派子代理去写**的唯一接口 ✓；子代理拿不到 `file` 工具 → 它写不进去 ✓，
+    #   主对话也读不到 → 只能反复 `vision_analyze` 一个空文件，
+    #   用户看到的一整天就是「文件还是空的，做不了了」✓。把入口收掉，那条死路一起没了 ✓。
+    #   老票里已经写好的 `handle` 不动 ✓ —— `components_save` 只在没带 `html` 时才会看它 ✓。
+    handle = ""
     ts = int(time.time())
     # ★ 票记住**是哪条对话派出去的** ✗→✓（2026-10-07）——
     #   用户切走的时候按它作废 ✓（见 `routes_workshop.py` 的 `_void_tickets` ✓）。
@@ -941,13 +956,14 @@ async def components_confirm(body: ComponentConfirmIn) -> dict:
         await start_waiting(body.group_id, wait_uid, int(task_id))
     log.info("组件开工：群 %s 的 %s（票 %s…）", body.group_id, slug, token[:8])
     return {
-        "ok": True, "token": token, "slug": slug, "handle": handle,
-        "next": ("写好后调 `component_save`，**带上这张 token**，并把 `html`（正文）、"
-                 "title、icon、note、data、spot 填上 —— **正文直接放在 `html` 里** ✓，"
-                 "不用写文件、也不用派谁去写 ✓。"
-                 "（`handle` 那个路径只在你决定派子代理的时候才用得上 ✓ —— "
-                 "那种情况把它原样交给子代理，让它写进去。）"
-                 "⚠️ token 和 handle 一个字都别改，原样传。"),
+        "ok": True, "token": token, "slug": slug,
+        "next": ("**正文自己写** ✓，写好之后调 `component_save`，把 `html`（正文）、"
+                 "title、icon、note、data、spot 填上，**带上这张 token** ✓。\n"
+                 "⚠️ 这里**没有文件路径给你，是故意的** ✗ —— 子代理拿不到写文件的工具，"
+                 "主对话也读不到它，那条路走不通 ✓。正文就直接放在 `html` 字段里 ✓。\n"
+                 "真要派子代理（**只有这块真的很大才派**），把 `token` 和 `brief` 给它 ✓，"
+                 "让它**自己调 `component_save` 带 `html`** —— 别让它去写文件 ✗。"
+                 "⚠️ token 一个字都别改，原样传。"),
     }
 
 
@@ -983,10 +999,19 @@ async def components_save(body: ComponentSaveIn) -> dict:
     if inline:
         html = inline
     elif not handle.is_file():
-        return {"ok": False,
-                "error": ("这次**没有正文** —— 要么直接把 HTML 放在 `html` 字段里"
-                          "（推荐 ✓，不用绕文件），要么先让子代理把暂存文件写好"
-                          "（它还没写进去 → 先等它回来说写好了，再调这个）。")}
+        # ⚠️ **别把「让子代理写文件」当第二条路** ✗→✓（2026-10-12）——
+        #   confirm 不再发那个路径 ✗ → 新票的 `handle` 是空的 ✓，
+        #   而子代理拿不到写文件的工具 ✓ → 那一支**根本不是路** ✗。
+        #   只有**老票**（库里真记了个路径）才提那一支 ✓。
+        if str(row["handle"] or ""):
+            err = ("这次**没有正文** —— 要么直接把 HTML 放在 `html` 字段里 ✓"
+                   "（正文就在你手里，别再绕文件 ✗），要么等子代理把暂存文件写好"
+                   "（它还没写进去 → 先等它回来说写好了，再调这个）。")
+        else:
+            err = ("这次**没有正文** —— 把 HTML 放在 `html` 字段里再调一次 ✓。"
+                   "正文就是你自己写的那一份，**不用写文件、也写不了** ✗"
+                   "（子代理拿不到写文件的工具 ✓，你这条会话也读不到文件 ✓）。")
+        return {"ok": False, "error": err}
     else:
         try:
             html = handle.read_text(encoding="utf-8", errors="replace")

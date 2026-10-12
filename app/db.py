@@ -264,7 +264,10 @@ CREATE TABLE IF NOT EXISTS component_tickets (
     group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     slug       TEXT    NOT NULL,
     brief      TEXT,                      -- 用户确认下来的那句需求（子代理的 brief 就靠它）
-    handle     TEXT,                      -- 暂存文件的绝对路径（子代理往那儿写）
+    handle     TEXT,                      -- ⚠️ **2026-10-12 起不再填** ✗→✓ ——
+                                          --    正文改走 `component_save` 的 `html` 字段 ✓。
+                                          --    列留着是为了**老票兼容** ✓（老票里是路径 ✓，
+                                          --    `components_save` 只在没带 `html` 时才会去看它 ✓）。
     created_at INTEGER NOT NULL,
     used_at    INTEGER,                   -- 用过一次就填上，**再用就拒**
     expires_at INTEGER NOT NULL,

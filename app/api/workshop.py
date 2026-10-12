@@ -705,7 +705,11 @@ async def poke_loop() -> None:
             await asyncio.sleep(10)
             for (gid, uid), w in list(_waiting.items()):
                 if now() >= w["deadline"]:
-                    _waiting.pop((gid, uid), None)
+                    # ⚠️ **放弃了就得把标记也清掉** ✗→✓ —— 只从内存摘掉的话，
+                    #    库里 `awaiting` 一直留着，而 15 分钟内只要重启一次，
+                    #    `restore_waiting` 就会把它**捡回来**、重新开一次提示 ✓。
+                    #    这张票早就死了（多半已经过期 ✓），不该再来一遍 ✓。
+                    await stop_waiting(w["task_id"])
                     await _save(gid, uid, w["task_id"], "agent",
                                 "（那个做组件的助手好像没消息了——你可以再跟它说一句，"
                                 "让它接着做。）")
