@@ -840,7 +840,7 @@
      4 列：手机上每格约 78px 宽 ✓，放一个图标 + 两行字正好 ✓。 */
   /* ★ 2026-10-08：这两屏的顶栏拆了 ✓ → body 要**自己顶到最上面** ✗→✓，
      并且自己让开刘海/状态栏 ✓（原来是 `.abody` 跟着顶栏走的 ✓）。 */
-  #workshop .abody, #compView .cpwrap {
+  #workshop .abody {
     padding-top: calc(var(--inset-top) + 12px);
     padding-bottom: calc(var(--inset-bottom) + 12px);
   }
@@ -896,12 +896,18 @@
        也**没有**保留/继续改/删除那几个按钮了 ✓（"界面就被压缩了"✓）——
        那些全搬去了创意工坊的组件管理页 ✓。
        只留**顶栏右上角一个图标** ✓，指向它在工坊里那条对话 ✓。 */
-  #compView .cpwrap { flex:1; min-height:0; margin:0 14px;
-                      border:1px solid var(--line); border-radius:14px;
-                      overflow:hidden; background:var(--bg); }
+  /* ★ 2026-10-12：组件预览**铺满整屏** ✗→✓（用户：「组件总是没全屏适配」✓）——
+     原来 `.cpwrap` 是一张**带边框圆角、左右各让 14px、上下还 +12** 的卡片 ✗ →
+     组件永远只占中间一块 ✓。改成**整屏铺满** ✓：左右贴边 ✓、上下只留**安全区**
+     （状态栏 / 导航键 ✓），卡片边框圆角全撤 ✓。
+     ⚠️ 安全区**由壳给** ✓ —— 组件自己那套用的是 `position:absolute;inset:0` ✗，
+        没读 `env(safe-area-inset-*)` ✗，所以得由这层把它框在安全区里 ✓。
+        （「让它学」= 他去教 diy 助手在组件里自己读 env ✓ —— 学会之后这层
+         的 padding 也能再撤 ✓，现在先兜住 ✓。） */
+  #compView .cpwrap { flex:1; min-height:0; margin:0;
+                      padding:var(--inset-top) 0 var(--inset-bottom);
+                      overflow:hidden; background:transparent; }
   #compView iframe { width:100%; height:100%; border:0; display:block; }
-  /* 底下垫一点，免得预览框贴着屏底（没有按钮那一栏了 ✓，只能靠它 ✓） */
-  #compView .cpwrap { margin-bottom:calc(var(--inset-bottom) + 12px); }
 
   /* ── 对话屏（工坊里的那段对话）───────────────────────────────────────
      和群聊那屏**不是一套东西** ✓：这里是**你一个人对着它** ✓，
