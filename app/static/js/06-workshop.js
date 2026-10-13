@@ -492,9 +492,13 @@
     //    （重命名弹层里显示的是对的 ✓ —— 因为那边读的是 `wsCur.title` ✓，
     //      数据一直是好的 ✓，只是**这一行没看它** ✓。）
     //
-    //    现在：**名字优先** ✓ —— 有名字就写名字 ✓，没名字才退回"做一个新的" ✓。
+    //    现在：**名字优先** ✓ —— 有名字就写名字 ✓。
+    //    ★ 2026-10-13：统一聊天里（没 slug、不是 wall ✓）顶上写**助手名** ✓ ——
+    //    不再是「做一个新的」✗（那是"一组件一对话"那会儿的词 ✓，现在是一条连续的聊天 ✓）。
+    //    wall 那条照旧写它自己的名字 ✓（「组件界面diy」✓）；做成组件的旧对话照旧写组件名 ✓。
+    const diyName = (wsCur.assistant && wsCur.assistant.name) || 'diy 小助手';
     t.textContent = wsCur.task
-      ? (wsCur.title || wsCur.slug || '做一个新的')
+      ? (wsCur.title || wsCur.slug || diyName)
       : '创意工坊';
     // 这里原来挂过一枚「未固化」的小牌子 ✓ —— 跟着"固化"整套一起去掉了 ✓（见上 ✓）。
     // ★ **「组件界面diy」那条：右上角什么都没有** ✗→✓（2026-10-09 用户定的：
@@ -675,23 +679,49 @@
    *    而不是落回**刚才那一页** ✓（那里可能刚刚被你删掉了 ✓ ——
    *    回到一个已经不存在的组件的预览上，是最难解释的一种错 ✓）。
    */
-  const openTaskForSlug = async (slug, title, from) => {
-    // ★ 2026-10-09：**不再动底下那两屏** ✗→✓ ——
-    //   原来这里先把组件页关掉（`closeComp` ✓）、再把导航屏补上（`pushScreen('wsNav')`✓），
-    //   因为"从组件页进聊天"时**聊天必须压在组件页上面** ✓，而当时 `#compView`(26)
-    //   比 `#wsChat`(25) **高** ✗ → 只能先关掉它 ✓。
-    //   ⚠️ 用户这一轮改了规矩：「在具体组件内时…下滑进入各自组件的编辑页，
-    //      **且返回时回到各自组件**」✓ —— 那么组件页就**必须一直开着** ✓
-    //      （关掉它，"返回回到各自组件"就无从谈起 ✗）。
-    //      z-index 已经把它理顺了（28 > 26 ✓，见 CSS 那段）→
-    //      这一屏现在只做一件事：**把那条对话（我自己的）找出来、打开** ✓。
-    //      返回落到哪一屏，由"底下原来是什么"决定 ✓ —— 那正是用户要的 ✓。
+  /** ★ 进**那条统一的 diy 聊天** ✓（2026-10-13）—— 一群一条、连续着聊 ✓。
+   *    组件不再各开一条对话了 ✗→✓：claude 桥路径下做完一个组件**不会把对话钉成那个组件的**
+   *    （MCP `confirm_component` 不带 task_id ✓ → 票 task_id 为空 ✓ → `components_save` 里那句
+   *    `UPDATE workshop_tasks SET slug` 因 `if task_id:` 直接跳过 ✓），所以那条 NULL-slug
+   *    的对话就是**统一的**那条 ✓ —— 角上、下滑都进它 ✓。
+   *    `prefill` 给个开场（从某个组件下滑进来时填「改「x」：」✓）。
+   *    ⚠️ wall（组件界面本身）**不走这条** —— 服务端 `_wall_task_ok` 闸着，只许 WALL_SLUG
+   *       那条对话改界面外观 ✓；下一步松闸后 wall 也并入这条 ✗→✓。 */
+  const openUnifiedChat = async (prefill, from) => {
     await wsReloadTasks();
-    const mine = wsCur.tasks.find(x => x.slug === slug);
-    if (mine) { await openTaskById(mine.id, from); return; }
-    // ⚠️ 新开的那条**名字也是对的** ✓ —— 服务端在 `_my_tasks` 里会给它
-    //    兜上"那个组件现在的标题" ✓（不然顶上会写着个英文 slug ✓，很难认 ✓）。
-    if (await wsNewTask(slug)) pushScreen('wsChat', from);
+    const hint = wsBusyHint(null);
+    if (hint) { toast(hint); return; }
+    const uni = wsCur.tasks.find(t => !t.slug);   // null / 空串都算「统一那条」✓
+    let opened = false;
+    if (uni) {
+      opened = await openTaskById(uni.id, from || 'corner');
+    } else {
+      // 第一次进：建那条统一的（**不起名** ✓ —— 名字等真做出组件时由 agent 定 ✓）。
+      //   ⚠️ 服务端会替它先开口一句问候 ✓（`_greeting` ✓，见 `tasks_new` ✓）。
+      opened = await wsNewTask('', '');
+      if (opened) pushScreen('wsChat', from || 'corner');
+    }
+    if (opened && prefill) {
+      // 只在**输入框还空着**时填 ✓ —— 别把他打到一半的字冲掉 ✓。
+      const ta = $('#wsText');
+      if (ta && !ta.value) { ta.value = prefill; syncWsSend(); ta.focus(); }
+    }
+  };
+
+  const openTaskForSlug = async (slug, title, from) => {
+    // ★ 2026-10-13：组件 diy 不再一人一条对话了 ✓ —— 统一进那条连续的聊天 ✓。
+    //   返回落到哪一屏，由"底下原来是什么"决定 ✓（`popScreen` 本来就是那个意思 ✓）。
+    //   例外只有 **wall**（组件界面本身 ✓）：它还走自己那条对话 ——
+    //   服务端 `_wall_task_ok` 闸着，只许 WALL_SLUG 那条改界面外观 ✓
+    //   （claude 桥没传 task_id，现在 claude 也改不了 wall ✗ —— 下一步松闸 ✓）。
+    if (slug === WALL_SLUG) {
+      await wsReloadTasks();
+      const wall = wsCur.tasks.find(x => x.slug === WALL_SLUG);
+      if (wall) { await openTaskById(wall.id, from); return; }
+      if (await wsNewTask(WALL_SLUG)) pushScreen('wsChat', from);
+      return;
+    }
+    await openUnifiedChat('改「' + (title || slug) + '」：', from);
   };
 
   /** 开一条新的 ✓（只置状态，不推屏 ✓ —— 推屏由调用方决定 ✓）。返回成没成 ✓。 */
@@ -793,77 +823,15 @@
     }
   };
 
-  /**
-   * ★ **群聊右上角那个按钮** ✓ —— 2026-10-09 改成**直接进"新建组件"的对话** ✗→✓。
+  /** ★ **群聊右上角那个按钮** ✗→✓（2026-10-13）—— 直接进**那条统一的 diy 聊天** ✓。
    *
-   *   用户原话：「主群聊右上角的按钮进入的不再是导航页，而是新建组件的聊天界面，
-   *   如果在这个界面没有做出组件，下次点击**自动进去上次没生成组件的聊天**，
-   *   一旦建立了组件，退出下次进入时就是新建组件的界面，这样省去了导航界面的麻烦」✓。
-   *
-   *   ⚠️ **"上次没生成组件的那条"是服务端算的** ✗→✓（`updated_at` 最近的那条、
-   *      且**还没做出组件** ✓）—— 不放 localStorage ✓（壳里的存储会被清 ✓、
-   *      换手机就没了 ✓，而这件事本来就该跟着人走 ✓）。
-   *   ⚠️ 判断"没有组件"用的是 `t.slug` **空** ✓ —— 那是服务端在 `_my_tasks`
-   *      里算好的 ✓（`workshop_tasks.slug` + 它做出来的组件的 slug ✓）。
-   *      ⚠️ 「组件界面diy」那条**不算** ✓（它的 slug 是 `wall` ✓，非空 ✓）。
-   *   ⚠️ 最多只会有**一条**这样的对话 ✓ —— 因为每次进来都**续着那条** ✓，
-   *      不会再开第二条 ✓（老数据可能留了几条，那些够不着了；无所谓 ✓）。
+   *   原来「一组件一对话」那会儿：没做出组件就续上次那条、做出来了就开新的（先起名）✓。
+   *   现在**一条连续的聊天** ✓：claude 桥做完一个组件不会把对话钉成那个组件的 ✓
+   *   （见 `openUnifiedChat` 那段 ✓），所以那条 NULL-slug 的对话**永远是统一的**那条 ✓
+   *   —— 角上每次都进它 ✓，不再起名、不再「已自动恢复」✗（那是"一组件一对话"才有的概念 ✓）。
+   *   要做个新组件：在聊天里说就行 ✓（组件知识已在 system prompt 里注入 ✓）。
    */
-  const openNewCompChat = async () => {
-    await wsReloadTasks();
-    const unfinished = wsCur.tasks.find(t => !t.slug);
-    if (unfinished) {
-      // 续上上次那条 ✓，并且**在屏幕正中短暂说一句** ✗→✓（用户 2026-10-09 原话：
-      //   「上次进去没做组件就退，则直接进上次，进入后在界面居中一个小卡片短暂提醒，
-      //     **上次退出时未做出组件，已自动恢复**」✓）。
-      // ⚠️ 那句话是**提醒他去哪儿了** ✓ —— 不然他按了右上角、突然进到一条
-      //    上次的半成品里 ✓，会以为"怎么又回来了" ✓。
-      const ok = await openTaskById(unfinished.id, 'corner');
-      // ⚠️ **只在真的进去了才说"已自动恢复"** ✗→✓（2026-10-11）——
-      //    被那道"占用"闸挡下时 `openTaskById` 返回 false ✓；
-      //    这时候还弹"已自动恢复"就是**在骗人** ✓（人明明没进去 ✓）。
-      if (ok) {
-        // ⚠️ **时间短一点** ✗→✓（2026-10-10 用户：「如果触发恢复，其提示小卡片
-        //   时间短一些」✓；给了 2000 之后他又说「1s 吧」✓ → **1000ms** ✓。
-        //   ⚠️ 这条只剩一秒，但该有的信息还在 ✓（它就是「我刚才替你续上了」✓）；
-        //      再短就来不及读了 ✗，别改到几百毫秒去 ✓。
-        showNotice('上次退出时未做出组件，已自动恢复', 1000);
-      }
-      return;
-    }
-    // ★ **真要开新的一条了 —— 这里才拦** ✗→✓（2026-10-11，用户原话：
-    //   「…或者不能通过**主群聊右上角**进入」✓）。
-    //   ⚠️ 拦在**弹那个起名框之前** ✗ —— 让他在弹层里打完名字、
-    //     点了"开始做"才被告知"不能分心" ✓，那一下是白费他的力气 ✓。
-    const hint = wsBusyHint(null);
-    if (hint) { toast(hint); return; }
-    // ★ **新的那条：先起个名字再进去** ✗→✓（用户 2026-10-09 定的：
-    //   「如果是新进入，会弹出界面**先起个名字**再进去新的组件聊天」✓）。
-    //   ⚠️ 上一轮我把它去掉了 ✗（当时按"少一步"理解的 ✓）—— 他这一版明确要它 ✓。
-    //   名字**不是白问的** ✓：它一路走到 `component_save`（以他起的为准 ✓），
-    //   也是这条对话的标题 ✓。⚠️ 起名那个弹层**是异步的** ✓ ——
-    //   "进哪条对话"要在 `save` 回调里做 ✓，别在这儿写（那时名字还没有 ✓）。
-    // ★ 措辞照用户 2026-10-10 的原话 ✓（他看截图说的两张字 ✓）：
-    //   抬头「打算做个啥组件？」✓、小字「随便起个名字就行，后面随时可以改」✓。
-    //   ⚠️ 他要的那句问的是「**做个啥**」✓ —— 比原来那句「它叫什么？」更贴
-    //      "这是新建那条路" ✓（改名那条路走的是另一处 ✓，抬头是「重命名」✓）。
-    //   ⚠️ 老的导航屏里**还留着一份旧措辞** ✓（那一屏没有入口 ✓，
-    //      回头清理时一起带走就行 ✓ —— 别为了它把这里抄两份 ✗）。
-    openNameSheet({
-      heading: '打算做个啥组件？',
-      initial: '',
-      cta: '开始做',
-      hint: '随便起个名字就行，后面随时可以改',
-      save: async (name) => {
-        // ⚠️ **先把弹层收掉，再开对话** ✗→✓ —— 弹层是 50 档 ✓、聊天屏才 28 ✓，
-        //    不收的话它**压在聊天上面** ✓，那条"从右上角弹出"的动效
-        //    会被它挡个正着 ✓（用户点名要这个动效 ✓，那就别让它白播 ✓）。
-        //    两个动画同时跑（弹层往下收 + 对话从右上角进 ✓）本来就自然 ✓。
-        closeSheet();
-        if (await wsNewTask('', name)) pushScreen('wsChat', 'corner');
-      },
-    });
-  };
+  const openNewCompChat = () => openUnifiedChat('', 'corner');
 
   // ── 正文的渲染（2026-10-07）─────────────────────────────────────────
   //
@@ -1390,25 +1358,11 @@
         }, true);
       }
     } else {
-      // ★ **还没做出组件的也能改名** ✗→✓（2026-10-07 深夜，用户问的：
-      //   「还没做出组件为啥连重命名都没有」✓）。
-      //   ⚠️ 走的是**另一个接口** ✓：名字这时候住在**对话**上 ✓
-      //      （`workshop_tasks.title` ✓ —— 就是他开做时起的那个 ✓），
-      //      组件那行的名字要等它真的做出来才存在 ✓（`components.title` ✓）。
-      //      同名的两件事、分两个阶段 ✓，所以两个都要能改 ✓。
-      mk('重命名', () => openNameSheet({
-        heading: '重命名',
-        initial: (t && t.title) || '',
-        cta: '保存',
-        save: async (name) => {
-          const r = await api(`/workshop/${group.id}/tasks/${wsCur.task}/title`,
-                              { method: 'PATCH', body: JSON.stringify({ title: name }) });
-          wsCur.title = (r.task && r.task.title) || name;
-          setWsHead();
-          await wsReloadTasks();
-          toast('改好了');
-        },
-      }));
+      // ★ 2026-10-13：统一聊天这条**没有"当前组件"** ✓ —— 组件的改名/导出/导入/删除
+      //   全收进「管理组件」✓（列一份清单、点哪个进哪个的动作 ✓）。
+      //   原来「重命名」改的是**这条对话的名字** ✓ —— 统一聊天里顶栏写的是助手名 ✓
+      //   （见 `setWsHead` ✓），对话名没意义了 ✗ → 去掉 ✗→✓。
+      mk('管理组件', () => openCompManager());
       // ★ 菜单里那一行的名字 ✓（2026-10-10 用户：「是**重命名下面那个按钮**是
       //   删除对话」✓）—— 原来叫「删掉这次对话」✓，改成「删除对话」✓。
       mk('删除对话', async () => {
@@ -1443,6 +1397,73 @@
     cbtn.onclick = closeSheet;
     cancel.appendChild(cbtn);
     p.appendChild(cancel);
+    openSheet();
+  };
+
+  /** ⋯ 里的「管理组件」✓（2026-10-13）—— 统一聊天里没有"当前组件"了 ✓，
+   *  组件的改名/导出/导入/删除全收在这里 ✓。列一份组件清单，点哪个进哪个的动作 ✓。
+   *  ⚠️ wall **不在这儿管** ✓ —— 它那条对话自己有 ⋯（重命名走的是另一处 ✓）。 */
+  const openCompManager = async () => {
+    let comps = [];
+    try {
+      comps = (await api(`/components?group_id=${group.id}`)).components || [];
+    } catch (e) { toast('打不开组件列表：' + e.message); return; }
+    comps = comps.filter(c => c.slug !== WALL_SLUG);
+    const p = $('#sheetPanel');
+    p.innerHTML = '';
+    p.appendChild(mkel('h3', null, comps.length ? '管理组件' : '还没有组件'));
+    const grp = mkel('div', 'wsmenu');
+    comps.forEach((c) => {
+      const row = mkel('button', null, c.title || c.slug);
+      row.onclick = () => openCompActions(c.slug, c.title || c.slug);
+      grp.appendChild(row);
+    });
+    p.appendChild(grp);
+    const acts = mkel('div', 'actions');
+    const back = mkel('button', 'btn-ghost', '返回');
+    back.onclick = openWsMenu;          // 回上一层 ⋯ ✓
+    acts.appendChild(back);
+    p.appendChild(acts);
+    openSheet();
+  };
+
+  /** 一个组件的动作页 ✓（改名/导出/导入/删除 ✓）—— 「管理组件」里点哪格进它 ✓。 */
+  const openCompActions = (slug, title) => {
+    const p = $('#sheetPanel');
+    p.innerHTML = '';
+    p.appendChild(mkel('h3', null, title || slug));
+    const grp = mkel('div', 'wsmenu');
+    const mk = (label, fn, danger) => {
+      const b = mkel('button', null, label);
+      b.onclick = fn;
+      if (danger) b.style.color = '#e06a6a';
+      grp.appendChild(b);
+    };
+    mk('重命名', () => openRenameSheet(slug, title));
+    mk('导出当前版本', () => wsExport(slug));
+    mk('导入新版本', () => wsImport(slug));
+    mk('删除组件', async () => {
+      closeSheet();
+      const ok = await confirmBox({
+        title: '删除组件',
+        body: '将会删除这个组件',
+        ok: '删除',
+        danger: true,
+      });
+      if (!ok) return;
+      try {
+        await api(`/components/${encodeURIComponent(slug)}?group_id=${group.id}`,
+                  { method: 'DELETE' });
+      } catch (e) { toast('没删掉：' + e.message); return; }
+      toast('删了');
+      openCompManager();              // 删完刷新清单 ✓
+    }, true);
+    p.appendChild(grp);
+    const acts = mkel('div', 'actions');
+    const back = mkel('button', 'btn-ghost', '返回');
+    back.onclick = openCompManager;   // 回上一层 ✓
+    acts.appendChild(back);
+    p.appendChild(acts);
     openSheet();
   };
 
