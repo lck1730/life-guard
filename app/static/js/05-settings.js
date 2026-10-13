@@ -1034,8 +1034,9 @@
               //      `preventDefault` 吃掉那一下 ✓、松手又什么都没发生 ✓
               //      —— 用户在那些地方右滑本来是有用的（比如选字 ✓），
               //      被我们白白吞掉 ✓。**认了就得给个交代** ✓，给不出就别认 ✓。
-              || (pgSw.dir === 'R' && !!pgSw.row && (s === 'chat' || wsOn))
-              || (pgSw.dir === 'D' && ((s === 'wall' && _wallAtTop()) || s === 'comp'));
+              || (pgSw.dir === 'R' && !!pgSw.row && (s === 'chat' || wsOn));
+      // ★ 2026-10-13：**下拉那一条撤了** ✗→✓ —— 只留群聊右上角一个入口进统一聊天 ✓
+      //   （用户：「只留右上角入口」✓）。'D' 不再算手势 ✓ —— 下拉回到正常滚动 ✓。
       if (!ok) { pgSw = null; hidePullHint(); return; }
       // ★ **手里正拎着一个格子**（长按 ≥450ms 之后在拖动换位置 ✓）→ 别认下拉 ✗→✓
       //   （2026-10-09 想到的一个交界处 ✓）：不然"把一个格子往下拖"会
@@ -1056,8 +1057,7 @@
     //    也要有提示"继续左滑进入创意工坊"和滑入阈值」✓）。
     // ⚠️ `'R'`（右滑退出那两条）**不给** ✓ —— 用户没要 ✓，
     //    而且"退出"是往回走 ✓ 不需要一句"继续滑"来鼓励 ✓。
-    if (pgSw.dir === 'D') showPullHint(_pullHintText('D'), dy, PULL_TRIG, false);
-    else if (pgSw.dir === 'L') showPullHint(_pullHintText('L'), -dx, SW_TRIG, true);
+    if (pgSw.dir === 'L') showPullHint(_pullHintText('L'), -dx, SW_TRIG, true);
     // ★ **右滑那一条：行跟着手走一点** ✗→✓（2026-10-11）——
     //   ⚠️ **不跟手是不行的** ✗：右滑是个"短划" ✓，划完手指就抬了 ✓，
     //      中间没有任何反馈的话，用户根本分不清"我是划了还是滚了一下"✓
@@ -1099,10 +1099,6 @@
       }
       return;
     }
-    if (s.dir === 'D') {
-      if ((s.dy || 0) >= PULL_TRIG) openCompChat();
-      return;
-    }
     const far = Math.abs(s.dx || 0) >= SW_TRIG;
     if (!far) return;
     const scr = _whichScreen();
@@ -1115,51 +1111,9 @@
   //    （`touchend` 不一定会来 ✓，这种"少一个事件"的坑这个项目栽过 ✓）。
   document.addEventListener('touchcancel', () => { pgSw = null; hidePullHint(); _endQuoteDrag(); });
 
-  /**
-   * **下拉 → 进这条对话** ✓（收纳页和单个组件页都走这里 ✓）。
-   *
-   * 收纳页下拉 = 进**它自己**那条对话 ✓ —— 也就是「组件界面diy」✓
-   * （`wall` 这个 slug ✓，它跟别的组件一样有对话 ✓，见 `routes_internal` 那段 ✓）。
-   * ⚠️ 这一条是**写死**的 ✗（用户原话："可以将这个能力写死，因为这是和组件沙箱外部的
-   *    创意工坊互通，不在用户可定义范围内"✓）—— 组件里面怎么自由都行 ✓，
-   *    但这一个动作通到沙箱外面 ✓，所以由我们定 ✓。
-   */
-  const openCompChat = () => {
-    const scr = _whichScreen();
-    // ⚠️ **`'top'` = 从上面滑进来** ✓（用户 2026-10-09 定的："从上面滑入" ✓）——
-    //    这个参数一路传到 `pushScreen` ✓，退场也会顺着它**往上收** ✓。
-    if (scr === 'comp') {
-      if (compCur) openTaskForSlug(compCur.slug, compCur.title, 'top');
-      return;
-    }
-    if (scr === 'wall') openTaskForSlug(WALL_SLUG, '组件界面diy', 'top');
-  };
-
-  // ★ **组件里面往下拉**那一条（沙箱里听不到 ✓，由注入的小桥报信 ✓）
-  //
-  // ⚠️ 2026-10-09 改成**报进度** ✗→✓（原来只在"拉够了"的那一下报一嗓子 ✓）——
-  //    用户要的是"顶部**慢慢**出现一个提示" ✓，那就必须**跟手** ✓，
-  //    而跟手需要中间那些值 ✓（只报一个"成了"是画不出渐变来的 ✗）。
-  //    所以小桥现在发三种信 ✓：`pull` 带 dy ✓ / `pullend` / `pullcancel` ✓。
-  let _pullDy = 0;
-  window.addEventListener('message', (ev) => {
-    const d = ev && ev.data;
-    if (!d || typeof d.lg !== 'string') return;
-    if (_whichScreen() !== 'comp') return;   // 只在看组件的时候认 ✓
-    if (d.lg === 'pull') {
-      _pullDy = Number(d.dy) || 0;
-      showPullHint('编辑该组件', _pullDy);      // 后半句 ✓，前半句它自己拼 ✓
-      return;
-    }
-    if (d.lg === 'pullend') {
-      const far = _pullDy >= PULL_TRIG;
-      _pullDy = 0;
-      hidePullHint();
-      if (far) openCompChat();
-      return;
-    }
-    if (d.lg === 'pullcancel') { _pullDy = 0; hidePullHint(); }
-  });
+  // ★ 2026-10-13：**下拉进编辑整套撤了** ✗→✓ —— `openCompChat` / 下拉桥 / message
+  //   监听一起删了 ✓。进统一聊天只留**群聊右上角**一个入口 ✓（用户定的 ✓）。
+  //   wall（组件界面本身）的外观也改在统一聊天里改 ✓（服务端松了 `_wall_task_ok` ✓）。
 
   /** 改账号（用户名 / 密码）✓ —— 和「我的」同构的一屏 ✓。 */
   const _rb = $('#reloadBtn');

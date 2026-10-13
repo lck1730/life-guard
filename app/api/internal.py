@@ -1289,15 +1289,19 @@ def _wall_dir(group_id: int) -> Path:
 
 
 async def _wall_task_ok(group_id: int, task_id: int | None) -> str | None:
-    """这条对话是不是「组件界面diy」那条 ✓？不是就返回一句给模型看的话。"""
+    """这条对话能不能改「组件界面」外观 ✓？不能就返回一句给模型看的话。"""
+    # ★ 2026-10-13：**统一聊天放行** ✗→✓ —— 下拉进 wall 那条对话的入口撤了 ✓，
+    #    wall 外观改在**统一聊天**里做 ✓。claude 桥路径下 MCP 不传 task_id（为空 ✓），
+    #    那就是统一聊天 → 放行 ✓。老的 WALL_SLUG 那条（Hermes 路径）照旧能改 ✓。
+    #   ⚠️ 安全边界是 **internal token**（这道闸在 `Depends(require_internal_token)` ✓），
+    #      不是 task_id ✓ —— 放空 task_id 不会让外面的人够得着 ✓。
     if not task_id:
-        return ("改「组件界面」的外观只能在**「组件界面diy」那条对话**里做 —— "
-                "你这条对话没有那个权限。")
+        return None
     row = await fetch_one(
         "SELECT slug FROM workshop_tasks WHERE id = ? AND group_id = ?",
         (int(task_id), int(group_id)))
     if not row or (row["slug"] or "") != WALL_SLUG:
-        return "只有「组件界面diy」那条对话能改组件界面的外观。"
+        return "只有统一聊天或「组件界面diy」那条对话能改组件界面的外观。"
     return None
 
 

@@ -85,6 +85,7 @@ from ..agent.agent import (
     _looks_like_leaked_reasoning,
     _strip_leaked_thinking,
     _stream_completion,
+    _stream_claude,
     diy_session_id_for,
     diy_persona,
 )
@@ -773,16 +774,25 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                 text = "（发了一张图）"
             images = _image_parts([{"msg_type": msg_type, "media_path": media_path}])
             parts: list[str] = []
-            async for piece in _stream_completion(
-                group_id, text, images, profile,
-                system=system,
-                session_id=diy_session_id_for(group_id, task_id),
-                # ★ **工坊这条要用 diy 那一档模型** ✗→✓（2026-10-07 深夜 ✓）——
-                #   不写的话它跟着 profile 的默认走 ✓ = `chat` ✓ = **dots** ✗ ✓，
-                #   而 dots 是那个老报错的 ✓（用户报的"diy 怎么在用 dots"就是这个 ✓）。
-                #   见 `_stream_completion` 里那段（为什么非要连 provider 一起给 ✓）。
-                role="diy",
-            ):
+
+            # ★ 2026-10-13：工坊编码走 Claude Code 子进程（glm-5.2 ✓），不走 Hermes ✓。
+            #   _stream_claude 读不到商汤 key 时自动回退 _stream_completion ✓（兜底 ✓）。
+            #   ⚠️ 图片暂时不传给 claude（-p 文本模式）—— 工坊发图少，TODO ✓。
+            #   想临时回退 Hermes：export LG_DIY_BACKEND=hermes 后 restart ✓。
+            async def _diy(t: str):  # noqa: ANN202
+                if __import__("os").environ.get("LG_DIY_BACKEND", "claude") == "hermes":
+                    async for p in _stream_completion(
+                        group_id, t, images, profile,
+                        system=system,
+                        session_id=diy_session_id_for(group_id, task_id),
+                        role="diy",
+                    ):
+                        yield p
+                else:
+                    async for p in _stream_claude(group_id, task_id, t, system):
+                        yield p
+
+            async for piece in _diy(text):
                 parts.append(piece)
                 # ⚠️ **空的片段不推** ✗→✓（2026-10-07 深夜，用户看着截图报的：
                 #    「思考的时候先返回了一个空消息占位干啥，没必要吧」✓）。
@@ -870,12 +880,7 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                                       "data": {"group_id": group_id,
                                                "task_id": task_id, "reset": True}})
                 fixed: list[str] = []
-                async for piece in _stream_completion(
-                    group_id, nudged, images, profile,
-                    system=system,
-                    session_id=diy_session_id_for(group_id, task_id),
-                    role="diy",
-                ):
+                async for piece in _diy(nudged):
                     fixed.append(piece)
                     if piece:
                         await _push(user_id, {"type": "ws_stream",

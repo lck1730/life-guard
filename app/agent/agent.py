@@ -17,6 +17,7 @@ import asyncio
 import base64
 import json
 import logging
+import os
 import re
 import time
 from pathlib import Path
@@ -934,6 +935,190 @@ async def _stream_completion(
                         yield piece
 
 
+# ── DIY 编码执行器：Claude Code 子进程（glm-5.2）────────────────────────────
+#
+# ★ 2026-10-13：工坊编码那一路从 Hermes 换成 Claude Code 子进程。
+#   痛点是 diy 那档现在指商汤 ``sensenova-6.8-flash-lite``（lite 弱模型 ✓），
+#   编码不行 ✓。换 ``claude -p`` 子进程 = 用上 ``glm-5.2``（和 butler 同档 ✓）。
+#
+#   ⚠️ **命门验过**（2026-10-13 ✓）：``claude`` CLI 在 ``/usr/bin/claude`` ✓；
+#     glm-5.2 经商汤网关 token.sensenova.cn、用 models.json 里 lifeguard 自己的
+#     商汤 key 跑通 ✓——**不碰 butler 的 ANTHROPIC_AUTH_TOKEN**（硬底线 ✓）。
+#
+#   ⚠️ **记忆不落第二次**（[[shadow-test-deleted-a-real-profile]] 的教训 ✓）：
+#     HOME 钉死在 ``var/claude-home/``（隔离 ✓），不碰 butler 的 ~/.claude ✓；
+#     claude -p 非交互，不主动写 memory ✓；会话按 task_id resume（``_CLAUDE_SESSIONS``）。
+_CLAUDE_HOME = Path("/opt/lifeguard-chat/var/claude-home")
+#: MCP server 得用 lifeguard 的 venv python（系统 python3 没 httpx ✓）。
+_CLAUDE_PY = "/opt/lifeguard/.venv/bin/python"
+#: task_id → claude session_id。内存里 ✓（重启丢，记忆靠注入补 ✓）。
+_CLAUDE_SESSIONS: dict[int, str] = {}
+
+
+def _load_diy_model_cfg() -> dict:
+    """读 ``var/models.json``，拿 diy 角色对应那档的 api_key + base_url。
+
+    model 用 ``glm-5.2``（命门验过比 lite 强 ✓）；如果 config 里有 ``claude_model``
+    字段就用它（方便以后换模型不改代码 ✓）。
+    """
+    try:
+        data = json.loads(settings.models_conf.read_text("utf-8"))
+        cfgs = {c["id"]: c for c in data.get("configs", [])}
+        cid = (data.get("roles") or {}).get("diy")
+        cfg = cfgs.get(cid) or (next(iter(cfgs.values())) if cfgs else {})
+        base = (cfg.get("base_url") or "").rstrip("/")
+        if base.endswith("/v1"):  # claude CLI 要的是 Anthropic 协议端点（无 /v1）
+            base = base[:-3]
+        return {
+            "base_url": base,
+            "api_key": cfg.get("api_key", ""),
+            "model": cfg.get("claude_model", "glm-5.2"),
+        }
+    except Exception as exc:  # noqa: BLE001
+        log.warning("读 models.json 给 claude 用失败了：%s", exc)
+        return {}
+
+
+def _claude_env(group_id: int) -> dict:
+    """spawn ``claude`` 子进程要用的 env。
+
+    ★ ``LG_INTERNAL_TOKEN`` 从 ``settings.internal_token`` 取 ✓（lifeguard 进程能读 ✓），
+      原样塞给子进程 → MCP server 从 env 读 ✓ → 不落盘、不碰 ``.env`` 硬底线 ✓。
+    """
+    cfg = _load_diy_model_cfg()
+    env = os.environ.copy()
+    # ★ 清掉 butler 那套（如果 lifeguard 进程 env 里带的话），用 lifeguard 自己的商汤 key ✓
+    for k in ("ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY",
+              "ANTHROPIC_BASE_URL", "ANTHROPIC_MODEL",
+              "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL",
+              "ANTHROPIC_DEFAULT_HAIKU_MODEL", "CLAUDE_CONFIG_DIR"):
+        env.pop(k, None)
+    env["ANTHROPIC_BASE_URL"] = cfg.get("base_url", "https://token.sensenova.cn")
+    env["ANTHROPIC_AUTH_TOKEN"] = cfg.get("api_key", "")
+    env["ANTHROPIC_MODEL"] = cfg.get("model", "glm-5.2")
+    env["HOME"] = str(_CLAUDE_HOME)
+    env["LG_INTERNAL_TOKEN"] = settings.internal_token
+    env["LG_GROUP_ID"] = str(group_id)
+    env["LIFEGUARD_API_BASE"] = "http://127.0.0.1:8730"
+    return env
+
+
+async def _stream_claude(
+    group_id: int,
+    task_id: int,
+    text: str,
+    system: str,
+) -> AsyncIterator[str]:
+    """把用户的话交给 ``claude -p`` 子进程干，把它的正文逐段 yield 回来。
+
+    工具调用过程不外露（只 yield text block）✓；MCP 工具起票/落版走正规
+    ``components/save``（版本自增 / 票据 / 校验全不绕 ✓）；claude 内置 Read 能在
+    组件目录里读当前 HTML（cwd 钉在该群组件目录 ✓）。
+
+    ⚠️ stream-json 不出 content_block_delta ✓——assistant 是整块 message，
+    单段长文本是"刷"一下出现、不是逐 token（比 Hermes 逐字差一档 ✓；
+    要逐字得换 SDK 直调，后续再说 ✓）。
+    """
+    from asyncio.subprocess import PIPE
+
+    env = _claude_env(group_id)
+    if not env.get("ANTHROPIC_AUTH_TOKEN"):
+        # 没 key 就别硬撑 ✓ —— 回退 Hermes（diy 那档虽然弱，但能跑 ✓）。
+        log.warning("工坊 claude：读不到商汤 key，回退 Hermes group=%s", group_id)
+        async for p in _stream_completion(
+            group_id, text, [], await _group_profile(group_id),
+            system=system, session_id=diy_session_id_for(group_id, task_id), role="diy",
+        ):
+            yield p
+        return
+
+    _CLAUDE_HOME.mkdir(parents=True, exist_ok=True)
+    mcp_file = _CLAUDE_HOME / f"mcp-{task_id}.json"
+    mcp_file.write_text(json.dumps({
+        "mcpServers": {
+            "lg": {
+                "command": _CLAUDE_PY,
+                "args": [str(Path(__file__).parent / "mcp_components.py")],
+            }
+        }
+    }), "utf-8")
+    cwd = settings.components_dir / f"g{int(group_id)}"
+    cwd.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        "claude", "-p", "--verbose", "--output-format", "stream-json",
+        "--model", env["ANTHROPIC_MODEL"],
+        "--dangerously-skip-permissions",
+        # ⚠️ claude -p 模式下 MCP 工具默认不加载到工具集 ✓ —— 必须显式
+        #    --allowedTools 列出来（实测不列的话 claude 说"没有这个工具"✓）。
+        #    内置只给 Read/Grep/Glob/Bash（够读组件 HTML + 探索 ✓），
+        #    写组件走 MCP save_component（正规落版 ✓），不给 Edit/Write。
+        "--allowedTools",
+        "Read", "Grep", "Glob", "Bash",
+        "mcp__lg__list_components", "mcp__lg__read_component_note",
+        "mcp__lg__confirm_component", "mcp__lg__save_component",
+        "mcp__lg__set_wall_style", "mcp__lg__clear_wall_style",
+        "--mcp-config", str(mcp_file),
+        "--append-system-prompt", system or "你是一个帮用户做界面组件的编码助手。",
+        "--add-dir", str(cwd),
+    ]
+    sid = _CLAUDE_SESSIONS.get(int(task_id))
+    if sid:
+        cmd += ["--resume", sid]
+
+    log.info("工坊 claude 起来 group=%s task=%s resume=%s", group_id, task_id, bool(sid))
+    # ⚠️ prompt 走 stdin ✓ —— `--add-dir` 是 variadic（吃多个目录 ✓），
+    #    positional 末尾的 prompt 会被它当第二个目录吞掉 ✓（实测踩过 ✓）。
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env, cwd=str(cwd),
+    )
+    try:
+        assert proc.stdin is not None
+        proc.stdin.write((text + "\n").encode("utf-8"))
+        await proc.stdin.drain()
+        proc.stdin.close()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("工坊 claude：写 stdin 失败 group=%s task=%s %s",
+                    group_id, task_id, exc)
+    try:
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            line = line.strip()
+            if not line.startswith(b"{"):
+                continue
+            try:
+                d = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            t = d.get("type")
+            if t == "system":
+                s = d.get("session_id")
+                if s:
+                    _CLAUDE_SESSIONS[int(task_id)] = s
+            elif t == "assistant":
+                for block in (d.get("message") or {}).get("content", []) or []:
+                    if block.get("type") == "text" and block.get("text"):
+                        yield block["text"]
+            elif t == "result":
+                break
+    finally:
+        if proc.returncode is None:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
+        try:
+            err = await asyncio.wait_for(proc.stderr.read(), timeout=2.0)
+            if err:
+                log.warning("工坊 claude stderr: %s",
+                            err.decode("utf-8", "replace")[:500])
+        except Exception:  # noqa: BLE001
+            pass
+        await proc.wait()
+
+
 # 引用标记：它可以在回复**开头**写 `[引用 #157]` 来引用某条消息。
 _QUOTE_RE = re.compile(r"^\s*[\[【]\s*引用\s*#(\d+)\s*[\]】]\s*")
 
@@ -1316,7 +1501,8 @@ async def diy_persona(group_id: int, task_id: int | None = None) -> str:
 
     return (
         f"你现在在**创意工坊**里 ✓ —— 这是 App 里专门做组件的地方，"
-        f"**只有你和他两个人** ✓（不是群聊；说话不用管「该不该接话」✓）。\n"
+        f"**群里谁都能在这儿和你说** ✓（不是主群聊那条 ✓；你不用管「该不该接话」✓ —— "
+        f"有人开口你就应 ✓）。\n"
         f"你在这个界面里叫 **{my_name}** ✓（他能在导航右上角改 ✓，"
         f"别用群聊里那个名字自称 ✗）。\n"
         "\n## 你是谁\n"
@@ -1327,8 +1513,8 @@ async def diy_persona(group_id: int, task_id: int | None = None) -> str:
         "· **改现成的** ✓ —— 换数据、换内容、换样子（**先 `component_list` / `component_note` 看清楚** ✗，"
         "别凭印象改 ✗）\n"
         "· **调它在组件界面怎么摆** ✓ —— 占几格、配什么底色\n"
-        "· **改组件界面本身** ✓ —— **只有「组件界面diy」那条对话**能干 ✓；"
-        "闸门在服务端 ✗，不是你自觉别做 ✗\n"
+        "· **改组件界面本身**（那张摆所有组件的表 ✓）✓ —— 用 `set_wall_style` 写一段 CSS，"
+        "**作用域用 `#workshop` 限定**（不然会改到别的屏 ✗ ✓）；恢复默认用 `clear_wall_style` ✓\n"
         "· **给每个组件留一份工程笔记** ✓ —— 下次有人接着改，读它自己的笔记就上手了 ✓\n"
         "\n**你看得见什么** ✓：这个群现有的组件 ✓、每个组件的笔记 ✓、"
         "群里的**长期记忆**（跟群聊**共享一份** ✓ —— 所以群里发生过什么、"
@@ -1337,7 +1523,9 @@ async def diy_persona(group_id: int, task_id: int | None = None) -> str:
         "那份是全群共享的，只有 2200 字符 ✓，被你填掉就轮到别人没地方写了 ✓。\n"
         + focus + named + existing +
         "\n## 你要做的事\n"
-        "把一个**需求**变成一块能看的组件。流程是固定的，按顺序走：\n"
+        "把一个**需求**变成一块能看的组件 ✓。**这是一条连续的对话** ✓ —— 像正常聊天一样："
+        "他说清楚就直接做 ✓，别每件事都死走全套流程 ✗。下面这套是**不清楚时**的问法 ✓ "
+        "（按顺序走 ✓），不是铁律 ✗；改现成的组件先 `component_list` / `component_note` 看清楚再做 ✓。\n"
         "\n"
         "**① 问清「要看什么」** —— 只问**体验** ✓，不问技术 ✗。\n"
         "   该问的：他想看到什么、给谁看、多久看一次、最要紧的是哪个数。\n"

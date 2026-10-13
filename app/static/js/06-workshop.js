@@ -350,38 +350,10 @@
     // ⚠️ 这里**不需要 `<base>`** ✗→✓ —— 组件在 `var/` 里 ✓，
     //    而规范本来就是"单文件、不引外部资源" ✓（2026-10-07）。
     const S = '<' + 'script>', E = '<' + '/script>';
-    // ★ **沙箱外那侧的桥：下拉** ✗→✓（2026-10-08 用户定的 ✓）——
-    //   用户原话：「这两种页，都可以有个特殊的动作进入组件聊天页，那就是从上往下滑，
-    //   虽然这些组件展示完全自由，但是可以将这个能力写死，因为这是和组件沙箱外部的
-    //   创意工坊互通，不在用户可定义范围内，先写死」✓。
-    //
-    //   ⚠️ 为什么必须**注入到 iframe 里** ✗：组件跑在 `sandbox="allow-scripts"`
-    //      （**不透明源** ✓）里，它的触摸事件**传不到外面的页面** ✓ ——
-    //      外面那层听不到"在组件里往下拉" ✗（`postMessage` 是通的 ✓，所以由它报信 ✓）。
-    //   ⚠️ 只看**页面滚到顶了还继续往下拉** ✓ ——「滚动中往下拉」是正常滚动 ✓，
-    //      不能拿它当手势 ✗（不然滚长组件就会一直触发 ✓）。
-    //   ⚠️ 2026-10-09：它改成**一路报进度** ✗→✓（见下面那段 message 监听 ✓）——
-    //      外面那条提示要跟着手指浮现 ✓，只报"拉够了"那一下是画不出渐变来的 ✓。
-    //      仍然**只看"滚到顶了还继续往下拉"** ✓（滚动中往下拉是正常滚动 ✗）。
-    //      ⚠️ 一旦里层滚起来了（`st>0`）就**撒手**（报 pullcancel ✓）——
-    //         那是"他在滚组件" ✓，不是"他想编辑" ✓；不撒手的话，
-    //         滚到一半手感会变得很怪 ✓（提示跟着乱闪 ✓）。
-    const bridge = S
-      + 'var _y0=null;'
-      + 'var _say=function(o){try{parent.postMessage(o,"*")}catch(_){}};'
-      + 'addEventListener("touchstart",function(e){'
-      + '_y0=(e.touches.length===1)?e.touches[0].clientY:null;},{passive:true});'
-      + 'addEventListener("touchmove",function(e){if(_y0===null)return;'
-      + 'var st=(document.scrollingElement||document.documentElement).scrollTop;'
-      + 'if(st>0){_y0=null;_say({lg:"pullcancel"});return;}'
-      + 'var dy=e.touches[0].clientY-_y0;'
-      + '_say({lg:"pull",dy:dy});},{passive:true});'
-      + 'var _end=function(ok){if(_y0===null)return;_y0=null;'
-      + '_say({lg:ok?"pullend":"pullcancel"});};'
-      + 'addEventListener("touchend",function(){_end(true)});'
-      + 'addEventListener("touchcancel",function(){_end(false)});'
-      + E;
-    const inject = S + `window.__LG_DATA__=${JSON.stringify(d.data)};` + E + bridge;
+    // ★ 2026-10-13：**下滑进编辑那套整个撤了** ✗→✓ —— 只留群聊右上角一个入口 ✓
+    //   （用户：「只留右上角入口」✓）。所以组件 iframe 里**不再注入下拉桥** ✓ ——
+    //   它只在沙箱里跑组件自己的东西 ✓，和外面创意工坊的互通走右上角那条统一聊天 ✓。
+    const inject = S + `window.__LG_DATA__=${JSON.stringify(d.data)};` + E;
     const ifr = document.createElement('iframe');
     ifr.setAttribute('sandbox', 'allow-scripts');   // ★ 没有 allow-same-origin
     ifr.setAttribute('referrerpolicy', 'no-referrer');
@@ -405,15 +377,12 @@
     //   所以底下那一栏**整个删掉了** ✓（连同那一行 "v2 · 未固化" 的事实行 ✓ ——
     //   它也是"信息"，用户要的是压缩 ✓）。那些动作全在工坊里 ✓。
     //
-    //   ★ 去那条对话的入口，2026-10-08 改成**下拉** ✓（原来顶上有个气泡图标 ✓，
-    //     而这一屏现在一个 chrome 都没有 ✓）——
-    //     拉下去由上面那段桥报信回来 ✓，落到 `openTaskForSlug` ✓。
-    //   ⚠️ 它**带的是 slug，不是 task_id** ✓ —— 因为从这一屏进来时
-    //     "我有没有为它开过对话"这件事前端并不知道 ✓，
-    //     交给 `openTaskForSlug` 去查/去开 ✓（见下 ✓）。
+    //   ★ 2026-10-13：进统一聊天**只留群聊右上角一个入口** ✓ —— 下拉那套撤了 ✓
+    //     （用户定的 ✓）。这一屏现在是**纯预览** ✓：要改它，回群聊点右上角、
+    //     在统一聊天里说就行 ✓（组件知识已在 system prompt 里注入 ✓）。
   };
 
-  //: 当前正在看的那个组件 ✓（下拉进对话要用它的 slug ✓）
+  //: 当前正在看的那个组件 ✓（`setWsHead` 点名字跳组件页时判"是不是同一个"用 ✓）
   let compCur = null;
 
   const closeComp = () => {
@@ -683,10 +652,10 @@
    *    组件不再各开一条对话了 ✗→✓：claude 桥路径下做完一个组件**不会把对话钉成那个组件的**
    *    （MCP `confirm_component` 不带 task_id ✓ → 票 task_id 为空 ✓ → `components_save` 里那句
    *    `UPDATE workshop_tasks SET slug` 因 `if task_id:` 直接跳过 ✓），所以那条 NULL-slug
-   *    的对话就是**统一的**那条 ✓ —— 角上、下滑都进它 ✓。
-   *    `prefill` 给个开场（从某个组件下滑进来时填「改「x」：」✓）。
-   *    ⚠️ wall（组件界面本身）**不走这条** —— 服务端 `_wall_task_ok` 闸着，只许 WALL_SLUG
-   *       那条对话改界面外观 ✓；下一步松闸后 wall 也并入这条 ✗→✓。 */
+   *    的对话就是**统一的**那条 ✓ —— 群聊右上角每次都进它 ✓。
+   *    `prefill` 给个开场（别处想带一句进来时用 ✓；角上那条路传空 ✓）。
+   *    ⚠️ wall（组件界面本身）也在这条里改 ✓ —— 服务端 `_wall_task_ok` 已松闸 ✓
+   *       （task_id 为空 = claude 桥路径 = 放行 ✓）；claude 用 `set_wall_style` MCP 工具改 ✓。 */
   const openUnifiedChat = async (prefill, from) => {
     await wsReloadTasks();
     const hint = wsBusyHint(null);
@@ -708,21 +677,8 @@
     }
   };
 
-  const openTaskForSlug = async (slug, title, from) => {
-    // ★ 2026-10-13：组件 diy 不再一人一条对话了 ✓ —— 统一进那条连续的聊天 ✓。
-    //   返回落到哪一屏，由"底下原来是什么"决定 ✓（`popScreen` 本来就是那个意思 ✓）。
-    //   例外只有 **wall**（组件界面本身 ✓）：它还走自己那条对话 ——
-    //   服务端 `_wall_task_ok` 闸着，只许 WALL_SLUG 那条改界面外观 ✓
-    //   （claude 桥没传 task_id，现在 claude 也改不了 wall ✗ —— 下一步松闸 ✓）。
-    if (slug === WALL_SLUG) {
-      await wsReloadTasks();
-      const wall = wsCur.tasks.find(x => x.slug === WALL_SLUG);
-      if (wall) { await openTaskById(wall.id, from); return; }
-      if (await wsNewTask(WALL_SLUG)) pushScreen('wsChat', from);
-      return;
-    }
-    await openUnifiedChat('改「' + (title || slug) + '」：', from);
-  };
+  // ★ 2026-10-13：`openTaskForSlug` 撤了 ✗→✓ —— 下拉进编辑那套整个没了 ✓
+  //   （只留群聊右上角进统一聊天 ✓）。进哪条都走 `openUnifiedChat` ✓。
 
   /** 开一条新的 ✓（只置状态，不推屏 ✓ —— 推屏由调用方决定 ✓）。返回成没成 ✓。 */
   const wsNewTask = async (slug, title) => {
