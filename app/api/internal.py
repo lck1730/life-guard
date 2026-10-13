@@ -1192,18 +1192,24 @@ async def components_save(body: ComponentSaveIn) -> dict:
     #   · 老票（迁移前派出去的 ✓，票上没有任务号 ✓）
     #   · 或者**这次报完之后没人再发过话**（例如 poke 轮自己触发的落版 ✓）
     #   两种都不猜名字 ✗ —— 编一个"某某"出来比不带人糟 ✗（那是编事实 ✗）。
-    nicks = await _participants_nicks(task_id)
-    nick = _join_names(nicks)
-    if not nick:
-        nick = await _maker_nickname(task_id)
-    if slug == WALL_SLUG or version > 1:
-        line = f"改了「{want_title}」，快去看看吧～"
-    else:
-        line = f"做了一个新组件：「{want_title}」，快去看看吧～"
-    await _say_system(group_id, nick + line)
-    # ⚠️ **通知真的发出去之后**才把水位线推进 ✗→✓ —— 见 `_mark_notified` 那段 ✓。
-    if task_id:
-        await _mark_notified(task_id)
+    # ★ 2026-10-13 用户定的：「除了新增组件，改组件不要显示了，把群里那些提示去掉」✓
+    #   所以**只有 v1（第一次做出来）才往主群聊报一条** ✓；之后每一版（改 ✓）
+    #   和组件页（wall ✓，它本来就一直算「改了」✓）都**不再报** ✗ → 群里不被刷屏 ✓。
+    #
+    #   ⚠️ 那一套参与人 / 水位线（`_participants_nicks` / `_mark_notified` ✓）
+    #      是**为「念谁」服务的** ✓ —— 不报就不念 ✓，连带不用算 ✓、不用推进 ✓。
+    #      它们只在**真要报**这一支里跑 ✓（「不报就不动」最稳 ✓ —— 免得白白推进
+    #      水位线 ✗，把下次该念的人提前清掉 ✗）。
+    is_new = (version == 1 and slug != WALL_SLUG)
+    if is_new:
+        nicks = await _participants_nicks(task_id)
+        nick = _join_names(nicks)
+        if not nick:
+            nick = await _maker_nickname(task_id)
+        await _say_system(group_id, nick + f"做了一个新组件：「{want_title}」，快去看看吧～")
+        # ⚠️ **通知真的发出去之后**才把水位线推进 ✗→✓ —— 见 `_mark_notified` 那段 ✓。
+        if task_id:
+            await _mark_notified(task_id)
     log.info("组件落成：群 %s 的 %s v%s" + ("（顺手收掉 v%s）" if pruned else ""),
              group_id, slug, version, pruned)
     return {"ok": True, "slug": slug, "version": version, "state": "draft",
