@@ -284,9 +284,9 @@
       _svg('image', { href: ic, x: s.x - 12, y: s.y - 43, width: 24, height: 24 }, g);
     } else {
       const t = _svg('text', { class: 'ws-ico', x: s.x, y: s.y - 31 }, g);       // 卡的上 2/3 ✓
-      t.textContent = ic || '🧩';
+      t.textContent = ic || '📓';           // 📓 比较居家 ✓
     }
-    const lbl = _svg('text', { class: 'ws-lbl', x: s.x, y: s.y - 7 }, g);         // 名字在卡底 ✓
+    // 名字去掉 ✓（2026-10-14，只显示图标）
     // ★ 深底给白字 ✓ —— tint 是设计者设的强调色，暗的话默认那个 `#5b4632` 就糊成一片 ✗。
     const _m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(tint);
     if (_m && (0.299 * parseInt(_m[1], 16) + 0.587 * parseInt(_m[2], 16)
@@ -307,7 +307,7 @@
     const cat = _svg('text', { class: 'cat', x: 68, y: 514, 'font-size': 34, 'text-anchor': 'middle' }, g);
     cat.textContent = '🐈';
     const nm = _svg('text', { class: 'ws-lbl', x: 68, y: 584 }, g);
-    nm.textContent = '二狗 · 回群聊';
+    nm.textContent = '🐈';
     g.addEventListener('click', () => closeWorkshop());
     return g;
   };
