@@ -1444,8 +1444,11 @@ async def task_delete(group_id: int, task_id: int,
                             "「组件收纳页」这条不能删。")
     running = _running.get(group_id)
     if running and running[0] == int(task_id) and not running[1].done():
+        # ⚠️ 2026-10-14：原来那句「先切到别的对话，再回来删」✗ —— 前端的「清空对话记录」
+        #   已经会**先掐再删**（停 → 删 → 开新的 ✓），"切到别的对话"这一步不存在了 ✗
+        #    （切走=终止那套 10-11 就撤了 ✓）。照旧说这句话，用户会去找一个已经不存在的动作 ✗。
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                            "这条正在做，删不了。先切到别的对话，再回来删。")
+                            "这条正在做，先把它停下，再清空。")
     await execute("DELETE FROM workshop_messages WHERE task_id = ?", (int(task_id),))
     await execute("UPDATE components SET task_id = NULL WHERE task_id = ?",
                   (int(task_id),))
