@@ -665,9 +665,16 @@
    *       （task_id 为空 = claude 桥路径 = 放行 ✓）；claude 用 `set_wall_style` MCP 工具改 ✓。 */
   const openUnifiedChat = async (prefill, from) => {
     await wsReloadTasks();
-    const hint = wsBusyHint(null);
-    if (hint) { toast(hint); return; }
     const uni = wsCur.tasks.find(t => !t.slug);   // null / 空串都算「统一那条」✓
+    // ★ 2026-10-14：判「能不能进」要拿**统一那条的 task_id** ✗→✓ ——
+    //   原来传 `null` ✗（=「我要开一条新的」✗），可**正在跑的那一轮往往就是
+    //   这条统一聊天本身** ✗（人从右上角出去、那一轮还在后台跑着、再进来 ✗）→
+    //   拿「开新的」那道闸去挡「进同一条」✗，人就进不去了 ✗，还 fallback 成
+    //   「正在「一个组件」」（统一聊天没标题 ✗）✓。
+    //   有 uni 就拿它的 id 去判 ✓（正在跑的就是这条 → 放行 ✓）；
+    //   没 uni（头一回进、要建新的）才按「开新的」判 ✓（有人在跑就挡 ✓）✓。
+    const hint = wsBusyHint(uni ? uni.id : null);
+    if (hint) { toast(hint); return; }
     let opened = false;
     if (uni) {
       opened = await openTaskById(uni.id, from || 'corner');
