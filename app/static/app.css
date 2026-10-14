@@ -878,6 +878,25 @@
   #workshop .cell.drag { z-index:9; opacity:.92; transition:none;
                          transform-origin:center; }
   #workshop .cell.over { border-color:var(--accent); background:#16233a; border-radius:12px; }
+
+  /* ── 卧室场景（2026-10-14）──────────────────────────────────────────
+     组件界面不再是格子 ✓，是一间**手写 SVG 的卧室** ✓（网关没出图模型 ✓ →
+     不引外部资源 ✓，和组件"单文件"一个规矩 ✓）。屋是静态的 ✓，组件是往家具上
+     **摆的物** ✓（点物 → 进组件 ✓）；屋里那只 🐱 二狗 ✓ 点它 → 回主群聊 ✓。
+     一屏装不下 → 横滑看别处 ✓（床/墙/抽屉/另一面墙都能塞 ✓）。
+     ⚠️ 横滑交给**原生滚动** ✓ —— 手势引擎右滑 `'wall'` 那道闸已松开 ✓
+        （见 `05-settings.js` ✓），这里只管**容器自己能横滚** ✓。
+     ⚠️ 退出 = 点猫 ✓ / 系统返回 ✓（右滑不再是退出 ✓，否则会吃掉横滑 ✓）。
+     ★ 墙/侧墙/地板走**变量** ✓ —— `set_wall_style` 改这几个色就能换肤 ✓
+        （不用懂屋里结构 ✓）。 */
+  #workshop .ws-scene { position:relative; width:100%; height:100%; min-height:0;
+                        overflow-x:auto; overflow-y:hidden;
+                        -webkit-overflow-scrolling:touch; touch-action:pan-x pan-y;
+                        background:#e9dcc4; }
+  #workshop .ws-room { height:100%; width:auto; display:block; min-width:100%; }
+  #workshop .ws-room .rm-wall { fill:#d9c7a8; }
+  #workshop .ws-room .rm-side { fill:#c9b696; }
+  #workshop .ws-room .rm-floor { fill:#9c7549; }
   #workshop .edithint { color:var(--muted); font-size:12.5px; text-align:center;
                         padding:0 2px 10px; }
   /* 「这个群还没有组件」那一句 ✓（只有收纳页用得到 ✓）。

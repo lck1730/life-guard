@@ -116,35 +116,187 @@
     paintCanvas();
   };
 
+  // ── 卧室场景（2026-10-14）──────────────────────────────────────────
+  //
+  // 用户要的：组件界面不再是手机格子 ✓，是一间**有空间感的卧室** ✓——
+  //   地板、墙、家具 ✓；组件是屋里**能点开的物**（账本躺在桌上 ✓）✓；
+  //   屋里还有只 🐱（二狗 ✓）在埋粑粑 ✓，点它 → 回主群聊 ✓。
+  //   一屏装不下就**横滑**看别处 ✓（床/墙/抽屉/另一面墙都能塞 ✓）。
+  //
+  //   ⚠️ **网关没出图模型** ✗（glm-5.2 纯文本 ✗、flash-lite 只会看图 ✗）→
+  //      这间屋是**手写 SVG** ✓（不引外部资源 ✓，和组件"单文件"一个规矩 ✓）。
+  //      像不像**先发出来** ✓，再靠「截图 → flash-lite 描述 → 调」这条回路磨 ✓
+  //      （flash-lite 能看图了 ✓，不再是上一轮的盲猜 ✓）。
+  //
+  //   ⚠️ **横滑交给原生** ✗→✓：这一屏在手势引擎里叫 `'wall'` ✓，原来右滑 = 退出 ✓
+  //      ——会**吃掉横滑** ✗。已松开那道闸 ✓（见 `05-settings.js` ✓）→ 场景里
+  //      右滑 = 原生平移 ✓。**退出**走"点猫 → 回主群聊"✓ + 系统返回 ✓。
+  //
+  //   ⚠️ **不再用 `.cell`** ✗→✓：原来长按拖拽换位那套挂在 `.cell` 上 ✓ ——
+  //      `pointerdown` 里 `closest('#wsBody .cell')` 找不到 `.cell` 就直接 return ✓
+  //      （不会炸 ✓、也不会误触拖拽 ✓）✓。"拖物到家具上摆"= v2 ✓。
+  //
+  //   ⚠️ **组件往哪摆** ✓：按顺序填 `SLOTS` ✓（桌面 → 书架几层 → 柜顶 → 床面 →
+  //      地板前排 ✓）。超了的前排继续往右 ✓（横滑可见 ✓）—— 真超太多再扩屋 ✓。
+  const NS = 'http://www.w3.org/2000/svg';
+  const _svg = (tag, attrs, parent) => {
+    const el = document.createElementNS(NS, tag);
+    if (attrs) for (const k in attrs) el.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(el);
+    return el;
+  };
+  // 家具上的摆位 ✓（坐标在 viewBox 0 0 960 620 里 ✓）。超了就叠在前排地板 ✓。
+  const SLOTS = [
+    { x: 335, y: 390 },                         // 桌面（账本就躺这儿 ✓）
+    { x: 665, y: 172 }, { x: 765, y: 172 },     // 书架顶层 左/右
+    { x: 665, y: 212 }, { x: 765, y: 212 },     // 书架中层
+    { x: 665, y: 252 }, { x: 765, y: 252 },     // 书架底层
+    { x: 858, y: 366 },                         // 柜顶
+    { x: 155, y: 396 },                         // 床面
+    { x: 140, y: 558 }, { x: 220, y: 558 }, { x: 300, y: 558 },  // 地板前排
+    { x: 380, y: 558 }, { x: 540, y: 558 }, { x: 620, y: 558 },
+    { x: 700, y: 558 }, { x: 780, y: 558 },
+  ];
+
+  /** 卧室那间屋（静态 ✓ —— 屋不随组件变 ✓，组件是往里**摆物** ✓）。
+   *  一整串 SVG ✓（没有反引号 ✓ → 部署那道"剥字符串"闸不会吃错 ✓）。 */
+  const ROOM_INNER = [
+    '<defs>',
+    '  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">',
+    '    <stop offset="0" stop-color="#bfe3f5"/><stop offset="1" stop-color="#eaf6fb"/>',
+    '  </linearGradient>',
+    '  <linearGradient id="flr" x1="0" y1="0" x2="0" y2="1">',
+    '    <stop offset="0" stop-color="#9c7549"/><stop offset="1" stop-color="#7c5a36"/>',
+    '  </linearGradient>',
+    '  <radialGradient id="vign" cx="0.5" cy="0.5" r="0.7">',
+    '    <stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.18"/>',
+    '  </radialGradient>',
+    '</defs>',
+    '<style>',
+    '  .ws-obj{cursor:pointer}',
+    '  .ws-obj:hover .ws-card{filter:brightness(1.06)}',
+    '  .ws-card{fill:#fff7e6;stroke:#d9bd86;stroke-width:2}',
+    '  .ws-ico{font-size:24px;text-anchor:middle;dominant-baseline:central}',
+    '  .ws-lbl{fill:#5b4632;font-size:12px;text-anchor:middle;font-family:inherit}',
+    '  .ws-sh{fill:#000;opacity:0.16}',
+    '  .ws-exit{cursor:pointer}',
+    '  .cat{transform-box:fill-box;transform-origin:center;animation:catBob 2.6s ease-in-out infinite}',
+    '  @keyframes catBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}',
+    '</style>',
+    '<!-- 墙 + 侧墙（透视收一点 ✓）-->',
+    '<polygon class="rm-side" points="0,30 60,30 60,330 0,560"/>',
+    '<polygon class="rm-side" points="900,30 960,30 960,560 900,330"/>',
+    '<rect class="rm-wall" x="60" y="30" width="840" height="300"/>',
+    '<rect x="60" y="324" width="840" height="10" fill="#b59a78"/>',
+    '<!-- 窗 -->',
+    '<rect x="340" y="74" width="280" height="170" rx="6" fill="url(#sky)" stroke="#8a6a3f" stroke-width="6"/>',
+    '<line x1="480" y1="74" x2="480" y2="244" stroke="#8a6a3f" stroke-width="4"/>',
+    '<line x1="340" y1="159" x2="620" y2="159" stroke="#8a6a3f" stroke-width="4"/>',
+    '<circle cx="582" cy="104" r="20" fill="#f6c453"/>',
+    '<!-- 地板（前宽后窄 = 透视 ✓）-->',
+    '<polygon class="rm-floor" points="60,334 900,334 960,560 0,560" fill="url(#flr)"/>',
+    '<line x1="60" y1="334" x2="900" y2="334" stroke="#6e4f30" stroke-width="1"/>',
+    '<!-- 地毯 -->',
+    '<ellipse cx="480" cy="466" rx="190" ry="40" fill="#c2566b" opacity="0.9"/>',
+    '<ellipse cx="480" cy="466" rx="152" ry="30" fill="none" stroke="#e8c7cb" stroke-width="2" opacity="0.7"/>',
+    '<!-- 床（左）-->',
+    '<rect x="70" y="372" width="46" height="150" rx="6" fill="#5d7d9e"/>',
+    '<rect x="70" y="400" width="172" height="110" rx="6" fill="#6f8fb5"/>',
+    '<rect x="82" y="408" width="42" height="22" rx="6" fill="#f2f2f2"/>',
+    '<rect x="112" y="472" width="128" height="36" rx="6" fill="#5d7d9e"/>',
+    '<!-- 桌（中左）-->',
+    '<rect x="250" y="410" width="170" height="70" rx="4" fill="#b0894e"/>',
+    '<rect x="248" y="396" width="174" height="16" rx="4" fill="#caa05f"/>',
+    '<rect x="256" y="478" width="10" height="60" fill="#8a6a3f"/>',
+    '<rect x="404" y="478" width="10" height="60" fill="#8a6a3f"/>',
+    '<!-- 书架（右靠墙）-->',
+    '<rect x="620" y="160" width="200" height="10" fill="#caa05f"/>',
+    '<rect x="620" y="200" width="200" height="10" fill="#caa05f"/>',
+    '<rect x="620" y="240" width="200" height="10" fill="#caa05f"/>',
+    '<rect x="620" y="160" width="10" height="120" fill="#a9854f"/>',
+    '<rect x="810" y="160" width="10" height="120" fill="#a9854f"/>',
+    '<!-- 柜（右下）-->',
+    '<rect x="800" y="372" width="120" height="186" rx="4" fill="#9a6b3f"/>',
+    '<line x1="860" y1="372" x2="860" y2="558" stroke="#7a4f2a" stroke-width="2"/>',
+    '<circle cx="852" cy="466" r="3" fill="#e8c9a0"/><circle cx="868" cy="466" r="3" fill="#e8c9a0"/>',
+    '<!-- 绿植（地板中）-->',
+    '<polygon points="448,540 492,540 484,502 456,502" fill="#b5552f"/>',
+    '<ellipse cx="470" cy="502" rx="16" ry="8" fill="#8a3f1f"/>',
+    '<circle cx="470" cy="488" r="18" fill="#5a8f4e"/>',
+    '<circle cx="452" cy="498" r="13" fill="#6fa45a"/>',
+    '<circle cx="490" cy="498" r="13" fill="#6fa45a"/>',
+    '<rect x="0" y="0" width="960" height="620" fill="url(#vign)" pointer-events="none"/>',
+  ].join('\n');
+
+  /** 组件 = 屋里一件物 ✓（点 → 进组件 ✓，和原来点格子一个出口 ✓）。 */
+  const objNode = (c, i, s) => {
+    const g = _svg('g', { class: 'ws-obj' });
+    g.dataset.i = String(i);
+    _svg('ellipse', { class: 'ws-sh', cx: s.x, cy: s.y + 22, rx: 22, ry: 5 }, g);
+    const card = _svg('rect', {
+      class: 'ws-card', x: s.x - 24, y: s.y - 20, width: 48, height: 40, rx: 7,
+    }, g);
+    const tint = (c.spot && c.spot.tint) || '';
+    if (tint) card.setAttribute('fill', tint);
+    const ic = String(c.icon || '');
+    if (ic.startsWith('data:image/')) {
+      _svg('image', { href: ic, x: s.x - 16, y: s.y - 18, width: 32, height: 32 }, g);
+    } else {
+      const t = _svg('text', { class: 'ws-ico', x: s.x, y: s.y }, g);
+      t.textContent = ic || '🧩';
+    }
+    const lbl = _svg('text', { class: 'ws-lbl', x: s.x, y: s.y + 34 }, g);
+    const name = c.title || c.slug || '组件';
+    lbl.textContent = name.length > 6 ? name.slice(0, 6) + '…' : name;
+    // ★ 点物 → 进组件 ✓（**和原来点格子完全同一个出口** ✓ → 后端那条路不动 ✓）。
+    g.addEventListener('click', () => openComp(c.slug, c.title, tint));
+    return g;
+  };
+
+  /** 屋里那只 🐱 二狗 ✓ —— 在埋粑粑 ✓，点它 → 回主群聊 ✓（叙事出口 ✓）。 */
+  const catNode = () => {
+    const g = _svg('g', { class: 'ws-exit' });
+    // 猫砂盆（左下角 ✓）
+    _svg('rect', { x: 20, y: 524, width: 96, height: 44, rx: 5, fill: '#cfc8bd', stroke: '#b3a9a0', 'stroke-width': 2 }, g);
+    _svg('rect', { x: 26, y: 530, width: 84, height: 24, rx: 3, fill: '#e6dcc0' }, g);
+    const cat = _svg('text', { class: 'cat', x: 68, y: 514, 'font-size': 34, 'text-anchor': 'middle' }, g);
+    cat.textContent = '🐈';
+    const nm = _svg('text', { class: 'ws-lbl', x: 68, y: 584 }, g);
+    nm.textContent = '二狗 · 回群聊';
+    g.addEventListener('click', () => closeWorkshop());
+    return g;
+  };
+
+  const buildScene = () => {
+    const wrap = document.createElement('div');
+    wrap.className = 'ws-scene';
+    const svg = _svg('svg', { viewBox: '0 0 960 620', preserveAspectRatio: 'xMidYMid meet', class: 'ws-room' });
+    svg.innerHTML = ROOM_INNER;
+    wsCanvas.forEach((c, i) => {
+      // 超过预设槽位 → 叠在前排地板往右排 ✓（横滑可见 ✓）。
+      const s = SLOTS[i] || { x: 780 + ((i - SLOTS.length) % 4) * 80, y: 558 };
+      svg.appendChild(objNode(c, i, s));
+    });
+    svg.appendChild(catNode());
+    wrap.appendChild(svg);
+    return wrap;
+  };
+
   const paintCanvas = () => {
     const box = $('#wsBody');
-    box.innerHTML = '';                       // 下面全部走 createElement，不进 innerHTML ✓
+    box.innerHTML = '';                       // 下面走 createElement ✓（屋是固定串 ✓、物是 DOM 摆 ✓）
     if (!wsCanvas.length) {
-      // ★ 空状态那句话 ✓（2026-10-08 用户给的原话：
-      //   「当没有组件的时候只会在界面居中位置提示：当前还没有组件，
-      //     去创意工坊创建一个组件吧」✓）。
-      // ⚠️ **后半句改了** ✗→✓（2026-10-09）——「去创意工坊」那个入口**没有了** ✓
-      //    （用户：「主群聊右上角的按钮进入的不再是导航页，而是新建组件的
-      //    聊天界面」✓）→ 留着那句话就是在**指一条走不通的路** ✓
-      //    （而且他现在看到这一屏的**第一眼**多半就是它 ✓：新空间里一个组件都没有 ✓）。
+      // ★ 空状态那句话 ✓（2026-10-08 用户给的原话）—— 「去创意工坊」入口没了 ✓
+      //   （只剩群聊右上角进统一聊天 ✓），后半句改了 ✓。
       const em = document.createElement('div');
       em.className = 'wsempty';
       em.textContent = '当前还没有组件，去群里右上角让他做一个吧';
       box.appendChild(em);
       return;
     }
-    // ⚠️ 这里原来有一句"按住一个拖到别处"的提示 ✓（只在调整模式里出现 ✓）——
-    //    调整模式没了 ✓，那句话跟着没了 ✓（这一屏**一句提示都不该有** ✓，
-    //    除非用户在拉 —— 那种短提示在 `bindWallDrag` 里临时画 ✓）。
-    const g = document.createElement('div');
-    g.className = 'canvas';
-    wsCanvas.forEach((c, i) => g.appendChild(canvasCell(c, i)));
-    box.appendChild(g);
-    // ★ **平时一句提示都不放** ✗→✓ —— 2026-10-07 晚上用户定的：
-    //   「将群聊右上角点开的界面做成**纯粹的展示界面**，里面**不要有任何的提示
-    //     和设置选项**」✓。"未固化"那颗点是**状态**，留着 ✓；
-    //   而"要去哪儿做新的""点保留才算数"那些话是**说明**，一律不放 ✓。
-    //   唯一的例外是**调整模式里那一句** ✓（见上 ✓）。
+    box.appendChild(buildScene());
+    // ★ **纯粹的展示界面** ✓（2026-10-07 用户定的：这屏不放任何提示/设置 ✓）——
+    //   屋里那只猫就是唯一的"出口"提示 ✓（叙事 ✓，不是说明文字 ✓）。
   };
 
   /** 画布上的一格 —— **组件自己声明长什么样** ✓（`spot` ✓，见 main.py 的 `_spot_of` ✓）。 */
