@@ -154,10 +154,10 @@
   //   超了就叠在前排地板往右 ✓（横滑可见 ✓）。
   // ⚠️ **顺序有意义** ✓ —— `component_spots.pos` 按序取槽 ✓。所以**前两个槽必须落在第一屏**
   //    （第一屏只到 viewBox x≈295 ✓）—— 不然组件只有两三个的时候，人进屋看到的是一间空屋 ✗。
-  //    第二槽是桌面 ✓：库里 `记账` 通常是 pos 1 ✓ → 正好躺在桌上 ✓（"账本躺在桌面" ✓）。
+  //    **第一槽就是桌面** ✓ —— 记账通常是 pos 0 ✓ → 落在桌上 ✓（"账本躺在桌面" ✓）。
   const SLOTS = [
-    { x: 155, y: 408 },                         // 床面（第一屏正中央 ✓）
-    { x: 335, y: 396 },                         // 桌面（账本就躺这儿 ✓）
+    { x: 335, y: 396 },                         // 桌面（第一件就是它 ✓ —— 「账本躺在桌上」✓）
+    { x: 155, y: 408 },                         // 床面
     { x: 665, y: 148 }, { x: 765, y: 148 },     // 书架顶层 左/右
     { x: 665, y: 200 }, { x: 765, y: 200 },     // 书架中层
     { x: 665, y: 252 }, { x: 765, y: 252 },     // 书架底层
@@ -183,10 +183,7 @@
     '</defs>',
     '<style>',
     '  .ws-obj{cursor:pointer}',
-    '  .ws-obj:hover .ws-card{filter:brightness(1.06)}',
-    '  .ws-card{fill:#fff7e6;stroke:#d9bd86;stroke-width:2}',
-    '  .ws-ico{font-size:24px;text-anchor:middle;dominant-baseline:central}',
-    '  .ws-lbl{fill:#5b4632;font-size:12px;text-anchor:middle;font-family:inherit}',
+    '  .ws-obj:hover .ws-bd{filter:brightness(1.08)}',
     '  .ws-sh{fill:#000;opacity:0.16}',
     '  .ws-exit{cursor:pointer}',
     '  .cat{transform-box:fill-box;transform-origin:center;animation:catBob 2.6s ease-in-out infinite}',
@@ -265,34 +262,81 @@
     '<rect x="0" y="0" width="960" height="620" fill="url(#vign)" pointer-events="none"/>',
   ].join('\n');
 
+  /** 物件的影子 ✓（画在面上 ✓，大小跟着物件走 ✓）。 */
+  const objShadow = (g, s, rx) =>
+    _svg('ellipse', { class: 'ws-sh', cx: s.x, cy: s.y + 2, rx: rx, ry: 4 }, g);
+
+  /** 记账本 ✓ —— 合着的一本厚账本摊在面上 ✓。
+   *  左脊（深）· 右页角（白 ✓，书的标志 ✓）· 顶面（皮 ✓，往回收一点 = 透视 ✓）·
+   *  书签从**页角那端**垂下来 ✓。全手绘 ✓ —— 不借 emoji（扁平色块跟这间屋的画风割裂 ✓）。
+   *
+   *  之前那版是「白页在下 + 深棕盖在上」✗ —— 深棕占了大半个高度，看着像鞋盒 ✗；
+   *  书签还从顶盖**正中间**竖出来 ✗，像蝴蝶结 ✗。屋里不放名字 ✓，它得**光凭形状**就是书 ✓。 */
+  const drawLedger = (g, s) => {
+    const x = s.x - 27, top = s.y - 20;
+    objShadow(g, s, 29);
+    // 侧立边（前立面 ✓）—— 左边是书脊，深一点 ✓；底贴 s.y ✓
+    _svg('rect', { class: 'ws-bd', x, y: top, width: 54, height: 20, rx: 1.2,
+                   fill: '#7e4f26', stroke: '#63401f', 'stroke-width': 1 }, g);
+    // 右端页角（白 ✓）—— 有这条才算书 ✓
+    _svg('rect', { x: x + 46, y: top + 2, width: 6, height: 16, rx: 1,
+                   fill: '#f5ecd7', stroke: '#d6c6a5', 'stroke-width': 0.8 }, g);
+    _svg('line', { x1: x + 48, y1: top + 5, x2: x + 48, y2: top + 15,
+                   stroke: '#e0d2b3', 'stroke-width': 0.8 }, g);
+    // 顶面（上表面 ✓，皮 ✓）
+    _svg('polygon', { class: 'ws-bd', fill: '#a3703d',
+                      points: (x) + ',' + top + ' ' + (x + 54) + ',' + top
+                        + ' ' + (x + 48) + ',' + (top - 5) + ' ' + (x + 6) + ',' + (top - 5) }, g);
+    _svg('line', { x1: x + 6, y1: top - 5, x2: x + 48, y2: top - 5,
+                   stroke: '#bd8b58', 'stroke-width': 1 }, g);
+    // 书签（从页角那端垂下来 ✓，V 口 ✓）
+    _svg('polygon', { fill: '#c2485c',
+                      points: (x + 34) + ',' + (top + 3) + ' ' + (x + 39) + ',' + (top + 3)
+                        + ' ' + (x + 39) + ',' + (s.y + 7) + ' ' + (x + 36) + ',' + (s.y + 4)
+                        + ' ' + (x + 34) + ',' + (s.y + 7) }, g);
+  };
+
+  // ⚠️ **没 tint 的组件不能长一个样** ✓ —— 名字和图标都去掉之后 ✓，
+  //    屋里两件物**全靠颜色分** ✗（之前全是同一个米色盒子 ✓，两件物一模一样 ✗，
+  //    而它们点的却是**不同的组件** ✗）。取一组跟这间屋配得上的低饱和色 ✓，按序轮 ✓。
+  const CRATE_COLORS = ['#e8dcc4', '#c08756', '#8fa8bf', '#a8b98a', '#c9a3a8', '#d9bc74'];
+
+  /** 通用小物件 ✓ —— 一个立着的小盒子 ✓（前立面 + 上表面 ✓）。
+   *  颜色取组件的 tint ✓；没设就按序轮 `CRATE_COLORS` ✓（见上 ✓）。 */
+  const drawCrate = (g, s, tint, i) => {
+    objShadow(g, s, 20);
+    const bd = tint || CRATE_COLORS[i % CRATE_COLORS.length];
+    _svg('rect', { class: 'ws-bd', x: s.x - 17, y: s.y - 30, width: 34, height: 30, rx: 3,
+                   fill: bd, stroke: '#a08a68', 'stroke-width': 1.5 }, g);
+    const top = (s.x - 17) + ',' + (s.y - 30) + ' ' + (s.x + 17) + ',' + (s.y - 30)
+              + ' ' + (s.x + 12) + ',' + (s.y - 36) + ' ' + (s.x - 12) + ',' + (s.y - 36);
+    _svg('polygon', { class: 'ws-bd', points: top, fill: bd }, g);
+    _svg('polygon', { points: top, fill: '#ffffff', opacity: '0.22' }, g);   // 上表面亮一点 ✓
+  };
+
+  /** 自己上传了图标图的组件 ✓ —— 一张立在面上的小照片（拍立得 ✓）。 */
+  const drawPolaroid = (g, s, href) => {
+    objShadow(g, s, 19);
+    _svg('rect', { class: 'ws-bd', x: s.x - 16, y: s.y - 40, width: 32, height: 40, rx: 2,
+                   fill: '#f7f1e4', stroke: '#b9a888', 'stroke-width': 1.5 }, g);
+    _svg('image', { href, x: s.x - 13, y: s.y - 37, width: 26, height: 26 }, g);
+  };
+
   /** 组件 = 屋里一件物 ✓（点 → 进组件 ✓，和原来点格子一个出口 ✓）。
-   *  ★ `s` 是**触点** ✓（卡片底贴桌面/板面 ✓，卡片往上长 ✓）—— 见 `SLOTS` 那段 ✓。 */
+   *  ★ `s` 是**触点** ✓（物件**底**贴桌面/板面 ✓，往上长 ✓）—— 见 `SLOTS` 那段 ✓。
+   *
+   *  ★ 屋里**不放图标、不放名字** ✓（用户 2026-10-14：「记账这个名不要显示」✓、
+   *    「图标也该改改画风」✓）—— emoji 是扁平色块 ✓，跟这间屋的手绘 SVG 割裂 ✗，
+   *    而且**家里哪来的字** ✗。所以按**物件**画 ✓：记账 = 一本账本 ✓，
+   *    自己传了图标的 = 一张小照片 ✓，别的 = 小盒子（tint 上色 ✓）。 */
   const objNode = (c, i, s) => {
     const g = _svg('g', { class: 'ws-obj' });
     g.dataset.i = String(i);
-    _svg('ellipse', { class: 'ws-sh', cx: s.x, cy: s.y + 2, rx: 22, ry: 4 }, g);  // 影在面上 ✓
-    const card = _svg('rect', {
-      // 竖 50 ✓ —— 名字要在**卡里**（卡在面上往下伸会被下一层盖掉 ✓）
-      class: 'ws-card', x: s.x - 24, y: s.y - 50, width: 48, height: 50, rx: 8,  // 底贴 s.y ✓
-    }, g);
     const tint = (c.spot && c.spot.tint) || '';
-    // ⚠️ 必须走 `style` ✓ —— 那个 `<style>` 里有 `.ws-card{fill:#fff7e6}` ✓，
-    //    CSS 规则压过 `fill=` presentation 属性 ✓，用 setAttribute 设了等于没设 ✗。
-    if (tint) card.style.fill = tint;
     const ic = String(c.icon || '');
-    if (ic.startsWith('data:image/')) {
-      _svg('image', { href: ic, x: s.x - 12, y: s.y - 43, width: 24, height: 24 }, g);
-    } else {
-      const t = _svg('text', { class: 'ws-ico', x: s.x, y: s.y - 31 }, g);       // 卡的上 2/3 ✓
-      t.textContent = ic || '📓';           // 📓 比较居家 ✓
-    }
-    // 名字去掉 ✓（2026-10-14，只显示图标）
-    // ★ 深底给白字 ✓ —— tint 是设计者设的强调色，暗的话默认那个 `#5b4632` 就糊成一片 ✗。
-    const _m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(tint);
-    if (_m && (0.299 * parseInt(_m[1], 16) + 0.587 * parseInt(_m[2], 16)
-                + 0.114 * parseInt(_m[3], 16)) < 150) lbl.setAttribute('fill', '#fff7e6');
-    const name = c.title || c.slug || '组件';
-    lbl.textContent = name.length > 6 ? name.slice(0, 6) + '…' : name;
+    if (ic.startsWith('data:image/')) drawPolaroid(g, s, ic);
+    else if (c.slug === 'bookkeeping-panel') drawLedger(g, s);
+    else drawCrate(g, s, tint, i);
     // ★ 点物 → 进组件 ✓（**和原来点格子完全同一个出口** ✓ → 后端那条路不动 ✓）。
     g.addEventListener('click', () => openComp(c.slug, c.title, tint));
     return g;
@@ -306,8 +350,7 @@
     _svg('rect', { x: 26, y: 530, width: 84, height: 24, rx: 3, fill: '#e6dcc0' }, g);
     const cat = _svg('text', { class: 'cat', x: 68, y: 514, 'font-size': 34, 'text-anchor': 'middle' }, g);
     cat.textContent = '🐈';
-    const nm = _svg('text', { class: 'ws-lbl', x: 68, y: 584 }, g);
-    nm.textContent = '🐈';
+    // 猫下面不写字 ✓（用户 2026-10-14：「家里哪来的字」✓）—— 点猫回主群聊的动作没动 ✓。
     g.addEventListener('click', () => closeWorkshop());
     return g;
   };
