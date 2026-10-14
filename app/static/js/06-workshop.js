@@ -136,164 +136,49 @@
   //      `pointerdown` 里 `closest('#wsBody .cell')` 找不到 `.cell` 就直接 return ✓
   //      （不会炸 ✓、也不会误触拖拽 ✓）✓。"拖物到家具上摆"= v2 ✓。
   //
-  //   ⚠️ **组件往哪摆** ✓：按顺序填 `SLOTS` ✓（桌面 → 书架几层 → 柜顶 → 床面 →
-  //      地板前排 ✓）。超了的前排继续往右 ✓（横滑可见 ✓）—— 真超太多再扩屋 ✓。
-  const NS = 'http://www.w3.org/2000/svg';
-  const _svg = (tag, attrs, parent) => {
-    const el = document.createElementNS(NS, tag);
-    if (attrs) for (const k in attrs) el.setAttribute(k, attrs[k]);
-    if (parent) parent.appendChild(el);
-    return el;
+  // ── 组件往哪摆（2026-10-15 换到 `07-scene.js` 的世界坐标）──────────────
+  // 槽位不再是屏幕像素 ✓ —— 它是**屋里一张面的位置**：`x/z` = 面上的点，
+  //   `y` = 那张面的**高**（床面 0.617 / 桌面 0.778 / 柜顶 / 地板 0 ✓）。
+  // 表在 `07-scene.js` 的 `RB_SLOTS` ✓（跟屋子的几何同一个文件 ✓ —— 家具挪了
+  //   槽跟着挪 ✓，不会出现「物飘在桌面外面」那类对不上的事 ✓）。
+  // ★ 屋里**不放图标、不放名字** ✓（用户 2026-10-14：「家里哪来的字」✓）——
+  //   emoji 是扁平色块 ✓，跟这间屋的手绘 SVG 割裂 ✗。所以按**物件**画 ✓：
+  //   记账 = 一本账本 ✓，自己传了图标的 = 一张小照片 ✓，别的 = 小盒子 ✓。
+  //
+  // ⚠️ 下面这几个函数**没有反引号** ✓（`05-settings.js` 顶上那段那个坑 ✓）：
+  //   SVG 属性一律**先算好再拼进字符串**，不用模板字符串 ✓。
+  // ⚠️ `objNode` 返回的字符串要能落进 DOM ✓ —— 所以 `<image>` / `href` 这些
+  //   属性都带引号写全 ✓，不靠 `innerHTML` 之外的解析帮忙 ✓。
+
+  // 把世界坐标 (x, y, z) 摆一件盒子的**投影尺寸**估出来 ✓ ——
+  //   影子要用屏幕里的半径（`RB_SHADOW` 要的是世界的半宽/半深 ✓，所以其实直接给 ✓）。
+  //   这里只留一个「世界单位 → 屏幕像素」的比例，给 `<image>` 那类必须写屏幕尺寸的元素用 ✓。
+  const _PX = (sx, sy) => {
+    const p = RB_PT([sx, sy, 1.1]);
+    const q = RB_PT([sx + 0.02, sy, 1.1]);
+    return Math.abs(q[0] - p[0]) / 0.02;             // 每米多少像素（局部 ✓）
   };
-  // 家具上的摆位 ✓（坐标在 viewBox 0 0 960 620 里 ✓）。
-  // ★ **槽位 = 触点** ✓（卡片**底**贴着桌面/板面/地板 ✓，卡片往上长 ✓）——
-  //   不然卡片往下伸会**陷进家具**里 ✓（账本没"躺"在桌上 ✓、书架物挂在板下 ✓）✓。
-  //   触点 Y = 各表面的**顶**（桌面 396 / 书架板 148·200·252 / 柜顶 372 / 床面 408 / 地板 560）✓。
-  //   ⚠️ 书架行距必须 ≥ 卡的竖高（50）✓ —— 名字现在在**卡里**，行距不够的话上一层的名字
-  //      会钻进下一层的卡（2026-10-14 眼睛看出来的 ✓）。
-  //   超了就叠在前排地板往右 ✓（横滑可见 ✓）。
-  // ⚠️ **顺序有意义** ✓ —— `component_spots.pos` 按序取槽 ✓。所以**前两个槽必须落在第一屏**
-  //    （第一屏只到 viewBox x≈295 ✓）—— 不然组件只有两三个的时候，人进屋看到的是一间空屋 ✗。
-  //    **第一槽就是桌面** ✓ —— 记账通常是 pos 0 ✓ → 落在桌上 ✓（"账本躺在桌面" ✓）。
-  const SLOTS = [
-    { x: 335, y: 396 },                         // 桌面（第一件就是它 ✓ —— 「账本躺在桌上」✓）
-    { x: 155, y: 408 },                         // 床面
-    { x: 665, y: 148 }, { x: 765, y: 148 },     // 书架顶层 左/右
-    { x: 665, y: 200 }, { x: 765, y: 200 },     // 书架中层
-    { x: 665, y: 252 }, { x: 765, y: 252 },     // 书架底层
-    { x: 858, y: 372 },                         // 柜顶
-    { x: 140, y: 560 }, { x: 220, y: 560 }, { x: 300, y: 560 },  // 地板前排
-    { x: 380, y: 560 }, { x: 540, y: 560 }, { x: 620, y: 560 },
-    { x: 700, y: 560 }, { x: 780, y: 560 },
-  ];
 
-  /** 卧室那间屋（静态 ✓ —— 屋不随组件变 ✓，组件是往里**摆物** ✓）。
-   *  一整串 SVG ✓（没有反引号 ✓ → 部署那道"剥字符串"闸不会吃错 ✓）。 */
-  const ROOM_INNER = [
-    '<defs>',
-    '  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">',
-    '    <stop offset="0" stop-color="#bfe3f5"/><stop offset="1" stop-color="#eaf6fb"/>',
-    '  </linearGradient>',
-    '  <linearGradient id="flr" x1="0" y1="0" x2="0" y2="1">',
-    '    <stop offset="0" stop-color="#9c7549"/><stop offset="1" stop-color="#7c5a36"/>',
-    '  </linearGradient>',
-    '  <radialGradient id="vign" cx="0.5" cy="0.5" r="0.7">',
-    '    <stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.18"/>',
-    '  </radialGradient>',
-    '</defs>',
-    '<style>',
-    '  .ws-obj{cursor:pointer}',
-    '  .ws-obj:hover .ws-bd{filter:brightness(1.08)}',
-    '  .ws-sh{fill:#000;opacity:0.16}',
-    '  .ws-exit{cursor:pointer}',
-    '  .cat{transform-box:fill-box;transform-origin:center;animation:catBob 2.6s ease-in-out infinite}',
-    '  @keyframes catBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}',
-    '</style>',
-    '<!-- 墙 + 侧墙（透视收一点 ✓）-->',
-    '<polygon class="rm-side" points="0,30 60,30 60,330 0,620"/>',
-    '<polygon class="rm-side" points="900,30 960,30 960,620 900,330"/>',
-    '<rect class="rm-wall" x="60" y="30" width="840" height="300"/>',
-    '<rect x="60" y="328" width="840" height="6" fill="#b59a78"/>',
-    '<!-- 门（左墙）—— 第一屏进来就有东西看 ✓ -->',
-    '<rect x="66" y="106" width="98" height="222" rx="2" fill="#c2af8f" stroke="#8a6a3f" stroke-width="4"/>',
-    '<rect x="82" y="122" width="66" height="190" rx="2" fill="#cdbb9c"/>',
-    '<circle cx="141" cy="222" r="4" fill="#6e4f30"/>',
-    '<!-- 挂画（柜上方，给那面墙点东西 ✓）—— 画芯 838..886，里面任何元素别越界 ✓ -->',
-    '<rect x="832" y="150" width="60" height="66" rx="3" fill="#7a5a34"/>',
-    '<rect x="838" y="156" width="48" height="54" fill="#a8c3d6"/>',
-    '<circle cx="856" cy="172" r="7" fill="#f6c453"/>',
-    '<polygon points="838,210 856,182 868,196 878,180 886,192 886,210" fill="#5a8f4e"/>',
-    '<!-- 壁架（门上）—— 给第一屏那面墙一个落脚 ✓ -->',
-    '<rect x="74" y="72" width="112" height="10" rx="3" fill="#b0894e"/>',
-    '<polygon points="78,82 92,82 85,98" fill="#a9854f"/>',
-    '<polygon points="172,82 186,82 179,98" fill="#a9854f"/>',
-    '<rect x="84" y="50" width="14" height="22" rx="4" fill="#b5552f"/>',
-    '<circle cx="91" cy="42" r="10" fill="#5a8f4e"/>',
-    '<rect x="106" y="60" width="32" height="12" rx="2" fill="#5d7d9e"/>',
-    '<rect x="110" y="48" width="24" height="12" rx="2" fill="#c2566b"/>',
-    '<path d="M146 78 L146 62 Q146 52 156 52 Q166 52 166 62 L166 78 Z" fill="#a8c3d6"/>',
-    '<!-- 窗（第一屏的大主体 ✓，窗台压到踢脚线上边）-->',
-    '<rect x="204" y="58" width="200" height="226" rx="6" fill="url(#sky)" stroke="#8a6a3f" stroke-width="6"/>',
-    '<line x1="304" y1="58" x2="304" y2="284" stroke="#8a6a3f" stroke-width="4"/>',
-    '<line x1="204" y1="171" x2="404" y2="171" stroke="#8a6a3f" stroke-width="4"/>',
-    '<circle cx="374" cy="96" r="18" fill="#f6c453"/>',
-    '<rect x="198" y="284" width="212" height="8" rx="3" fill="#b0894e"/>',
-    '<!-- 挂钟（窗和书架之间那面墙 ✓）-->',
-    '<circle cx="500" cy="140" r="34" fill="#f4efe4" stroke="#8a6a3f" stroke-width="5"/>',
-    '<circle cx="500" cy="140" r="3.5" fill="#8a6a3f"/>',
-    '<line x1="500" y1="140" x2="486" y2="124" stroke="#5b4632" stroke-width="4" stroke-linecap="round"/>',
-    '<line x1="500" y1="140" x2="519" y2="127" stroke="#5b4632" stroke-width="4" stroke-linecap="round"/>',
-    '<circle cx="500" cy="110" r="2.5" fill="#8a6a3f"/><circle cx="530" cy="140" r="2.5" fill="#8a6a3f"/>',
-    '<circle cx="500" cy="170" r="2.5" fill="#8a6a3f"/><circle cx="470" cy="140" r="2.5" fill="#8a6a3f"/>',
-    '<!-- 地板（前宽后窄 = 透视 ✓）—— 一直铺到画面底边 ✓ -->',
-    '<polygon class="rm-floor" points="60,334 900,334 960,620 0,620" fill="url(#flr)"/>',
-    '<line x1="60" y1="334" x2="900" y2="334" stroke="#6e4f30" stroke-width="1"/>',
-    '<!-- 地毯 -->',
-    '<ellipse cx="480" cy="466" rx="190" ry="40" fill="#c2566b" opacity="0.9"/>',
-    '<ellipse cx="480" cy="466" rx="152" ry="30" fill="none" stroke="#e8c7cb" stroke-width="2" opacity="0.7"/>',
-    '<!-- 床（左）—— 床头板高出一截 ✓，不然整块蓝看着像个板子 ✓ -->',
-    '<rect x="70" y="356" width="56" height="170" rx="8" fill="#5d7d9e"/>',
-    '<rect x="78" y="364" width="40" height="154" rx="5" fill="#4d6a88"/>',
-    '<rect x="70" y="408" width="176" height="118" rx="8" fill="#7b99c0"/>',
-    '<rect x="84" y="418" width="46" height="26" rx="9" fill="#f4f4f6"/>',
-    '<rect x="80" y="492" width="150" height="30" rx="6" fill="#5d7d9e"/>',
-    '<!-- 桌（中左）-->',
-    '<rect x="250" y="410" width="170" height="70" rx="4" fill="#b0894e"/>',
-    '<rect x="248" y="396" width="174" height="16" rx="4" fill="#caa05f"/>',
-    '<rect x="256" y="478" width="10" height="60" fill="#8a6a3f"/>',
-    '<rect x="404" y="478" width="10" height="60" fill="#8a6a3f"/>',
-    '<!-- 书架（右靠墙）—— 三层行距 52 ✓（卡的竖高是 50，30/40 会让名字压进下一层的卡里 ✗）-->',
-    '<rect x="620" y="148" width="200" height="10" fill="#caa05f"/>',
-    '<rect x="620" y="200" width="200" height="10" fill="#caa05f"/>',
-    '<rect x="620" y="252" width="200" height="10" fill="#caa05f"/>',
-    '<rect x="620" y="148" width="10" height="122" fill="#a9854f"/>',
-    '<rect x="810" y="148" width="10" height="122" fill="#a9854f"/>',
-    '<!-- 柜（右下）-->',
-    '<rect x="800" y="372" width="120" height="186" rx="4" fill="#9a6b3f"/>',
-    '<line x1="860" y1="372" x2="860" y2="558" stroke="#7a4f2a" stroke-width="2"/>',
-    '<circle cx="852" cy="466" r="3" fill="#e8c9a0"/><circle cx="868" cy="466" r="3" fill="#e8c9a0"/>',
-    '<!-- 绿植（地毯右前方 ✓）—— 别压在桌后头 ✓，那样只剩一片绿顶看着别扭 -->',
-    '<polygon points="662,548 706,548 698,508 670,508" fill="#b5552f"/>',
-    '<ellipse cx="684" cy="508" rx="16" ry="8" fill="#8a3f1f"/>',
-    '<circle cx="684" cy="492" r="19" fill="#5a8f4e"/>',
-    '<circle cx="664" cy="502" r="14" fill="#6fa45a"/>',
-    '<circle cx="704" cy="502" r="14" fill="#6fa45a"/>',
-    '<circle cx="684" cy="472" r="13" fill="#6fa45a"/>',
-    '<rect x="0" y="0" width="960" height="620" fill="url(#vign)" pointer-events="none"/>',
-  ].join('\n');
-
-  /** 物件的影子 ✓（画在面上 ✓，大小跟着物件走 ✓）。 */
-  const objShadow = (g, s, rx) =>
-    _svg('ellipse', { class: 'ws-sh', cx: s.x, cy: s.y + 2, rx: rx, ry: 4 }, g);
-
-  /** 记账本 ✓ —— 合着的一本厚账本摊在面上 ✓。
-   *  左脊（深）· 右页角（白 ✓，书的标志 ✓）· 顶面（皮 ✓，往回收一点 = 透视 ✓）·
-   *  书签从**页角那端**垂下来 ✓。全手绘 ✓ —— 不借 emoji（扁平色块跟这间屋的画风割裂 ✓）。
-   *
-   *  之前那版是「白页在下 + 深棕盖在上」✗ —— 深棕占了大半个高度，看着像鞋盒 ✗；
-   *  书签还从顶盖**正中间**竖出来 ✗，像蝴蝶结 ✗。屋里不放名字 ✓，它得**光凭形状**就是书 ✓。 */
-  const drawLedger = (g, s) => {
-    const x = s.x - 27, top = s.y - 20;
-    objShadow(g, s, 29);
-    // 侧立边（前立面 ✓）—— 左边是书脊，深一点 ✓；底贴 s.y ✓
-    _svg('rect', { class: 'ws-bd', x, y: top, width: 54, height: 20, rx: 1.2,
-                   fill: '#7e4f26', stroke: '#63401f', 'stroke-width': 1 }, g);
-    // 右端页角（白 ✓）—— 有这条才算书 ✓
-    _svg('rect', { x: x + 46, y: top + 2, width: 6, height: 16, rx: 1,
-                   fill: '#f5ecd7', stroke: '#d6c6a5', 'stroke-width': 0.8 }, g);
-    _svg('line', { x1: x + 48, y1: top + 5, x2: x + 48, y2: top + 15,
-                   stroke: '#e0d2b3', 'stroke-width': 0.8 }, g);
-    // 顶面（上表面 ✓，皮 ✓）
-    _svg('polygon', { class: 'ws-bd', fill: '#a3703d',
-                      points: (x) + ',' + top + ' ' + (x + 54) + ',' + top
-                        + ' ' + (x + 48) + ',' + (top - 5) + ' ' + (x + 6) + ',' + (top - 5) }, g);
-    _svg('line', { x1: x + 6, y1: top - 5, x2: x + 48, y2: top - 5,
-                   stroke: '#bd8b58', 'stroke-width': 1 }, g);
-    // 书签（从页角那端垂下来 ✓，V 口 ✓）
-    _svg('polygon', { fill: '#c2485c',
-                      points: (x + 34) + ',' + (top + 3) + ' ' + (x + 39) + ',' + (top + 3)
-                        + ' ' + (x + 39) + ',' + (s.y + 7) + ' ' + (x + 36) + ',' + (s.y + 4)
-                        + ' ' + (x + 34) + ',' + (s.y + 7) }, g);
+  /** 记账本 ✓ —— 摊开的一本厚账本，用**真盒子**画 ✓（`RB_BOX` 自己排 5 面 ✓）。
+   *  左半（深皮）+ 右半（书页白）+ 一条书签（细红盒，从页角那端垂下来 ✓）。
+   *  受光、投影、排序全走引擎 ✓ —— 不用再手写「顶面往回收一点 = 透视」✓。 */
+  const drawLedger = (cx, cz, y, rot) => {
+    let s = '';
+    // 底下压一条软的 ✓（不是椭圆的画 ✗ —— 是**凸包投影** ✓，见 `RB_SHADOW` ✓）
+    s += RB_SHADOW(cx, cz, 0.135, 0.10, 0.05, 0.20);
+    // 左半：书皮（深 ✓）
+    s += RB_ROT(cx - 0.062, cz, y, 0.13, 0.21, 0.028, rot, '#7e4f26',
+      { stroke: '#63401f', sw: 0.9 });
+    // 右半：书页（白 ✓，书的标志 ✓）
+    s += RB_ROT(cx + 0.062, cz, y, 0.13, 0.21, 0.030, rot, '#f5ecd7',
+      { stroke: '#d6c6a5', sw: 0.9 });
+    // 页角那道缝（把两半分开 ✓）
+    s += RB_ROT(cx, cz, y + 0.030, 0.008, 0.20, 0.004, rot, '#d9c8a4',
+      { stroke: '#cdbb95', sw: 0.6 });
+    // 书签（从右半的页角端垂下来 ✓）
+    s += RB_ROT(cx + 0.115, cz + 0.062, y + 0.002, 0.012, 0.020, 0.018, rot, '#c2485c',
+      { stroke: '#9c3547', sw: 0.6 });
+    return s;
   };
 
   // ⚠️ **没 tint 的组件不能长一个样** ✓ —— 名字和图标都去掉之后 ✓，
@@ -301,59 +186,49 @@
   //    而它们点的却是**不同的组件** ✗）。取一组跟这间屋配得上的低饱和色 ✓，按序轮 ✓。
   const CRATE_COLORS = ['#e8dcc4', '#c08756', '#8fa8bf', '#a8b98a', '#c9a3a8', '#d9bc74'];
 
-  /** 通用小物件 ✓ —— 一个立着的小盒子 ✓（前立面 + 上表面 ✓）。
-   *  颜色取组件的 tint ✓；没设就按序轮 `CRATE_COLORS` ✓（见上 ✓）。 */
-  const drawCrate = (g, s, tint, i) => {
-    objShadow(g, s, 20);
+  /** 通用小物件 ✓ —— 一个立着的盒子（`RB_BOX` ✓，受光 + 投影全在引擎里 ✓）。 */
+  const drawCrate = (cx, cz, y, tint, i, rot) => {
     const bd = tint || CRATE_COLORS[i % CRATE_COLORS.length];
-    _svg('rect', { class: 'ws-bd', x: s.x - 17, y: s.y - 30, width: 34, height: 30, rx: 3,
-                   fill: bd, stroke: '#a08a68', 'stroke-width': 1.5 }, g);
-    const top = (s.x - 17) + ',' + (s.y - 30) + ' ' + (s.x + 17) + ',' + (s.y - 30)
-              + ' ' + (s.x + 12) + ',' + (s.y - 36) + ' ' + (s.x - 12) + ',' + (s.y - 36);
-    _svg('polygon', { class: 'ws-bd', points: top, fill: bd }, g);
-    _svg('polygon', { points: top, fill: '#ffffff', opacity: '0.22' }, g);   // 上表面亮一点 ✓
+    return RB_SHADOW(cx, cz, 0.10, 0.10, 0.24, 0.20) +
+      RB_ROT(cx, cz, y, 0.21, 0.21, 0.24, rot, bd,
+        { stroke: '#a08a68', sw: 1 });
   };
 
-  /** 自己上传了图标图的组件 ✓ —— 一张立在面上的小照片（拍立得 ✓）。 */
-  const drawPolaroid = (g, s, href) => {
-    objShadow(g, s, 19);
-    _svg('rect', { class: 'ws-bd', x: s.x - 16, y: s.y - 40, width: 32, height: 40, rx: 2,
-                   fill: '#f7f1e4', stroke: '#b9a888', 'stroke-width': 1.5 }, g);
-    _svg('image', { href, x: s.x - 13, y: s.y - 37, width: 26, height: 26 }, g);
+  /** 自己上传了图标图的组件 ✓ —— 一张**立在面上**的小照片（拍立得 ✓）。
+   *  白框是真盒子 ✓；图贴在前立面上 ✓（`RB_FACE` 给的是世界里的矩形 ✓，
+   *   所以图上跟着透视一起歪 ✓，不是浮在上面的一张贴纸 ✗）。 */
+  const drawPolaroid = (cx, cz, y, href) => {
+    let s = RB_SHADOW(cx, cz, 0.09, 0.09, 0.26, 0.20);
+    // 相纸（白框 ✓，有厚度 = 它立着 ✓）
+    s += RB_BOX(cx, cz, y, 0.185, 0.024, 0.235, '#f7f1e4', { stroke: '#b9a888', sw: 1.1 });
+    // 照片本体（贴在前立面 ✓）
+    const P = [cx, y + 0.012, cz + 0.0121];
+    s += '<image href="' + href + '" x="' + P[0].toFixed(3) + '" y="' + P[1].toFixed(3) +
+      '" width="' + P[2].toFixed(3) + '" height="' + (P[2] * 1.0).toFixed(3) +
+      '" preserveAspectRatio="xMidYMid slice"/>';
+    return s;
   };
 
   /** 组件 = 屋里一件物 ✓（点 → 进组件 ✓，和原来点格子一个出口 ✓）。
-   *  ★ `s` 是**触点** ✓（物件**底**贴桌面/板面 ✓，往上长 ✓）—— 见 `SLOTS` 那段 ✓。
-   *
-   *  ★ 屋里**不放图标、不放名字** ✓（用户 2026-10-14：「记账这个名不要显示」✓、
-   *    「图标也该改改画风」✓）—— emoji 是扁平色块 ✓，跟这间屋的手绘 SVG 割裂 ✗，
-   *    而且**家里哪来的字** ✗。所以按**物件**画 ✓：记账 = 一本账本 ✓，
-   *    自己传了图标的 = 一张小照片 ✓，别的 = 小盒子（tint 上色 ✓）。 */
+   *  ★ `s` 是**触点** ✓（物件**底**贴着那张面 ✓，往上长 ✓）—— 见 `RB_SLOTS` ✓。
+   *  返回 **SVG 字符串** ✓ —— 由 `buildScene` 统一 `innerHTML` 进 svg ✓。 */
   const objNode = (c, i, s) => {
-    const g = _svg('g', { class: 'ws-obj' });
-    g.dataset.i = String(i);
     const tint = (c.spot && c.spot.tint) || '';
     const ic = String(c.icon || '');
-    if (ic.startsWith('data:image/')) drawPolaroid(g, s, ic);
-    else if (c.slug === 'bookkeeping-panel') drawLedger(g, s);
-    else drawCrate(g, s, tint, i);
-    // ★ 点物 → 进组件 ✓（**和原来点格子完全同一个出口** ✓ → 后端那条路不动 ✓）。
-    g.addEventListener('click', () => openComp(c.slug, c.title, tint));
-    return g;
+    // ⚠️ 每件物**歪一点点** ✓ —— 全对齐反而像摆拍 ✗（散一点才是「家里的东西」✓）。
+    const rot = ((i * 37) % 7 - 3) * 0.022;
+    let body;
+    if (ic.indexOf('data:image/') === 0) body = drawPolaroid(s.x, s.z, s.y, ic);
+    else if (c.slug === 'bookkeeping-panel') body = drawLedger(s.x, s.z, s.y, rot);
+    else body = drawCrate(s.x, s.z, s.y, tint, i, rot);
+    return '<g class="ws-obj" data-i="' + i + '">' + body + '</g>';
   };
 
-  /** 屋里那只 🐱 二狗 ✓ —— 在埋粑粑 ✓，点它 → 回主群聊 ✓（叙事出口 ✓）。 */
-  const catNode = () => {
-    const g = _svg('g', { class: 'ws-exit' });
-    // 猫砂盆（左下角 ✓）
-    _svg('rect', { x: 20, y: 524, width: 96, height: 44, rx: 5, fill: '#cfc8bd', stroke: '#b3a9a0', 'stroke-width': 2 }, g);
-    _svg('rect', { x: 26, y: 530, width: 84, height: 24, rx: 3, fill: '#e6dcc0' }, g);
-    const cat = _svg('text', { class: 'cat', x: 68, y: 514, 'font-size': 34, 'text-anchor': 'middle' }, g);
-    cat.textContent = '🐈';
-    // 猫下面不写字 ✓（用户 2026-10-14：「家里哪来的字」✓）—— 点猫回主群聊的动作没动 ✓。
-    g.addEventListener('click', () => closeWorkshop());
-    return g;
-  };
+  /** 屋里那只猫 二狗 ✓ —— 点它 → 回主群聊 ✓（叙事出口 ✓）。
+   *  猫**是屏幕空间手绘的**（`RB_CAT` ✓，曲线+耳朵方块凑不出来 ✗），
+   *  但它的**位置**是世界坐标 `RB_CAT_AT` ✓ —— 锚在屋里那个角落 ✓。 */
+  const catNode = () => '<g class="ws-exit">' + RB_CAT() + '</g>';
+
 
   // ── 坐标调试（2026-10-14）──────────────────────────────────────────
   // 用户要的："给界面添加个坐标调试按钮"✓ —— **我俩一起极限微操**的通道 ✓：
@@ -367,7 +242,23 @@
     + 'background:rgba(20,30,45,0.78);color:#cfe;border:1px solid #3a5680;'
     + 'font-size:12px;padding:4px 10px;touch-action:none;user-select:none;';
 
-  /** viewBox 坐标读数 ✓ —— 拿不到 CTM 就退回比例算 ✓。 */
+  const paintCanvas = () => {
+    const box = $('#wsBody');
+    box.innerHTML = '';                       // 下面走 createElement ✓（屋是固定串 ✓、物是 DOM 摆 ✓）
+    if (!wsCanvas.length) {
+      // ★ 空状态那句话 ✓（2026-10-08 用户给的原话）—— 「去创意工坊」入口没了 ✓
+      //   （只剩群聊右上角进统一聊天 ✓），后半句改了 ✓。
+      const em = document.createElement('div');
+      em.className = 'wsempty';
+      em.textContent = '当前还没有组件，去群里右上角让他做一个吧';
+      box.appendChild(em);
+      return;
+    }
+    box.appendChild(buildScene());
+    // ★ **纯粹的展示界面** ✓（2026-10-07 用户定的：这屏不放任何提示/设置 ✓）——
+    //   屋里那只猫就是唯一的"出口"提示 ✓（叙事 ✓，不是说明文字 ✓）。
+  };
+
   const svgPoint = (svg, ev) => {
     try {
       const pt = svg.createSVGPoint();
@@ -377,41 +268,65 @@
       if (m) { const p = pt.matrixTransform(m.inverse()); return [p.x, p.y]; }
     } catch (e) { /* 退回比例 ✓ */ }
     const r = svg.getBoundingClientRect();
-    return [960 * ((ev.clientX || 0) - r.left) / (r.width || 1),
-            620 * ((ev.clientY || 0) - r.top) / (r.height || 1)];
+    return [RB_W * ((ev.clientX || 0) - r.left) / (r.width || 1),
+            RB_H * ((ev.clientY || 0) - r.top) / (r.height || 1)];
   };
 
-  /** 铺一层调试叠片 ✓（网格 + 每个槽位十字+坐标 ✓）。 */
+  //       这是**第二条路** ✓：用户指定的那条是**下拉** ✓（两条都通 ✓，
+  //       长按那条只是顺手，免得"长按了却什么都没发生" ✓）。
   const paintDebugLayer = (svg) => {
     document.getElementById('ws-debug-g')?.remove();
     const g = _svg('g', { id: 'ws-debug-g' }, svg);
     g.style.pointerEvents = 'none';
-    for (let x = 0; x <= 960; x += 50)         // 竖线 ✓
-      _svg('line', { x1: x, y1: 0, x2: x, y2: 620, stroke: '#000', 'stroke-width': .5, opacity: .12 }, g);
-    for (let y = 0; y <= 620; y += 50)         // 横线 ✓
-      _svg('line', { x1: 0, y1: y, x2: 960, y2: y, stroke: '#000', 'stroke-width': .5, opacity: .12 }, g);
-    SLOTS.forEach((s, i) => {                   // 槽位十字 + 坐标 ✓
-      _svg('line', { x1: s.x - 10, y1: s.y, x2: s.x + 10, y2: s.y, stroke: '#d33', 'stroke-width': 1.5 }, g);
-      _svg('line', { x1: s.x, y1: s.y - 10, x2: s.x, y2: s.y + 10, stroke: '#d33', 'stroke-width': 1.5 }, g);
-      const t = _svg('text', { x: s.x, y: s.y - 14, 'text-anchor': 'middle',
+    for (let x = 0; x <= RB_W; x += 50)        // 竖线 ✓
+      _svg('line', { x1: x, y1: 0, x2: x, y2: RB_H, stroke: '#000', 'stroke-width': .5, opacity: .12 }, g);
+    for (let y = 0; y <= RB_H; y += 50)        // 横线 ✓
+      _svg('line', { x1: 0, y1: y, x2: RB_W, y2: y, stroke: '#000', 'stroke-width': .5, opacity: .12 }, g);
+    RB_SLOTS.forEach((s, i) => {               // 槽位十字 + 坐标（世界 → 屏幕 ✓）
+      const q = RB_PT([s.x, s.y, s.z]);
+      _svg('line', { x1: q[0] - 10, y1: q[1], x2: q[0] + 10, y2: q[1], stroke: '#d33', 'stroke-width': 1.5 }, g);
+      _svg('line', { x1: q[0], y1: q[1] - 10, x2: q[0], y2: q[1] + 10, stroke: '#d33', 'stroke-width': 1.5 }, g);
+      const t = _svg('text', { x: q[0], y: q[1] - 14, 'text-anchor': 'middle',
         'font-size': 11, fill: '#d33', 'font-family': 'monospace' }, g);
-      t.textContent = `${i}·(${s.x},${s.y})`;
+      t.textContent = i + '·(' + s.x + ',' + s.y + ',' + s.z + ')';
     });
     svg.insertBefore(g, svg.firstChild);       // 压在家具上面 ✓（十字看得见 ✓）
   };
 
+
   const buildScene = () => {
     const wrap = document.createElement('div');
     wrap.className = 'ws-scene';
-    const svg = _svg('svg', { viewBox: '0 0 960 620', preserveAspectRatio: 'xMidYMid meet', class: 'ws-room' });
-    svg.innerHTML = ROOM_INNER;
-    wsCanvas.forEach((c, i) => {
-      // 超过预设槽位 → 叠在前排地板往右排 ✓（横滑可见 ✓）。
-      const s = SLOTS[i] || { x: 780 + ((i - SLOTS.length) % 4) * 80, y: 560 };
-      svg.appendChild(objNode(c, i, s));
-    });
-    svg.appendChild(catNode());
+    const svg = _svg('svg', { viewBox: '0 0 ' + RB_W + ' ' + RB_H,
+                              preserveAspectRatio: 'xMidYMid meet', class: 'ws-room' });
+    // ⚠️ **画序不能错** ✓：壳（墙/地板）→ 圆毯 → 光的落点 → 家具 ✓
+    //    —— 光要**落在毯上** ✗，所以 pool 必须在 rug **之后** ✓；
+    //    家具整体压住那两道 ✓。
+    svg.innerHTML = RB_DEFS + '\n' + RB_SHELL + '\n' + RB_RUG + '\n' + RB_POOL + '\n' + FURN;
+
+    // ★ 组件按**纵深**排队（画家算法 ✓：远先画、近后画 ✓）—— 否则前排的物会
+    //    被后排的物盖掉 ✗（屋里的物件比家具近的时候尤其明显 ✓）。
+    const placed = wsCanvas.map((c, i) => {
+      const s = RB_SLOTS[i] || RB_SLOTS[RB_SLOTS.length - 1];
+      return [RB_Z([s.x, s.y, s.z]), objNode(c, i, s)];
+    }).sort((a, b) => b[0] - a[0]);
+    svg.innerHTML += placed.map(p => p[1]).join('');
+
+    // 二狗是**前景控件** ✓ —— 不参与排序，永远压在最上 ✓（不然会被书架挡掉 ✗）。
+    svg.innerHTML += catNode();
     wrap.appendChild(svg);
+
+    // ★ 点物 → 进组件 ✓（**和原来点格子完全同一个出口** ✓ → 后端那条路不动 ✓）。
+    //   `objNode` 只吐字符串、不带监听器 ✓ → 在这里按 `data-i` 挂回去 ✓。
+    svg.querySelectorAll('.ws-obj').forEach(el => {
+      const c = wsCanvas[+el.getAttribute('data-i')];
+      if (!c) return;
+      const tint = (c.spot && c.spot.tint) || '';
+      el.addEventListener('click', () => openComp(c.slug, c.title, tint));
+    });
+    svg.querySelectorAll('.ws-exit').forEach(el => {
+      el.addEventListener('click', () => closeWorkshop());
+    });
 
     // ★ 坐标调试按钮（右上角小胶囊 ✓）+ HUD（顶上读数 ✓）—— 见上面那段 ✓。
     const hud = document.createElement('div');
@@ -427,7 +342,7 @@
       if (!wsDebugOn) return;
       ev.stopPropagation(); ev.preventDefault();
       const [x, y] = svgPoint(svg, ev);
-      hud.textContent = `(${Math.round(x)}, ${Math.round(y)})`;
+      hud.textContent = '(' + Math.round(x) + ', ' + Math.round(y) + ')';
     };
     btn.addEventListener('click', (ev) => {
       ev.stopPropagation();
@@ -447,197 +362,6 @@
     wrap.appendChild(btn);
     return wrap;
   };
-
-  const paintCanvas = () => {
-    const box = $('#wsBody');
-    box.innerHTML = '';                       // 下面走 createElement ✓（屋是固定串 ✓、物是 DOM 摆 ✓）
-    if (!wsCanvas.length) {
-      // ★ 空状态那句话 ✓（2026-10-08 用户给的原话）—— 「去创意工坊」入口没了 ✓
-      //   （只剩群聊右上角进统一聊天 ✓），后半句改了 ✓。
-      const em = document.createElement('div');
-      em.className = 'wsempty';
-      em.textContent = '当前还没有组件，去群里右上角让他做一个吧';
-      box.appendChild(em);
-      return;
-    }
-    box.appendChild(buildScene());
-    // ★ **纯粹的展示界面** ✓（2026-10-07 用户定的：这屏不放任何提示/设置 ✓）——
-    //   屋里那只猫就是唯一的"出口"提示 ✓（叙事 ✓，不是说明文字 ✓）。
-  };
-
-  /** 画布上的一格 —— **组件自己声明长什么样** ✓（`spot` ✓，见 main.py 的 `_spot_of` ✓）。 */
-  const canvasCell = (c, i) => {
-    const sp = c.spot || {};
-    const el = document.createElement('div');
-    el.className = 'cell';
-    el.dataset.i = String(i);
-    // ⚠️ **格子数要夹在 1..3** ✓ —— 服务端已经夹过一次了 ✓，
-    //    这里再夹一次是**防前端自己**：万一以后哪条路传进来一个 99 ✓，
-    //    那一格会占满整屏 ✓，而"排不下"是**看不出来**的（别的都不见了 ✓）。
-    el.style.gridColumn = 'span ' + Math.max(1, Math.min(3, +(sp.w || 1)));
-    el.style.gridRow = 'span ' + Math.max(1, Math.min(3, +(sp.h || 1)));
-    if (sp.tint) el.style.background = sp.tint;
-    const ic = document.createElement('span');
-    // ⚠️ 这里原来有一颗「未固化」的小黄点 ✓ —— 2026-10-07 深夜跟着"固化"
-    //    整套一起删了 ✓（用户定的："组件聊天没有所谓的固化和非固化概念了"✓）。
-    ic.className = 'ico';
-    setIcon(ic, c.icon);
-    const nm = document.createElement('span');
-    nm.className = 'nm';
-    nm.textContent = c.title || c.slug;
-    el.append(ic, nm);
-    return el;
-  };
-
-  // ── 拖一下换位置 ✓：**长按才拎起来** ✗→✓（2026-10-08）──────────────
-  //
-  // 原来入口是右上角一个十字图标（"调整模式" ✓）—— 那个按钮没了 ✓，
-  // 所以改成**直接在格子上长按** ✓。用户说位置要能调 ✓，而这一屏不能有按钮 ✓，
-  // 这两条合起来只有这一个做法 ✓。
-  //
-  // ⚠️ **拖动用 Pointer 事件，不用 HTML5 那套** ✗（`dragstart/drop` 在触摸屏上
-  //    基本不触发 ✓，而这一屏全在手机上 ✓）。
-  // ⚠️ **拖的时候不重排，只高亮** ✗→✓ —— 一边拖一边重渲染的话，
-  //    被手指按住的那个元素会被**销毁重建** ✓ → 指针捕获当场丢掉 ✓ →
-  //    拖着拖着就不动了 ✓。所以拖动时只改 `transform` ✓，松手才改数组 ✓。
-  //
-  // ⚠️ 一个手指在格子上有**三种结局** ✗（这是这一屏最容易做拧的地方 ✓）：
-  //     · 短按（<450ms）        → 进这个组件 ✓
-  //     · 长按后**动了**         → 换位置 ✓（松手才落库 ✓）
-  //     · 长按后**没动**         → 弹小卡片（去它那条对话 ✓）——
-  //       这是**第二条路** ✓：用户指定的那条是**下拉** ✓（两条都通 ✓，
-  //       长按那条只是顺手，免得"长按了却什么都没发生" ✓）。
-
-  // ★ 一个格子上有**两种**结局，不是三种 ✗→✓（2026-10-08 实测改的）：
-  //
-  //     · **没动过**（不管按多久） → 打开这个组件 ✓
-  //     · **动过**                 → 换位置 ✓（松手才落库 ✓）
-  //
-  //   ⚠️ 原来还有第三种"长按不动 → 弹小卡片" ✗ —— 那是我想的 ✓，用户没要 ✓，
-  //      而且它**正好吃掉了点击** ✗：真机上"有意地点一下"很容易超过 450ms ✓ →
-  //      计时器先到 ✓ → 判成"拎起来" ✓ → 松手弹的是那张卡片 ✗ →
-  //      用户看到的就是**点了没反应** ✓（他报的就是这一条 ✓）。
-  //
-  //   ⚠️ 所以现在**只有一条判定路**：`pointerdown` 起计时器 ✓、`pointerup` 定结局 ✓，
-  //      并且**不看 click 事件** ✗（pointer 事件鼠标和手指都发 ✓，
-  //      两套都听会**开两次** ✗ —— 这正是"点击/长按"这类代码最容易出的错 ✓）。
-  let wsDrag = null;
-  let wsPressTimer = null;
-  let wsPressAt = null;
-
-  const saveArrangement = async () => {
-    try {
-      await api(`/components/spots?group_id=${group.id}`, {
-        method: 'POST',
-        body: JSON.stringify({ order: wsCanvas.map(c => c.slug) }),
-      });
-    } catch (e) {
-      // ⚠️ **存不上要说** ✓ —— 不说的话用户拖了半天、退出去再进来，
-      //    东西全回到原位 ✓，而那看起来像"它自己变回去了" ✓（像见鬼 ✓）。
-      toast('位置没存上：' + e.message);
-    }
-  };
-
-  const cellUnder = (x, y) => {
-    const el = document.elementFromPoint(x, y);
-    const cell = el && el.closest ? el.closest('#wsBody .cell') : null;
-    return cell && cell !== (wsDrag && wsDrag.el) ? cell : null;
-  };
-
-  /** 打开一个格子 ✓ —— 点一下就进**这个组件**那一屏（纯预览 ✓）。
-   *
-   *  ⚠️ 「组件界面diy」那一格不画出来 ✓（用户：「组件收纳界面不要有
-   *    组件界面diy这个图标和入口，它本身点进去不是一个独立组件」✓，
-   *    服务端就筛掉了 ✓，见 `main.py:_scan_components` ✓）。
-   *  ★ 2026-10-13：要改组件回群聊点右上角、进统一聊天说 ✓ —— 下拉进编辑那套
-   *    整个撤了 ✓，这一屏只剩预览 ✓。
-   */
-  const openCell = (c) => {
-    if (!c) return;
-    // ★ 把这一格的底色一起带进去 ✓ —— 组件页滑进来的头一帧就刷它 ✓
-    //   （见 `openComp` 里那句 ✓）。没有 tint 的组件给空串 ✓（那它就还是原底色 ✓）。
-    openComp(c.slug, c.title, (c.spot && c.spot.tint) || '');
-  };
-
-  const endDrag = (commit) => {
-    const d = wsDrag;
-    wsDrag = null;
-    if (!d) return;
-    d.el.classList.remove('drag');
-    d.el.style.transform = '';
-    d.el.style.pointerEvents = '';           // ★ 拖的时候关掉它，见下面那段 ✓
-    document.querySelectorAll('#wsBody .cell.over').forEach(e => e.classList.remove('over'));
-    if (!commit) return;
-    // ★ **没动过 = 点它** ✗→✓（见上面那段：原来这里弹卡片 ✗）
-    if (!d.moved) { openCell(d.c); return; }
-    const to = d.over == null ? d.from : d.over;
-    if (to !== d.from) {
-      const [item] = wsCanvas.splice(d.from, 1);
-      wsCanvas.splice(to, 0, item);
-      paintCanvas();
-      saveArrangement();
-    }
-  };
-
-  $('#wsBody').addEventListener('pointerdown', (ev) => {
-    const cell = ev.target.closest('#wsBody .cell');
-    if (!cell) return;
-    wsPressAt = { x: ev.clientX || 0, y: ev.clientY || 0 };
-    clearTimeout(wsPressTimer);
-    // ⚠️ 这里**不 preventDefault** ✗ —— 那会把"从格子上起手的滚动"也掐掉 ✓
-    //    （组件多了就滚不动了 ✓）。拦横向是 CSS 的 `pan-y` 在管 ✓。
-    wsPressTimer = setTimeout(() => {
-      wsPressTimer = null;
-      const c = wsCanvas[Number(cell.dataset.i) || 0];
-      if (!c) return;
-      wsDrag = { el: cell, c, from: Number(cell.dataset.i) || 0, over: null,
-                 moved: false, x0: wsPressAt.x, y0: wsPressAt.y };
-      cell.classList.add('drag');
-      // ★ **被拖的那一个要从"命中测试"里摘出去** ✗→✓ ——
-      //   不摘的话，`elementFromPoint` 在手指底下永远先撞到**它自己** ✓
-      //   （它就在手指那儿 ✓），于是"落在谁身上"永远是 null ✓ →
-      //   整个拖动看着能拖、松手却**什么都没发生** ✓（最难查的那种"没坏但没用"✓）。
-      cell.style.pointerEvents = 'none';
-      try { cell.setPointerCapture(ev.pointerId); } catch (e) { /* 没有捕获也能拖 ✓ */ }
-    }, 450);
-  });
-
-  $('#wsBody').addEventListener('pointermove', (ev) => {
-    if (!wsDrag) {
-      // 还没拎起来就动了 → 那多半是在**滚动** ✓（或手指滑开了 ✓）→ 别判成长按 ✓
-      if (wsPressTimer && wsPressAt) {
-        const dx = Math.abs((ev.clientX || 0) - wsPressAt.x);
-        const dy = Math.abs((ev.clientY || 0) - wsPressAt.y);
-        if (dx > 6 || dy > 6) { clearTimeout(wsPressTimer); wsPressTimer = null; wsPressAt = null; }
-      }
-      return;
-    }
-    const dx = ev.clientX - wsDrag.x0, dy = ev.clientY - wsDrag.y0;
-    if (!wsDrag.moved && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) wsDrag.moved = true;
-    wsDrag.el.style.transform = `translate(${dx}px, ${dy}px)`;
-    const under = cellUnder(ev.clientX, ev.clientY);
-    document.querySelectorAll('#wsBody .cell.over').forEach(e => {
-      if (e !== under) e.classList.remove('over');
-    });
-    if (under) {
-      under.classList.add('over');
-      wsDrag.over = Number(under.dataset.i);
-    }
-  });
-
-  $('#wsBody').addEventListener('pointerup', (ev) => {
-    const wasTimer = !!wsPressTimer;
-    if (wsPressTimer) { clearTimeout(wsPressTimer); wsPressTimer = null; }
-    if (wsDrag) { endDrag(true); return; }
-    if (!wasTimer) return;                    // 已经被 pointermove 判成"滚动了" ✓
-    // ★ **短按**（计时器还没到）→ 直接开 ✓ —— 不等 click 事件 ✓（只留一条路 ✓）
-    const cell = ev.target.closest('#wsBody .cell');
-    if (cell) openCell(wsCanvas[Number(cell.dataset.i) || 0]);
-  });
-  $('#wsBody').addEventListener('pointercancel', () => {
-    if (wsPressTimer) { clearTimeout(wsPressTimer); wsPressTimer = null; }
-    endDrag(false);
-  });
 
   // ── 组件页：一个组件自己的页 ✓ ──────────────────────────────────────
   const openComp = async (slug, title, tint) => {
