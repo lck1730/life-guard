@@ -1346,6 +1346,35 @@ async def wall_style_clear(body: ComponentSlugIn) -> dict:
     return {"ok": True, "note": "本来就是默认外观 ✓"}
 
 
+@router.post("/components/html", dependencies=[Depends(require_internal_token)])
+async def components_html(body: ComponentSlugIn) -> dict:
+    """某一个组件**当前最新版**的完整 HTML 源码 ✓。
+
+    ★ 2026-10-13：给编码执行器（Claude Code 直连）用的——改现成组件**必须先读它** ✗，
+      在这份源码上改 ✗，**别凭空重写** ✗（凭空重写会丢掉之前几版的修复 ✓ ——
+      正是 diy 助手来回重写、把记账组件搞乱那个老毛病的根 ✓）。
+    ⚠️ 只回**最新一版**（最高 v）的 HTML，不管它是 live 还是 draft ✓ ——
+       改版时它要看的本来是"现在盘上是什么"✓，不是"哪版在跑"✓。
+    """
+    await _assert_group(body.group_id)
+    slug = (body.slug or "").strip().lower()
+    if not _slug_ok(slug):
+        return {"ok": False, "error": "短名不合法（小写字母、数字、连字符）"}
+    row = await fetch_one(
+        "SELECT version, state, title FROM components"
+        " WHERE group_id = ? AND slug = ? ORDER BY version DESC LIMIT 1",
+        (body.group_id, slug))
+    if not row:
+        return {"ok": False, "error": "这个群还没有 " + slug + " 这个组件"}
+    d = settings.components_dir / ("g" + str(body.group_id)) / slug / ("v" + str(row["version"]))
+    try:
+        html = (d / "index.html").read_text("utf-8")
+    except FileNotFoundError:
+        return {"ok": False, "error": f"v{row['version']} 的 HTML 文件不在盘上（目录可能被挪过）"}
+    return {"ok": True, "slug": slug, "version": int(row["version"]),
+            "state": row["state"], "title": row["title"] or slug, "html": html}
+
+
 @router.post("/components/note", dependencies=[Depends(require_internal_token)])
 async def components_note(body: ComponentSlugIn) -> dict:
     """某一个组件的**工程笔记** ✓ —— 「回顾之前的组件」就靠它 ✓。

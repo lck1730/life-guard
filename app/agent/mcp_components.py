@@ -24,19 +24,35 @@ API_BASE = os.environ.get("LIFEGUARD_API_BASE", "http://127.0.0.1:8730").rstrip(
 TOKEN = os.environ.get("LG_INTERNAL_TOKEN", "")
 GROUP_ID = os.environ.get("LG_GROUP_ID", "")
 
+# ★ 2026-10-13：不再起 claude 子进程 ✓ —— 编码执行器改成 httpx 直连，
+#   工具派发**在进程内**调（agent.py import 本模块 ✓）。子进程那一套 env
+#   （spawn 时塞 LG_INTERNAL_TOKEN / LG_GROUP_ID ✓）在进程内没有 ✓，
+#   所以加这一份 `_CTX`：进程内路径调 `configure(...)` 覆盖 ✓，
+#   子进程路径（已废弃 ✓，但文件留着不删）照旧读 env ✓。
+_CTX: dict = {"token": TOKEN, "group_id": GROUP_ID, "api_base": API_BASE}
+
+
+def configure(*, token: str, group_id, api_base: str) -> None:
+    """进程内用：agent.py 调一次，把 token/群号/后端地址塞进来 ✓。"""
+    _CTX["token"] = token
+    _CTX["group_id"] = str(group_id)
+    _CTX["api_base"] = (api_base or "").rstrip("/")
+
 
 async def _post(path: str, payload: dict) -> dict:
     """照抄 ``provision/lifeguard-tools/__init__.py`` 里那套 ``_post``。"""
-    if not TOKEN:
-        return {"error": "LG_INTERNAL_TOKEN 未配置（spawn 时没传）"}
-    if GROUP_ID and "group_id" not in payload:
-        payload = {**payload, "group_id": int(GROUP_ID)}
+    token = _CTX["token"]
+    if not token:
+        return {"error": "LG_INTERNAL_TOKEN 未配置（进程内未 configure / spawn 时没传）"}
+    gid = _CTX["group_id"]
+    if gid and "group_id" not in payload:
+        payload = {**payload, "group_id": int(gid)}
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
-                API_BASE + path,
+                _CTX["api_base"] + path,
                 json=payload,
-                headers={"X-Internal-Token": TOKEN},
+                headers={"X-Internal-Token": token},
             )
         if resp.status_code >= 400:
             return {"error": f"后端 {resp.status_code}: {resp.text[:200]}"}
@@ -57,6 +73,17 @@ TOOLS = [
             "读某个组件的工程笔记 + 版本元数据（第几版、哪版最新、spot 摆放、NOTE 正文）。"
             "注意：不含 HTML 源码——HTML 用你的内置 Read 工具直接读 cwd 下的 "
             "`<slug>/v<版本>/index.html`。"
+        ),
+        "inputSchema": {"type": "object",
+                         "properties": {"slug": {"type": "string"}},
+                         "required": ["slug"]},
+    },
+    {
+        "name": "read_component_html",
+        "description": (
+            "读某个组件**当前最新版**的完整 HTML 源码 ✗。改现成组件**必须先调它** ✗，"
+            "在这份源码上改 ✗，别凭空重写 ✗（凭空重写会丢掉之前几版的修复 ✓）。"
+            "配合 read_component_note 一起看：note 给的是笔记和版次，这个给的是真源码。"
         ),
         "inputSchema": {"type": "object",
                          "properties": {"slug": {"type": "string"}},
@@ -117,6 +144,9 @@ async def call_tool(name: str, args: dict) -> dict:
     if name == "read_component_note":
         return await _post("/api/internal/tools/components/note",
                            {"slug": args.get("slug", "")})
+    if name == "read_component_html":
+        return await _post("/api/internal/tools/components/html",
+                           {"slug": args.get("slug", "")})
     if name == "confirm_component":
         return await _post("/api/internal/tools/components/confirm",
                            {"slug": args["slug"], "brief": args.get("brief", ""),
@@ -126,10 +156,13 @@ async def call_tool(name: str, args: dict) -> dict:
         return await _post("/api/internal/tools/components/save",
                            {k: v for k, v in args.items() if k in keep})
     if name == "set_wall_style":
-        return await _post("/api/internal/components/wall-set",
+        # ⚠️ 路由前缀是 `/api/internal/tools` ✓（router prefix ✓）——
+        #    上一版写成 `/api/internal/components/wall-set`（少 `/tools/`）✗，
+        #    一直 404、wall 工具从没真调通 ✗。2026-10-13 修 ✓。
+        return await _post("/api/internal/tools/components/wall-set",
                            {"css": args.get("css", ""), "note": args.get("note", "")})
     if name == "clear_wall_style":
-        return await _post("/api/internal/components/wall-clear", {})
+        return await _post("/api/internal/tools/components/wall-clear", {})
     return {"error": f"未知工具：{name}"}
 
 

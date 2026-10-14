@@ -935,31 +935,40 @@ async def _stream_completion(
                         yield piece
 
 
-# ── DIY 编码执行器：Claude Code 子进程（glm-5.2）────────────────────────────
+# ── DIY 编码执行器：httpx 直连商汤 /v1/messages（glm-5.2）──────────────────
 #
-# ★ 2026-10-13：工坊编码那一路从 Hermes 换成 Claude Code 子进程。
-#   痛点是 diy 那档现在指商汤 ``sensenova-6.8-flash-lite``（lite 弱模型 ✓），
-#   编码不行 ✓。换 ``claude -p`` 子进程 = 用上 ``glm-5.2``（和 butler 同档 ✓）。
+# ★ 2026-10-14：从 ``claude -p`` 子进程换成 httpx 直连 ✓。两条原因：
+#   ① 子进程的 stream-json **不出 delta** ✓（assistant 整块出来 ✓）→ 做不到逐字 ✓；
+#   ② 子进程 -p 文本模式**喂不了图** ✓。直连两件都行 ✓（实测 text_delta 逐 token 来 ✓、
+#      tool_use 流式 ✓、image 块收得下 ✓）。
 #
-#   ⚠️ **命门验过**（2026-10-13 ✓）：``claude`` CLI 在 ``/usr/bin/claude`` ✓；
-#     glm-5.2 经商汤网关 token.sensenova.cn、用 models.json 里 lifeguard 自己的
-#     商汤 key 跑通 ✓——**不碰 butler 的 ANTHROPIC_AUTH_TOKEN**（硬底线 ✓）。
+#   ⚠️ **不碰 butler 的 ANTHROPIC_AUTH_TOKEN**（硬底线 ✓）——用 ``var/models.json``
+#      里 lifeguard 自己那把商汤 key ✓。**不落第二次记忆** ✓（[[shadow-test-deleted-a-real-profile]]）：
+#      直连是纯 API 调用 ✓、不写任何 ~/.claude ✓（比子进程那套更干净 ✓）；
+#      状态在进程内 ``_CLAUDE_SESSIONS``（task_id → messages ✓，重启丢 ✓，靠每轮注入补 ✓）。
 #
-#   ⚠️ **记忆不落第二次**（[[shadow-test-deleted-a-real-profile]] 的教训 ✓）：
-#     HOME 钉死在 ``var/claude-home/``（隔离 ✓），不碰 butler 的 ~/.claude ✓；
-#     claude -p 非交互，不主动写 memory ✓；会话按 task_id resume（``_CLAUDE_SESSIONS``）。
-_CLAUDE_HOME = Path("/opt/lifeguard-chat/var/claude-home")
-#: MCP server 得用 lifeguard 的 venv python（系统 python3 没 httpx ✓）。
-_CLAUDE_PY = "/opt/lifeguard/.venv/bin/python"
-#: task_id → claude session_id。内存里 ✓（重启丢，记忆靠注入补 ✓）。
-_CLAUDE_SESSIONS: dict[int, str] = {}
+#   ★ 工具循环自己写 ✓（替代 CLI 的 MCP 循环）：工具定义/派发复用 ``mcp_components`` 那套 ✓
+#      （进程内 import ✓，不起子进程 ✓）。读组件源码靠新加的 ``read_component_html`` ✓
+#      ——没它就只能凭空重写 ✓，会丢掉之前几版的修复 ✓（diy 助手搞乱组件那个老毛病的根 ✓）。
+#      ★ 看图 ✓：glm-5.2 纯文本 ✓，图先过一道 flash-lite 描述成文字 ✓，再喂主模型 ✓。
+#: task_id → messages（assistant/用户/工具往返 ✓）。内存里 ✓（重启丢 ✓）。
+_CLAUDE_SESSIONS: dict[int, list[dict]] = {}
+#: 历史超这阈值就压缩 ✓（粗估 token ≈ 字符/2 ✓；glm-5.2 窗口 200k ✓，留够系统+新轮+输出余量 ✓）。
+_HISTORY_COMPACT_CHARS = 200_000
+#: 压缩时最近几轮原样留 ✓（别把正在做的事压没 ✓）。
+_HISTORY_KEEP_TURNS = 6
+#: 工具往返上限 ✓（够改一个组件 ✓，挡死循环 ✓）。
+_MAX_TOOL_TURNS = 12
 
 
 def _load_diy_model_cfg() -> dict:
-    """读 ``var/models.json``，拿 diy 角色对应那档的 api_key + base_url。
+    """读 ``var/models.json``，拿编码那档的 api_key + base_url + 两个模型名 ✓。
 
-    model 用 ``glm-5.2``（命门验过比 lite 强 ✓）；如果 config 里有 ``claude_model``
-    字段就用它（方便以后换模型不改代码 ✓）。
+    - ``model``：编码主模型 ✓，默认 ``glm-5.2``（命门验过比 lite 强 ✓）。
+    - ``vision_model``：看图用 ✓，默认 ``sensenova-6.8-flash-lite``（网关上
+      **唯一**带视觉的模型 ✓ —— glm-5.2 是纯文本 ✓，看不了图 ✓）。
+      两档用**同一把 key、同一个网关** ✓（商汤 token.sensenova.cn ✓）。
+    config 里 ``claude_model`` / ``claude_vision_model`` 能覆盖 ✓（换模型不改代码 ✓）。
     """
     try:
         data = json.loads(settings.models_conf.read_text("utf-8"))
@@ -967,40 +976,178 @@ def _load_diy_model_cfg() -> dict:
         cid = (data.get("roles") or {}).get("diy")
         cfg = cfgs.get(cid) or (next(iter(cfgs.values())) if cfgs else {})
         base = (cfg.get("base_url") or "").rstrip("/")
-        if base.endswith("/v1"):  # claude CLI 要的是 Anthropic 协议端点（无 /v1）
+        if base.endswith("/v1"):  # Anthropic 协议端点不带 /v1 ✓
             base = base[:-3]
         return {
             "base_url": base,
             "api_key": cfg.get("api_key", ""),
             "model": cfg.get("claude_model", "glm-5.2"),
+            "vision_model": cfg.get("claude_vision_model", "sensenova-6.8-flash-lite"),
         }
     except Exception as exc:  # noqa: BLE001
-        log.warning("读 models.json 给 claude 用失败了：%s", exc)
+        log.warning("读 models.json 给编码执行器用失败了：%s", exc)
         return {}
 
 
-def _claude_env(group_id: int) -> dict:
-    """spawn ``claude`` 子进程要用的 env。
+def _sdk_tools() -> list[dict]:
+    """把 ``mcp_components.TOOLS`` 转成 Anthropic messages API 的 tools 形状 ✓。
 
-    ★ ``LG_INTERNAL_TOKEN`` 从 ``settings.internal_token`` 取 ✓（lifeguard 进程能读 ✓），
-      原样塞给子进程 → MCP server 从 env 读 ✓ → 不落盘、不碰 ``.env`` 硬底线 ✓。
+    差一处 ✓：``inputSchema`` → ``input_schema``（API 那边叫这个 ✓）。
     """
-    cfg = _load_diy_model_cfg()
-    env = os.environ.copy()
-    # ★ 清掉 butler 那套（如果 lifeguard 进程 env 里带的话），用 lifeguard 自己的商汤 key ✓
-    for k in ("ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY",
-              "ANTHROPIC_BASE_URL", "ANTHROPIC_MODEL",
-              "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL",
-              "ANTHROPIC_DEFAULT_HAIKU_MODEL", "CLAUDE_CONFIG_DIR"):
-        env.pop(k, None)
-    env["ANTHROPIC_BASE_URL"] = cfg.get("base_url", "https://token.sensenova.cn")
-    env["ANTHROPIC_AUTH_TOKEN"] = cfg.get("api_key", "")
-    env["ANTHROPIC_MODEL"] = cfg.get("model", "glm-5.2")
-    env["HOME"] = str(_CLAUDE_HOME)
-    env["LG_INTERNAL_TOKEN"] = settings.internal_token
-    env["LG_GROUP_ID"] = str(group_id)
-    env["LIFEGUARD_API_BASE"] = "http://127.0.0.1:8730"
-    return env
+    from .mcp_components import TOOLS
+    return [{"name": t["name"], "description": t["description"],
+             "input_schema": t["inputSchema"]} for t in TOOLS]
+
+
+async def _describe_images(cfg: dict, media_paths: list[str]) -> str:
+    """用视觉模型把图描述成文字 ✓ —— glm-5.2 看不了图 ✓，得先过一道眼睛 ✓。
+
+    ★ 眼睛归眼睛、手归手 ✓：图先让 flash-lite 看一眼、写成描述 ✓，
+      再把描述喂给编码主模型 ✓ —— 拿文字干活的还是主模型 ✓。
+    """
+    blocks: list[dict] = []
+    for mp in media_paths:
+        p = settings.media_dir / mp
+        try:
+            raw = p.read_bytes()
+        except OSError:
+            continue
+        if len(raw) > 4 * 1024 * 1024:  # 单张 4MB 上限 ✓（同 _image_parts ✓）
+            continue
+        ext = p.suffix.lower()
+        mime = {".png": "image/png", ".webp": "image/webp",
+                ".gif": "image/gif"}.get(ext, "image/jpeg")
+        blocks.append({"type": "image",
+                       "source": {"type": "base64", "media_type": mime,
+                                  "data": base64.b64encode(raw).decode()}})
+    if not blocks:
+        return ""
+    blocks.append({"type": "text", "text":
+        "这是一张截图。用两三句话描述画面上的界面/内容/布局，给一个编码者"
+        "照着复现或改动用。只描述能看到的，别猜看不见的。"})
+    url = (cfg.get("base_url") or "https://token.sensenova.cn").rstrip("/") + "/v1/messages"
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as cli:
+            r = await cli.post(url, json={
+                "model": cfg.get("vision_model", "sensenova-6.8-flash-lite"),
+                "max_tokens": 400,
+                "messages": [{"role": "user", "content": blocks}]},
+                headers={"x-api-key": cfg.get("api_key", ""),
+                         "anthropic-version": "2023-06-01"})
+        if r.status_code >= 400:
+            log.warning("看图失败 %s: %s", r.status_code, r.text[:200])
+            return ""
+        for blk in r.json().get("content", []):
+            if blk.get("type") == "text" and blk.get("text"):
+                return blk["text"].strip()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("看图那一路挂了：%s", exc)
+    return ""
+
+
+def _history_chars(msgs: list[dict]) -> int:
+    """粗估历史占用 ✓（token ≈ 字符/2 ✓）。"""
+    return sum(len(json.dumps(m, ensure_ascii=False)) for m in msgs)
+
+
+async def _compact_history(msgs: list[dict], cfg: dict) -> list[dict]:
+    """历史太长时把**老的**那批压成一段摘要 ✓，最近几轮原样留 ✓。
+
+    ★ 统一聊天是长寿命的 ✓（一群一条、连续着聊 ✓）——不压会几十轮撑爆 200k 窗口 ✓
+      → API 413 ✓ → 这条聊天下不来 ✓。
+    ⚠️ 压缩本身是一次模型调用 ✓（用主模型自己 ✓），产一段 recap ✓，顶在前面 ✓；
+       压失败就照原样 ✓（最坏下一轮 413，不至于整条瘫 ✓）。
+    """
+    if len(msgs) <= _HISTORY_KEEP_TURNS * 2 or _history_chars(msgs) <= _HISTORY_COMPACT_CHARS:
+        return msgs
+    keep = msgs[-_HISTORY_KEEP_TURNS * 2:]
+    old = msgs[:-_HISTORY_KEEP_TURNS * 2]
+    prompt = ("下面是这条工坊对话**较早的**经过（已省略）。压成一段简短回顾，"
+        "只留：做过哪些组件、改过什么、用户明确要过什么、踩过的坑。一两百字以内，"
+        "别复述细节。\n\n") + json.dumps(old, ensure_ascii=False)[:_HISTORY_COMPACT_CHARS]
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as cli:
+            r = await cli.post(
+                (cfg.get("base_url") or "https://token.sensenova.cn").rstrip("/") + "/v1/messages",
+                json={"model": cfg.get("model", "glm-5.2"), "max_tokens": 600,
+                      "messages": [{"role": "user", "content": prompt}]},
+                headers={"x-api-key": cfg.get("api_key", ""), "anthropic-version": "2023-06-01"})
+        if r.status_code < 400:
+            txt = next((b["text"] for b in r.json().get("content", [])
+                        if b.get("type") == "text" and b.get("text")), "")
+            if txt:
+                return [{"role": "user",
+                         "content": f"[这是之前对话的回顾，细节已省略]\n{txt}"},
+                        {"role": "assistant", "content": "好，我接着来。"}] + keep
+    except Exception as exc:  # noqa: BLE001
+        log.warning("历史压缩那一路挂了，跳过：%s", exc)
+    return msgs
+
+
+async def _stream_one_turn(cfg: dict, system: str, msgs: list[dict],
+                           tools: list[dict], out_content: list[dict],
+                           out_tools: list[dict]) -> AsyncIterator[str]:
+    """跑一次 messages.create（流式 ✓）：**逐字** yield 文字 delta ✓，
+    把这一轮的 content 块 / tool_use 收进 out_content / out_tools ✓。
+
+    ⚠️ 工具过程不外露 ✓（只 yield text_delta ✓ —— 工具调用是它和后端之间的事 ✓）。
+    ⚠️ thinking 块也**不外露** ✓（内部推理 ✓），但**收进 out_content** ✓
+       （回传给下一轮要带签名 ✓，不然 API 报 thinking 块不匹配 ✗）。
+    """
+    url = (cfg.get("base_url") or "https://token.sensenova.cn").rstrip("/") + "/v1/messages"
+    body = {"model": cfg.get("model", "glm-5.2"), "max_tokens": 8000,
+            "stream": True, "system": system, "messages": msgs, "tools": tools}
+    headers = {"x-api-key": cfg.get("api_key", ""), "anthropic-version": "2023-06-01",
+               "content-type": "application/json"}
+    cur: dict | None = None
+    async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=10.0)) as cli:
+        async with cli.stream("POST", url, json=body, headers=headers) as r:
+            if r.status_code >= 400:
+                raw = await r.aread()
+                raise RuntimeError(f"模型 {r.status_code}: {raw.decode('utf-8','replace')[:300]}")
+            async for line in r.aiter_lines():
+                if not line or not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if not data:
+                    continue
+                try:
+                    ev = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+                t = ev.get("type")
+                if t == "content_block_start":
+                    cb = ev.get("content_block", {}) or {}
+                    cur = dict(cb)
+                    if cb.get("type") == "tool_use":
+                        cur["_json"] = ""
+                elif t == "content_block_delta":
+                    d = ev.get("delta", {}) or {}
+                    dt = d.get("type")
+                    if dt == "text_delta" and d.get("text"):
+                        yield d["text"]
+                        if cur is not None and cur.get("type") == "text":
+                            cur["text"] = cur.get("text", "") + d["text"]
+                    elif dt == "thinking_delta" and cur is not None:
+                        cur["thinking"] = cur.get("thinking", "") + d.get("thinking", "")
+                    elif dt == "signature_delta" and cur is not None:
+                        cur["signature"] = cur.get("signature", "") + d.get("signature", "")
+                    elif dt == "input_json_delta" and cur is not None:
+                        cur["_json"] = cur.get("_json", "") + d.get("partial_json", "")
+                elif t == "content_block_stop":
+                    if cur is not None:
+                        if cur.get("type") == "tool_use":
+                            try:
+                                cur["input"] = json.loads(cur.pop("_json", "") or "{}")
+                            except json.JSONDecodeError:
+                                cur["input"] = {}
+                            out_tools.append(cur)
+                        else:
+                            cur.pop("_json", None)
+                        out_content.append(cur)
+                        cur = None
+                elif t == "message_stop":
+                    break
 
 
 async def _stream_claude(
@@ -1008,23 +1155,20 @@ async def _stream_claude(
     task_id: int,
     text: str,
     system: str,
+    media_paths: list[str] | None = None,
 ) -> AsyncIterator[str]:
-    """把用户的话交给 ``claude -p`` 子进程干，把它的正文逐段 yield 回来。
+    """编码执行器 ✓：httpx 直连商汤 ``/v1/messages``，**逐字流** ✓ + **看图** ✓。
 
-    工具调用过程不外露（只 yield text block）✓；MCP 工具起票/落版走正规
-    ``components/save``（版本自增 / 票据 / 校验全不绕 ✓）；claude 内置 Read 能在
-    组件目录里读当前 HTML（cwd 钉在该群组件目录 ✓）。
-
-    ⚠️ stream-json 不出 content_block_delta ✓——assistant 是整块 message，
-    单段长文本是"刷"一下出现、不是逐 token（比 Hermes 逐字差一档 ✓；
-    要逐字得换 SDK 直调，后续再说 ✓）。
+    ★ 工具循环自己跑 ✓：模型一轮里要调工具就执行（进程内 ``call_tool`` ✓），
+      把结果喂回去再让它接着说 ✓，直到它不再调工具（``end_turn``）✓。
+      起票/落版走正规 ``components/save``（版本自增 / 票据 / 校验全不绕 ✓）✓。
     """
-    from asyncio.subprocess import PIPE
+    from .mcp_components import configure, call_tool
 
-    env = _claude_env(group_id)
-    if not env.get("ANTHROPIC_AUTH_TOKEN"):
-        # 没 key 就别硬撑 ✓ —— 回退 Hermes（diy 那档虽然弱，但能跑 ✓）。
-        log.warning("工坊 claude：读不到商汤 key，回退 Hermes group=%s", group_id)
+    cfg = _load_diy_model_cfg()
+    if not cfg.get("api_key"):
+        # 没 key 就别硬撑 ✓ —— 回退 Hermes（diy 那档弱，但能跑 ✓）。
+        log.warning("工坊：读不到商汤 key，回退 Hermes group=%s", group_id)
         async for p in _stream_completion(
             group_id, text, [], await _group_profile(group_id),
             system=system, session_id=diy_session_id_for(group_id, task_id), role="diy",
@@ -1032,91 +1176,53 @@ async def _stream_claude(
             yield p
         return
 
-    _CLAUDE_HOME.mkdir(parents=True, exist_ok=True)
-    mcp_file = _CLAUDE_HOME / f"mcp-{task_id}.json"
-    mcp_file.write_text(json.dumps({
-        "mcpServers": {
-            "lg": {
-                "command": _CLAUDE_PY,
-                "args": [str(Path(__file__).parent / "mcp_components.py")],
-            }
-        }
-    }), "utf-8")
-    cwd = settings.components_dir / f"g{int(group_id)}"
-    cwd.mkdir(parents=True, exist_ok=True)
+    # 进程内配好 token / 群号 / 后端 ✓（工具派发走 localhost internal API ✓）
+    configure(token=settings.internal_token, group_id=group_id,
+              api_base="http://127.0.0.1:8730")
 
-    cmd = [
-        "claude", "-p", "--verbose", "--output-format", "stream-json",
-        "--model", env["ANTHROPIC_MODEL"],
-        "--dangerously-skip-permissions",
-        # ⚠️ claude -p 模式下 MCP 工具默认不加载到工具集 ✓ —— 必须显式
-        #    --allowedTools 列出来（实测不列的话 claude 说"没有这个工具"✓）。
-        #    内置只给 Read/Grep/Glob/Bash（够读组件 HTML + 探索 ✓），
-        #    写组件走 MCP save_component（正规落版 ✓），不给 Edit/Write。
-        "--allowedTools",
-        "Read", "Grep", "Glob", "Bash",
-        "mcp__lg__list_components", "mcp__lg__read_component_note",
-        "mcp__lg__confirm_component", "mcp__lg__save_component",
-        "mcp__lg__set_wall_style", "mcp__lg__clear_wall_style",
-        "--mcp-config", str(mcp_file),
-        "--append-system-prompt", system or "你是一个帮用户做界面组件的编码助手。",
-        "--add-dir", str(cwd),
-    ]
-    sid = _CLAUDE_SESSIONS.get(int(task_id))
-    if sid:
-        cmd += ["--resume", sid]
+    # 图片：先让 flash-lite 看一眼、描述成文字 ✓ —— 主模型拿文字干活 ✓
+    if media_paths:
+        desc = await _describe_images(cfg, media_paths)
+        if desc:
+            text = (f"（用户发了一张图，画面内容：{desc}）\n\n{text}"
+                    if text and text.strip()
+                    else f"（用户发了一张图，画面内容：{desc}）")
 
-    log.info("工坊 claude 起来 group=%s task=%s resume=%s", group_id, task_id, bool(sid))
-    # ⚠️ prompt 走 stdin ✓ —— `--add-dir` 是 variadic（吃多个目录 ✓），
-    #    positional 末尾的 prompt 会被它当第二个目录吞掉 ✓（实测踩过 ✓）。
-    proc = await asyncio.create_subprocess_exec(
-        *cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env, cwd=str(cwd),
-    )
-    try:
-        assert proc.stdin is not None
-        proc.stdin.write((text + "\n").encode("utf-8"))
-        await proc.stdin.drain()
-        proc.stdin.close()
-    except Exception as exc:  # noqa: BLE001
-        log.warning("工坊 claude：写 stdin 失败 group=%s task=%s %s",
-                    group_id, task_id, exc)
-    try:
-        while True:
-            line = await proc.stdout.readline()
-            if not line:
-                break
-            line = line.strip()
-            if not line.startswith(b"{"):
-                continue
-            try:
-                d = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            t = d.get("type")
-            if t == "system":
-                s = d.get("session_id")
-                if s:
-                    _CLAUDE_SESSIONS[int(task_id)] = s
-            elif t == "assistant":
-                for block in (d.get("message") or {}).get("content", []) or []:
-                    if block.get("type") == "text" and block.get("text"):
-                        yield block["text"]
-            elif t == "result":
-                break
-    finally:
-        if proc.returncode is None:
-            try:
-                proc.kill()
-            except ProcessLookupError:
-                pass
+    tools = _sdk_tools()
+    msgs = _CLAUDE_SESSIONS.get(int(task_id)) or []
+    msgs = await _compact_history(msgs, cfg)  # 太长先压 ✓
+    msgs = msgs + [{"role": "user", "content": text}]
+
+    log.info("工坊直连起来 group=%s task=%s hist=%d", group_id, task_id, len(msgs))
+    for _ in range(_MAX_TOOL_TURNS):
+        content: list[dict] = []
+        tool_uses: list[dict] = []
         try:
-            err = await asyncio.wait_for(proc.stderr.read(), timeout=2.0)
-            if err:
-                log.warning("工坊 claude stderr: %s",
-                            err.decode("utf-8", "replace")[:500])
-        except Exception:  # noqa: BLE001
-            pass
-        await proc.wait()
+            async for piece in _stream_one_turn(cfg, system, msgs, tools, content, tool_uses):
+                yield piece
+        except RuntimeError as exc:
+            log.warning("工坊模型那一路挂了 group=%s task=%s %s", group_id, task_id, exc)
+            yield f"\n\n[出了点问题：{exc}]"
+            return
+        # 这轮 assistant 的完整 content 落进历史 ✓（thinking 带签名 ✓、text ✓、tool_use ✓）
+        msgs.append({"role": "assistant", "content": content})
+        if not tool_uses:
+            break
+        # 执行工具 ✓（进程内 ✓）→ 结果喂回去 ✓ → 下一轮接着说 ✓
+        for tu in tool_uses:
+            res = await call_tool(tu.get("name", ""), tu.get("input") or {})
+            rtext = json.dumps(res, ensure_ascii=False)
+            if len(rtext) > 30000:  # 大 HTML 截一段 ✓（别把上下文撑爆 ✓）
+                rtext = rtext[:30000] + "\n…（已截断）"
+            is_err = bool(res.get("error") or res.get("ok") is False)
+            msgs.append({"role": "user", "content": [{
+                "type": "tool_result", "tool_use_id": tu.get("id", ""),
+                "content": rtext, "is_error": is_err}]})
+            log.info("工坊工具 %s group=%s err=%s", tu.get("name"), group_id, is_err)
+    else:
+        log.warning("工坊工具循环到上限还没收尾 group=%s task=%s", group_id, task_id)
+
+    _CLAUDE_SESSIONS[int(task_id)] = msgs
 
 
 # 引用标记：它可以在回复**开头**写 `[引用 #157]` 来引用某条消息。

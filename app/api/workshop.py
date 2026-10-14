@@ -773,11 +773,13 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
             if msg_type == "image" and not text.strip():
                 text = "（发了一张图）"
             images = _image_parts([{"msg_type": msg_type, "media_path": media_path}])
+            # ★ 2026-10-14：claude 桥要的是**原始 media_path** ✓（直连商汤、
+            #   自己读图喂给视觉模型 ✓），不是 Hermes 那套 data-URL 片段 ✓。
+            media_paths = [media_path] if (msg_type == "image" and media_path) else []
             parts: list[str] = []
 
-            # ★ 2026-10-13：工坊编码走 Claude Code 子进程（glm-5.2 ✓），不走 Hermes ✓。
+            # ★ 2026-10-14：工坊编码走 httpx 直连商汤（glm-5.2 ✓，逐字流 + 看图 ✓），不走 Hermes ✓。
             #   _stream_claude 读不到商汤 key 时自动回退 _stream_completion ✓（兜底 ✓）。
-            #   ⚠️ 图片暂时不传给 claude（-p 文本模式）—— 工坊发图少，TODO ✓。
             #   想临时回退 Hermes：export LG_DIY_BACKEND=hermes 后 restart ✓。
             async def _diy(t: str):  # noqa: ANN202
                 if __import__("os").environ.get("LG_DIY_BACKEND", "claude") == "hermes":
@@ -789,7 +791,7 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                     ):
                         yield p
                 else:
-                    async for p in _stream_claude(group_id, task_id, t, system):
+                    async for p in _stream_claude(group_id, task_id, t, system, media_paths):
                         yield p
 
             async for piece in _diy(text):
