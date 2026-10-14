@@ -145,17 +145,21 @@
     if (parent) parent.appendChild(el);
     return el;
   };
-  // 家具上的摆位 ✓（坐标在 viewBox 0 0 960 620 里 ✓）。超了就叠在前排地板 ✓。
+  // 家具上的摆位 ✓（坐标在 viewBox 0 0 960 620 里 ✓）。
+  // ★ **槽位 = 触点** ✓（卡片**底**贴着桌面/板面/地板 ✓，卡片往上长 ✓）——
+  //   不然卡片往下伸会**陷进家具**里 ✓（账本没"躺"在桌上 ✓、书架物挂在板下 ✓）✓。
+  //   触点 Y = 各表面的**顶**（桌面 396 / 书架板 160·200·240 / 柜顶 372 / 床面 400 / 地板 560）✓。
+  //   超了就叠在前排地板往右 ✓（横滑可见 ✓）。
   const SLOTS = [
-    { x: 335, y: 390 },                         // 桌面（账本就躺这儿 ✓）
-    { x: 665, y: 172 }, { x: 765, y: 172 },     // 书架顶层 左/右
-    { x: 665, y: 212 }, { x: 765, y: 212 },     // 书架中层
-    { x: 665, y: 252 }, { x: 765, y: 252 },     // 书架底层
-    { x: 858, y: 366 },                         // 柜顶
-    { x: 155, y: 396 },                         // 床面
-    { x: 140, y: 558 }, { x: 220, y: 558 }, { x: 300, y: 558 },  // 地板前排
-    { x: 380, y: 558 }, { x: 540, y: 558 }, { x: 620, y: 558 },
-    { x: 700, y: 558 }, { x: 780, y: 558 },
+    { x: 335, y: 396 },                         // 桌面（账本就躺这儿 ✓）
+    { x: 665, y: 160 }, { x: 765, y: 160 },     // 书架顶层 左/右
+    { x: 665, y: 200 }, { x: 765, y: 200 },     // 书架中层
+    { x: 665, y: 240 }, { x: 765, y: 240 },     // 书架底层
+    { x: 858, y: 372 },                         // 柜顶
+    { x: 155, y: 400 },                         // 床面
+    { x: 140, y: 560 }, { x: 220, y: 560 }, { x: 300, y: 560 },  // 地板前排
+    { x: 380, y: 560 }, { x: 540, y: 560 }, { x: 620, y: 560 },
+    { x: 700, y: 560 }, { x: 780, y: 560 },
   ];
 
   /** 卧室那间屋（静态 ✓ —— 屋不随组件变 ✓，组件是往里**摆物** ✓）。
@@ -228,24 +232,25 @@
     '<rect x="0" y="0" width="960" height="620" fill="url(#vign)" pointer-events="none"/>',
   ].join('\n');
 
-  /** 组件 = 屋里一件物 ✓（点 → 进组件 ✓，和原来点格子一个出口 ✓）。 */
+  /** 组件 = 屋里一件物 ✓（点 → 进组件 ✓，和原来点格子一个出口 ✓）。
+   *  ★ `s` 是**触点** ✓（卡片底贴桌面/板面 ✓，卡片往上长 ✓）—— 见 `SLOTS` 那段 ✓。 */
   const objNode = (c, i, s) => {
     const g = _svg('g', { class: 'ws-obj' });
     g.dataset.i = String(i);
-    _svg('ellipse', { class: 'ws-sh', cx: s.x, cy: s.y + 22, rx: 22, ry: 5 }, g);
+    _svg('ellipse', { class: 'ws-sh', cx: s.x, cy: s.y + 2, rx: 22, ry: 4 }, g);  // 影在面上 ✓
     const card = _svg('rect', {
-      class: 'ws-card', x: s.x - 24, y: s.y - 20, width: 48, height: 40, rx: 7,
+      class: 'ws-card', x: s.x - 24, y: s.y - 40, width: 48, height: 40, rx: 7,  // 底贴 s.y ✓
     }, g);
     const tint = (c.spot && c.spot.tint) || '';
     if (tint) card.setAttribute('fill', tint);
     const ic = String(c.icon || '');
     if (ic.startsWith('data:image/')) {
-      _svg('image', { href: ic, x: s.x - 16, y: s.y - 18, width: 32, height: 32 }, g);
+      _svg('image', { href: ic, x: s.x - 16, y: s.y - 38, width: 32, height: 32 }, g);
     } else {
-      const t = _svg('text', { class: 'ws-ico', x: s.x, y: s.y }, g);
+      const t = _svg('text', { class: 'ws-ico', x: s.x, y: s.y - 20 }, g);       // 卡片竖中 ✓
       t.textContent = ic || '🧩';
     }
-    const lbl = _svg('text', { class: 'ws-lbl', x: s.x, y: s.y + 34 }, g);
+    const lbl = _svg('text', { class: 'ws-lbl', x: s.x, y: s.y + 13 }, g);        // 名字在面上 ✓
     const name = c.title || c.slug || '组件';
     lbl.textContent = name.length > 6 ? name.slice(0, 6) + '…' : name;
     // ★ 点物 → 进组件 ✓（**和原来点格子完全同一个出口** ✓ → 后端那条路不动 ✓）。
@@ -267,6 +272,51 @@
     return g;
   };
 
+  // ── 坐标调试（2026-10-14）──────────────────────────────────────────
+  // 用户要的："给界面添加个坐标调试按钮"✓ —— **我俩一起极限微操**的通道 ✓：
+  //   点开 → 每个槽位画十字 + 标 `(x,y)` ✓、铺 50px 参考网格 ✓、
+  //   点任意位置读出该处 viewBox 坐标（顶上 HUD 显示 ✓）。
+  //   调试时**点物不会误进组件** ✓（点用来读坐标 ✓）。
+  //   ⚠️ 这是**开发期工具** ✓ —— 之前"这屏不放任何按钮"那条 ✓ 是对**发布态**说的 ✓；
+  //      微操完了删掉即可 ✓（`buildScene` 里那段 + 这几个函数 ✓）。
+  let wsDebugOn = false;
+  const dbgStyle = 'position:absolute;z-index:30;border-radius:999px;'
+    + 'background:rgba(20,30,45,0.78);color:#cfe;border:1px solid #3a5680;'
+    + 'font-size:12px;padding:4px 10px;touch-action:none;user-select:none;';
+
+  /** viewBox 坐标读数 ✓ —— 拿不到 CTM 就退回比例算 ✓。 */
+  const svgPoint = (svg, ev) => {
+    try {
+      const pt = svg.createSVGPoint();
+      pt.x = ev.clientX || 0;
+      pt.y = ev.clientY || 0;
+      const m = svg.getScreenCTM();
+      if (m) { const p = pt.matrixTransform(m.inverse()); return [p.x, p.y]; }
+    } catch (e) { /* 退回比例 ✓ */ }
+    const r = svg.getBoundingClientRect();
+    return [960 * ((ev.clientX || 0) - r.left) / (r.width || 1),
+            620 * ((ev.clientY || 0) - r.top) / (r.height || 1)];
+  };
+
+  /** 铺一层调试叠片 ✓（网格 + 每个槽位十字+坐标 ✓）。 */
+  const paintDebugLayer = (svg) => {
+    document.getElementById('ws-debug-g')?.remove();
+    const g = _svg('g', { id: 'ws-debug-g' }, svg);
+    g.style.pointerEvents = 'none';
+    for (let x = 0; x <= 960; x += 50)         // 竖线 ✓
+      _svg('line', { x1: x, y1: 0, x2: x, y2: 620, stroke: '#000', 'stroke-width': .5, opacity: .12 }, g);
+    for (let y = 0; y <= 620; y += 50)         // 横线 ✓
+      _svg('line', { x1: 0, y1: y, x2: 960, y2: y, stroke: '#000', 'stroke-width': .5, opacity: .12 }, g);
+    SLOTS.forEach((s, i) => {                   // 槽位十字 + 坐标 ✓
+      _svg('line', { x1: s.x - 10, y1: s.y, x2: s.x + 10, y2: s.y, stroke: '#d33', 'stroke-width': 1.5 }, g);
+      _svg('line', { x1: s.x, y1: s.y - 10, x2: s.x, y2: s.y + 10, stroke: '#d33', 'stroke-width': 1.5 }, g);
+      const t = _svg('text', { x: s.x, y: s.y - 14, 'text-anchor': 'middle',
+        'font-size': 11, fill: '#d33', 'font-family': 'monospace' }, g);
+      t.textContent = `${i}·(${s.x},${s.y})`;
+    });
+    svg.insertBefore(g, svg.firstChild);       // 压在家具上面 ✓（十字看得见 ✓）
+  };
+
   const buildScene = () => {
     const wrap = document.createElement('div');
     wrap.className = 'ws-scene';
@@ -274,11 +324,44 @@
     svg.innerHTML = ROOM_INNER;
     wsCanvas.forEach((c, i) => {
       // 超过预设槽位 → 叠在前排地板往右排 ✓（横滑可见 ✓）。
-      const s = SLOTS[i] || { x: 780 + ((i - SLOTS.length) % 4) * 80, y: 558 };
+      const s = SLOTS[i] || { x: 780 + ((i - SLOTS.length) % 4) * 80, y: 560 };
       svg.appendChild(objNode(c, i, s));
     });
     svg.appendChild(catNode());
     wrap.appendChild(svg);
+
+    // ★ 坐标调试按钮（右上角小胶囊 ✓）+ HUD（顶上读数 ✓）—— 见上面那段 ✓。
+    const hud = document.createElement('div');
+    hud.style.cssText = dbgStyle + 'top:8px;left:8px;display:none;font-family:monospace;';
+    const btn = document.createElement('div');
+    btn.style.cssText = dbgStyle + 'top:8px;right:8px;';
+    btn.textContent = '坐标';
+    // 调试时点场景 = 读坐标 ✓（**拦截掉进组件**✓）—— 关了就还原成点物进组件 ✓。
+    //   ⚠️ 用 **`click` 捕获阶段** ✓：`pointerdown` 拦不住后续的 `click` ✗
+    //      → 物的 `click` 还是会进组件 ✗。捕获在 svg 上 ✓、跑在物的冒泡之前 ✓ →
+    //      `stopPropagation` 把物的 `click` 摁掉 ✓。
+    const onSceneTap = (ev) => {
+      if (!wsDebugOn) return;
+      ev.stopPropagation(); ev.preventDefault();
+      const [x, y] = svgPoint(svg, ev);
+      hud.textContent = `(${Math.round(x)}, ${Math.round(y)})`;
+    };
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      wsDebugOn = !wsDebugOn;
+      if (wsDebugOn) {
+        paintDebugLayer(svg);
+        hud.style.display = 'block';
+        hud.textContent = '点场景读坐标';
+        svg.addEventListener('click', onSceneTap, true);   // capture ✓：拦在点物之前 ✓
+      } else {
+        document.getElementById('ws-debug-g')?.remove();
+        hud.style.display = 'none';
+        svg.removeEventListener('click', onSceneTap, true);
+      }
+    });
+    wrap.appendChild(hud);
+    wrap.appendChild(btn);
     return wrap;
   };
 
