@@ -148,15 +148,20 @@
   // 家具上的摆位 ✓（坐标在 viewBox 0 0 960 620 里 ✓）。
   // ★ **槽位 = 触点** ✓（卡片**底**贴着桌面/板面/地板 ✓，卡片往上长 ✓）——
   //   不然卡片往下伸会**陷进家具**里 ✓（账本没"躺"在桌上 ✓、书架物挂在板下 ✓）✓。
-  //   触点 Y = 各表面的**顶**（桌面 396 / 书架板 160·200·240 / 柜顶 372 / 床面 400 / 地板 560）✓。
+  //   触点 Y = 各表面的**顶**（桌面 396 / 书架板 148·200·252 / 柜顶 372 / 床面 408 / 地板 560）✓。
+  //   ⚠️ 书架行距必须 ≥ 卡的竖高（50）✓ —— 名字现在在**卡里**，行距不够的话上一层的名字
+  //      会钻进下一层的卡（2026-10-14 眼睛看出来的 ✓）。
   //   超了就叠在前排地板往右 ✓（横滑可见 ✓）。
+  // ⚠️ **顺序有意义** ✓ —— `component_spots.pos` 按序取槽 ✓。所以**前两个槽必须落在第一屏**
+  //    （第一屏只到 viewBox x≈295 ✓）—— 不然组件只有两三个的时候，人进屋看到的是一间空屋 ✗。
+  //    第二槽是桌面 ✓：库里 `记账` 通常是 pos 1 ✓ → 正好躺在桌上 ✓（"账本躺在桌面" ✓）。
   const SLOTS = [
+    { x: 155, y: 408 },                         // 床面（第一屏正中央 ✓）
     { x: 335, y: 396 },                         // 桌面（账本就躺这儿 ✓）
-    { x: 665, y: 160 }, { x: 765, y: 160 },     // 书架顶层 左/右
+    { x: 665, y: 148 }, { x: 765, y: 148 },     // 书架顶层 左/右
     { x: 665, y: 200 }, { x: 765, y: 200 },     // 书架中层
-    { x: 665, y: 240 }, { x: 765, y: 240 },     // 书架底层
+    { x: 665, y: 252 }, { x: 765, y: 252 },     // 书架底层
     { x: 858, y: 372 },                         // 柜顶
-    { x: 155, y: 400 },                         // 床面
     { x: 140, y: 560 }, { x: 220, y: 560 }, { x: 300, y: 560 },  // 地板前排
     { x: 380, y: 560 }, { x: 540, y: 560 }, { x: 620, y: 560 },
     { x: 700, y: 560 }, { x: 780, y: 560 },
@@ -188,47 +193,75 @@
     '  @keyframes catBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}',
     '</style>',
     '<!-- 墙 + 侧墙（透视收一点 ✓）-->',
-    '<polygon class="rm-side" points="0,30 60,30 60,330 0,560"/>',
-    '<polygon class="rm-side" points="900,30 960,30 960,560 900,330"/>',
+    '<polygon class="rm-side" points="0,30 60,30 60,330 0,620"/>',
+    '<polygon class="rm-side" points="900,30 960,30 960,620 900,330"/>',
     '<rect class="rm-wall" x="60" y="30" width="840" height="300"/>',
-    '<rect x="60" y="324" width="840" height="10" fill="#b59a78"/>',
-    '<!-- 窗 -->',
-    '<rect x="340" y="74" width="280" height="170" rx="6" fill="url(#sky)" stroke="#8a6a3f" stroke-width="6"/>',
-    '<line x1="480" y1="74" x2="480" y2="244" stroke="#8a6a3f" stroke-width="4"/>',
-    '<line x1="340" y1="159" x2="620" y2="159" stroke="#8a6a3f" stroke-width="4"/>',
-    '<circle cx="582" cy="104" r="20" fill="#f6c453"/>',
-    '<!-- 地板（前宽后窄 = 透视 ✓）-->',
-    '<polygon class="rm-floor" points="60,334 900,334 960,560 0,560" fill="url(#flr)"/>',
+    '<rect x="60" y="328" width="840" height="6" fill="#b59a78"/>',
+    '<!-- 门（左墙）—— 第一屏进来就有东西看 ✓ -->',
+    '<rect x="66" y="106" width="98" height="222" rx="2" fill="#c2af8f" stroke="#8a6a3f" stroke-width="4"/>',
+    '<rect x="82" y="122" width="66" height="190" rx="2" fill="#cdbb9c"/>',
+    '<circle cx="141" cy="222" r="4" fill="#6e4f30"/>',
+    '<!-- 挂画（柜上方，给那面墙点东西 ✓）—— 画芯 838..886，里面任何元素别越界 ✓ -->',
+    '<rect x="832" y="150" width="60" height="66" rx="3" fill="#7a5a34"/>',
+    '<rect x="838" y="156" width="48" height="54" fill="#a8c3d6"/>',
+    '<circle cx="856" cy="172" r="7" fill="#f6c453"/>',
+    '<polygon points="838,210 856,182 868,196 878,180 886,192 886,210" fill="#5a8f4e"/>',
+    '<!-- 壁架（门上）—— 给第一屏那面墙一个落脚 ✓ -->',
+    '<rect x="74" y="72" width="112" height="10" rx="3" fill="#b0894e"/>',
+    '<polygon points="78,82 92,82 85,98" fill="#a9854f"/>',
+    '<polygon points="172,82 186,82 179,98" fill="#a9854f"/>',
+    '<rect x="84" y="50" width="14" height="22" rx="4" fill="#b5552f"/>',
+    '<circle cx="91" cy="42" r="10" fill="#5a8f4e"/>',
+    '<rect x="106" y="60" width="32" height="12" rx="2" fill="#5d7d9e"/>',
+    '<rect x="110" y="48" width="24" height="12" rx="2" fill="#c2566b"/>',
+    '<path d="M146 78 L146 62 Q146 52 156 52 Q166 52 166 62 L166 78 Z" fill="#a8c3d6"/>',
+    '<!-- 窗（第一屏的大主体 ✓，窗台压到踢脚线上边）-->',
+    '<rect x="204" y="58" width="200" height="226" rx="6" fill="url(#sky)" stroke="#8a6a3f" stroke-width="6"/>',
+    '<line x1="304" y1="58" x2="304" y2="284" stroke="#8a6a3f" stroke-width="4"/>',
+    '<line x1="204" y1="171" x2="404" y2="171" stroke="#8a6a3f" stroke-width="4"/>',
+    '<circle cx="374" cy="96" r="18" fill="#f6c453"/>',
+    '<rect x="198" y="284" width="212" height="8" rx="3" fill="#b0894e"/>',
+    '<!-- 挂钟（窗和书架之间那面墙 ✓）-->',
+    '<circle cx="500" cy="140" r="34" fill="#f4efe4" stroke="#8a6a3f" stroke-width="5"/>',
+    '<circle cx="500" cy="140" r="3.5" fill="#8a6a3f"/>',
+    '<line x1="500" y1="140" x2="486" y2="124" stroke="#5b4632" stroke-width="4" stroke-linecap="round"/>',
+    '<line x1="500" y1="140" x2="519" y2="127" stroke="#5b4632" stroke-width="4" stroke-linecap="round"/>',
+    '<circle cx="500" cy="110" r="2.5" fill="#8a6a3f"/><circle cx="530" cy="140" r="2.5" fill="#8a6a3f"/>',
+    '<circle cx="500" cy="170" r="2.5" fill="#8a6a3f"/><circle cx="470" cy="140" r="2.5" fill="#8a6a3f"/>',
+    '<!-- 地板（前宽后窄 = 透视 ✓）—— 一直铺到画面底边 ✓ -->',
+    '<polygon class="rm-floor" points="60,334 900,334 960,620 0,620" fill="url(#flr)"/>',
     '<line x1="60" y1="334" x2="900" y2="334" stroke="#6e4f30" stroke-width="1"/>',
     '<!-- 地毯 -->',
     '<ellipse cx="480" cy="466" rx="190" ry="40" fill="#c2566b" opacity="0.9"/>',
     '<ellipse cx="480" cy="466" rx="152" ry="30" fill="none" stroke="#e8c7cb" stroke-width="2" opacity="0.7"/>',
-    '<!-- 床（左）-->',
-    '<rect x="70" y="372" width="46" height="150" rx="6" fill="#5d7d9e"/>',
-    '<rect x="70" y="400" width="172" height="110" rx="6" fill="#6f8fb5"/>',
-    '<rect x="82" y="408" width="42" height="22" rx="6" fill="#f2f2f2"/>',
-    '<rect x="112" y="472" width="128" height="36" rx="6" fill="#5d7d9e"/>',
+    '<!-- 床（左）—— 床头板高出一截 ✓，不然整块蓝看着像个板子 ✓ -->',
+    '<rect x="70" y="356" width="56" height="170" rx="8" fill="#5d7d9e"/>',
+    '<rect x="78" y="364" width="40" height="154" rx="5" fill="#4d6a88"/>',
+    '<rect x="70" y="408" width="176" height="118" rx="8" fill="#7b99c0"/>',
+    '<rect x="84" y="418" width="46" height="26" rx="9" fill="#f4f4f6"/>',
+    '<rect x="80" y="492" width="150" height="30" rx="6" fill="#5d7d9e"/>',
     '<!-- 桌（中左）-->',
     '<rect x="250" y="410" width="170" height="70" rx="4" fill="#b0894e"/>',
     '<rect x="248" y="396" width="174" height="16" rx="4" fill="#caa05f"/>',
     '<rect x="256" y="478" width="10" height="60" fill="#8a6a3f"/>',
     '<rect x="404" y="478" width="10" height="60" fill="#8a6a3f"/>',
-    '<!-- 书架（右靠墙）-->',
-    '<rect x="620" y="160" width="200" height="10" fill="#caa05f"/>',
+    '<!-- 书架（右靠墙）—— 三层行距 52 ✓（卡的竖高是 50，30/40 会让名字压进下一层的卡里 ✗）-->',
+    '<rect x="620" y="148" width="200" height="10" fill="#caa05f"/>',
     '<rect x="620" y="200" width="200" height="10" fill="#caa05f"/>',
-    '<rect x="620" y="240" width="200" height="10" fill="#caa05f"/>',
-    '<rect x="620" y="160" width="10" height="120" fill="#a9854f"/>',
-    '<rect x="810" y="160" width="10" height="120" fill="#a9854f"/>',
+    '<rect x="620" y="252" width="200" height="10" fill="#caa05f"/>',
+    '<rect x="620" y="148" width="10" height="122" fill="#a9854f"/>',
+    '<rect x="810" y="148" width="10" height="122" fill="#a9854f"/>',
     '<!-- 柜（右下）-->',
     '<rect x="800" y="372" width="120" height="186" rx="4" fill="#9a6b3f"/>',
     '<line x1="860" y1="372" x2="860" y2="558" stroke="#7a4f2a" stroke-width="2"/>',
     '<circle cx="852" cy="466" r="3" fill="#e8c9a0"/><circle cx="868" cy="466" r="3" fill="#e8c9a0"/>',
-    '<!-- 绿植（地板中）-->',
-    '<polygon points="448,540 492,540 484,502 456,502" fill="#b5552f"/>',
-    '<ellipse cx="470" cy="502" rx="16" ry="8" fill="#8a3f1f"/>',
-    '<circle cx="470" cy="488" r="18" fill="#5a8f4e"/>',
-    '<circle cx="452" cy="498" r="13" fill="#6fa45a"/>',
-    '<circle cx="490" cy="498" r="13" fill="#6fa45a"/>',
+    '<!-- 绿植（地毯右前方 ✓）—— 别压在桌后头 ✓，那样只剩一片绿顶看着别扭 -->',
+    '<polygon points="662,548 706,548 698,508 670,508" fill="#b5552f"/>',
+    '<ellipse cx="684" cy="508" rx="16" ry="8" fill="#8a3f1f"/>',
+    '<circle cx="684" cy="492" r="19" fill="#5a8f4e"/>',
+    '<circle cx="664" cy="502" r="14" fill="#6fa45a"/>',
+    '<circle cx="704" cy="502" r="14" fill="#6fa45a"/>',
+    '<circle cx="684" cy="472" r="13" fill="#6fa45a"/>',
     '<rect x="0" y="0" width="960" height="620" fill="url(#vign)" pointer-events="none"/>',
   ].join('\n');
 
@@ -239,18 +272,25 @@
     g.dataset.i = String(i);
     _svg('ellipse', { class: 'ws-sh', cx: s.x, cy: s.y + 2, rx: 22, ry: 4 }, g);  // 影在面上 ✓
     const card = _svg('rect', {
-      class: 'ws-card', x: s.x - 24, y: s.y - 40, width: 48, height: 40, rx: 7,  // 底贴 s.y ✓
+      // 竖 50 ✓ —— 名字要在**卡里**（卡在面上往下伸会被下一层盖掉 ✓）
+      class: 'ws-card', x: s.x - 24, y: s.y - 50, width: 48, height: 50, rx: 8,  // 底贴 s.y ✓
     }, g);
     const tint = (c.spot && c.spot.tint) || '';
-    if (tint) card.setAttribute('fill', tint);
+    // ⚠️ 必须走 `style` ✓ —— 那个 `<style>` 里有 `.ws-card{fill:#fff7e6}` ✓，
+    //    CSS 规则压过 `fill=` presentation 属性 ✓，用 setAttribute 设了等于没设 ✗。
+    if (tint) card.style.fill = tint;
     const ic = String(c.icon || '');
     if (ic.startsWith('data:image/')) {
-      _svg('image', { href: ic, x: s.x - 16, y: s.y - 38, width: 32, height: 32 }, g);
+      _svg('image', { href: ic, x: s.x - 12, y: s.y - 43, width: 24, height: 24 }, g);
     } else {
-      const t = _svg('text', { class: 'ws-ico', x: s.x, y: s.y - 20 }, g);       // 卡片竖中 ✓
+      const t = _svg('text', { class: 'ws-ico', x: s.x, y: s.y - 31 }, g);       // 卡的上 2/3 ✓
       t.textContent = ic || '🧩';
     }
-    const lbl = _svg('text', { class: 'ws-lbl', x: s.x, y: s.y + 13 }, g);        // 名字在面上 ✓
+    const lbl = _svg('text', { class: 'ws-lbl', x: s.x, y: s.y - 7 }, g);         // 名字在卡底 ✓
+    // ★ 深底给白字 ✓ —— tint 是设计者设的强调色，暗的话默认那个 `#5b4632` 就糊成一片 ✗。
+    const _m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(tint);
+    if (_m && (0.299 * parseInt(_m[1], 16) + 0.587 * parseInt(_m[2], 16)
+                + 0.114 * parseInt(_m[3], 16)) < 150) lbl.setAttribute('fill', '#fff7e6');
     const name = c.title || c.slug || '组件';
     lbl.textContent = name.length > 6 ? name.slice(0, 6) + '…' : name;
     // ★ 点物 → 进组件 ✓（**和原来点格子完全同一个出口** ✓ → 后端那条路不动 ✓）。
