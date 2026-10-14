@@ -991,6 +991,15 @@
       syncWsSend();
     };
     pv.append(img, rm);
+    // ★ 2026-10-14：视频抽帧来的图 ✓ —— 画个「视频」角标 ✓，让用户知道
+    //   它不是原图、是抽出来的一帧 ✓（网关没视频模型 ✓）。
+    if (wsPending.fromVideo) {
+      const b = document.createElement('div');
+      b.textContent = '视频';
+      b.style.cssText = 'position:absolute;left:2px;bottom:2px;background:rgba(0,0,0,.62);'
+        + 'color:#fff;font-size:10px;line-height:1;padding:2px 5px;border-radius:6px';
+      pv.appendChild(b);
+    }
     box.appendChild(pv);
   };
 
@@ -1113,12 +1122,14 @@
     //    往外层写 textContent 会**把转圈一起抹掉** ✓（文字有了、圈没了 ✓，看着像卡住 ✓）。
     $('#wsStatusText').textContent = text;
     el.hidden = !text;
-    // ★ **「停掉」只在"有活在手上"的时候露** ✗→✓（2026-10-11）——
-    //   见 `#wsStop` 那段：`thinking` / `working` 才停得掉 ✓；
-    //   `done` / `idle` 没东西可停 ✓ → 藏起来 ✓。
-    //   ⚠️ 一个"点了没反应"的按钮**比没有按钮更让人犯嘀咕** ✓（这个项目的老结论 ✓）。
-    const stop = $('#wsStop');
-    if (stop) stop.hidden = !(state === 'thinking' || state === 'working');
+    // ★ 2026-10-14：思考过程**就是右边那个可中断按钮** ✓（用户定的 ✓）——
+    //   thinking / working 时：藏发送、露停止 ✓；idle / done 时：露发送、藏停止 ✓。
+    //   （原来顶栏那个「停掉」小胶囊撤了 ✓ —— 出口挪到右边主按钮位 ✓。）
+    const stop = $('#wsStopBtn');
+    const send = $('#wsSend');
+    const running = (state === 'thinking' || state === 'working');
+    if (stop) stop.hidden = !running;
+    if (send) send.style.display = running ? 'none' : 'flex';
   };
 
   const sendWs = async () => {
@@ -1172,11 +1183,12 @@
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = Math.min(120, ta.scrollHeight) + 'px';
-    // ★ **右边那个按钮：有字显示发送、没字显示加图** ✓（用户定的 ✓）——
-    //   待发区有图时也要能发 ✓（图发出去不用配字是允许的 ✓）。
-    const typed = !!(ta.value || '').trim();
-    $('#wsSend').style.display = typed ? 'flex' : 'none';
-    $('#wsPick').style.display = typed ? 'none' : 'flex';
+    // ★ 2026-10-14：右边**固定是发送** ✓（不再和加图来回切 ✓）。
+    //   思考/制作中时 setWsStatus 会把发送换成停止 ✓ —— 那期间别把它顶回去 ✓。
+    const stop = $('#wsStopBtn');
+    if (stop && !stop.hidden) return;
+    const send = $('#wsSend');
+    if (send) send.style.display = 'flex';
   };
 
   // ── 长按 → **交给系统**；引用 → **右滑** ✗→✓（2026-10-11）──────────────
@@ -1787,10 +1799,10 @@
   //      前端清一下状态是**没有用**的 ✓（下一片 delta 照样会推过来 ✓）。
   //   ⚠️ **服务端写的那句"（这一轮被你停掉了）"要当场画上** ✗ —— 它不走 WebSocket ✓
   //      （是这次请求的返回值 ✓，见 `task_stop` ✓），等下一轮同步才画＝**看不到** ✓。
-  $('#wsStop').onclick = async () => {
+  $('#wsStopBtn').onclick = async () => {
     const tid = wsCur.task;
     if (!tid) return;
-    const btn = $('#wsStop');
+    const btn = $('#wsStopBtn');
     btn.disabled = true;                       // 连按两下 = 两次取消 ✓，挡一下 ✓
     try {
       const d = await api(`/workshop/${group.id}/tasks/${tid}/stop`, { method: 'POST' });
@@ -1804,11 +1816,9 @@
     }
   };
   $('#wsSend').onclick = sendWs;
-  // ★ 加图那个按钮 ✓ —— 选完先停在待发区 ✓（用户定的 ✓）。
-  // ★ 2026-10-08：从"一个图片按钮"改成**和主群聊同款的 ＋** ✓
-  //   （用户：「组件聊天界面里，底部聊天框右边的照片还是要改成[主群聊]同款+，
-  //     并且支持相机和相册」✓）。
-  $('#wsPick').onclick = () => openPickSheet('ws');
+  // ★ 左边那个 ＋ ✓（2026-10-14）—— 点开和生活管家群聊同款的附件面板 ✓
+  //   （相册/拍摄/视频/文件/音频 ✓），选完先停在待发区 ✓。视频那项只在工坊露 ✓。
+  $('#wsPlus').onclick = () => openPickSheet('ws');
   // 原来那个隐藏的 `#fileWs`（只管图片 ✓）不走了 ✓ —— 留着是为了不破坏老引用 ✓
   // （它是 `input` ✓，没人点它也没关系 ✓）。
   $('#fileWs').addEventListener('change', (e) => {

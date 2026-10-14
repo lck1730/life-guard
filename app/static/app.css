@@ -1004,19 +1004,9 @@
      而它们其实一件是"等它说话"、一件是"它在干活" ✓。 */
   #wsChat .wsstat.busy { color:var(--accent); }
   #wsChat .wsstat.busy i { border:0; background:var(--accent); animation:pulse 1.4s infinite; }
-  /* ★ **「停掉」** ✗→✓（2026-10-11）—— 见 06-workshop.js 里 `#wsStop` 那段：
-     "切换即终止"改成"占用即拒绝进入"之后 ✓，出口必须**显式** ✓
-     （手滑切走不再等于取消 ✓，想停就明着按 ✓）。
-     ⚠️ 只在**它正在跑**的时候露 ✓（`整体 idle` 时整行都 hidden ✓；
-        `做好了` 那一档里它也得藏 ✓ —— 那时候没有可停的东西 ✓）。
-     ⚠️ 做成**小胶囊**、不要做成主按钮 ✗ —— 它贴着状态字 ✓，
-        是那一行的一部分 ✓，抢眼就成了"这一屏的主行动" ✓（它不是 ✓）。 */
-  #wsChat .wsstat #wsStop { margin-left:2px; padding:1px 8px; border-radius:999px;
-                            border:1px solid var(--line); background:transparent;
-                            color:var(--muted); font:inherit; font-size:11px;
-                            line-height:1.5; }
-  #wsChat .wsstat #wsStop:active { color:#e06a6a; border-color:#e06a6a; }
-  #wsChat .wsstat #wsStop[disabled] { opacity:.45; }
+  /* ★ **停止按钮**（2026-10-14）—— 原来"停掉"是顶栏一个小胶囊 ✗，
+     用户改成"思考过程就是右边那个可中断的按钮"✓：思考/制作中时，
+     右边的发送**变成停止** ✓（顶栏那个不要了 ✓）。只有在跑的时候露 ✓。 */
   #wsChat .mkfoot { flex:0 0 auto; display:flex; align-items:flex-end; gap:8px;
                     padding:10px 12px calc(10px + var(--inset-bottom));
                     border-top:1px solid var(--line); background:var(--panel); }
@@ -1024,13 +1014,19 @@
                      border:1px solid var(--line); border-radius:16px; color:var(--text);
                      font:inherit; font-size:16px; resize:none; max-height:120px; line-height:1.4; }
   #wsChat textarea:focus { outline:none; border-color:var(--accent); }
-  #wsChat .mksend { width:44px; height:44px; flex:0 0 auto; display:none;
-                    align-items:center; justify-content:center; color:var(--accent); }
-  /* ★ **右边那个按钮：有字就是发送、没字就是加图** ✗→✓（用户定的 ✓）——
-     两个都在 DOM 里 ✓，`syncWsSend` 按"输入框里有没有字"决定显示哪个 ✓
-     （和生活管家的 ＋ / 发送同一套做法 ✓）。 */
-  #wsChat .mkpick { width:44px; height:44px; flex:0 0 auto; display:flex;
+  /* ★ 左边固定的 ＋ ✓（添加附件 ✓，和生活管家同款面板 ✓）。 */
+  #wsChat .mkplus { width:44px; height:44px; flex:0 0 auto; display:flex;
                     align-items:center; justify-content:center; color:var(--muted); }
+  /* ★ 右边固定的发送 ✓（不再和加图来回切 ✓）。思考/制作中时 JS 把它藏掉、
+     露出下面的 .mkstop ✓。 */
+  #wsChat .mksend { width:44px; height:44px; flex:0 0 auto; display:flex;
+                    align-items:center; justify-content:center; color:var(--accent); }
+  /* ★ 思考/制作中的**停止**按钮 ✓ —— 取代发送 ✓，可中断 ✓。
+     稍红一点提示"这是中断、不是发送"✓。 */
+  #wsChat .mkstop { width:44px; height:44px; flex:0 0 auto; display:flex;
+                    align-items:center; justify-content:center; color:#e06a6a; }
+  #wsChat .mkstop[hidden] { display:none; }
+  #wsChat .mkstop[disabled] { opacity:.45; }
   /* 待发的那张图 —— 缩略图 + 一个 ✕ ✓（和生活管家的待发区一个意思 ✓） */
   #wsChat .mkpend { flex:0 0 auto; display:flex; gap:8px; padding:8px 12px 0; }
   #wsChat .mkpend[hidden] { display:none; }
