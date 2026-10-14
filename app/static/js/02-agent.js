@@ -208,12 +208,10 @@
     card2.appendChild(save);
     m.appendChild(card2);
 
-    // 卡片**外面**的取消 ✓ —— 夹在卡片里会跑到「保存」上面去 ✗（壳那边栽过 ✓）
-    const back = mkel('div', 'swap');
-    back.appendChild(mkel('b', null, '取消'));
-    back.onclick = () => closeAgentEdit();
-    m.appendChild(back);
-
+    // ★ 2026-10-14：原来保存下面还放了一颗「取消」✗ ——
+    //   返回手势（右滑 / 原生返回）能干同样的事，那颗是多余的 ✓，整块 `swap` 拿掉。
+    //   用户原话：「上面一个大保存按钮，下面一个小取消或者放回按钮……统一将取消或返回按钮去掉」✓。
+    //   （`closeAgentEdit` 仍由 `__goBack` 在 agentEdit 屏那一支调用 ✓，不用按钮。）
     save.onclick = async () => {
       save.disabled = true;
       err.textContent = '';

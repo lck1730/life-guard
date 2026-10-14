@@ -1207,8 +1207,10 @@
                                 display:inline-block; transform:rotate(90deg); }
   .ascreen .pbox .go { color:var(--muted); font-size:20px; line-height:1; flex-shrink:0; }
   .ascreen .err { color:var(--danger); font-size:13px; min-height:18px; margin-top:10px; }
-  .ascreen .swap { margin-top:14px; text-align:center; color:var(--muted); font-size:13px; }
-  .ascreen .swap b { color:var(--accent); font-weight:600; }
+  /* ★ 2026-10-14：这里原有一对 `.ascreen .swap`（保存下面那颗「取消/返回」小字的样式）✗
+     —— 四屏的 `swap` 块全删了 ✓（改管家资料 · 我的 · 备注 · diy 小助手，见
+     02-agent.js / 05-settings.js / 06-workshop.js ✓），样式跟着拿掉 ✓。
+     ⚠️ `#login .swap` 是**登录 ⇄ 注册**那个切换 ✓ —— 不同选择器，**别碰** ✓。 */
   .ascreen .btn-save { display:block; width:100%; padding:14px; background:var(--accent);
                        color:var(--on-accent); font-weight:600; font-size:16px;
                        border-radius:12px; }
@@ -1446,7 +1448,7 @@
 
   /* ⚠️ diy 小助手的设置屏**没有自己的样式** ✓ —— 它整屏照抄
      改管家资料那一屏（`.card.avcard` / `.bigav` / `.tip` / `.field` /
-     `.btn-save` / `.swap` ✓，都在 `.ascreen` 底下 ✓）。
+     `.btn-save` ✓，都在 `.ascreen` 底下 ✓；`.swap` 2026-10-14 已删 ✓）。
      ⚠️ **别在这儿另发明一套** ✗ —— 两屏一旦各有一套，改一边的间距
         另一边不跟 ✓，而那是用户**看得见**的不一致 ✓。（原来那几条
         `.diyhead` / `.diyav2` / `.diychange` 就是这么删掉的 ✓。） */

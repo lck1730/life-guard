@@ -717,17 +717,17 @@
     }
 
     const btn = mkel('button', 'btn-save', '保存');
-    const swap = mkel('div', 'swap');
-    const back = mkel('b', null, '取消');
-    back.onclick = closeMeEdit;
-    swap.appendChild(back);
+    // ★ 2026-10-14：原来保存下面还放了一颗「取消」✗（`swap` + `b`）——
+    //   返回手势能干同样的事，那颗是多余的 ✓，整块 `swap` 拿掉 ✓。
+    //   用户原话：「上面一个大保存按钮，下面一个小取消或者放回按钮……统一将取消或返回按钮去掉」✓。
+    //   `closeMeEdit` 仍由 `__goBack` 在 meEdit 屏那一支调用 ✓（02-agent.js ✓），不用按钮。
     // ★ 头像那一页**按钮单独一张卡** ✓（壳那版就是两张：一张装头像、一张装按钮 ✓）；
     //   别的几页一页一张卡 ✓。
     // ⚠️ `err` 挂在**按钮那张卡**里 ✓（壳那版特意挪过来的）——
     //    挂在上面那张卡里的话，空着时要占 `min-height` + `margin-top` ≈ 30px 死空间 ✓，
     //    用户会以为"下面的间距太大" ✓（他当时就是这么说那个间距的 ✓）。
     const btnCard = (kind === 'avatar') ? mkel('div', 'card') : card;
-    btnCard.append(btn, err, swap);
+    btnCard.append(btn, err);
     body.appendChild(card);
     if (btnCard !== card) body.appendChild(btnCard);
 
@@ -815,12 +815,9 @@
     };
     card.append(err, save);
     body.appendChild(card);
-
-    const swap = mkel('div', 'swap');
-    const b = mkel('b', null, '返回');
-    b.onclick = closePeer;
-    swap.appendChild(b);
-    body.appendChild(swap);
+    // ★ 2026-10-14：原来保存下面还放了一颗「返回」✗（`swap` + `b`）——
+    //   返回手势能干同样的事，那颗是多余的 ✓，整块 `swap` 拿掉 ✓。
+    //   `closePeer` 仍由 `__goBack` 在 peer 屏那一支调用 ✓（02-agent.js ✓），不用按钮。
   };
 
   /** 把当前这一屏消息**按现在的备注重画一遍** ✓（备注一改就得用 ✓）。 */
