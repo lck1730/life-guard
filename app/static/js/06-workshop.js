@@ -512,7 +512,7 @@
     // ★ 平面预览按钮（2026-10-15 方向调整）✓ —— 跟「坐标」同排 ✓。
     //   点一下看精致平面屋（+ 二狗），再点回默认视图（组件那条路在默认视图里 ✓）。
     const btnFlat = document.createElement('div');
-    btnFlat.style.cssText = dbgStyle + 'right:64px;';
+    btnFlat.style.cssText = dbgStyle + 'top:8px;right:64px;';
     btnFlat.textContent = '平面';
     btnFlat.addEventListener('click', function (ev) {
       ev.stopPropagation();
