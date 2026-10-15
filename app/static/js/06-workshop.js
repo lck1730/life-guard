@@ -96,7 +96,44 @@
     // ⚠️ 那件外套要**摘掉** ✓（见 `applyWallCss` 那段：它只在看这一屏时该生效 ✓）
     const st = $('#wall-diy');
     if (st) st.remove();
+    // ★ 3D 视图（2026-10-15）：离开工坊必须卸掉 ✓ —— 否则 rAF 一直跑、
+    //    canvas 残在 DOM 里、GPU 不停 ✗。
+    if (ws3DOn) { try { window.Room3D && window.Room3D.unmount(); } catch (e) {} ws3DOn = false; }
     popScreen('workshop');
+  };
+
+  // ── 3D 卧室视图（2026-10-15 大升级，M1）──────────────────────────
+  // 按需加载 `/static/room3d.js`（925KB three.js ✗ → 不进 app.js ✓，只在用时拉），
+  // 挂进 #wsBody。**SVG 屋仍是默认视图** ✓（组件点进 `openComp` 那条路不动 ✓）；
+  // 3D 目前是「看效果」的预览态，等 M2 把组件物也搬进 3D 才正式替换。
+  let ws3DOn = false;
+  const loadRoom3D = () => window.Room3D
+    ? Promise.resolve(window.Room3D)
+    : new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = '/static/room3d.js?v=' + (window.__room3dV || Date.now());
+        s.onload = () => window.Room3D ? res(window.Room3D) : rej(new Error('脚本没定义 Room3D'));
+        s.onerror = () => rej(new Error('3D 脚本没加载上'));
+        document.head.appendChild(s);
+      });
+  const toggleRoom3D = async (box) => {
+    if (!ws3DOn) {
+      ws3DOn = true;
+      document.getElementById('ws-debug-g')?.remove();
+      try {
+        const R = await loadRoom3D();
+        R.unmount();
+        box.innerHTML = '';
+        R.mount(box, { preserveDrawingBuffer: true });
+      } catch (e) {
+        ws3DOn = false;
+        box.textContent = '3D 起不来：' + e.message;
+      }
+    } else {
+      ws3DOn = false;
+      try { window.Room3D && window.Room3D.unmount(); } catch (e) {}
+      paintCanvas();   // 回到 SVG 屋
+    }
   };
 
   //: 「容纳界面」里当前的顺序 ✓ —— 调整模式就是**在这个数组上拖** ✓，
@@ -438,6 +475,16 @@
     });
     wrap.appendChild(hud);
     wrap.appendChild(btn);
+    // ★ 3D 视图按钮（2026-10-15，dev 预览态 ✓）—— 跟「坐标」同一排的胶囊 ✓。
+    //   点一下进 3D 卧室、再点回 SVG 屋。组件那条路（点物 → openComp）目前只在 SVG 屋有 ✓。
+    const btn3D = document.createElement('div');
+    btn3D.style.cssText = dbgStyle + 'right:64px;';
+    btn3D.textContent = '3D';
+    btn3D.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      toggleRoom3D($('#wsBody'));
+    });
+    wrap.appendChild(btn3D);
     return wrap;
   };
 
