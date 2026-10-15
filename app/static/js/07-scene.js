@@ -192,13 +192,17 @@
   // ⚠️ `_SHD` 要按**几何**算 ✓：光每下降 1 单位就在地板上走 0.82/0.55 ≈ 1.49 单位 ✓，
   //    所以 `t` 里的 1.15 是把「1 米高的东西影子走 1.7 米」收回来一点（不然拖出画面外 ✗）。
   const _SHD = [0.17, -0.95];
-  const RB_SHADOW = (cx, cz, hw, hd, h, op) => {
+  // ⚠️ `sy` = 东西**踩的那张面**的高度 ✓（默认 0 = 地板 ✓，屋里所有家具照旧 ✓）。
+  //   原来写死 y=0 ✗ —— 摆在被子上（0.617）或桌面上（0.778）的东西，
+  //   影子会落到**地板上** ✗，在屏上离本体差一百多像素 ✗。
+  const RB_SHADOW = (cx, cz, hw, hd, h, op, sy) => {
     const t = h * 1.15;
-    const B = [[cx - hw, 0, cz - hd], [cx + hw, 0, cz - hd],
-               [cx + hw, 0, cz + hd], [cx - hw, 0, cz + hd]];
+    const y = sy || 0;
+    const B = [[cx - hw, y, cz - hd], [cx + hw, y, cz - hd],
+               [cx + hw, y, cz + hd], [cx - hw, y, cz + hd]];
     const cast = [];
     for (let i = 0; i < 4; i++)
-      cast.push([B[i][0] + _SHD[0] * t, 0, B[i][2] + _SHD[1] * t]);
+      cast.push([B[i][0] + _SHD[0] * t, y, B[i][2] + _SHD[1] * t]);
     const hull = RB_HULL(B.concat(cast), 0, 2);
     const scr = RB_CLIP(hull.map(RB_PT));
     if (!scr.length) return '';
@@ -261,19 +265,29 @@
     const c = Math.cos(th), s = Math.sin(th);
     const x0 = cx - w / 2, x1 = cx + w / 2;
     const z0 = cz - d / 2, z1 = cz + d / 2, y1 = y0 + h;
-    const T = (px, pz) => {
+    const T = (px, py, pz) => {
       const a = px - cx, b = pz - cz;
-      return [cx + a * c - b * s, cz + a * s + b * c];
+      return [cx + a * c - b * s, py, cz + a * s + b * c];
     };
     const B = [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]]
-      .map(p => T(p[0], p[2]));
+      .map(p => T(p[0], p[1], p[2]));
     const Tp = [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]]
-      .map(p => T(p[0], p[2]));
+      .map(p => T(p[0], p[1], p[2]));
     const C = B.concat(Tp);
-    const F = [[[4, 5, 6, 7], [0, 1, 0]], [[5, 1, 2, 6], s > 0 ? [c, 0, s] : [-c, 0, -s]],
-               [[4, 0, 3, 7], s > 0 ? [-c, 0, -s] : [c, 0, s]],
-               [[2, 3, 7, 6], s > 0 ? [-s, 0, c] : [s, 0, -c]],
-               [[1, 0, 4, 5], s > 0 ? [s, 0, -c] : [-s, 0, c]]];
+    // ★ **2026-10-15 修** ✓ —— 这里原来有两个 bug，合起来的效果是**这个函数永远返回空串** ✗
+    //   于是屋里**每一件歪着放的盒子（枕头）和工坊里每一件组件物（账本、小盒子）全都画不出来** ✗
+    //   （只留下影子）✗ —— 他问「记账入口在哪」，那件事就是根本不存在 ✗。
+    //
+    //   ① 原来 `T` 只回 2 个分量 `[x, z]` ✗，但下面 `C` 把它当 3 元组用 ✗
+    //      → `q[1]` 拿到的是 z、`q[2]` 是 `undefined` → `mz` 变成 NaN ✗
+    //      → 法线点积是 NaN ✗，而 `0 * NaN === NaN`、`NaN < 0 === false`
+    //      → **五个面全部被剔除** ✗，一个面都留不住 ✗。现在带 y 穿过 ✓。
+    //   ② 法线原来按 `s > 0` 分叉 ✗ —— 负角度（和 th=0）时三个立面的法线整条取反 ✗
+    //      → 近端立面被剔、远端立面被画 ✗。正确的做法就是**无条件按 θ 旋** ✓，
+    //      和 `RB_BOX` 那四个固定法线一个规矩 ✓。
+    const F = [[[4, 5, 6, 7], [0, 1, 0]], [[5, 1, 2, 6], [c, 0, s]],
+               [[4, 0, 3, 7], [-c, 0, -s]], [[2, 3, 7, 6], [-s, 0, c]],
+               [[1, 0, 4, 5], [s, 0, -c]]];
     const st = o.stroke ? ' stroke="' + o.stroke + '" stroke-width="' +
       (o.sw || 1) + '" stroke-linejoin="round"' : '';
     const vis = [];

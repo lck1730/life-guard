@@ -176,18 +176,28 @@
   const drawLedger = (cx, cz, y, rot) => {
     let s = '';
     // 底下压一条软的 ✓（不是椭圆的画 ✗ —— 是**凸包投影** ✓，见 `RB_SHADOW` ✓）
-    s += RB_SHADOW(cx, cz, 0.135, 0.10, 0.05, 0.20);
-    // 左半：书皮（深 ✓）
-    s += RB_ROT(cx - 0.062, cz, y, 0.13, 0.21, 0.028, rot, '#7e4f26',
+    s += RB_SHADOW(cx, cz, 0.178, 0.142, 0.084, 0.24, y);
+    // ⚠️ 原来两半各 0.028 厚 ✗ → 投到屏上整本只有 **8px** 高 ✗
+    //    → 认不出是书，也点不进去 ✗（2026-10-15 他问「记账入口在哪」就是这个 ✓）。
+    //   这版**加厚**：书皮 0.046 + 书页 0.038 ✓（合计 0.084 ✓），
+    //   是一本摊开的厚账本，不是被子上的一道印 ✗。
+    //   单位是**世界米** ✓ —— 床面那个深度（z≈1.43 ✗）下 1 单位 ≈ 233 屏单位 ✗。
+    // 书皮（深 ✓，左右各半 ✓，在中缝 `cx` 处相接 ✓）
+    s += RB_ROT(cx - 0.0825, cz, y, 0.165, 0.270, 0.046, rot, '#7e4f26',
       { stroke: '#63401f', sw: 0.9 });
-    // 右半：书页（白 ✓，书的标志 ✓）
-    s += RB_ROT(cx + 0.062, cz, y, 0.13, 0.21, 0.030, rot, '#f5ecd7',
-      { stroke: '#d6c6a5', sw: 0.9 });
+    s += RB_ROT(cx + 0.0825, cz, y, 0.165, 0.270, 0.046, rot, '#8a5a2c',
+      { stroke: '#63401f', sw: 0.9 });
+    // 右半摊开的是**书页**（白 ✓ —— 书的标志 ✓）
+    s += RB_ROT(cx + 0.0825, cz, y + 0.046, 0.152, 0.256, 0.038, rot, '#f7efdc',
+      { stroke: '#d6c6a5', sw: 0.7 });
+    // 左半露出一线页边（说明左边也夹着页 ✓）
+    s += RB_ROT(cx - 0.0825, cz, y + 0.046, 0.152, 0.256, 0.008, rot, '#e8dcc2',
+      { stroke: '#d6c6a5', sw: 0.5 });
     // 页角那道缝（把两半分开 ✓）
-    s += RB_ROT(cx, cz, y + 0.030, 0.008, 0.20, 0.004, rot, '#d9c8a4',
-      { stroke: '#cdbb95', sw: 0.6 });
+    s += RB_ROT(cx, cz, y + 0.084, 0.008, 0.256, 0.004, rot, '#d9c8a4',
+      { stroke: '#cdbb95', sw: 0.5 });
     // 书签（从右半的页角端垂下来 ✓）
-    s += RB_ROT(cx + 0.115, cz + 0.062, y + 0.002, 0.012, 0.020, 0.018, rot, '#c2485c',
+    s += RB_ROT(cx + 0.140, cz + 0.080, y + 0.004, 0.014, 0.024, 0.030, rot, '#c2485c',
       { stroke: '#9c3547', sw: 0.6 });
     return s;
   };
@@ -200,7 +210,7 @@
   /** 通用小物件 ✓ —— 一个立着的盒子（`RB_BOX` ✓，受光 + 投影全在引擎里 ✓）。 */
   const drawCrate = (cx, cz, y, tint, i, rot) => {
     const bd = tint || CRATE_COLORS[i % CRATE_COLORS.length];
-    return RB_SHADOW(cx, cz, 0.10, 0.10, 0.24, 0.20) +
+    return RB_SHADOW(cx, cz, 0.10, 0.10, 0.24, 0.20, y) +
       RB_ROT(cx, cz, y, 0.21, 0.21, 0.24, rot, bd,
         { stroke: '#a08a68', sw: 1 });
   };
@@ -209,7 +219,7 @@
    *  白框是真盒子 ✓；图贴在前立面上 ✓（`RB_FACE` 给的是世界里的矩形 ✓，
    *   所以图上跟着透视一起歪 ✓，不是浮在上面的一张贴纸 ✗）。 */
   const drawPolaroid = (cx, cz, y, href) => {
-    let s = RB_SHADOW(cx, cz, 0.09, 0.09, 0.26, 0.20);
+    let s = RB_SHADOW(cx, cz, 0.09, 0.09, 0.26, 0.20, y);
     // 相纸（白框 ✓，有厚度 = 它立着 ✓）
     s += RB_BOX(cx, cz, y, 0.185, 0.024, 0.235, '#f7f1e4', { stroke: '#b9a888', sw: 1.1 });
     // 照片本体（贴在前立面 ✓）
@@ -232,13 +242,62 @@
     if (ic.indexOf('data:image/') === 0) body = drawPolaroid(s.x, s.z, s.y, ic);
     else if (c.slug === 'bookkeeping-panel') body = drawLedger(s.x, s.z, s.y, rot);
     else body = drawCrate(s.x, s.z, s.y, tint, i, rot);
-    return '<g class="ws-obj" data-i="' + i + '">' + body + '</g>';
+    // ★ 点的入口**单独立一块** ✓ —— 物本身在屏上可能小得离谱 ✗
+    //  （摊开的账本本体也就 19px 高 ✗），手指一偏就点空 ✗。
+    //   这块**看不见**，但比任何一件物的投影都宽 ✓ → 松松地戳一下也落得进去 ✓。
+    //   ⚠️ 用 `RB_Q` 走**世界的四角**投影 ✓ —— 是屏幕上随便糊一个正方形的反面 ✗
+    //      （那在远端会明显不对）✗。
+    //   ⚠️ **这块必须是「立着的」** ✓ —— 相机自己就在 y≈0.66 ✗，
+    //      一张平铺在 y=0.617（床面）上的板，和相机只差 0.04 ✗
+    //      → 透视把它压成一条**线** ✗（实测 116×3 px ✗，等于没有入口 ✗）。
+    //      换成贴着相机视线的一竖条（`s.z` 恒定 ✗），投影出来就是块真矩形 ✓。
+    //   ⚠️ 下面那半截**故意往下探** ✓（`s.y - 0.10` ✗，扎进被子一点）——
+    //      物的**名牌**就挂在它脚底下（`labelNode` ✓），
+    //      「照着牌子点」是人的第一反应 ✗，那块也得算进入口里 ✗。
+    //   ⚠️ SVG 的命中判断是**二维的** ✓ —— z 那一维只负责把它投到对的位置，
+    //      不参与"点在不在里面"✗，所以单面就够了 ✗。
+    //   ⚠️ 画在 `body` **前面** ✓ —— 它透明，物盖在上面，看着只有物 ✓。
+    const p = 0.205;
+    // `yb` 不越过地板 ✓ —— 地上的物（`s.y === 0` ✗）别再往下扎 ✗。
+    const yb = Math.max(0.002, s.y - 0.10), yT = s.y + 0.26;
+    const hit = '<polygon points="' + RB_Q([
+      [s.x - p, yb, s.z],
+      [s.x + p, yb, s.z],
+      [s.x + p, yT, s.z],
+      [s.x - p, yT, s.z],
+    ]) + '" fill="#000" fill-opacity="0" pointer-events="all"/>';
+    return '<g class="ws-obj" data-i="' + i + '">' + hit + body + '</g>';
   };
 
   /** 屋里那只猫 二狗 ✓ —— 点它 → 回主群聊 ✓（叙事出口 ✓）。
    *  猫**是屏幕空间手绘的**（`RB_CAT` ✓，曲线+耳朵方块凑不出来 ✗），
    *  但它的**位置**是世界坐标 `RB_CAT_AT` ✓ —— 锚在屋里那个角落 ✓。 */
   const catNode = () => '<g class="ws-exit">' + RB_CAT() + '</g>';
+
+  /** 物的**名牌** ✓ —— 屋里不放第二层 UI（`paintCanvas` 那段 ✓），
+   *  所以名字是一块**长在物脚下**的小牌子，不是浮在画上面的提示 ✗。
+   *
+   *  ⚠️ 走**屏幕坐标**、画在所有物**之后** ✓ —— 它是前景控件（和二狗一档）✗：
+   *  跟着世界的画家排序走的话，近处的家具会把远处的名牌整块吃掉 ✗，
+   *  那就成了"看得见物、看不见名" ✗。2026-10-15 就是栽在这上面 ✓ ——
+   *  屋里唯一的物（记账本）没有任何一个字，他问「记账入口在哪」找不到 ✗。
+   *
+   *  ⚠️ 顺序是**物 → 名牌 → 二狗** ✓ —— 二狗是出口，永远压在最上 ✗。
+   *  ⚠️ `pointer-events:none` ✓ —— 牌子是说明、不是新的点击目标 ✗
+   *   （物的多边形自己就是入口 ✓，别在这里多一层语义 ✗）。 */
+  const labelNode = (title, s) => {
+    const t = String(title || '').slice(0, 8);
+    if (!t) return '';
+    const q = RB_PT([s.x, s.y, s.z]);
+    const w = t.length * 12.6 + 17;
+    return '<g class="ws-label" pointer-events="none">'
+      + '<rect x="' + (q[0] - w / 2).toFixed(1) + '" y="' + (q[1] + 5).toFixed(1)
+      + '" width="' + w.toFixed(1) + '" height="18" rx="9"'
+      + ' fill="#161c28" fill-opacity="0.72" stroke="#ffffff" stroke-opacity="0.16"/>'
+      + '<text x="' + q[0].toFixed(1) + '" y="' + (q[1] + 17.8).toFixed(1)
+      + '" text-anchor="middle" font-size="12.5" fill="#f0ece3">' + t + '</text>'
+      + '</g>';
+  };
 
 
   // ── 坐标调试（2026-10-14）──────────────────────────────────────────
@@ -322,6 +381,14 @@
       return [RB_Z([s.x, s.y, s.z]), objNode(c, i, s)];
     }).sort((a, b) => b[0] - a[0]);
     svg.innerHTML += placed.map(p => p[1]).join('');
+
+    // ★ 名牌（物名）✓ —— 单独一层，不和物一起排队 ✓（理由见 `labelNode` ✓）。
+    //   还是远先画 ✓：两块牌子挨上的时候，近的那块压上去（和物一致 ✓）。
+    const labels = wsCanvas.map((c, i) => {
+      const s = RB_SLOTS[i] || RB_SLOTS[RB_SLOTS.length - 1];
+      return [RB_Z([s.x, s.y, s.z]), labelNode(c.title, s)];
+    }).sort((a, b) => b[0] - a[0]);
+    svg.innerHTML += labels.map(p => p[1]).join('');
 
     // 二狗是**前景控件** ✓ —— 不参与排序，永远压在最上 ✓（不然会被书架挡掉 ✗）。
     svg.innerHTML += catNode();
