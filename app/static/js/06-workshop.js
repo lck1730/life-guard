@@ -110,12 +110,15 @@
   const buildFlatScene = function () {
     const wrap = document.createElement('div');
     wrap.className = 'ws-scene';
-    // ★ 竖幅 760×1340（贴手机竖屏 ✓），preserveAspectRatio meet → 一屏完整不横滑 ✓。
+    // ★ 竖幅 760×1340（贴手机竖屏 ✓）。preserveAspectRatio **slice** ✓ ——
+    //   工坊 .abody 给刘海/底栏留了 padding → 场景区比 760:1340 更窄更高 ✓，
+    //   meet 会按宽度撑满 → 高度剩一段出米色空白条 ✗；slice 竖向填满、左右
+    //   对称裁 ~2%（只裁墙边 ✓，账本热区在正中不受影响 ✓），不产生滚动 ✓。
     const svg = _svg('svg', { viewBox: '0 0 760 1340',
-      preserveAspectRatio: 'xMidYMid meet', class: 'ws-flat' });
+      preserveAspectRatio: 'xMidYMid slice', class: 'ws-flat' });
     svg.innerHTML =
       '<image href="/static/flat-room.svg" x="0" y="0" width="760" height="1340" ' +
-        'preserveAspectRatio="xMidYMid meet"/>' +
+        'preserveAspectRatio="xMidYMid slice"/>' +
       // 账本热区（桌上账本位置 ✓）—— 透明、可点 → 进记账。
       //   ⚠️ <image> 引的 svg 没法点子元素 ✓，所以盖一块透明 rect 当入口 ✓。
       '<rect class="ws-obj" data-slug="bookkeeping-panel" x="195" y="835" ' +
