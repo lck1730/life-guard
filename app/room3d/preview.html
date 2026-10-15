@@ -1,0 +1,14 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>html,body{margin:0;background:#bfe3f0}#stage{width:100vw;height:100vh}</style>
+</head><body>
+<div id="stage"></div>
+<script src="/static/js/08-room3d.js"></script>
+<script>
+// preview：开屏即挂场景，用来给 headless 截图自检。
+window.addEventListener('load', () => {
+  Room3D.mount(document.getElementById('stage'), { preserveDrawingBuffer: true });
+});
+</script>
+</body></html>
