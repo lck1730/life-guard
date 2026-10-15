@@ -99,7 +99,41 @@
     // ★ 3D 视图（2026-10-15）：离开工坊必须卸掉 ✓ —— 否则 rAF 一直跑、
     //    canvas 残在 DOM 里、GPU 不停 ✗。
     if (ws3DOn) { try { window.Room3D && window.Room3D.unmount(); } catch (e) {} ws3DOn = false; }
+    if (wsFlatOn) { wsFlatOn = false; }   // 平面预览也复位 ✓
     popScreen('workshop');
+  };
+
+  // ── 平面精致屋（2026-10-15 方向调整）──────────────────────────────
+  // <image> 引静态 svg（房 + 猫），不进 app.js 拼接 ✓。组件物件管线
+  // （drawCrate/ledger/polaroid 还是透视的 ✗）暂不接 —— 先把**观感**定下来，
+  // 平面管线下一步再写。猫是出口（.ws-exit → closeWorkshop ✓）。
+  const buildFlatScene = function () {
+    const wrap = document.createElement('div');
+    wrap.className = 'ws-scene';
+    const svg = _svg('svg', { viewBox: '0 0 1180 700',
+      preserveAspectRatio: 'xMidYMid meet', class: 'ws-room' });
+    svg.innerHTML =
+      '<image href="/static/flat-room.svg" x="0" y="0" width="1180" height="700" ' +
+        'preserveAspectRatio="xMidYMid meet"/>' +
+      '<image class="ws-exit" href="/static/erdog.svg" x="316" y="428" ' +
+        'width="200" height="228" style="cursor:pointer"/>';
+    svg.querySelectorAll('.ws-exit').forEach(function (el) {
+      el.addEventListener('click', function () { closeWorkshop(); });
+    });
+    wrap.appendChild(svg);
+    return wrap;
+  };
+  let wsFlatOn = false;
+  const toggleFlatScene = function (box) {
+    if (!wsFlatOn) {
+      wsFlatOn = true;
+      var g = document.getElementById('ws-debug-g'); if (g) g.remove();
+      box.innerHTML = '';
+      box.appendChild(buildFlatScene());
+    } else {
+      wsFlatOn = false;
+      paintCanvas();
+    }
   };
 
   // ── 3D 卧室视图（2026-10-15 大升级，M1）──────────────────────────
@@ -475,6 +509,16 @@
     });
     wrap.appendChild(hud);
     wrap.appendChild(btn);
+    // ★ 平面预览按钮（2026-10-15 方向调整）✓ —— 跟「坐标」同排 ✓。
+    //   点一下看精致平面屋（+ 二狗），再点回默认视图（组件那条路在默认视图里 ✓）。
+    const btnFlat = document.createElement('div');
+    btnFlat.style.cssText = dbgStyle + 'right:64px;';
+    btnFlat.textContent = '平面';
+    btnFlat.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      toggleFlatScene($('#wsBody'));
+    });
+    wrap.appendChild(btnFlat);
     return wrap;
   };
 
