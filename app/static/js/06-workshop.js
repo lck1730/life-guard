@@ -150,6 +150,17 @@
   // ⚠️ `objNode` 返回的字符串要能落进 DOM ✓ —— 所以 `<image>` / `href` 这些
   //   属性都带引号写全 ✓，不靠 `innerHTML` 之外的解析帮忙 ✓。
 
+  // SVG 命名空间 + 建元素的 helper ✓ —— `buildScene`/`paintDebugLayer` 用它建
+  //   `<svg>`/`<g>`/`<line>` 这些（它们要进 DOM、带监听器 ✓，所以不能像 `objNode`
+  //   那样只吐字符串 ✗）。
+  const NS = 'http://www.w3.org/2000/svg';
+  const _svg = (tag, attrs, parent) => {
+    const el = document.createElementNS(NS, tag);
+    if (attrs) for (const k in attrs) el.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(el);
+    return el;
+  };
+
   // 把世界坐标 (x, y, z) 摆一件盒子的**投影尺寸**估出来 ✓ ——
   //   影子要用屏幕里的半径（`RB_SHADOW` 要的是世界的半宽/半深 ✓，所以其实直接给 ✓）。
   //   这里只留一个「世界单位 → 屏幕像素」的比例，给 `<image>` 那类必须写屏幕尺寸的元素用 ✓。
