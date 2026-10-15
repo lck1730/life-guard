@@ -20,6 +20,7 @@ import logging
 import os
 import re
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, AsyncIterator
 
@@ -441,6 +442,39 @@ def session_key_for(group_id: int) -> str:
     return f"lifeguard:group:{group_id}"
 
 
+_WEEKDAY = ("星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日")
+
+
+def _now_line() -> str:
+    """当前日期，**只精确到日** ✓。每轮现算 —— 它是**会变的东西** ✓。
+
+    ⚠️ **这个得我们自己说** ✗→✓ —— Hermes 只给「会话开始那天」：
+       `system_prompt._timestamp_line` 拼的是
+       ``Conversation started: <起始日>``，而"今天是几号"那一行**只在上下文
+       重建那天**（压缩边界）才补。我们的群会话是**一条用到底的** ✓
+       （`session_id` 固定 ``lifeguard-group-N`` ✓，3 号那个从 2026-10-06 用到现在 ✓）
+       → 中间只要没压过，它就**永远认为自己活在开始那天** ✓。
+       实测：2026-10-11 它说「今天 10 月 8 号」✗，还把体重记成了 10-08 ✗。
+       它也没有查时间的工具（`platform_toolsets.api_server` 里没有一个能报时的 ✓），
+       想问都没有地方问 —— **只能靠我们给** ✓。
+
+    **只给日期，不给时分秒** ✗ —— 这一段进的是**系统提示**，Hermes 按内容缓存
+       前缀 ✓。精确到分钟 = 每一轮都把缓存打穿 ✗；精确到日 = 一天只穿一次 ✓。
+       要具体时分的动作（提醒到点）本来就是**服务端算的**
+       （`internal.py` 的 ``now() + N*60`` ✓），不靠它猜 ✓。
+    """
+    d = datetime.now()
+    return (
+        "## 现在是什么时候\n"
+        f"今天是 {d.year} 年 {d.month} 月 {d.day} 日，{_WEEKDAY[d.weekday()]}，北京时间 ✓。\n"
+        "「今天 / 明天 / 下周 / 上礼拜」都按这个算 ✓。\n"
+        "记东西要写日期的，**就写今天** ✓ —— 别用你印象里的日期 ✗"
+        "（印象里的那个早就过期了 ✗）。\n"
+        "⚠️ 这个群聊了很久了 —— 别把**这条对话开聊的头一天**当成今天 ✗，"
+        "上面这句才是准的 ✓。\n\n"
+    )
+
+
 async def _group_persona(group_id: int) -> str:
     """每轮注入的**群配置**：它在这个群叫什么、群里都有谁。
 
@@ -559,6 +593,7 @@ async def _group_persona(group_id: int) -> str:
         f"你是「{agent_name}」，住在这个群里（群名「{gname}」）✓。\n"
         "你是个**过日子的人**：他们跟你聊事、让你办事，你也随口接话 ✓。\n"
         "\n"
+        f"{_now_line()}"
         "## 你手里有的\n"
         "· **记录** —— 要记的东西（记钱、待办、体重…）存下来 ✓，以后能查能算 ✓\n"
         "· **提醒** —— 到点我来跟你说 ✓\n"
@@ -622,14 +657,35 @@ def _image_parts(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def _day_tag(ts: Any) -> str:
+    """时间戳 → `10月14日`；取不到就空串（= 不打分隔行）✓。
+
+    不给年份 —— 年份由 `_now_line` 那句给 ✓（会话跨年的话看那句话才对 ✓）。
+    """
+    if not ts:
+        return ""
+    try:
+        d = datetime.fromtimestamp(float(ts))
+    except (TypeError, ValueError, OSError, OverflowError):
+        return ""
+    return f"{d.month}月{d.day}日"
+
+
 def _render_transcript(messages: list[dict[str, Any]], agent_name: str) -> str:
     """把一批群消息渲染成一段记录。
 
     格式 `[昵称] 内容` —— 让 agent 分得清谁在说话。
     非文本消息在这里降级成占位描述，真正的多模态后续再补。
+
+    **跨天的地方插一行日期** ✗→✓（2026-10-15 ✓）—— 缓冲可能横跨好几天
+    （群安静的时候 40 条能排上两周 ✓），而不插的话它**根本看不出哪句是几天前说的** ✗
+    → 只能说"你昨天说的那件事"，而那是五天前的 ✓。只标**换了天**的那条 ✗
+    （每条都标 = 40 行白加 40 行日期 ✗，还盖住正话 ✓）。
     """
     lines: list[str] = []
+    prev_day = ""
     for m in messages:
+        day = _day_tag(m.get("created_at"))
         kind_of_sender = m.get("sender_type")
         if kind_of_sender == "system":
             # 系统自己塞进来的条目（目前只有"提醒到点了"）。
@@ -706,6 +762,12 @@ def _render_transcript(messages: list[dict[str, Any]], agent_name: str) -> str:
             # 顺带解决了图片断层：以前图片那行只写「[发了一张图片，见下方附图]」，
             # 而附图只在图片到达的那一轮才有（Hermes 不把图存进会话历史），
             # 下一轮再聊到它就只能反问「那刚才那张图拍的是啥」——实测翻过车。
+            # ⚠️ 日期分隔行**只在真有一条要写时才插** ✗ —— 在循环开头插的话，
+            #    后面那条正文是空的（被跳过 ✓），就会留下一行没人说话的日期 ✗。
+            if day and day != prev_day:
+                if prev_day:
+                    lines.append(f"—— {day} ——")
+                prev_day = day
             lines.append(f"[#{m.get('id')} {name}] {text}")
     return "\n".join(lines)
 
@@ -1611,7 +1673,8 @@ async def diy_persona(group_id: int, task_id: int | None = None) -> str:
         f"有人开口你就应 ✓）。\n"
         f"你在这个界面里叫 **{my_name}** ✓（他能在导航右上角改 ✓，"
         f"别用群聊里那个名字自称 ✗）。\n"
-        "\n## 你是谁\n"
+        + _now_line()
+        + "\n## 你是谁\n"
         "**专门做组件的** ✓ —— 一个需求，做成一块能在手机上看的界面 ✓。"
         "别的都归群聊里那个管家：记账、提醒、看图发消息、跟群里的日子 ✗ —— **不归你** ✓。\n"
         "\n**你能做的** ✓：\n"
