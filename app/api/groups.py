@@ -507,10 +507,14 @@ async def send_message(
                 raw = ""
                 log.info("读文件失败：%s（%s）", body.media_path, exc)
             if raw.strip():
-                text = raw.strip()[:4000]        # ⚠️ 截断 ✓：别让一个 2MB 的日志把上下文吃光 ✗
+                # ⚠️ 截断要跟**去空白后的全长**比 ✗→✓ —— 拿 `raw` 比的话，
+                #   文件末尾那个换行也算成"多出来的一段" ✗
+                #   → 小文件一律被标成截断 ✗，管家那句「（只给了前面一段）」就一直跟着 ✗。
+                full = raw.strip()
+                text = full[:4000]              # ⚠️ 截断 ✓：别让一个 2MB 的日志把上下文吃光 ✗
                 content = text
                 media_meta["text"] = text
-                media_meta["truncated"] = len(raw) > len(text)
+                media_meta["truncated"] = len(full) > len(text)
         else:
             # 不读的类型（pdf/word/excel…）→ **说清楚它是什么** ✓，
             # 免得管家猜"这个文件里是什么" ✓（它会编 ✓）。

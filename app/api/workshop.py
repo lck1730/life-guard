@@ -736,8 +736,74 @@ async def poke_loop() -> None:
             log.exception("工坊的「等交付」循环出错了")
 
 
+#: 工坊一句话能带的类型 ✓（和群聊同一个白名单 ✓）
+_SAY_KINDS = ("image", "voice", "file", "audio")
+
+#: 文本类文件读进来最多多少字 ✓ —— 和群聊一个数（别让一个 2MB 的日志吃光上下文 ✓）
+_TEXT_FILE_CHARS = 4000
+
+
+async def _flatten_media(kind: str, text: str, media_path: str | None,
+                         meta: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    """把附件**摊平成正文** ✓ —— 和生活管家（`routes_groups`）同一套规矩 ✓。
+
+    ⚠️ 这一步不是摆设 ✓：`media_path` 落库只是**给人看**的 ✓，模型这一轮
+       拿到的只有 `text` ✗ —— 不摊平就等于「数据存了，但没告诉它」✗
+       （这个项目在别处吃过这个亏 ✓）。
+
+    · voice / audio → 转写进正文 ✓（**转写失败不拦消息** ✓ —— 音频照样发出去，
+      只是它听不见内容 ✓；为了转写失败让人发不出话，本末倒置 ✓）
+    · file（txt / md / csv / json）→ 读进来、截断后进正文 ✓
+    · file（pdf / word / excel）→ **不读**，标 `opaque` ✓（要装解析库才读得动 ✓，
+      而那个 venv 是四个服务共用的 ✓ → 代价大收益小 ✓）；
+      `_run_turn` 会照实说一句"这个格式我读不了" ✓
+    """
+    if kind in ("voice", "audio") and media_path and not text.strip():
+        from ..core.stt import transcribe
+
+        audio = settings.media_dir / media_path
+        out = await transcribe(audio) if audio.exists() else None
+        if out:
+            text = out
+            meta["transcript"] = out
+        else:
+            meta["transcript_failed"] = True
+            log.info("工坊音频转写失败或为空：%s", media_path)
+
+    if kind == "file" and media_path and not text.strip():
+        from .media import TEXT_EXTS
+
+        p = (settings.media_dir / media_path).resolve()
+        base = settings.media_dir.resolve()
+        # ⚠️ `media_path` 是客户端给的 ✓ —— 拼路径之前先确认它没跑出 `media_dir` ✓
+        ok = p.is_relative_to(base) and p.suffix.lower() in TEXT_EXTS and p.is_file()
+        if ok:
+            try:
+                raw = p.read_text(encoding="utf-8", errors="replace")
+            except OSError as exc:  # noqa: BLE001
+                raw = ""
+                log.info("工坊读文件失败：%s（%s）", media_path, exc)
+            if raw.strip():
+                # ⚠️ 截断要跟**去掉首尾空白的全长**比 ✓ —— 拿 `raw` 比的话，
+                #   一个 10 字节的 txt 会因为"末尾带个换行"被标成截断 ✗。
+                full = raw.strip()
+                body = full[:_TEXT_FILE_CHARS]
+                text = body
+                meta["text"] = body
+                meta["truncated"] = len(full) > len(body)
+            else:
+                # 读得动、但里面是空的 ✓ —— 记一笔，
+                #   免得 `_run_turn` 在下面说成"这个格式我读不了" ✗（那不是事实 ✓）。
+                meta["empty"] = True
+        else:
+            meta.setdefault("opaque", True)
+
+    return text, meta
+
+
 async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                     *, msg_type: str = "text", media_path: str | None = None,
+                    media_meta: dict[str, Any] | None = None,
                     quote: dict | None = None, poke: bool = False) -> None:
     """跑一轮工坊对话 —— 后台任务 ✓（POST 立刻返回，正文走 WebSocket 推 ✓）。
 
@@ -768,10 +834,31 @@ async def _run_turn(group_id: int, user_id: int, task_id: int, text: str,
                          else (quote.get("content") or "").strip()[:80])
                 who = "你自己" if quote.get("sender_type") == "agent" else "用户"
                 text = f"（在回{who}说的「{qtext}」）{text}"
-            # ⚠️ 只有图片、没打字是允许的 ✓ —— 那一轮就把图交给它看 ✓
-            #    （正文给一句占位 ✓，因为 Hermes 那条消息的 text 部分是必须的 ✓）。
-            if msg_type == "image" and not text.strip():
-                text = "（发了一张图）"
+            meta = media_meta or {}
+            # ⚠️ **只有附件、没打字是允许的** ✓ —— 但模型那条消息的 text 不能空 ✗，
+            #   所以这几样都要**补一句它听得懂的说明** ✓（和群聊 `_render_transcript`
+            #   那段同一个措辞 ✓）：
+            #   · 图 → 下面 `_image_parts` / `_stream_claude` 会拿去描述 ✓
+            #   · 文件读不进来 → **明确说"读不了"** ✗ —— 不写这一句它会自己猜里面
+            #     是什么 ✓（模型对"没给它的信息"会编 ✓）
+            #   · 语音 / 音频没转出来 → 说清楚 ✓（不然它装作听见了 ✓）
+            if not text.strip():
+                if msg_type == "image":
+                    text = "（发了一张图）"
+                elif msg_type == "voice":
+                    text = "[语音，没转出文字]"
+                elif msg_type == "audio":
+                    text = "[音频，没转出文字]"
+                elif msg_type == "file":
+                    fname = meta.get("original_name") or "文件"
+                    text = (f"[文件 {fname}]（这个文件是空的）" if meta.get("empty")
+                            else f"[文件 {fname}]（这个格式我读不了内容 —— 能看到的只有文件名）")
+            elif msg_type == "file":
+                # 正文里已经是摊平出来的内容 ✓（见 `_flatten_media` ✓）——
+                #   前面还得挂个「这是哪个文件」的头 ✓，不然它当自己在跟人聊天 ✗。
+                fname = meta.get("original_name") or "文件"
+                cut = "（只给了前面一段）" if meta.get("truncated") else ""
+                text = f"[文件 {fname}{cut}]\n{text}"
             images = _image_parts([{"msg_type": msg_type, "media_path": media_path}])
             # ★ 2026-10-14：claude 桥要的是**原始 media_path** ✓（直连商汤、
             #   自己读图喂给视觉模型 ✓），不是 Hermes 那套 data-URL 片段 ✓。
@@ -1068,10 +1155,13 @@ async def assistant_avatar(group_id: int, file: UploadFile = File(...),
 
 class TaskSayIn(BaseModel):
     # ★ 2026-10-07 深夜：**图片和引用跟着一起收** ✗→✓（用户定的"套用生活管家模板"✓）。
-    # ⚠️ `content` 现在**可以是空的** ✗→✓ —— 只发一张图不打字是正常的 ✓
-    #    （群聊那边也允许 ✓）。真正的"什么都没发"由下面那两句合起来判 ✓。
+    # ⚠️ `content` 现在**可以是空的** ✗→✓ —— 只发一张图 / 一个文件 / 一段音频
+    #    不打字是正常的 ✓（群聊那边也允许 ✓）。
+    #    真正的"什么都没发"由 `task_say` 里那道闸判 ✓（有没有带东西上来 ✓）。
     content: str = Field(default="", max_length=4000)
-    msg_type: str = Field(default="text", max_length=16)
+    # 白名单和群聊同一个 ✓ —— 没这个 pattern 的话，前端塞个 `file` 进来
+    # 也不会报错，而是走到下面那个"发点东西吧"（2026-10-15 那个 bug 的形状 ✓）。
+    msg_type: str = Field(default="text", pattern="^(text|image|voice|file|audio)$")
     media_path: str = Field(default="", max_length=200)
     media_meta: dict[str, Any] | None = None
     #: 引用的是**本表**哪一条 ✓（前端长按气泡选"引用"时给 ✓）。
@@ -1352,10 +1442,20 @@ async def task_say(group_id: int, task_id: int, body: TaskSayIn,
     row = await _own_task(group_id, user["id"], task_id)
     text = body.content.strip()
 
-    # ★ **图片这条路** ✓（2026-10-07 深夜）—— 和生活管家同一套规矩 ✓：
-    #   图片先传上来（前端先传 ✓），路径跟着这一条消息走 ✓。
-    kind = "image" if (body.msg_type == "image" and body.media_path) else "text"
-    if kind == "text" and not text:
+    # ★ **附件这条路** ✓（图片 2026-10-07 深夜起；文件 / 音频 2026-10-15 补上）——
+    #   和生活管家（`routes_groups`）同一套规矩 ✓：先传上来（前端先传 ✓）、
+    #   路径跟着这一条消息走 ✓、内容**摊平进正文** ✓（见 `_flatten_media` ✓）。
+    #
+    # ⚠️ **原来这里只认 image** ✗→✓ —— 任何别的类型都被降成 `text` ✓，
+    #   而"没打字"就撞上「发点东西吧」✗ → 文件**上传明明 200** ✓、
+    #   消息 **400** ✗（`chat.log` 里那两行是挨着的 ✓）。
+    kind = body.msg_type if body.msg_type in _SAY_KINDS else "text"
+    text, media_meta = await _flatten_media(kind, text, body.media_path,
+                                            dict(body.media_meta or {}))
+    # ⚠️ **判据是"有没有带东西上来"，不是"有没有打字"** ✓ —— 只发一张图 ✓、
+    #   只发一个打不开的格式的文件 ✓、语音没转出来 ✓ —— 这三样 `text` 都是空的 ✓，
+    #   但它们都是**一条完整的话**（`_run_turn` 会各补一句说明 ✓）。
+    if not text and not body.media_path:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "发点东西吧")
     # ⚠️ **引用只认本对话里的消息** ✗ —— 前端给的 id 是它自己画出来的 ✓，
     #    但**不能信** ✓（换个 id 就能引用别人的对话 ✓）。查一下归属 ✓，
@@ -1387,7 +1487,7 @@ async def task_say(group_id: int, task_id: int, body: TaskSayIn,
     msg = await _save(group_id, user["id"], row["id"], "user", text,
                       msg_type=kind,
                       media_path=body.media_path or None,
-                      media_meta=body.media_meta,
+                      media_meta=media_meta or None,
                       reply_to=reply_to)
     await _touch(row["id"])
     await _push(user["id"], {"type": "ws_message", "data": msg})
@@ -1395,7 +1495,8 @@ async def task_say(group_id: int, task_id: int, body: TaskSayIn,
     _register_turn(
         group_id, row["id"],
         _run_turn(group_id, user["id"], row["id"], text,
-                  msg_type=kind, media_path=body.media_path or None, quote=q))
+                  msg_type=kind, media_path=body.media_path or None,
+                  media_meta=media_meta or None, quote=q))
 
     # ⚠️ **登记没生效就当场说一声** ✗→✓ —— 2026-10-12 用户实测踩到的：
     #   「新建了一个记账组件的聊天，我提了需求它不理我」✗。
