@@ -475,16 +475,6 @@
     });
     wrap.appendChild(hud);
     wrap.appendChild(btn);
-    // ★ 3D 视图按钮（2026-10-15，dev 预览态 ✓）—— 跟「坐标」同一排的胶囊 ✓。
-    //   点一下进 3D 卧室、再点回 SVG 屋。组件那条路（点物 → openComp）目前只在 SVG 屋有 ✓。
-    const btn3D = document.createElement('div');
-    btn3D.style.cssText = dbgStyle + 'right:64px;';
-    btn3D.textContent = '3D';
-    btn3D.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      toggleRoom3D($('#wsBody'));
-    });
-    wrap.appendChild(btn3D);
     return wrap;
   };
 

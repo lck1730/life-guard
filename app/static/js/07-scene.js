@@ -795,47 +795,105 @@
     s += '<path d="M ' + (cx - 50).toFixed(1) + ' ' + (cy - 6).toFixed(1) +
       ' Q ' + cx.toFixed(1) + ' ' + (cy + 6).toFixed(1) + ' ' + (cx + 50).toFixed(1) + ' ' +
       (cy - 6).toFixed(1) + '" fill="none" stroke="#b3a184" stroke-width="2.2"/>';
-    // 猫 ✓ —— 坐着，微微侧身
-    const bx = cx - 2, by = cy - 8;
-    s += '<path d="M ' + (bx - 12).toFixed(1) + ' ' + by.toFixed(1) +
-      ' C ' + (bx - 26).toFixed(1) + ' ' + (by - 2).toFixed(1) + ', ' + (bx - 30).toFixed(1) + ' ' +
-      (by - 20).toFixed(1) + ', ' + (bx - 18).toFixed(1) + ' ' + (by - 30).toFixed(1) +
-      '" fill="none" stroke="#a07a52" stroke-width="7" stroke-linecap="round"/>';
-    s += '<path d="M ' + (bx - 13).toFixed(1) + ' ' + by.toFixed(1) +
-      ' C ' + (bx - 21).toFixed(1) + ' ' + (by - 15).toFixed(1) + ', ' + (bx - 20).toFixed(1) + ' ' +
-      (by - 36).toFixed(1) + ', ' + (bx - 7).toFixed(1) + ' ' + (by - 42).toFixed(1) +
-      ' L ' + (bx + 12).toFixed(1) + ' ' + (by - 42).toFixed(1) +
-      ' C ' + (bx + 21).toFixed(1) + ' ' + (by - 36).toFixed(1) + ', ' + (bx + 20).toFixed(1) + ' ' +
-      (by - 14).toFixed(1) + ', ' + (bx + 12).toFixed(1) + ' ' + by.toFixed(1) +
-      ' Z" fill="#a9815a" stroke="#8a6542" stroke-width="1.4" stroke-linejoin="round"/>';
-    s += '<ellipse cx="' + (bx + 2).toFixed(1) + '" cy="' + (by - 20).toFixed(1) +
-      '" rx="10" ry="14" fill="#d9bd9c"/>';
-    // 头 ✓
-    s += '<circle cx="' + (bx + 5).toFixed(1) + '" cy="' + (by - 50).toFixed(1) +
-      '" r="11.5" fill="#a9815a" stroke="#8a6542" stroke-width="1.4"/>';
-    s += '<path d="M ' + (bx - 6).toFixed(1) + ' ' + (by - 57).toFixed(1) +
-      ' L ' + (bx - 10).toFixed(1) + ' ' + (by - 71).toFixed(1) + ' L ' + (bx + 1).toFixed(1) + ' ' +
-      (by - 61).toFixed(1) + ' Z" fill="#a9815a" stroke="#8a6542" stroke-width="1.4" ' +
-      'stroke-linejoin="round"/>';
-    s += '<path d="M ' + (bx + 14).toFixed(1) + ' ' + (by - 59).toFixed(1) +
-      ' L ' + (bx + 22).toFixed(1) + ' ' + (by - 72).toFixed(1) + ' L ' + (bx + 13).toFixed(1) + ' ' +
-      (by - 63).toFixed(1) + ' Z" fill="#a9815a" stroke="#8a6542" stroke-width="1.4" ' +
-      'stroke-linejoin="round"/>';
-    s += '<path d="M ' + (bx - 6).toFixed(1) + ' ' + (by - 60).toFixed(1) +
-      ' L ' + (bx - 8).toFixed(1) + ' ' + (by - 67).toFixed(1) + ' L ' + (bx - 1).toFixed(1) + ' ' +
-      (by - 62).toFixed(1) + ' Z" fill="#c98f76"/>';
-    s += '<path d="M ' + (bx + 14).toFixed(1) + ' ' + (by - 62).toFixed(1) +
-      ' L ' + (bx + 19).toFixed(1) + ' ' + (by - 69).toFixed(1) + ' L ' + (bx + 13).toFixed(1) + ' ' +
-      (by - 65).toFixed(1) + ' Z" fill="#c98f76"/>';
-    // 眼睛（眯着 ✓ —— 猫在打盹，屋子是安稳的）+ 鼻子 ✓
-    s += '<path d="M ' + (bx - 1).toFixed(1) + ' ' + (by - 51).toFixed(1) +
-      ' q ' + '3 ' + '2.4 ' + '6 ' + '0" fill="none" stroke="#3a2a1c" stroke-width="1.5" ' +
-      'stroke-linecap="round"/>';
-    s += '<path d="M ' + (bx + 9).toFixed(1) + ' ' + (by - 51).toFixed(1) +
-      ' q ' + '3 ' + '2.4 ' + '6 ' + '0" fill="none" stroke="#3a2a1c" stroke-width="1.5" ' +
-      'stroke-linecap="round"/>';
-    s += '<path d="M ' + (bx + 5).toFixed(1) + ' ' + (by - 46.5).toFixed(1) +
-      ' l ' + '2.2 ' + '2.2 l ' + '-4.4 ' + '0 Z" fill="#c98f76"/>';
+
+    // ★ 二狗（2026-10-15 重画）✓ —— chibi 大头、亮橘、大眼睛、铃铛；
+    //    SMIL 微动：呼吸 + 甩尾 + 眨眼，让它不板正 ✓。坐标在本地 140×160 系，
+    //    整组 translate+scale 坐到窝上（脚落 y≈cy-6）✓。
+    const CS = 0.82;                                  // 缩放
+    const tx = cx - 70 * CS;                          // 本地 x=70 是猫中线
+    const ty = (cy - 6) - 150 * CS;                   // 本地 y=150 是脚底
+    s += '<g transform="translate(' + tx.toFixed(1) + ',' + ty.toFixed(1) +
+      ') scale(' + CS + ')">';
+    // 本地系 defs（id 带 cat 前缀，不和屋子的 rbB1 撞 ✓）
+    s += '<defs>' +
+      '<radialGradient id="catBody" cx="40%" cy="35%" r="75%">' +
+      '<stop offset="0%" stop-color="#ffb46b"/><stop offset="55%" stop-color="#f5a051"/>' +
+      '<stop offset="100%" stop-color="#e0823a"/></radialGradient>' +
+      '<radialGradient id="catHead" cx="42%" cy="38%" r="72%">' +
+      '<stop offset="0%" stop-color="#ffbf72"/><stop offset="60%" stop-color="#f5a051"/>' +
+      '<stop offset="100%" stop-color="#df7d33"/></radialGradient>' +
+      '<radialGradient id="catEye" cx="40%" cy="35%" r="70%">' +
+      '<stop offset="0%" stop-color="#5ed0a0"/><stop offset="100%" stop-color="#1f9e62"/>' +
+      '</radialGradient></defs>';
+
+    // 尾巴（甩动 ✓）—— 绕到右前卷个圈
+    s += '<g>' +
+      '<animateTransform attributeName="transform" type="rotate" ' +
+      'values="-7 100 96;7 100 96;-7 100 96" keyTimes="0;0.5;1" ' +
+      'dur="2.6s" repeatCount="indefinite"/>' +
+      '<path d="M 96 96 C 122 92 128 64 112 58 C 104 55 100 62 104 68 C 108 74 100 78 95 74" ' +
+      'fill="none" stroke="#e0823a" stroke-width="13" stroke-linecap="round"/>' +
+      '<path d="M 96 96 C 122 92 128 64 112 58" fill="none" stroke="#ffb46b" ' +
+      'stroke-width="4" stroke-linecap="round" opacity="0.6"/></g>';
+
+    // 身体（呼吸 ✓）
+    s += '<g>' +
+      '<animateTransform attributeName="transform" type="scale" ' +
+      'values="1 1;1.02 0.99;1 1" keyTimes="0;0.5;1" dur="3.2s" ' +
+      'repeatCount="indefinite" additive="sum"/>' +
+      '<path d="M 44 150 C 30 150 28 110 40 96 C 48 86 92 86 100 96 C 112 110 110 150 96 150 Z" ' +
+      'fill="url(#catBody)" stroke="#c4671f" stroke-width="2.5"/>' +
+      '<path d="M 56 148 C 50 128 52 104 70 100 C 88 104 90 128 84 148 Z" ' +
+      'fill="#fbe7c6" opacity="0.95"/>' +
+      '<path d="M 44 110 q 8 -2 10 6" fill="none" stroke="#cf6f24" stroke-width="3" ' +
+      'stroke-linecap="round" opacity="0.7"/>' +
+      '<path d="M 96 108 q -8 0 -9 7" fill="none" stroke="#cf6f24" stroke-width="3" ' +
+      'stroke-linecap="round" opacity="0.7"/></g>';
+
+    // 前爪
+    s += '<ellipse cx="58" cy="150" rx="11" ry="7" fill="#fbe7c6" stroke="#c4671f" stroke-width="2"/>' +
+      '<ellipse cx="82" cy="150" rx="11" ry="7" fill="#fbe7c6" stroke="#c4671f" stroke-width="2"/>';
+
+    // 头（小幅点头 ✓）
+    s += '<g>' +
+      '<animateTransform attributeName="transform" type="rotate" ' +
+      'values="-2 70 96;3 70 96;-2 70 96" keyTimes="0;0.5;1" dur="3.8s" ' +
+      'repeatCount="indefinite"/>' +
+      '<circle cx="70" cy="62" r="34" fill="url(#catHead)" stroke="#c4671f" stroke-width="2.5"/>' +
+      '<path d="M 40 46 L 36 18 L 58 36 Z" fill="#f0983e" stroke="#c4671f" stroke-width="2.5" ' +
+      'stroke-linejoin="round"/>' +
+      '<path d="M 100 46 L 104 18 L 82 36 Z" fill="#f0983e" stroke="#c4671f" stroke-width="2.5" ' +
+      'stroke-linejoin="round"/>' +
+      '<path d="M 43 40 L 41 26 L 53 35 Z" fill="#f7b8c0"/>' +
+      '<path d="M 97 40 L 99 26 L 87 35 Z" fill="#f7b8c0"/>' +
+      '<path d="M 64 38 q 6 4 12 0" fill="none" stroke="#cf6f24" stroke-width="2.5" ' +
+      'stroke-linecap="round" opacity="0.6"/>' +
+      '<path d="M 60 44 q 10 5 20 0" fill="none" stroke="#cf6f24" stroke-width="2.5" ' +
+      'stroke-linecap="round" opacity="0.5"/>' +
+      '<ellipse cx="50" cy="74" rx="7" ry="4.5" fill="#ff9aa8" opacity="0.55"/>' +
+      '<ellipse cx="90" cy="74" rx="7" ry="4.5" fill="#ff9aa8" opacity="0.55"/>';
+
+    // 眼睛（眨眼 ✓）—— 白眼 + 绿瞳 + 双高光
+    s += '<ellipse cx="56" cy="64" rx="7.5" ry="9.5" fill="white" stroke="#3a2a1c" stroke-width="1.6">' +
+      '<animate attributeName="ry" values="9.5;9.5;1;9.5" keyTimes="0;0.93;0.97;1" ' +
+      'dur="4.5s" repeatCount="indefinite"/></ellipse>' +
+      '<ellipse cx="84" cy="64" rx="7.5" ry="9.5" fill="white" stroke="#3a2a1c" stroke-width="1.6">' +
+      '<animate attributeName="ry" values="9.5;9.5;1;9.5" keyTimes="0;0.93;0.97;1" ' +
+      'dur="4.5s" repeatCount="indefinite"/></ellipse>' +
+      '<ellipse cx="56" cy="66" rx="4.6" ry="6.6" fill="url(#catEye)"/>' +
+      '<ellipse cx="84" cy="66" rx="4.6" ry="6.6" fill="url(#catEye)"/>' +
+      '<ellipse cx="57.5" cy="61" rx="2" ry="2.6" fill="white"/>' +
+      '<ellipse cx="85.5" cy="61" rx="2" ry="2.6" fill="white"/>' +
+      '<ellipse cx="54" cy="68" rx="1.1" ry="1.4" fill="white" opacity="0.8"/>' +
+      '<ellipse cx="82" cy="68" rx="1.1" ry="1.4" fill="white" opacity="0.8"/>';
+
+    // 鼻子 + 笑嘴 + 胡须
+    s += '<path d="M 67 76 l 6 0 l -3 4 Z" fill="#e07a8c" stroke="#b4526a" stroke-width="0.8"/>' +
+      '<path d="M 70 80 q -4 5 -8 2 M 70 80 q 4 5 8 2" fill="none" stroke="#7a4a2a" ' +
+      'stroke-width="1.8" stroke-linecap="round"/>' +
+      '<path d="M 44 78 q -8 -1 -12 -3 M 44 82 q -8 1 -12 4" fill="none" stroke="#9a6a3a" ' +
+      'stroke-width="1.2" stroke-linecap="round"/>' +
+      '<path d="M 96 78 q 8 -1 12 -3 M 96 82 q 8 1 12 4" fill="none" stroke="#9a6a3a" ' +
+      'stroke-width="1.2" stroke-linecap="round"/>';
+
+    // 铃铛项圈
+    s += '<path d="M 50 96 q 20 8 40 0" fill="none" stroke="#d83a3a" stroke-width="6" ' +
+      'stroke-linecap="round"/>' +
+      '<circle cx="70" cy="100" r="6.5" fill="#ffd34d" stroke="#c9931f" stroke-width="1.6"/>' +
+      '<circle cx="70" cy="98.4" r="1.4" fill="#c9931f"/>' +
+      '<path d="M 70 101 l 0 3.5" stroke="#c9931f" stroke-width="1.2" stroke-linecap="round"/>';
+
+    s += '</g>';   // /cat
     return s;
   };
 
