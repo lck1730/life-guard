@@ -894,6 +894,9 @@
                         -webkit-overflow-scrolling:touch; touch-action:pan-x pan-y;
                         background:#e9dcc4; }
   #workshop .ws-room { height:100%; width:auto; display:block; min-width:100%; }
+  /* ★ 2026-10-15 平面屋：竖幅贴屏 ✓ —— width/height 都 100% +
+     preserveAspectRatio meet → 一屏完整、不横滑 ✓（ws-room 那套是按高撑宽 → 会横滑 ✗）*/
+  #workshop .ws-flat { width:100%; height:100%; display:block; }
   #workshop .ws-room .rm-wall { fill:#d9c7a8; }
   #workshop .ws-room .rm-side { fill:#c9b696; }
   #workshop .ws-room .rm-floor { fill:#9c7549; }

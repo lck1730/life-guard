@@ -110,15 +110,21 @@
   const buildFlatScene = function () {
     const wrap = document.createElement('div');
     wrap.className = 'ws-scene';
-    const svg = _svg('svg', { viewBox: '0 0 1180 700',
-      preserveAspectRatio: 'xMidYMid meet', class: 'ws-room' });
+    // ★ 竖幅 760×1340（贴手机竖屏 ✓），preserveAspectRatio meet → 一屏完整不横滑 ✓。
+    const svg = _svg('svg', { viewBox: '0 0 760 1340',
+      preserveAspectRatio: 'xMidYMid meet', class: 'ws-flat' });
     svg.innerHTML =
-      '<image href="/static/flat-room.svg" x="0" y="0" width="1180" height="700" ' +
+      '<image href="/static/flat-room.svg" x="0" y="0" width="760" height="1340" ' +
         'preserveAspectRatio="xMidYMid meet"/>' +
-      '<image class="ws-exit" href="/static/erdog.svg" x="316" y="428" ' +
-        'width="200" height="228" style="cursor:pointer"/>';
-    svg.querySelectorAll('.ws-exit').forEach(function (el) {
-      el.addEventListener('click', function () { closeWorkshop(); });
+      // 账本热区（桌上账本位置 ✓）—— 透明、可点 → 进记账。
+      //   ⚠️ <image> 引的 svg 没法点子元素 ✓，所以盖一块透明 rect 当入口 ✓。
+      '<rect class="ws-obj" data-slug="bookkeeping-panel" x="195" y="835" ' +
+        'width="360" height="110" fill="transparent" style="cursor:pointer"/>';
+    svg.querySelectorAll('.ws-obj').forEach(function (el) {
+      el.addEventListener('click', function () {
+        const c = wsCanvas.find(function (x) { return x.slug === 'bookkeeping-panel'; });
+        if (c) openComp(c.slug, c.title || '记账', (c.spot && c.spot.tint) || '');
+      });
     });
     wrap.appendChild(svg);
     return wrap;
@@ -395,9 +401,11 @@
       box.appendChild(em);
       return;
     }
-    box.appendChild(buildScene());
-    // ★ **纯粹的展示界面** ✓（2026-10-07 用户定的：这屏不放任何提示/设置 ✓）——
-    //   屋里那只猫就是唯一的"出口"提示 ✓（叙事 ✓，不是说明文字 ✓）。
+    box.appendChild(buildFlatScene());
+    // ★ 2026-10-15 方向调整：工坊默认 = 精致平面屋（竖幅一屏、不横滑 ✓），
+    //   画面里只有**账本**一件物（点 → openComp 记账 ✓）。二狗先拿掉 ✓。
+    //   其它组件暂不摆进平面屋（平面物件管线 drawCrate/ledger/polaroid 还没接 ✓），
+    //   接好后它们也成画面里的物件。旧的透视 buildScene 留着做 fallback ✓。
   };
 
   const svgPoint = (svg, ev) => {

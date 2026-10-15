@@ -1,108 +1,136 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 700" width="1180" height="700">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 1340" width="760" height="1340">
   <defs>
     <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f3e7cd"/><stop offset="1" stop-color="#e7d6b3"/>
+      <stop offset="0" stop-color="#f6ead2"/><stop offset="0.5" stop-color="#efdcb4"/><stop offset="1" stop-color="#e3cda0"/>
     </linearGradient>
     <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#b08a5c"/><stop offset="1" stop-color="#8a5e30"/>
+      <stop offset="0" stop-color="#b98e5c"/><stop offset="1" stop-color="#8a5e2e"/>
     </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cfeaf6"/><stop offset="0.6" stop-color="#aacde8"/><stop offset="1" stop-color="#8fb8d8"/>
+    </linearGradient>
+    <linearGradient id="desk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a86c3a"/><stop offset="1" stop-color="#7c4a22"/>
+    </linearGradient>
+    <linearGradient id="book" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a3a3a"/><stop offset="1" stop-color="#5e2424"/>
+    </linearGradient>
+    <linearGradient id="pages" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff6e2"/><stop offset="1" stop-color="#ead9b2"/>
+    </linearGradient>
+    <radialGradient id="lampGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffe9a0" stop-opacity="0.5"/><stop offset="1" stop-color="#ffe9a0" stop-opacity="0"/>
+    </radialGradient>
     <radialGradient id="rugG" cx="50%" cy="50%" r="60%">
-      <stop offset="0" stop-color="#d56057"/><stop offset="100%" stop-color="#b23a30"/>
+      <stop offset="0" stop-color="#c4514a"/><stop offset="1" stop-color="#933027"/>
     </radialGradient>
-    <radialGradient id="sky" cx="50%" cy="20%" r="90%">
-      <stop offset="0" stop-color="#cfeaf6"/><stop offset="1" stop-color="#9cc8e6"/>
-    </radialGradient>
-    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="4"/>
-    </filter>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>
   </defs>
 
   <!-- 墙 -->
-  <rect x="0" y="0" width="1180" height="700" fill="url(#wall)"/>
+  <rect x="0" y="0" width="760" height="1340" fill="url(#wall)"/>
   <!-- 墙裙 -->
-  <rect x="0" y="470" width="1180" height="230" fill="#dcc59a"/>
-  <rect x="0" y="464" width="1180" height="10" fill="#c9a96f"/>
+  <rect x="0" y="900" width="760" height="440" fill="#dcbf86"/>
+  <rect x="0" y="892" width="760" height="12" fill="#c9a965"/>
 
-  <!-- 地板 -->
-  <rect x="0" y="500" width="1180" height="200" fill="url(#floor)"/>
-  <!-- 地板缝 -->
-  <g stroke="#8a5e2c" stroke-width="2" opacity="0.5">
-    <line x1="0" y1="540" x2="1180" y2="540"/>
-    <line x1="0" y1="600" x2="1180" y2="600"/>
-    <line x1="0" y1="660" x2="1180" y2="660"/>
+  <!-- 窗（左上） -->
+  <g transform="translate(60,90)">
+    <rect x="-12" y="-12" width="300" height="330" fill="#f4ecd8" stroke="#b89a5e" stroke-width="7" rx="8"/>
+    <rect x="0" y="0" width="276" height="306" fill="url(#sky)"/>
+    <path d="M 0 210 L 60 170 L 110 200 L 170 160 L 230 195 L 276 175 L 276 306 L 0 306 Z" fill="#9ec0a0" opacity="0.85"/>
+    <path d="M 0 240 L 80 215 L 150 235 L 220 210 L 276 230 L 276 306 L 0 306 Z" fill="#7ea67f"/>
+    <rect x="131" y="0" width="14" height="306" fill="#f4ecd8"/>
+    <rect x="0" y="146" width="276" height="14" fill="#f4ecd8"/>
+    <rect x="-22" y="306" width="320" height="18" fill="#d8bd86" stroke="#b89a5e" stroke-width="3"/>
+    <path d="M 264 -12 q 40 60 26 150 q -8 70 -30 160 L 300 296 q 10 -90 8 -170 q -2 -80 -12 -140 Z" fill="#d09a8a" opacity="0.9"/>
   </g>
 
-  <!-- 窗 -->
-  <g transform="translate(820,70)">
-    <rect x="-10" y="-10" width="320" height="260" fill="#f4ecd8" stroke="#bfa674" stroke-width="6" rx="6"/>
-    <rect x="0" y="0" width="300" height="240" fill="url(#sky)"/>
-    <rect x="0" y="150" width="300" height="90" fill="#bfe0c4" opacity="0.7"/>
-    <!-- 窗框十字 -->
-    <rect x="143" y="0" width="14" height="240" fill="#f4ecd8"/>
-    <rect x="0" y="113" width="300" height="14" fill="#f4ecd8"/>
-    <!-- 窗台 -->
-    <rect x="-20" y="240" width="340" height="16" fill="#d8bd86" stroke="#bfa674" stroke-width="3"/>
-  </g>
-
-  <!-- 画框（墙左） -->
-  <g transform="translate(90,90)">
-    <rect x="0" y="0" width="180" height="130" fill="#7a4a28" stroke="#5c3717" stroke-width="4"/>
-    <rect x="10" y="10" width="160" height="110" fill="#cfe0d6"/>
-    <path d="M 10 110 L 60 60 L 95 85 L 130 40 L 170 90 L 170 120 L 10 120 Z" fill="#7fa86b"/>
-    <circle cx="140" cy="35" r="14" fill="#f0c04a"/>
+  <!-- 画框（右上墙） -->
+  <g transform="translate(420,120)">
+    <rect x="0" y="0" width="250" height="190" fill="#6a4220" stroke="#4a2c12" stroke-width="5"/>
+    <rect x="12" y="12" width="226" height="166" fill="#dfe7da"/>
+    <rect x="12" y="120" width="226" height="58" fill="#9ec0a0"/>
+    <path d="M 12 130 L 70 80 L 110 110 L 160 70 L 210 100 L 238 90 L 238 178 L 12 178 Z" fill="#7ea67f"/>
+    <circle cx="200" cy="50" r="20" fill="#f0c04a"/>
+    <path d="M 12 150 L 50 120 L 90 138 L 140 110 L 190 132 L 238 120 L 238 178 L 12 178 Z" fill="#5e8a62"/>
   </g>
 
   <!-- 壁灯 -->
-  <g transform="translate(560,80)">
-    <rect x="-4" y="0" width="8" height="40" fill="#6a6a6a"/>
-    <path d="M -34 40 q 34 -30 68 0 q -8 36 -34 36 q -26 0 -34 -36 Z" fill="#ffe6a0" stroke="#c9931f" stroke-width="2"/>
+  <g transform="translate(380,80)">
+    <rect x="-3" y="0" width="6" height="46" fill="#5a5a5a"/>
+    <path d="M -36 46 q 36 -32 72 0 q -8 40 -36 40 q -28 0 -36 -40 Z" fill="#ffe39a" stroke="#c9931f" stroke-width="2"/>
+    <circle cx="0" cy="40" r="70" fill="url(#lampGlow)"/>
+  </g>
+
+  <!-- 挂钟（填中墙空白） -->
+  <g transform="translate(370,560)">
+    <circle cx="0" cy="0" r="52" fill="#3a2a1c" opacity="0.18" filter="url(#soft)"/>
+    <circle cx="0" cy="0" r="48" fill="#f4ecd8" stroke="#6a4220" stroke-width="5"/>
+    <circle cx="0" cy="0" r="48" fill="none" stroke="#c9a14a" stroke-width="1.5" opacity="0.7"/>
+    <g stroke="#6a4220" stroke-width="3" stroke-linecap="round">
+      <line x1="0" y1="-40" x2="0" y2="-34"/>
+      <line x1="0" y1="34" x2="0" y2="40"/>
+      <line x1="-40" y1="0" x2="-34" y2="0"/>
+      <line x1="34" y1="0" x2="40" y2="0"/>
+    </g>
+    <line x1="0" y1="0" x2="0" y2="-26" stroke="#3a2a1c" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="20" y2="8" stroke="#3a2a1c" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="0" cy="0" r="3.5" fill="#3a2a1c"/>
   </g>
 
   <!-- 地毯 -->
-  <ellipse cx="430" cy="600" rx="280" ry="52" fill="url(#rugG)" stroke="#8a2a22" stroke-width="3"/>
-  <ellipse cx="430" cy="600" rx="240" ry="42" fill="none" stroke="#f0d8a8" stroke-width="4" opacity="0.8"/>
+  <ellipse cx="380" cy="1140" rx="300" ry="60" fill="url(#rugG)" stroke="#7a2520" stroke-width="4"/>
+  <ellipse cx="380" cy="1140" rx="256" ry="48" fill="none" stroke="#f0d8a8" stroke-width="5" opacity="0.8"/>
+  <ellipse cx="380" cy="1140" rx="200" ry="36" fill="none" stroke="#f0d8a8" stroke-width="3" opacity="0.5"/>
 
-  <!-- 床（正面立面、平面） -->
-  <g transform="translate(120,360)">
-    <!-- 软影 -->
-    <ellipse cx="220" cy="200" rx="240" ry="22" fill="#000" opacity="0.18" filter="url(#soft)"/>
-    <!-- 床头板 -->
-    <rect x="0" y="-30" width="440" height="120" rx="14" fill="#8a5a30" stroke="#5c3717" stroke-width="3"/>
-    <rect x="14" y="-16" width="412" height="92" rx="10" fill="#a06a3a"/>
-    <!-- 床架 -->
-    <rect x="0" y="86" width="440" height="34" fill="#6a4420" stroke="#5c3717" stroke-width="2"/>
-    <!-- 床垫/被子 -->
-    <path d="M 8 110 L 432 110 L 446 200 L -6 200 Z" fill="#f2e6cf" stroke="#cdbb95" stroke-width="2"/>
-    <!-- 被子（翻折面） -->
-    <path d="M 8 110 L 432 110 L 432 150 L 8 150 Z" fill="#c0612f" stroke="#8a3f1f" stroke-width="2"/>
-    <path d="M 8 150 L 432 150 L 432 158 L 8 158 Z" fill="#a44a20"/>
-    <!-- 枕头 -->
-    <rect x="30" y="78" width="120" height="40" rx="16" fill="#fff3df" stroke="#cdbb95" stroke-width="2"/>
-    <rect x="170" y="78" width="120" height="40" rx="16" fill="#fff3df" stroke="#cdbb95" stroke-width="2"/>
-  </g>
+  <!-- 木桌 + 账本 -->
+  <g transform="translate(70,880)">
+    <ellipse cx="310" cy="300" rx="330" ry="26" fill="#000" opacity="0.18" filter="url(#soft)"/>
+    <rect x="20" y="60" width="26" height="240" fill="#6a4220"/>
+    <rect x="574" y="60" width="26" height="240" fill="#6a4220"/>
+    <path d="M 0 40 L 620 40 L 610 70 L 10 70 Z" fill="#7c4a22"/>
+    <rect x="0" y="20" width="620" height="30" fill="url(#desk)" stroke="#5c3717" stroke-width="2"/>
+    <rect x="14" y="24" width="592" height="8" fill="#c89464" opacity="0.6"/>
 
-  <!-- 床头柜 + 台灯 -->
-  <g transform="translate(600,470)">
-    <ellipse cx="60" cy="118" rx="80" ry="12" fill="#000" opacity="0.16" filter="url(#soft)"/>
-    <rect x="0" y="0" width="120" height="110" fill="#7a4a28" stroke="#5c3717" stroke-width="3"/>
-    <rect x="14" y="16" width="92" height="40" fill="#9a6a40" stroke="#5c3717" stroke-width="2"/>
-    <rect x="14" y="64" width="92" height="40" fill="#9a6a40" stroke="#5c3717" stroke-width="2"/>
-    <!-- 台灯 -->
-    <rect x="52" y="-46" width="16" height="50" fill="#5a5a5a"/>
-    <path d="M 20 -46 q 40 -30 80 0 q -6 34 -40 34 q -34 0 -40 -34 Z" fill="#ffd070" stroke="#c9931f" stroke-width="2"/>
-    <circle cx="60" cy="-12" r="50" fill="#ffe6a0" opacity="0.18"/>
-  </g>
-
-  <!-- 绿植（右角） -->
-  <g transform="translate(1010,470)">
-    <ellipse cx="55" cy="118" rx="80" ry="12" fill="#000" opacity="0.16" filter="url(#soft)"/>
-    <path d="M 10 110 L 100 110 L 88 60 L 22 60 Z" fill="#b06a3a" stroke="#7a4420" stroke-width="2"/>
-    <ellipse cx="55" cy="60" rx="33" ry="9" fill="#8a4a24"/>
-    <g fill="#5fa86b" stroke="#3f7a4a" stroke-width="2">
-      <ellipse cx="55" cy="30" rx="16" ry="34"/>
-      <ellipse cx="30" cy="40" rx="14" ry="30" transform="rotate(-25 30 40)"/>
-      <ellipse cx="80" cy="40" rx="14" ry="30" transform="rotate(25 80 40)"/>
-      <ellipse cx="55" cy="18" rx="12" ry="26"/>
+    <!-- 账本 -->
+    <g transform="translate(150,18)">
+      <ellipse cx="170" cy="34" rx="190" ry="16" fill="#000" opacity="0.22" filter="url(#soft)"/>
+      <rect x="20" y="-44" width="300" height="64" rx="4" fill="url(#pages)" stroke="#cdbb95" stroke-width="1.5"/>
+      <line x1="40" y1="-40" x2="300" y2="-40" stroke="#d8c69a" stroke-width="1" opacity="0.7"/>
+      <line x1="40" y1="-32" x2="300" y2="-32" stroke="#d8c69a" stroke-width="1" opacity="0.6"/>
+      <line x1="40" y1="-24" x2="300" y2="-24" stroke="#d8c69a" stroke-width="1" opacity="0.6"/>
+      <path d="M 8 -50 L 312 -50 Q 322 -50 322 -40 L 322 12 Q 322 22 312 22 L 8 22 Q -2 22 -2 12 L -2 -40 Q -2 -50 8 -50 Z"
+            fill="url(#book)" stroke="#3e1818" stroke-width="2"/>
+      <path d="M -2 -40 Q -2 -50 8 -50 L 26 -50 L 26 22 L 8 22 Q -2 22 -2 12 Z" fill="#4a1c1c" opacity="0.7"/>
+      <rect x="16" y="-42" width="288" height="56" rx="3" fill="none" stroke="#c79a4a" stroke-width="1.4" opacity="0.8"/>
+      <path d="M 154 -16 L 168 -28 L 182 -16 L 168 -4 Z" fill="none" stroke="#d8a85a" stroke-width="1.6"/>
+      <path d="M 154 -16 L 168 -28 L 182 -16 L 168 -4 Z" fill="#d8a85a" opacity="0.18"/>
+      <path d="M 250 -44 L 250 30 L 244 24 L 256 24 Z" fill="#c2485c" stroke="#8e2f3e" stroke-width="1"/>
+      <g transform="translate(330,8) rotate(-12)">
+        <rect x="0" y="0" width="120" height="9" rx="4" fill="#3a2a1c"/>
+        <rect x="0" y="0" width="26" height="9" rx="4" fill="#c9a14a"/>
+        <path d="M 120 0 L 134 4.5 L 120 9 Z" fill="#3a2a1c"/>
+      </g>
     </g>
+  </g>
+
+  <!-- 绿植（右下） -->
+  <g transform="translate(600,1000)">
+    <ellipse cx="60" cy="150" rx="80" ry="14" fill="#000" opacity="0.16" filter="url(#soft)"/>
+    <path d="M 14 150 L 106 150 L 92 86 L 28 86 Z" fill="#b06a3a" stroke="#7a4420" stroke-width="2"/>
+    <ellipse cx="60" cy="86" rx="32" ry="9" fill="#8a4a24"/>
+    <g fill="#5fa86b" stroke="#3f7a4a" stroke-width="2">
+      <ellipse cx="60" cy="46" rx="16" ry="40"/>
+      <ellipse cx="34" cy="56" rx="14" ry="34" transform="rotate(-25 34 56)"/>
+      <ellipse cx="86" cy="56" rx="14" ry="34" transform="rotate(25 86 56)"/>
+      <ellipse cx="60" cy="30" rx="12" ry="28"/>
+    </g>
+  </g>
+
+  <!-- 地板 -->
+  <rect x="0" y="1180" width="760" height="160" fill="url(#floor)"/>
+  <g stroke="#6a4420" stroke-width="2" opacity="0.5">
+    <line x1="0" y1="1230" x2="760" y2="1230"/>
+    <line x1="0" y1="1280" x2="760" y2="1280"/>
   </g>
 </svg>
