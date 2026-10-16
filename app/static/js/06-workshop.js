@@ -117,8 +117,12 @@
     const svg = _svg('svg', { viewBox: '0 0 760 1340',
       preserveAspectRatio: 'xMidYMid slice', class: 'ws-flat' });
     svg.innerHTML =
+      // ★ 内层 <image> 用 **meet**（不是 slice！）✓ —— flat-room 本身 760×1340，
+      //   放进 760×1340 盒子是 1:1 精确贴合，meet 即满、slice 在某些 WebView 上
+      //   会把 <image> 渲成黑块/不铺满 ✗（实测黑边根因 ✓）。真正填满屏幕的是
+      //   **外层 svg 的 slice** ✓，内层只管把图原样贴进 viewBox。
       '<image href="/static/flat-room.svg" x="0" y="0" width="760" height="1340" ' +
-        'preserveAspectRatio="xMidYMid slice"/>' +
+        'preserveAspectRatio="xMidYMid meet"/>' +
       // 账本热区（桌上账本位置 ✓）—— 透明、可点 → 进记账。
       //   ⚠️ <image> 引的 svg 没法点子元素 ✓，所以盖一块透明 rect 当入口 ✓。
       '<rect class="ws-obj" data-slug="bookkeeping-panel" x="195" y="835" ' +
