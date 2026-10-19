@@ -245,8 +245,122 @@
   $('#modelsBack').onclick = () => popScreen('models');
   $('#modelsAdd').onclick = () => editForm(null);
 
+  // ── 聊天背景（2026-10-19）───────────────────────────────────────────
+  //
+  // ★ 每个空间一张图 ✓（服务端在 `var/background/g<群号>/` 里存 ✓，
+  //   `group.background` 跟着群这一行走 ✓ → bootstrap / `/groups` 都有 ✓）。
+  //   ⚠️ 这里**不缓存**那张图 ✓ —— 地址里带版本号 ✓（换图换 URL ✓），
+  //      所以"有没有背景"永远以 `group.background` 为准 ✓。
+  //
+  // ⚠️ 上传**不能用 `api()`** ✗ —— 它固定发 JSON ✓；
+  //    这里要 `FormData` ✓，所以照头像那两处（`uploadAgentAvatarFile` ✓）
+  //    直接 `fetch` ✓，失败时自己把 `detail` 读出来 ✓。
+  let bgBusy = false;
+
+  const openBgSet = () => { pushScreen('bgSet', 'settings'); renderBgSet(); };
+
+  const renderBgSet = () => {
+    const body = $('#bgBody');
+    if (!body) return;
+    body.textContent = '';
+    const url = group && group.background;
+
+    // 预览：**画成竖的那种** ✓（手机相册里大多数是竖图 ✓）
+    const prev = document.createElement('div');
+    prev.className = 'bgprev';
+    if (url) prev.style.backgroundImage = `url("${url}")`;
+    else {
+      const none = document.createElement('span');
+      none.className = 'bgempty';
+      none.textContent = bgBusy ? '正在上传…' : '还没有设置背景';
+      prev.appendChild(none);
+    }
+    body.appendChild(prev);
+
+    const pick = document.createElement('button');
+    pick.className = 'bgbtn';
+    pick.textContent = url ? '换一张图片' : '选择图片';
+    pick.disabled = bgBusy;
+    pick.onclick = () => { if (!bgBusy) $('#fileBg').click(); };
+    body.appendChild(pick);
+
+    // 「移除」只在有背景时出现 ✓ —— 没背景时摆一颗红按钮只是吓人 ✓
+    if (url) {
+      const del = document.createElement('button');
+      del.className = 'bgbtn danger';
+      del.textContent = '移除背景';
+      del.disabled = bgBusy;
+      del.onclick = removeBg;
+      body.appendChild(del);
+    }
+
+    const hint = document.createElement('div');
+    hint.className = 'bghint';
+    hint.textContent = '支持 jpg / png / webp / gif，最大 12MB。'
+      + '背景只有这个空间里的人能看到。';
+    body.appendChild(hint);
+  };
+
+  const uploadBg = async (file) => {
+    if (!file || !group) return;
+    // 前端先挡一道只是**省一趟** ✓ —— 真正的闸门在服务端 ✓
+    //（能被绕过的检查等于没有 ✓，这条是这个项目的老规矩 ✓）。
+    if (file.size > 12 * 1024 * 1024) { toast('图片太大（上限 12MB）'); return; }
+    bgBusy = true; renderBgSet(); toast('正在上传…');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const r = await fetch(`/api/groups/${group.id}/background`,
+                            { method: 'POST', body: fd, credentials: 'same-origin' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || ('上传失败 ' + r.status));
+      // ⚠️ 拿服务端回来的地址 ✓（别自己拼 ✓）—— 版本号只有它知道 ✓。
+      group.background = (d && d.background) || null;
+      renderHeader(); renderSettings();
+      toast('背景已换好');
+    } catch (e) {
+      toast((e && e.message) || '没上传上');
+    } finally {
+      bgBusy = false; renderBgSet();
+    }
+  };
+
+  const removeBg = async () => {
+    const yes = await confirmBox({
+      title: '移除背景？',
+      body: '移除后群聊会回到默认的底色。',
+      ok: '移除', danger: true,
+    });
+    if (!yes) return;
+    bgBusy = true; renderBgSet();
+    try {
+      await api(`/groups/${group.id}/background`, { method: 'DELETE' });
+      group.background = null;
+      renderHeader(); renderSettings();
+      toast('背景已移除');
+    } catch (e) {
+      toast((e && e.message) || '没移除掉');
+    } finally {
+      bgBusy = false; renderBgSet();
+    }
+  };
+
+  $('#bgBack').onclick = () => popScreen('bgSet');
+  // ⚠️ 选完**马上把 input 清空** ✓ —— 不然同一张图再选一次不会触发 `change` ✓，
+  //    用户看到的是"点了没反应"✓。
+  $('#fileBg').onchange = (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (f) uploadBg(f);
+  };
+
   const renderSettings = () => {
     const eGname = $('#vGname'); if (eGname) eGname.textContent = group?.name || '';
+    // 「聊天背景」右边：只说有没有 ✓ —— 缩略图不塞进这一行 ✓（行太窄 ✓）。
+    const eBg = $('#vBg');
+    if (eBg) eBg.textContent = (group && group.background) ? '已设置' : '默认';
+    // 背景设置页开着时，群一刷新（比如别的成员换了图 ✓）它也得跟着重画 ✓
+    if ($('#bgSet').classList.contains('on')) renderBgSet();
     const eAname = $('#vAname'); if (eAname) eAname.textContent = agentName();
     // ⚠️ 这里原来还给「群昵称」那一行填值 ✓（`#vMy` ✓）——
     //    **那一行和这个 DOM 都删了** ✗→✓（2026-10-08：一个人的名字只有一个 ✓）。
@@ -440,6 +554,8 @@
       const act = el.dataset.act;
       // ★ **点「空间」只改名** ✗→✓（2026-10-09 用户定的 ✓ —— 原来它推开 `#space` ✓）
       if (act === 'gname') renameSpace();
+      // ★ 2026-10-19：「聊天背景」—— 推开这一屏 ✓（上传 / 移除都在它里面 ✓）
+      else if (act === 'bg') openBgSet();
       else if (act === 'invite') inviteCodeNow();
       // ★ **退出当前空间**（红字居中，就在「退出登录」上面 ✓）—— 二次确认在它里面 ✓
       else if (act === 'leave') confirmLeaveSpace();
@@ -910,7 +1026,7 @@
   //:    上左滑也会把收纳页推上来 ✗✓（用户看到的就是"到处都能滑出来" ✓）。
   //:    判据改成"**最上面那一屏**是不是这三屏之一" ✓。
   const _OTHER_SCREENS = [
-    '#settings', '#me', '#meAccount', '#space', '#peer', '#selfIntro',
+    '#settings', '#bgSet', '#me', '#meAccount', '#space', '#peer', '#selfIntro',
     '#agent', '#agentEdit', '#diySet', '#wsNav', '#wsChat', '#login', '#init',
   ];
 

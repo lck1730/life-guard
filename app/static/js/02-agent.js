@@ -507,6 +507,9 @@
     //   排在**设置之前** ✓（从哪进来就按哪儿的顺序退 ✓，和别的屏一个规矩 ✓）。
     //   ⚠️ 原来这一支**没有** ✗ —— 在模型页按返回会**落到设置页那一支** ✓，
     //     把设置关掉 ✓ → 用户看到的是"退多了" ✓（本该回到设置，结果回到了群聊 ✓）。
+    // ★ **聊天背景**（2026-10-19）—— 和模型池一样从设置页推出来 ✓，
+    //   所以排在**设置之前** ✓（从哪进来就按哪儿的顺序退 ✓）。
+    if ($('#bgSet').classList.contains('on')) { popScreen('bgSet'); return; }
     if ($('#models').classList.contains('on')) { popScreen('models'); return; }
     if ($('#settings').classList.contains('on')) { closeSettings(); return; }
     // ⚠️ `#login` / `#init` **刻意不列在这儿** ✗ —— 它们是**根屏** ✓：

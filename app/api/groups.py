@@ -7,10 +7,12 @@ import logging
 import os
 import re
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import (APIRouter, Depends, File, HTTPException, Query, Request,
                      UploadFile, status)
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 log = logging.getLogger("lifeguard.groups")
@@ -114,6 +116,62 @@ def _agent_avatar_url(rel) -> str:
     return _versioned(rel) or _versioned("avatar.png")
 
 
+# ── 主群聊背景（2026-10-19）────────────────────────────────────────────
+#
+# 每个空间一张图，文件在 `var/background/g<群号>/bg.<ext>` ✓。
+# ⚠️ **不进 `ui/`** ✗ —— 那里整个挂在没有鉴权的 `/ui` 上 ✓；
+#    背景只有这个群里的人该看到 ✓，所以读取也走 `require_member` ✓。
+_BG_EXTS = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+_BG_MAX = 12 * 1024 * 1024       # 手机照片一张通常 3–8MB；再大就该压一下了
+
+
+def _background_dir(group_id: int) -> Path:
+    return settings.backgrounds_dir / f"g{int(group_id)}"
+
+
+def _background_file(group_id: int) -> Path | None:
+    """这个空间现在用的那张图 —— **看文件在不在，不另存一份状态** ✓。
+
+    每个空间同时只会有一张 ✓（上传时先删旧的 ✓），
+    所以"有没有设置背景"就是"这个目录里有没有 `bg.*`" ✓。
+    """
+    for ext in _BG_EXTS.values():
+        p = _background_dir(group_id) / f"bg{ext}"
+        if p.is_file():
+            return p
+    return None
+
+
+def _background_url(group_id: int) -> str | None:
+    """给前端的地址 —— 带版本号 ✓（下面那条读取接口能长期缓存 ✓）。"""
+    p = _background_file(group_id)
+    if not p:
+        return None
+    try:
+        v = p.stat().st_mtime_ns
+    except OSError:
+        return None
+    return f"/api/groups/{int(group_id)}/background/file?v={v}"
+
+
+def _check_image_magic(data: bytes, ext: str) -> bool:
+    """**信内容，不信客户端说的类型** ✓ —— 不然 `.html` 换个 MIME 就能传上来 ✓。"""
+    if ext == ".jpg":
+        return data.startswith(b"\xff\xd8\xff")
+    if ext == ".png":
+        return data.startswith(b"\x89PNG\r\n\x1a\n")
+    if ext == ".gif":
+        return data[:6] in (b"GIF87a", b"GIF89a")
+    if ext == ".webp":
+        return len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+    return False
+
+
 def _normalize_rows(rows: list[dict]) -> list[dict]:
     """出去之前把状态配置**过一遍 normalize** ✓ —— 2026-10-06 加。
 
@@ -140,6 +198,11 @@ def _normalize_rows(rows: list[dict]) -> list[dict]:
         #   "没配头像"照样给一个**带版本的默认图** ✓，
         #   不然前端会退回一个没版本号的 `/ui/avatar.png` → 又闪 ✓。
         r["agent_avatar"] = _agent_avatar_url(r.get("agent_avatar"))
+        # ★ 主群聊背景 ✓ —— 和头像一样**每次现算** ✓：
+        #   文件在不在、版本号多少，都以磁盘为准 ✓（换图后 URL 立刻变 ✓）。
+        #   把它放进群这一行里 ✓ → bootstrap 和 `/groups` **两条路一起有** ✓，
+        #   不用前端再单开一趟 ✓（这个项目"两处口径"栽过太多次了 ✓）。
+        r["background"] = _background_url(r["id"])
     return rows
 
 
@@ -434,6 +497,88 @@ async def upload_agent_avatar(
     return {"ok": True, "avatar": f"/ui/{rel}"}
 
 
+# ── 主群聊背景：上传 / 读取 / 移除 ──────────────────────────────────────
+#
+# ★ 2026-10-19：用户要的「上传图片作为主群聊背景，在设置页新开一个背景设置」✓。
+#
+# ⚠️ **读也要鉴权** ✗ —— 图放在 `var/`、走这个接口 ✓，
+#   不是 `/ui/` 那种谁都能猜着取的地方 ✓（背景是群里的东西 ✓）。
+_BG_BY_EXT = {".jpg": ".jpg", ".jpeg": ".jpg", ".png": ".png",
+              ".webp": ".webp", ".gif": ".gif"}
+
+
+@router.get("/{group_id}/background/file")
+async def read_background(
+    group_id: int,
+    user: dict = Depends(current_user),
+) -> FileResponse:
+    """把这张背景发给**这个群的人** ✓。
+
+    ⚠️ URL 里带 `?v=<mtime_ns>` ✓（见 `_background_url`）——
+      换图必然换 URL ✓ → 这里可以放心让浏览器长期缓存 ✓（省WireGuard流量 ✓）。
+    """
+    await require_member(group_id, user["id"])
+    p = _background_file(group_id)
+    if not p:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "这个空间还没有设置背景")
+    return FileResponse(
+        p, headers={"Cache-Control": "private, max-age=31536000, immutable"})
+
+
+@router.post("/{group_id}/background")
+async def upload_background(
+    group_id: int,
+    file: UploadFile = File(...),
+    user: dict = Depends(current_user),
+) -> dict:
+    await require_member(group_id, user["id"])
+
+    ctype = (file.content_type or "").split(";")[0].strip().lower()
+    ext = _BG_EXTS.get(ctype)
+    if not ext:
+        # ⚠️ 安卓相册/文件选择器有时给的是 `application/octet-stream` ✗ ——
+        #    和 `api/media.py` 那条一样，按扩展名兜底 ✓。
+        ext = _BG_BY_EXT.get(Path(file.filename or "").suffix.lower())
+    if not ext:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                            "只支持 jpg / png / webp / gif 图片")
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "空文件")
+    if len(data) > _BG_MAX:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            f"图片过大（{len(data) // 1024 // 1024}MB），"
+                            f"上限 {_BG_MAX // 1024 // 1024}MB")
+    if not _check_image_magic(data, ext):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "这不是有效的图片文件")
+
+    d = _background_dir(group_id)
+    d.mkdir(parents=True, exist_ok=True)
+    # 先写临时名再原子换 ✓ —— 别让"读到半张图"有一瞬间的可能 ✓。
+    tmp = d / f".bg{ext}.tmp"
+    tmp.write_bytes(data)
+    for other in _BG_EXTS.values():
+        if other != ext:
+            (d / f"bg{other}").unlink(missing_ok=True)
+    os.replace(tmp, d / f"bg{ext}")
+
+    # 另一个成员开着 App 时也能立刻换 ✓（前端收到信号后重拉 `/groups` ✓）。
+    await broadcast_group_update(group_id)
+    return {"ok": True, "background": _background_url(group_id)}
+
+
+@router.delete("/{group_id}/background")
+async def delete_background(
+    group_id: int,
+    user: dict = Depends(current_user),
+) -> dict:
+    await require_member(group_id, user["id"])
+    d = _background_dir(group_id)
+    for ext in _BG_EXTS.values():
+        (d / f"bg{ext}").unlink(missing_ok=True)
+    await broadcast_group_update(group_id)
+    return {"ok": True, "background": None}
 
 
 @router.get("/{group_id}/messages")

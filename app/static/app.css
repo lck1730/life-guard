@@ -314,6 +314,27 @@
 
   #msgs { flex:1; min-height:0; overflow-y:auto; padding:14px; display:flex;
           flex-direction:column; gap:10px; -webkit-overflow-scrolling:touch; }
+  /* ── 主群聊背景（2026-10-19）────────────────────────────────────────
+     背景 = **垫在消息下面的一张图** ✓，用 `#chat::before` 画一层 ✓，
+     再把顶栏 / 消息区 / 输入区抬到它上面 ✓。
+     ⚠️ **不用 `#chat { background-image }`** ✗ —— `.screen` 自己那条
+        `background:var(--bg)` 是不透明的 ✓，会把它盖住 ✓；
+        而且伪元素能单独控制层级 ✓（照"叠一层"的想法写最省事 ✓）。
+     ⚠️ `inset:0` 能成立是因为 `.screen` 是 `position:fixed` ✓。
+     ⚠️ 那层 18% 的黑纱是给文字留对比度 ✓ —— 亮色照片没有它，
+        白字会糊成一片 ✓（深色主题下最明显 ✓）。
+     ⚠️ URL 带 `?v=<mtime_ns>` ✓（服务端给的 ✓）→ 换图必然换 URL ✓。 */
+  #chat.has-bg::before {
+    content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background-image:var(--chat-bg); background-size:cover;
+    background-position:center; background-repeat:no-repeat;
+  }
+  #chat.has-bg::after {
+    content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background:rgba(0,0,0,.18);
+  }
+  #chat.has-bg > header.top, #chat.has-bg > #msgs,
+  #chat.has-bg > #composer { position:relative; z-index:1; }
   .empty { margin:auto; color:var(--muted); font-size:14px; text-align:center; }
   .row { display:flex; gap:8px; max-width:84%; }
   .row.mine { align-self:flex-end; flex-direction:row-reverse; }
@@ -1230,6 +1251,21 @@
                                 display:inline-block; transform:rotate(90deg); }
   .ascreen .pbox .go { color:var(--muted); font-size:20px; line-height:1; flex-shrink:0; }
   .ascreen .err { color:var(--danger); font-size:13px; min-height:18px; margin-top:10px; }
+  /* ── 聊天背景设置（2026-10-19）── 设置页「聊天背景」那一行进来的整屏 ✓ */
+  #bgSet .bgprev { width:100%; aspect-ratio:3/4; min-height:220px; max-height:52vh; border-radius:16px;
+    overflow:hidden; background:var(--panel2) center/cover no-repeat;
+    border:1px solid var(--line); display:flex; align-items:center;
+    justify-content:center; }
+  #bgSet .bgempty { color:var(--muted); font-size:14px; }
+  /* 按钮：主按钮用强调色 ✓，危险动作只描边 + 红字 ✓（不用一整块红 ✓） */
+  #bgSet .bgbtn { display:block; width:100%; padding:14px; margin-top:10px;
+    border-radius:12px; background:var(--accent); color:var(--on-accent);
+    font-size:16px; font-weight:600; }
+  #bgSet .bgbtn:disabled { opacity:.45; }
+  #bgSet .bgbtn.danger { background:transparent; color:var(--danger);
+    border:1px solid var(--line); }
+  #bgSet .bghint { color:var(--muted); font-size:12.5px; text-align:center;
+    margin-top:12px; line-height:1.5; }
   /* ★ 2026-10-14：这里原有一对 `.ascreen .swap`（保存下面那颗「取消/返回」小字的样式）✗
      —— 四屏的 `swap` 块全删了 ✓（改管家资料 · 我的 · 备注 · diy 小助手，见
      02-agent.js / 05-settings.js / 06-workshop.js ✓），样式跟着拿掉 ✓。

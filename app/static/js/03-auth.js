@@ -259,7 +259,31 @@
   //   —— 少了它，"正在输入"会变成一个**空的状态条** ✗。
   const STATUS_TEXT = { idle:'正在窥屏…', thinking:'正在思考…', typing:'正在输入…', lurking:'打算继续窥屏…' };
 
-  const renderHeader = () => { $('#gname').textContent = group?.name || ''; setStatus(curStatus); };
+  /** 把这个空间的背景贴到主群聊上 ✓（没有就摘掉 ✓）。
+   *
+   *  ⚠️ 只改 `#chat` 上的一个 class + 一个 CSS 变量 ✓ —— **不重建节点** ✓
+   *    （换背景时消息列表不该闪一下 ✓）。
+   *  ⚠️ 地址**只认服务端给的** `group.background` ✓（它带版本号 ✓，
+   *    换图必然换 URL ✓）—— 前端不自己拼 ✓。
+   */
+  const applyChatBackground = () => {
+    const chat = $('#chat');
+    if (!chat) return;
+    const url = group && group.background;
+    if (url) {
+      chat.style.setProperty('--chat-bg', `url("${url}")`);
+      chat.classList.add('has-bg');
+    } else {
+      chat.classList.remove('has-bg');
+      chat.style.removeProperty('--chat-bg');
+    }
+  };
+
+  const renderHeader = () => {
+    $('#gname').textContent = group?.name || '';
+    setStatus(curStatus);
+    applyChatBackground();
+  };
 
   // ★ 三档文案的分工（2026-10-06，见 app/agent_status.py 那段）：
   //   · 思考中 / 不打算说话 → 服务端在**事件**里挑好一句发下来 ✓

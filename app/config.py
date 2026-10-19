@@ -93,6 +93,16 @@ class Settings(BaseSettings):
         """
         return self.var_dir / "staging"
 
+    @property
+    def backgrounds_dir(self) -> Path:
+        """**主群聊的自定义背景**：`var/background/g<群号>/bg.<ext>`。
+
+        ⚠️ 和组件一样放在 `var/` 下、**不挂静态** ✗ ——
+        背景只有这个群里的人该看得到 ✓，读取走带 `require_member` 的接口 ✓。
+        每个空间只有一张 ✓（换图是覆盖，不是堆积 ✓）。
+        """
+        return self.var_dir / "background"
+
     # ── 发布物（APK）────────────────────────────────────────────────────
     #
     # **这是"原生壳"唯一的出口。** 界面能热更新（服务器换个文件就行），
