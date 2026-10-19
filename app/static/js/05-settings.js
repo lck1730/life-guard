@@ -296,8 +296,7 @@
 
     const hint = document.createElement('div');
     hint.className = 'bghint';
-    hint.textContent = '支持 jpg / png / webp / gif，最大 12MB。'
-      + '背景只有这个空间里的人能看到。';
+    hint.textContent = '支持 jpg / png / webp / gif，最大 12MB。';
     body.appendChild(hint);
   };
 
