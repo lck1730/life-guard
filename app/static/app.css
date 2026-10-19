@@ -1,8 +1,25 @@
+  /* ── 三套主题（2026-10-19）────────────────────────────────────────────
+     夜阑 = 原来的深色 ✓（默认 ✓）· 奶霜 = 奶白 ✓ · 林深 = 深林绿 ✓。
+     ⚠️ 主题是**个人的** ✓ —— 由 `01-core.js` 写 `data-theme` ✓，
+        值只存在这台设备上 ✓，不经过服务端 ✓、不跟空间共享 ✓。
+     下面那几个辅助变量（`--hover` / `--accent-line` / `--quote-bg` …）是
+     这次顺手收进来的 ✓ —— 原来那些颜色写死在规则里 ✓，浅色主题下会
+     "一块深蓝浮在奶白上" ✗（见 `#wsChat .qchip` 之类 ✓）。 */
   :root, [data-theme="dark"] {
     --bg:#0f1115; --panel:#171a21; --panel2:#1e222b;
     --text:#e6e8ee; --muted:#8b93a7; --line:#262b36;
     --accent:#6ea8ff; --accent-bg:#1e3a5f; --on-accent:#07131f;
     --agent:#9dd0aa; --danger:#ff6b6b;
+    /* 辅助色（规则里不再写死） */
+    --accent-line:#35507a;  --accent-soft:rgba(90,140,255,.10);
+    --hover:#1d2129;        --avatar-bg:#232833;
+    --quote-bg:rgba(127,127,127,.16);
+    --danger-soft:rgba(255,107,107,.4);
+    --bg-scrim:rgba(0,0,0,.18);
+    --warn2:#d8b06a;
+    --ok:#34c759; --warn:#ffb020; --bad:#ff453a;
+    --shadow-md:0 6px 24px rgba(0,0,0,.35);
+    --shadow-lg:0 18px 50px rgba(0,0,0,.45);
     /* 系统留白。**由网页自己做主**——原生壳只上报数字（window.__onInsets），
        这里决定怎么用。这样调布局改网页就行，不用重装 App。
        浏览器里（没有原生壳）退回 CSS 的 env()。 */
@@ -10,11 +27,39 @@
     --inset-bottom: env(safe-area-inset-bottom, 0px);
     --kb: 0px;                    /* 仅浏览器下的键盘兜底，App 里原生已算进 inset-bottom */
   }
-  [data-theme="light"] {
-    --bg:#f5f6fa; --panel:#ffffff; --panel2:#eef0f6;
-    --text:#14161c; --muted:#5a637a; --line:#dde1ea;
-    --accent:#2f6fd0; --accent-bg:#dce8fb; --on-accent:#ffffff;
-    --agent:#2f8a52; --danger:#c0392b;
+  /* 奶霜：暖白底 + 焦糖强调色 ✓ —— 不是纯白（纯白在手机上调亮度会刺眼 ✗），
+     也不是冷灰（冷灰配棕色会显脏 ✗）。气泡用面板白，自己的用淡焦糖 ✓。 */
+  [data-theme="cream"], [data-theme="light"] {
+    --bg:#f6f0e4; --panel:#fffcf5; --panel2:#efe7d8;
+    --text:#2d2822; --muted:#706658; --line:#e4d8c5;
+    --accent:#9a5b2e; --accent-bg:#f2e1cb; --on-accent:#fffdf8;
+    --agent:#5e7d4a; --danger:#b94735;
+    --accent-line:#d8be9e;  --accent-soft:rgba(154,91,46,.10);
+    --hover:#f3eadb;        --avatar-bg:#e9dfcf;
+    --quote-bg:rgba(122,112,99,.12);
+    --danger-soft:rgba(185,71,53,.35);
+    --bg-scrim:rgba(255,252,245,.46);   /* 奶白下字是深色 → 照片要压得更白一点才读得清 ✓ */
+    --warn2:#8a5f1e;
+    --ok:#2f7d45; --warn:#966a12; --bad:#b23a2e;
+    --shadow-md:0 6px 24px rgba(74,58,38,.10);
+    --shadow-lg:0 18px 50px rgba(74,58,38,.16);
+  }
+  /* 林深：墨绿底 + 苔绿强调色 ✓ —— 比夜阑暖一档（偏绿而不是偏蓝 ✓），
+     但对比度保持住 ✓（深底上正文不用纯白，带一点绿灰更柔和 ✓）。 */
+  [data-theme="forest"] {
+    --bg:#0d1711; --panel:#142219; --panel2:#1b2c20;
+    --text:#e6efe3; --muted:#90a794; --line:#263b2c;
+    --accent:#a2d5a4; --accent-bg:#23422c; --on-accent:#0a150e;
+    --agent:#d9c68a; --danger:#e37e6d;
+    --accent-line:#3a5a44;  --accent-soft:rgba(162,213,164,.12);
+    --hover:#1f3326;        --avatar-bg:#1f3326;
+    --quote-bg:rgba(144,167,148,.15);
+    --danger-soft:rgba(227,126,109,.4);
+    --bg-scrim:rgba(0,0,0,.25);
+    --warn2:#d9c68a;
+    --ok:#7bcc8a; --warn:#e6c35c; --bad:#ff8f7c;
+    --shadow-md:0 6px 24px rgba(0,0,0,.35);
+    --shadow-lg:0 18px 50px rgba(0,0,0,.45);
   }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { margin:0; height:100%; overscroll-behavior:none; }
@@ -107,7 +152,7 @@
             background:none; border:none;
             color:var(--accent); font-size:17.5px; font-weight:600;
             border-radius:12px; box-shadow:none; }
-  #initGo:active { background:rgba(90,140,255,.10); }
+  #initGo:active { background:var(--accent-soft); }
   #login .logo { width:64px;height:64px;border-radius:50%;background:var(--accent-bg);
                  display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
                  font-size:26px;color:var(--accent); }
@@ -141,7 +186,7 @@
   /* 身后一层极淡的光晕 —— 纯黑背景上"有个中心" ✓（很淡，看不见边界才对 ✓） */
   #init::before { content:''; position:absolute; inset:0; pointer-events:none;
                   background:radial-gradient(60% 42% at 50% 40%,
-                              rgba(90,140,255,.10), rgba(0,0,0,0) 70%); }
+                              var(--accent-soft), rgba(0,0,0,0) 70%); }
   #init .wrap { position:relative; }
   /* ★ **表单浮起来的时候，这一屏自己的三行要藏掉** ✗→✓（2026-10-10 用户看截图：
      「底部还有上一个页面的」✓）—— 卡片是 absolute ✓、hero 那一坨还留在原地 ✓ →
@@ -180,7 +225,7 @@
                      transform:translate(-50%,-50%);
                      width:min(360px, calc(100% - 40px)); padding:24px 22px;
                      background:var(--panel); border:1px solid var(--line);
-                     border-radius:18px; box-shadow:0 18px 50px rgba(0,0,0,.45);
+                     border-radius:18px; box-shadow:var(--shadow-lg);
                      animation:popIn .2s cubic-bezier(.22,1,.36,1) both; }
   #init .introcard h2 { margin:0 0 12px; font-size:17px; text-align:center; }
   /* ★ 每个框头上那行小提示 ✓（和登录页那套 label 一个长相 ✓ —— 那边也是
@@ -195,7 +240,7 @@
   /* ⚠️ 表单里那行内嵌的红字**不用了** ✗→✓（用户 2026-10-10：「红字…不好看也不会
      主动消失，应该悬浮一张卡片提示并且一会就消失」✓）→ 改成 `showNotice` ✓
      （居中那张卡 ✓，3.6 秒自己淡出 ✓，不占版面 ✓、不把下面的东西顶下去 ✓）。 */
-  .notice.err { color:var(--danger); border-color:rgba(224,106,106,.45); }
+  .notice.err { color:var(--danger); border-color:var(--danger-soft); }
   #init .introcard p { margin:0 0 10px; color:var(--muted); font-size:14px; line-height:1.75; }
   #init .introcard p b { color:var(--text); font-weight:600; }
   #init .introcard .foot { margin:16px 0 0; color:var(--muted); font-size:12px; text-align:center; }
@@ -331,7 +376,7 @@
   }
   #chat.has-bg::after {
     content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
-    background:rgba(0,0,0,.18);
+    background:var(--bg-scrim);
   }
   #chat.has-bg > header.top, #chat.has-bg > #msgs,
   #chat.has-bg > #composer { position:relative; z-index:1; }
@@ -443,7 +488,7 @@
               cursor:pointer; padding:2px 4px; line-height:1; }
 
   /* 气泡里的引用块（微信是气泡顶部一块浅灰，左侧不描边，整体比正文小一号） */
-  .quote { display:block; background:rgba(127,127,127,.16); border-radius:8px;
+  .quote { display:block; background:var(--quote-bg); border-radius:8px;
            padding:6px 9px; margin-bottom:7px; font-size:12.5px; line-height:1.45;
            cursor:pointer; max-width:100%; }
   .quote .qwho { color:var(--accent); font-weight:600; margin-bottom:2px; }
@@ -624,7 +669,7 @@
   #atMenu { position:absolute; left:12px; right:12px; bottom:100%;
             margin-bottom:6px; background:var(--panel); border:1px solid var(--line);
             border-radius:12px; overflow:hidden; display:none; max-height:190px; overflow-y:auto;
-            box-shadow:0 6px 24px rgba(0,0,0,.35); }
+            box-shadow:var(--shadow-md); }
   #atMenu.on { display:block; }
   #atMenu .pick { display:flex; align-items:center; gap:10px; padding:12px 14px;
                   border-bottom:1px solid var(--line); }
@@ -824,7 +869,7 @@
                    padding:16px 8px; letter-spacing:.06em; }
   /* 拉满了：变色 ✓ —— "现在松手就进去" ✓（不给这个反馈的话，
      用户不知道要拉多远 ✓，只会觉得"拉了没反应" ✓）。 */
-  #pullHint.ready { color:var(--accent); border-color:#35507a; }
+  #pullHint.ready { color:var(--accent); border-color:var(--accent-line); }
   /* ⚠️ **`#diySet` 原来没写 z-index** ✗→✓（2026-10-07 深夜，用户报的：
      「导航界面点击右上角没有显示 diy 助手的界面」✓）——
      它落在 `.ascreen` 的默认值（20）上 ✓，而它只可能从 `#wsNav`（24）进去 ✓ →
@@ -846,10 +891,10 @@
   #wsNav .abody { padding-top: calc(var(--inset-top) + 6px); }
 
   #workshop .wsnew { display:flex; align-items:center; justify-content:center; gap:9px;
-                     width:100%; border:1px dashed #35507a; background:#0e1c30;
+                     width:100%; border:1px dashed var(--accent-line); background:var(--accent-soft);
                      color:var(--accent); border-radius:14px; padding:15px;
                      font:inherit; font-size:16px; font-weight:600; }
-  #workshop .wsnew:active { background:#16233a; }
+  #workshop .wsnew:active { background:var(--accent-bg); }
 
   /* ★ 「组件容纳界面」= 一块**画布**（2026-10-07 晚上用户定的 ✓）——
      用户的原话：「整个组件容纳界面就像一张纸」✓，
@@ -898,7 +943,7 @@
   #workshop .cell { touch-action:pan-y; }
   #workshop .cell.drag { z-index:9; opacity:.92; transition:none;
                          transform-origin:center; }
-  #workshop .cell.over { border-color:var(--accent); background:#16233a; border-radius:12px; }
+  #workshop .cell.over { border-color:var(--accent); background:var(--accent-soft); border-radius:12px; }
 
   /* ── 卧室场景（2026-10-14）──────────────────────────────────────────
      组件界面不再是格子 ✓，是一间**手写 SVG 的卧室** ✓（网关没出图模型 ✓ →
@@ -982,10 +1027,10 @@
   /* 「问题 2/3」那个小标签 —— 让他一眼看见"还有几个" ✓（用户点名的可视化 ✓） */
   #wsChat .qchip { display:inline-block; margin-right:7px; padding:1px 8px;
                    border-radius:999px; font-size:12px; font-weight:600;
-                   color:var(--accent); border:1px solid #35507a; background:#0e1c30; }
-  #wsChat .mkbub b { color:#fff; font-weight:600; }
+                   color:var(--accent); border:1px solid var(--accent-line); background:var(--accent-soft); }
+  #wsChat .mkbub b { color:var(--text); font-weight:600; }
   #wsChat .mkbub code { font-family:ui-monospace,Menlo,Consolas,monospace;
-                        font-size:13.5px; background:#0e1116; border:1px solid var(--line);
+                        font-size:13.5px; background:var(--panel2); border:1px solid var(--line);
                         border-radius:5px; padding:0 4px; }
   /* 列表项前面那个小圆点（正文里的 `- …`） */
   #wsChat .mli::before { content:'·'; color:var(--muted); margin-right:7px; font-weight:700; }
@@ -1068,7 +1113,7 @@
   /* ★ 思考/制作中的**停止**按钮 ✓ —— 取代发送 ✓，可中断 ✓。
      稍红一点提示"这是中断、不是发送"✓。 */
   #wsChat .mkstop { width:44px; height:44px; flex:0 0 auto; display:flex;
-                    align-items:center; justify-content:center; color:#e06a6a; }
+                    align-items:center; justify-content:center; color:var(--danger); }
   #wsChat .mkstop[hidden] { display:none; }
   #wsChat .mkstop[disabled] { opacity:.45; }
   /* 待发的那张图 —— 缩略图 + 一个 ✕ ✓（和生活管家的待发区一个意思 ✓） */
@@ -1107,7 +1152,7 @@
   #wsNav .navrow .nm { display:block; overflow:hidden; text-overflow:ellipsis;
                        white-space:nowrap; }
   #wsNav .navrow .sub { display:block; font-size:11.5px; margin-top:2px;
-                        color:var(--warn2,#d8b06a); }
+                        color:var(--warn2); }
   #wsNav .navrow .chev { color:var(--muted); font-size:22px; line-height:1; }
   /* ★ 参与过这个组件的人的头像（2026-10-07 深夜 ✓）—— 用户定的：
      「对于每个组件，需要标注其由群里哪些用户参与构建，在导航界面，
@@ -1138,8 +1183,8 @@
                             background-position:center; }
   /* 「新建组件」那一行**跟别的不一样** ✓ —— 虚线框、加号、强调色 ✓。
      它是这一屏唯一"不是东西"的入口 ✓，长得一样就找不着了 ✓。 */
-  #wsNav .navrow.new { border:1.5px dashed #35507a; color:var(--accent); }
-  #wsNav .navrow.new .ico { background:none; border:1.5px dashed #35507a;
+  #wsNav .navrow.new { border:1.5px dashed var(--accent-line); color:var(--accent); }
+  #wsNav .navrow.new .ico { background:none; border:1.5px dashed var(--accent-line);
                             color:var(--accent); font-size:22px; }
   #wsNav .navlist .navrow.new { margin-bottom:10px; }
 
@@ -1185,7 +1230,7 @@
                   min-height:50px; padding:0 16px; background:none; border:0;
                   border-radius:12px; color:var(--text); font:inherit; text-align:left; }
   .ascreen .row + .row { border-top:1px solid var(--line); }
-  .ascreen .row:active { background:#1d2129; }
+  .ascreen .row:active { background:var(--hover); }
   .ascreen .row .rl { flex:1; min-width:0; font-size:16px; line-height:1.3; }
   .ascreen .row .rv { color:var(--muted); font-size:16px; line-height:1.3;
                       max-width:52%; overflow:hidden; text-overflow:ellipsis;
@@ -1200,9 +1245,9 @@
   .ascreen .prof { background:var(--panel); border-radius:14px; display:flex;
                    align-items:center; gap:14px; padding:18px 16px 16px;
                    margin-bottom:8px; }
-  .ascreen .prof:active { background:#1d2129; }
+  .ascreen .prof:active { background:var(--hover); }
   .ascreen .prof .av { width:58px; height:58px; border-radius:10px; overflow:hidden;
-                       flex:none; background:#232833; color:var(--muted);
+                       flex:none; background:var(--avatar-bg); color:var(--muted);
                        font-size:24px; display:flex; align-items:center;
                        justify-content:center; background-size:cover;
                        background-position:center; }
@@ -1222,7 +1267,7 @@
   .ascreen .bigav .av { width:150px; height:150px; font-size:56px; cursor:pointer;
                         overflow:hidden; display:flex; align-items:center;
                         justify-content:center; border-radius:50%;
-                        background:#232833; color:var(--muted);
+                        background:var(--avatar-bg); color:var(--muted);
                         background-size:cover; background-position:center; }
   .ascreen .bigav .av img { width:100%; height:100%; object-fit:cover; display:block; }
   /* 提示语：**在"头像下沿"和"卡片下沿"之间居中** ✓ —— margin-top 要等于卡片的下内边距 ✓ */
@@ -1266,6 +1311,67 @@
     border:1px solid var(--line); }
   #bgSet .bghint { color:var(--muted); font-size:12.5px; text-align:center;
     margin-top:12px; line-height:1.5; }
+
+  /* ── 主题选择（2026-10-19）────────────────────────────────────────────
+     三张**大预览卡** ✓：每张卡里画一个"迷你聊天" ✓，直接用那套主题的
+     颜色 ✓（`--p-*` 由 JS 写在卡上 ✓，和外面的 `data-theme` 无关 ✓ ——
+     所以站在林深里也能看见奶霜长什么样 ✓）。
+     ⚠️ 外面那圈选中描边用的是**当前主题**的 `--accent` ✓，
+        卡片里面才是**被预览主题**的颜色 ✓ —— 这两套别混 ✓。 */
+  #themeSet .tintro { color:var(--muted); font-size:12.5px; line-height:1.65;
+                      margin:2px 2px 16px; }
+  #themeSet .tcard { display:block; width:100%; padding:0; margin-bottom:14px;
+    text-align:left; border:1.5px solid var(--line); border-radius:16px;
+    background:var(--panel); overflow:hidden; color:var(--text);
+    transition:border-color .15s ease, box-shadow .15s ease; }
+  #themeSet .tcard:active { transform:scale(.995); }
+  #themeSet .tcard.on { border-color:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-soft); }
+  /* 迷你聊天：顶栏 / 两个气泡 / 输入条 —— 只画形，不写长句 ✓ */
+  #themeSet .tprev { padding:12px 14px 0; background:var(--p-bg); }
+  #themeSet .tptop { display:flex; align-items:center; gap:8px;
+                     padding-bottom:9px; border-bottom:1px solid var(--p-line); }
+  #themeSet .tpav { width:16px; height:16px; border-radius:50%;
+                    background:var(--p-accent-bg); flex:0 0 auto; }
+  #themeSet .tptitle { width:54px; height:7px; border-radius:4px;
+                       background:var(--p-text); opacity:.55; }
+  #themeSet .tptime { width:23px; height:5px; border-radius:3px; margin-left:auto;
+                      background:var(--p-muted); opacity:.55; }
+  #themeSet .tpbody { display:flex; flex-direction:column; gap:7px;
+                      padding:11px 0 12px; }
+  #themeSet .tpbub { max-width:74%; padding:7px 10px; border-radius:11px;
+                     font-size:12px; line-height:1.35; color:var(--p-text);
+                     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #themeSet .tpbub.agent { align-self:flex-start; background:var(--p-panel2);
+                           border-bottom-left-radius:3px; }
+  #themeSet .tpbub.mine { align-self:flex-end; background:var(--p-accent-bg);
+                          border-bottom-right-radius:3px; }
+  #themeSet .tpinput { display:flex; align-items:center; gap:7px; padding:7px 9px;
+                       border-radius:10px; background:var(--p-panel);
+                       border:1px solid var(--p-line); }
+  #themeSet .tpinput i { flex:1; height:5px; border-radius:3px;
+                         background:var(--p-muted); opacity:.4; }
+  #themeSet .tpinput b { width:18px; height:18px; border-radius:50%;
+                         background:var(--p-accent); flex:0 0 auto; }
+  /* 卡片下半：名字 + 一句话 + 「使用中」 */
+  #themeSet .tmeta { display:flex; align-items:center; gap:10px;
+                     padding:13px 15px 14px; }
+  #themeSet .tmeta .ttxt { flex:1; min-width:0; }
+  #themeSet .tname { display:flex; align-items:center; gap:8px;
+                     font-size:16px; font-weight:600; line-height:1.3; }
+  #themeSet .tdesc { color:var(--muted); font-size:12.5px; line-height:1.45;
+                     margin-top:2px; }
+  #themeSet .tbadge { flex:0 0 auto; padding:2px 8px; border-radius:999px;
+                      font-size:11px; font-weight:600; letter-spacing:.02em;
+                      color:var(--accent); background:var(--accent-soft);
+                      border:1px solid var(--accent-line); }
+  #themeSet .tocardot { width:18px; height:18px; border-radius:50%; flex:0 0 auto;
+                        border:1.5px solid var(--line); }
+  #themeSet .tcard.on .tocardot { border-color:var(--accent);
+                                  background:var(--accent);
+                                  box-shadow:inset 0 0 0 3px var(--panel); }
+  #themeSet .thint { color:var(--muted); font-size:12.5px; line-height:1.6;
+                     text-align:center; margin:2px 8px 18px; }
   /* ★ 2026-10-14：这里原有一对 `.ascreen .swap`（保存下面那颗「取消/返回」小字的样式）✗
      —— 四屏的 `swap` 块全删了 ✓（改管家资料 · 我的 · 备注 · diy 小助手，见
      02-agent.js / 05-settings.js / 06-workshop.js ✓），样式跟着拿掉 ✓。
@@ -1416,8 +1522,8 @@
   .mcard .meta { color:var(--muted); font-size:12px; word-break:break-all; line-height:1.7;
                  font-family:var(--mono); }
   /* 状态牌：[OK] / [!!] / [ERR] / [??] —— 终端味 ✓ */
-  .mtag { font-family:var(--mono); font-weight:700; font-size:12px; color:#888; }
-  .mtag.ok { color:#34c759; } .mtag.warn { color:#ffb020; } .mtag.bad { color:#ff453a; }
+  .mtag { font-family:var(--mono); font-weight:700; font-size:12px; color:var(--muted); }
+  .mtag.ok { color:var(--ok); } .mtag.warn { color:var(--warn); } .mtag.bad { color:var(--bad); }
   .mcard .acts { display:flex; gap:8px; margin-top:5px; }
   .mbtn { padding:7px 13px; border-radius:8px; border:1px solid var(--line);
           background:transparent; color:var(--text); font-size:13.5px; font-family:var(--mono); }
@@ -1428,12 +1534,12 @@
   .mbtn.icon { width:36px; height:36px; padding:0; display:inline-flex;
                align-items:center; justify-content:center; }
   .mbtn.icon svg { width:17px; height:17px; }
-  .mbtn.icon.danger { border-color:rgba(255,107,107,.4); }
+  .mbtn.icon.danger { border-color:var(--danger-soft); }
   /* 状态点：圆点 → 发光像素方块 ✓ */
-  .mdot { width:8px; height:8px; border-radius:2px; background:#888; flex:0 0 auto; }
-  .mdot.ok { background:#34c759; box-shadow:0 0 7px #34c75988; }
-  .mdot.warn { background:#ffb020; box-shadow:0 0 7px #ffb02088; }
-  .mdot.bad { background:#ff453a; box-shadow:0 0 7px #ff453a88; }
+  .mdot { width:8px; height:8px; border-radius:2px; background:var(--muted); flex:0 0 auto; }
+  .mdot.ok { background:var(--ok); box-shadow:0 0 7px var(--ok); }
+  .mdot.warn { background:var(--warn); box-shadow:0 0 7px var(--warn); }
+  .mdot.bad { background:var(--bad); box-shadow:0 0 7px var(--bad); }
   .mhint { padding:10px 18px; color:var(--muted); font-size:13px; line-height:1.75;
            font-family:var(--mono); }
   .mhint::before { content:"# "; opacity:.6; }

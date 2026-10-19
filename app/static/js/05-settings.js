@@ -353,6 +353,99 @@
     if (f) uploadBg(f);
   };
 
+  // ── 主题（2026-10-19）───────────────────────────────────────────────
+  //
+  // ★ 三套：夜阑（深色，默认）/ 奶霜（奶白）/ 林深（深林绿）✓。
+  // ⚠️ 主题**不进服务端** ✓ —— 存在本机 localStorage、按用户 id 分开 ✓
+  //    （底层在 `01-core.js` 的 `applyTheme` / `syncThemeForUser` ✓）。
+  //    所以「群内用户背景不共享」不是靠服务端过滤 ✓：**根本没人上传** ✓，
+  //    别的成员既看不到也改不了 ✓。
+  // ⚠️ 预览卡用的是**那套主题自己的颜色** ✓（`THEMES[i].vars` → `--p-*` ✓）——
+  //    和当前 `data-theme` 无关 ✓，站在林深里也看得见奶霜长什么样 ✓。
+  const openThemeSet = () => { pushScreen('themeSet', 'settings'); renderThemeSet(); };
+
+  const renderThemeSet = () => {
+    const body = $('#themeBody');
+    if (!body) return;
+    const cur = document.documentElement.dataset.theme || THEME_DEFAULT;
+    body.textContent = '';
+
+    const intro = document.createElement('div');
+    intro.className = 'tintro';
+    intro.textContent = '选一个你喜欢的。换主题只影响你这台手机，不会同步给空间里的其他人。';
+    body.appendChild(intro);
+
+    THEMES.forEach(t => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'tcard' + (t.id === cur ? ' on' : '');
+      card.dataset.themePick = t.id;
+      card.setAttribute('aria-pressed', t.id === cur ? 'true' : 'false');
+      card.setAttribute('style', t.vars);   // 预览用这套主题的颜色 ✓
+
+      // 迷你聊天：顶栏 / 一问一答 / 输入条 ✓ —— 只看形和配色，不写长句 ✓
+      const prev = document.createElement('div');
+      prev.className = 'tprev';
+      const top = document.createElement('div');
+      top.className = 'tptop';
+      const av = document.createElement('span'); av.className = 'tpav';
+      const title = document.createElement('span'); title.className = 'tptitle';
+      const time = document.createElement('span'); time.className = 'tptime';
+      top.append(av, title, time);
+      prev.appendChild(top);
+
+      const pbody = document.createElement('div');
+      pbody.className = 'tpbody';
+      const a = document.createElement('div');
+      a.className = 'tpbub agent'; a.textContent = '今晚想记点什么？';
+      const m = document.createElement('div');
+      m.className = 'tpbub mine'; m.textContent = '记一笔晚饭';
+      pbody.append(a, m);
+      const input = document.createElement('div');
+      input.className = 'tpinput';
+      input.append(document.createElement('i'), document.createElement('b'));
+      pbody.appendChild(input);
+      prev.appendChild(pbody);
+      card.appendChild(prev);
+
+      // 名字 + 一句话 + 右边的选中点（选中的再加「使用中」✓）
+      const meta = document.createElement('div');
+      meta.className = 'tmeta';
+      const txt = document.createElement('div');
+      txt.className = 'ttxt';
+      const name = document.createElement('div');
+      name.className = 'tname';
+      name.appendChild(document.createTextNode(t.name));
+      if (t.id === cur) {
+        const badge = document.createElement('span');
+        badge.className = 'tbadge';
+        badge.textContent = '使用中';
+        name.appendChild(badge);
+      }
+      const desc = document.createElement('div');
+      desc.className = 'tdesc';
+      desc.textContent = t.desc;
+      txt.append(name, desc);
+      const dot = document.createElement('span');
+      dot.className = 'tocardot';
+      meta.append(txt, dot);
+      card.appendChild(meta);
+
+      card.onclick = () => {
+        applyTheme(t.id);     // 立即生效 + 记住 ✓
+        renderSettings();     // 这一屏会跟着重画（见下面那行 ✓），设置页右边也换掉 ✓
+      };
+      body.appendChild(card);
+    });
+
+    const hint = document.createElement('div');
+    hint.className = 'thint';
+    hint.textContent = '主题只保存在这台手机上，换手机或重装 App 需要重新选。';
+    body.appendChild(hint);
+  };
+
+  $('#themeBack').onclick = () => popScreen('themeSet');
+
   const renderSettings = () => {
     const eGname = $('#vGname'); if (eGname) eGname.textContent = group?.name || '';
     // 「聊天背景」右边：只说有没有 ✓ —— 缩略图不塞进这一行 ✓（行太窄 ✓）。
@@ -360,6 +453,11 @@
     if (eBg) eBg.textContent = (group && group.background) ? '已设置' : '默认';
     // 背景设置页开着时，群一刷新（比如别的成员换了图 ✓）它也得跟着重画 ✓
     if ($('#bgSet').classList.contains('on')) renderBgSet();
+    // ★ 2026-10-19：「主题」右边写**当前这套的名字** ✓（夜阑 / 奶霜 / 林深 ✓）。
+    const eTheme = $('#vTheme');
+    if (eTheme) eTheme.textContent = themeById(document.documentElement.dataset.theme || THEME_DEFAULT).name;
+    // 主题页开着时，选完主题要重画（把「使用中」挪到新卡上 ✓）
+    if ($('#themeSet').classList.contains('on')) renderThemeSet();
     const eAname = $('#vAname'); if (eAname) eAname.textContent = agentName();
     // ⚠️ 这里原来还给「群昵称」那一行填值 ✓（`#vMy` ✓）——
     //    **那一行和这个 DOM 都删了** ✗→✓（2026-10-08：一个人的名字只有一个 ✓）。
@@ -555,6 +653,8 @@
       if (act === 'gname') renameSpace();
       // ★ 2026-10-19：「聊天背景」—— 推开这一屏 ✓（上传 / 移除都在它里面 ✓）
       else if (act === 'bg') openBgSet();
+      // ★ 2026-10-19：「主题」—— 夜阑 / 奶霜 / 林深 ✓（只影响这台设备 ✓）
+      else if (act === 'theme') openThemeSet();
       else if (act === 'invite') inviteCodeNow();
       // ★ **退出当前空间**（红字居中，就在「退出登录」上面 ✓）—— 二次确认在它里面 ✓
       else if (act === 'leave') confirmLeaveSpace();
@@ -1025,7 +1125,7 @@
   //:    上左滑也会把收纳页推上来 ✗✓（用户看到的就是"到处都能滑出来" ✓）。
   //:    判据改成"**最上面那一屏**是不是这三屏之一" ✓。
   const _OTHER_SCREENS = [
-    '#settings', '#bgSet', '#me', '#meAccount', '#space', '#peer', '#selfIntro',
+    '#settings', '#bgSet', '#themeSet', '#me', '#meAccount', '#space', '#peer', '#selfIntro',
     '#agent', '#agentEdit', '#diySet', '#wsNav', '#wsChat', '#login', '#init',
   ];
 

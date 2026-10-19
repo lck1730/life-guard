@@ -167,17 +167,67 @@
   }
 
   // ── 主题 ──
-  const applyTheme = (t) => {
-    document.documentElement.dataset.theme = t;
-    localStorage.setItem('lg_theme', t);
-    $$('[data-theme-set]').forEach(b => b.classList.toggle('on', b.dataset.themeSet === t));
-    const meta = document.querySelector('meta[name=theme-color]');
-    if (meta) meta.content = t === 'light' ? '#f5f6fa' : '#0f1115';
-    // 让原生同步状态栏图标的明暗，否则浅色主题下白图标会看不见
-    try { window.LifeGuardNative?.setLightStatusBar?.(t === 'light'); } catch {}
+  //
+  // ★ 2026-10-19：三套主题 —— 夜阑（黑）/ 奶霜（奶白）/ 林深（深林绿）。
+  // ⚠️ 主题是**个人的** ✓ —— 只存在这台设备的 localStorage 里 ✓，而且按
+  //    用户 id 分开存（`lg_theme:u<id>` ✓）→ 同一个群里两个人各用各的 ✓，
+  //    换账号登录也不会把上一个人的主题带过去 ✓。服务端完全不知道这件事 ✓。
+  const THEMES = [
+    { id: 'dark', name: '夜阑', desc: '墨黑与夜蓝，安静得刚好',
+      color: '#0f1115', light: false,
+      vars: '--p-bg:#0f1115;--p-panel:#171a21;--p-panel2:#1e222b;'
+          + '--p-line:#262b36;--p-text:#e6e8ee;--p-muted:#8b93a7;'
+          + '--p-accent:#6ea8ff;--p-accent-bg:#1e3a5f' },
+    { id: 'cream', name: '奶霜', desc: '暖白与焦糖，像一杯温牛奶',
+      color: '#f6f0e4', light: true,
+      vars: '--p-bg:#f6f0e4;--p-panel:#fffcf5;--p-panel2:#efe7d8;'
+          + '--p-line:#e4d8c5;--p-text:#2d2822;--p-muted:#706658;'
+          + '--p-accent:#9a5b2e;--p-accent-bg:#f2e1cb' },
+    { id: 'forest', name: '林深', desc: '深林与苔绿，沉静而有生气',
+      color: '#0d1711', light: false,
+      vars: '--p-bg:#0d1711;--p-panel:#142219;--p-panel2:#1b2c20;'
+          + '--p-line:#263b2c;--p-text:#e6efe3;--p-muted:#90a794;'
+          + '--p-accent:#a2d5a4;--p-accent-bg:#23422c' },
+  ];
+  const THEME_ALIAS = { light: 'cream' };   // 旧版本存过 'light'，别让老用户掉回默认
+  const THEME_DEFAULT = 'dark';
+  const themeById = (id) => THEMES.find(t => t.id === id) || THEMES[0];
+  const themeOfUser = () => {
+    const uid = me && (me.id ?? me.username);
+    return (uid === undefined || uid === null || uid === '') ? '' : 'lg_theme:u' + uid;
   };
-  applyTheme(localStorage.getItem('lg_theme') || 'dark');
-  $$('[data-theme-set]').forEach(b => b.onclick = () => applyTheme(b.dataset.themeSet));
+
+  const applyTheme = (t) => {
+    t = THEME_ALIAS[t] || t;
+    const id = THEMES.some(x => x.id === t) ? t : THEME_DEFAULT;
+    const theme = themeById(id);
+    document.documentElement.dataset.theme = id;
+    try {
+      localStorage.setItem('lg_theme', id);          // 这台设备上次用的（登录前兜底）
+      const k = themeOfUser();
+      if (k) localStorage.setItem(k, id);           // 这个账号自己的
+    } catch (e) { /* 隐私模式存不了就算了，主题照样生效 */ }
+    const meta = document.querySelector('meta[name=theme-color]');
+    if (meta) meta.content = theme.color;
+    // 让原生同步状态栏图标的明暗：奶霜是浅底，另外两套是深底
+    try { window.LifeGuardNative?.setLightStatusBar?.(!!theme.light); } catch {}
+    return id;
+  };
+
+  /** 登录/换账号后调用：把这个账号自己选的主题贴回来。
+   *  ⚠️ 这个账号**没选过**就回默认的夜阑 ✓ —— **不继承**设备上一个人留下的
+   *     那套 ✓（同一台手机换账号登录时，"这是谁的选择"才分得干净 ✓）。
+   *     登录前那一下用的是设备值 ✓（只为避免闪屏 ✓，见 index.html 里那段 ✓）。 */
+  const syncThemeForUser = () => {
+    let saved = '';
+    try {
+      const k = themeOfUser();
+      saved = k ? (localStorage.getItem(k) || '') : '';
+    } catch (e) {}
+    applyTheme(saved || THEME_DEFAULT);
+  };
+
+  applyTheme(localStorage.getItem('lg_theme') || THEME_DEFAULT);
 
   const explain = (data, status) => {
     if (!data) return '请求失败 ' + status;

@@ -180,6 +180,8 @@
     // 前缀是 /api/groups —— 所以是 /api/groups/bootstrap，不是 /api/bootstrap ✗
     const b = await api('/groups/bootstrap?limit=50');
     me = b.me;
+    // ★ 知道是谁了，才能取"这个人自己选的主题" ✓（存在本机、按用户 id 分开 ✓）。
+    syncThemeForUser();
     // ★ 备注跟着这一趟一起下来 ✓（`{peer_id: 备注}` ✓）——
     //   它决定**每条消息画什么名字** ✓，晚一步到就会先按真名画一遍再被覆盖 ✓（看得见的闪 ✓）。
     notes = b.notes || {};

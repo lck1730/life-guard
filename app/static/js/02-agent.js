@@ -510,6 +510,10 @@
     // ★ **聊天背景**（2026-10-19）—— 和模型池一样从设置页推出来 ✓，
     //   所以排在**设置之前** ✓（从哪进来就按哪儿的顺序退 ✓）。
     if ($('#bgSet').classList.contains('on')) { popScreen('bgSet'); return; }
+    // ★ **主题**（2026-10-19）—— 同样从设置页推出来 ✓，排在设置之前 ✓。
+    //   ⚠️ 没这一支的话，在主题页按返回会**隔着它把设置关掉** ✓
+    //      （屏幕不动、人退到了群聊 ✓ —— 见 `android-back-key-only-knows-settings` ✓）。
+    if ($('#themeSet').classList.contains('on')) { popScreen('themeSet'); return; }
     if ($('#models').classList.contains('on')) { popScreen('models'); return; }
     if ($('#settings').classList.contains('on')) { closeSettings(); return; }
     // ⚠️ `#login` / `#init` **刻意不列在这儿** ✗ —— 它们是**根屏** ✓：
