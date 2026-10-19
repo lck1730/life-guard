@@ -437,11 +437,6 @@
       };
       body.appendChild(card);
     });
-
-    const hint = document.createElement('div');
-    hint.className = 'thint';
-    hint.textContent = '主题只保存在这台手机上，换手机或重装 App 需要重新选。';
-    body.appendChild(hint);
   };
 
   $('#themeBack').onclick = () => popScreen('themeSet');
