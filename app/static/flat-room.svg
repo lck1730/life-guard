@@ -583,33 +583,6 @@
     <path d="M-38 0 q38 -22 76 0" fill="none" stroke="#9a7042" stroke-width="3"/>
   </g>
 
-  <!-- ══ 猫（睡在地毯上） ═══════════════════════════════════════════ -->
-  <g transform="translate(682,1444)">
-    <ellipse cx="0" cy="26" rx="62" ry="16" fill="#6a4530" opacity=".22" filter="url(#soft2)"/>
-    <path d="M-56 18 q-2 -34 28 -42 q30 -8 54 10 q16 12 12 32 q-2 12 -16 12 h-62 q-14 0 -16 -12 Z"
-          fill="#d9955f" stroke="#b3733f" stroke-width="1.6"/>
-    <path d="M-50 14 q8 -20 28 -18 q8 1 6 8 q-2 8 -12 10 q-14 2 -22 0 Z" fill="#f0c08d" opacity=".85"/>
-    <g fill="#b3733f" opacity=".65">
-      <path d="M-20 -22 q8 6 2 14 q-6 -6 -2 -14"/>
-      <path d="M-4 -18 q8 6 2 14 q-6 -6 -2 -14"/>
-      <path d="M12 -14 q8 6 2 14 q-6 -6 -2 -14"/>
-      <path d="M-32 -14 q7 5 2 12 q-6 -5 -2 -12"/>
-    </g>
-    <path d="M-56 10 q-20 -6 -20 -20 q0 -10 10 -8 q12 4 14 18" fill="#d9955f" stroke="#b3733f" stroke-width="1.5"/>
-    <path d="M-36 -12 q-6 -14 2 -20 q8 6 6 18" fill="#d9955f" stroke="#b3733f" stroke-width="1.4"/>
-    <path d="M-22 -18 q2 -12 12 -14 q6 8 0 18" fill="#d9955f" stroke="#b3733f" stroke-width="1.4"/>
-    <g stroke="#7d4a2c" stroke-width="2" fill="none" stroke-linecap="round">
-      <path d="M-44 6 q5 4 9 0"/>
-      <path d="M-28 4 q5 4 9 0"/>
-    </g>
-    <path d="M-38 14 q6 4 12 0" stroke="#7d4a2c" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-    <g fill="#f0c08d" opacity=".6">
-      <circle cx="-34" cy="0" r="1.6"/><circle cx="-26" cy="1" r="1.4"/><circle cx="-18" cy="0" r="1.5"/>
-    </g>
-    <animateTransform attributeName="transform" type="translate"
-      values="682 1444;682 1442;682 1444" dur="4.5s" repeatCount="indefinite"/>
-  </g>
-
   <!-- 拖鞋 -->
   <g transform="translate(238,1492)" fill="#c98e83" stroke="#a76f66" stroke-width="1.4">
     <path d="M-18 0 q0 -14 14 -14 q14 0 14 14 q0 8 -14 8 q-14 0 -14 -8 Z"/>
