@@ -61,6 +61,9 @@
       //   `location.href='/'` ✗：后者会把整页重新下一遍 ✓（100KB ✓ 白屏一下 ✓），
       //   而我们手上已经有全部代码了 ✓。
       //   ⚠️ 但**登出必须真导航** ✗（要清 httpOnly cookie ✓，见 `logout()` ✓）。
+      // ⚠️ 登录成功 = 可能换了人 ✓ → 本机那份"上次的样子"作废 ✓，
+      //    这一趟照常等网络（就慢这一次 ✓），别把上一个人的聊天闪出来 ✓。
+      _clearBoot();
       try { history.replaceState(null, '', '/'); } catch (e) {}
       await enterApp();
     } catch (e) {
@@ -172,13 +175,99 @@
     });
   });
 
+  // ★ **上一次的样子先画出来** ✓ —— 2026-10-20。
+  //
+  //   用户报的："短时间挂后台回来很顺；挂久了回来，界面先很快出来一下、
+  //   然后黑一次、又加载出来。" 服务端日志里那一次是**整页重新载入** ✓
+  //   （`GET /` + app.js + bootstrap 一整套 ✓）—— 这是安卓壳/系统那边的决定 ✓，
+  //   网页拦不住 ✗。但网页能决定**这趟重新载入看起来黑多久** ✓：
+  //   原来要等 `/bootstrap` 从（刚醒的）WireGuard 上回来才画第一帧 ✓，
+  //   那段时间页面只有夜阑的深色底 ✓ = 他说的"黑一下" ✓。
+  //
+  //   现在每次 bootstrap 成功就把那份存本机 ✓；下次开页**同步**先画出来 ✓
+  //   （localStorage 读 + 渲染 50 条，几十毫秒 ✓），网络那份回来再覆盖 ✓。
+  //   → 黑屏的长度从"等一个来回"缩到"等脚本自己跑完" ✓。
+  //
+  //   ⚠️ 只存**这个人已经看过的群聊内容** ✓ —— 同一台手机自己的 localStorage ✓。
+  //   ⚠️ 登出 / 登录成功时清掉 ✓（`logout()` 和 `doLogin()` 里各一句 ✓），
+  //      免得换账号时先闪出上一个人的聊天 ✓。
+  //   ⚠️ 30 天没开过就作废 ✓ —— 太久以前的样子顶上来反而容易让人误会 ✓。
+  const BOOT_CACHE = 'lg_boot_v1';
+  let bootCacheUsed = false;
+
+  const _clearBoot = () => {
+    try { localStorage.removeItem(BOOT_CACHE); } catch (e) {}
+  };
+
+  const _saveBoot = (b) => {
+    try {
+      if (!b || !b.group) { _clearBoot(); return; }   // 没空间 → 不留旧的了 ✓
+      localStorage.setItem(BOOT_CACHE, JSON.stringify({
+        at: Date.now(),
+        me: b.me,
+        group: b.group,
+        members: b.members || [],
+        notes: b.notes || {},
+        messages: (b.messages || []).slice(-50),
+      }));
+    } catch (e) {}   // 存不下就存不下 ✓ —— 绝不能因此进不了 App ✓
+  };
+
+  const _loadBoot = () => {
+    try {
+      const raw = localStorage.getItem(BOOT_CACHE);
+      if (!raw) return null;
+      const c = JSON.parse(raw);
+      if (!c || !c.me || !c.group) return null;
+      if (Date.now() - (Number(c.at) || 0) > 30 * 24 * 3600 * 1000) return null;
+      return c;
+    } catch (e) { return null; }
+  };
+
+  /** 把缓存那一份**照真入口的同一个顺序**画出来 ✓ —— 不联网、不连 WS ✓ */
+  const _paintBoot = (c) => {
+    me = c.me;
+    syncThemeForUser();
+    notes = c.notes || {};
+    group = c.group;
+    members = Array.isArray(c.members) ? c.members : [];
+    renderHeader();
+    $('#msgs').innerHTML = '';
+    show('chat', 'fade');
+    tellNative('chat');
+    const first = Array.isArray(c.messages) ? c.messages : [];
+    first.forEach(m => addMsg(m));
+    oldestId = first.length ? first[0].id : 0;
+    historyDone = first.length < 50;
+    scrollDown(true);
+    normalizeStatus();
+    // ⚠️ 这里**不调 `renderSettings()`** ✓ —— 它顺手会发
+    //    `refreshSpaceInfo()`（一趟网络 ✓），而设置屏这会儿根本看不见 ✓；
+    //    真入口那一趟回来会调它 ✓。少这一下，第一帧更快 ✓。
+  };
+
   const enterApp = async () => {
+    // ★ **先用本机上一次的样子顶上** ✓（只在本页第一次进时用 ✓）
+    //   后面的网络那一趟照旧 ✓ —— 它回来会把这些覆盖成最新的 ✓。
+    if (!bootCacheUsed) {
+      bootCacheUsed = true;
+      const c = _loadBoot();
+      if (c) { try { _paintBoot(c); } catch (e) {} }
+    }
     // ★ **一趟拿齐。** 原来是 /auth/me → /groups → /members → /messages
     //   **连着四趟**，每趟都要过 WireGuard —— 开 App 时那片"黑屏"就是它 ✗
     //   现在一次往返搞定（服务端 /bootstrap 把四样一起给）。
     // 注意路径：这个接口注册在 groups 那个 router 下（它要复用群那套查询），
     // 前缀是 /api/groups —— 所以是 /api/groups/bootstrap，不是 /api/bootstrap ✗
-    const b = await api('/groups/bootstrap?limit=50');
+    let b;
+    try {
+      b = await api('/groups/bootstrap?limit=50');
+    } catch (e) {
+      // 票已经没了 → 本机那份也不该再露 ✓（下一次开页别再顶出来 ✓）
+      if (e && e.status === 401) _clearBoot();
+      throw e;
+    }
+    _saveBoot(b);
     me = b.me;
     // ★ 知道是谁了，才能取"这个人自己选的主题" ✓（存在本机、按用户 id 分开 ✓）。
     syncThemeForUser();
@@ -335,17 +424,94 @@
     } catch (e) {}
   };
 
+  /** 读一张图的宽高 ✓ —— 只解析文件头 ✓，不把几千万像素解进内存 ✓。
+   *  认 jpeg / png（背景图基本就这两种 ✓）；认不出来返回 null ✓。 */
+  const _imgSize = async (blob) => {
+    try {
+      const b = new DataView(await blob.slice(0, 65536).arrayBuffer());
+      if (b.byteLength >= 24 && b.getUint32(0) === 0x89504e47) {       // PNG
+        return { w: b.getUint32(16), h: b.getUint32(20) };
+      }
+      if (b.byteLength >= 4 && b.getUint16(0) === 0xffd8) {            // JPEG
+        let i = 2;
+        while (i + 9 < b.byteLength) {
+          if (b.getUint8(i) !== 0xFF) { i++; continue; }
+          const m = b.getUint8(i + 1);
+          if (m === 0xD8 || m === 0x01 || (m >= 0xD0 && m <= 0xD7)) { i += 2; continue; }
+          const len = b.getUint16(i + 2);
+          if (len < 2) return null;
+          if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) {
+            return { w: b.getUint16(i + 7), h: b.getUint16(i + 5) };
+          }
+          i += 2 + len;
+        }
+      }
+    } catch (e) {}
+    return null;
+  };
+
+  /** 背景图**只留手机用得上那么大** ✓ —— 2026-10-20。
+   *
+   *  现在这张是 7469×5265（约 3900 万像素、5.6MB）✓。每次重进都要解码一遍 ✓；
+   *  后台挂久了、安卓把 WebView 的渲染进程收掉之后 ✓，回来的第一帧就得重新解码 ✓
+   *  —— 那一瞬就是他看到的"先黑一下" ✓。缩到长边 2000 之后解码量只剩约 1/14 ✓，
+   *  存进 IndexedDB 的也从 5.6MB 变成几百 KB ✓。
+   *
+   *  ⚠️ **不动服务端那张原图** ✗ —— 这里只换这台手机上的缓存副本 ✓
+   *    （服务端没有图像库 ✓；他要是想在别处用原图，原图也还在 ✓）。
+   *  ⚠️ 失败 / 不支持就**原样返回** ✓ —— 绝不能因为缩图把背景弄没 ✓。
+   */
+  const _shrinkBg = async (blob) => {
+    try {
+      if (!blob || blob.size < 700 * 1024) return blob;   // 已经够小 ✓
+      if (blob.type === 'image/gif') return blob;         // 动图不碰 ✓
+      if (typeof createImageBitmap !== 'function') return blob;
+      const dim = await _imgSize(blob);
+      if (!dim || !dim.w || !dim.h) return blob;
+      const k = Math.min(1, 2000 / Math.max(dim.w, dim.h));
+      if (k >= 0.98) return blob;
+      const w = Math.max(1, Math.round(dim.w * k));
+      const h = Math.max(1, Math.round(dim.h * k));
+      const bmp = await createImageBitmap(blob, {
+        resizeWidth: w, resizeHeight: h, resizeQuality: 'high',
+      });
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
+      try { bmp.close(); } catch (e) {}
+      const out = await new Promise(res => cv.toBlob(res, 'image/jpeg', 0.85));
+      return (out && out.size && out.size < blob.size) ? out : blob;
+    } catch (e) {
+      return blob;
+    }
+  };
+
   /** 把一个版本地址**变成 blob: URL** ✓ —— 命中本机缓存秒回 ✓；
-   *  没命中就现取、顺手存一份 ✓。取不到返回 null ✓（调用方退回网络地址 ✓）。 */
+   *  没命中就现取、缩一版再存 ✓。取不到返回 null ✓（调用方退回网络地址 ✓）。 */
   const _materializeBg = async (url) => {
     try {
-      const hit = await _bgGet(url);
-      if (hit) return URL.createObjectURL(hit);   // ★ 不上网 ✓
+      let hit = await _bgGet(url);
+      if (hit) {
+        // 老缓存里可能还躺着那张原图 ✓ → 这次顺手换小 ✓，下次开页就轻了 ✓
+        // ⚠️ **按尺寸判断** ✓，不按大小 ✗ —— 2000px 的图也可能有 800KB ✓，
+        //    按大小判会每次开页都白缩一遍 ✓。
+        if (hit.size > 700 * 1024) {
+          const dim = await _imgSize(hit);
+          if (dim && Math.max(dim.w, dim.h) > 2000) {
+            const small = await _shrinkBg(hit);
+            if (small && small !== hit) {
+              try { await _bgPut(url, small); } catch (e) {}
+              hit = small;
+            }
+          }
+        }
+        return URL.createObjectURL(hit);   // ★ 不上网 ✓
+      }
     } catch (e) {}
     try {
       const r = await fetch(url, { credentials: 'same-origin' });
       if (!r.ok) return null;
-      const blob = await r.blob();
+      const blob = await _shrinkBg(await r.blob());
       try { await _bgPut(url, blob); } catch (e) {}
       return URL.createObjectURL(blob);
     } catch (e) { return null; }

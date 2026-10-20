@@ -31,6 +31,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -118,6 +119,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ★ 2026-10-20：**给文本类响应开 gzip** ✓ —— 手机进 App 的"黑一下"。
+#
+#   这一页要过 WireGuard 才能到手机 ✓，而 `app.js` 现在是 **~400KB 明文** ✓
+#   （6 个 js 文件拼起来的 ✓，里面大半是注释 ✓）。安卓壳又没在用 HTTP 缓存 ✓
+#   （服务端日志里每次重载都是 `GET /static/app.js ... 200` ✓）→ 一次重载
+#   要实打实传 400KB ✓。挂后台久了隧道刚醒的时候，这段时间就是用户看到的
+#   "界面先出来一下、黑一次、又出来" ✓。
+#
+#   Starlette 这个中间件**自己就会跳过** `image/*`、`text/event-stream`、
+#   `video/*`、`audio/*`、字体和压缩包 ✓ —— 所以背景图不会白压一遍 ✓，
+#   SSE 那条流也不会被攒住 ✓（这一条最要紧 ✗：流一旦被缓冲，打字机效果就没了 ✓）。
+#   `minimum_size` 别太小 ✓：几十字节的状态包压了反而更大 ✓。
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 
 app.include_router(groups_router)
 app.include_router(media_router)

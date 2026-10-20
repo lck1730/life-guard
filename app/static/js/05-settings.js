@@ -266,9 +266,12 @@
     const url = group && group.background;
 
     // 预览：**画成竖的那种** ✓（手机相册里大多数是竖图 ✓）
+    // ⚠️ 主群聊已经贴上的那张就用**本机缓存那份** ✓ —— 不然一进这一屏
+    //    又要把 5.6MB 原图从 WireGuard 上拉一遍 ✓（预览只要看得见就行 ✓）。
     const prev = document.createElement('div');
     prev.className = 'bgprev';
-    if (url) prev.style.backgroundImage = `url("${url}")`;
+    if (url) prev.style.backgroundImage =
+      `url("${(bgKey === url && bgObjUrl) ? bgObjUrl : url}")`;
     else {
       const none = document.createElement('span');
       none.className = 'bgempty';
@@ -710,6 +713,8 @@
     // 先让服务端把票作废 ✓（`POST /api/logout` ✓），再真导航去登录页 ✓ ——
     // ⚠️ 顺序不能反 ✗：先跳的话那次清票请求可能还没发出去 ✓，
     //    而 `/login` 那一页**自己也会清一次票** ✓（服务端那一条 ✓），所以两道都在 ✓。
+    // ⚠️ 本机那份"上次的样子"也要清 ✓ —— 下一个人登录时不该先闪出上一个人的聊天 ✓。
+    _clearBoot();
     api('/logout', { method: 'POST' })
       .catch(() => {})
       .finally(() => { location.href = '/login'; });
