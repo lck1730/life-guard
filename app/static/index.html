@@ -165,26 +165,32 @@
       <div class="gname" id="gname">—</div>
       <div class="status" id="status"><span class="dot"></span><span id="statusText"></span></div>
     </div>
-    <!-- ★ 右上角：**创意工坊** ✓ —— 2026-10-07。这个位置 10-06 特地留白过 ✓，
-         现在给它 ✓。它顶掉了原来那个 `.spacer` ✓ —— 占位本来就是
-         "放一个和左边等宽的东西、让群名真居中"用的 ✓，
-         现在右边真有一个 40px 的按钮 ✓，占位就是多余的 ✗。
-         ⚠️ 图标是 SVG（和 ☰ / ↻ 同一套画法 ✓）而不是文字或 emoji ✗ ——
-            字形的墨迹位置算不准 ✓，就没法跟另外两个对齐 ✓。 -->
-    <!-- ★ 2026-10-07 深夜用户定的：「右上角的创意工坊按钮稍微大一点」✓。
-         ⚠️ **图标大一号，外面那个 40px 的方框不动** ✗ ——
-            左中右各 40px 是"群名居中"的保证 ✓（见 `header.top .spacer` 那段 ✓），
-            方框一变宽，标题就会被顶歪 ✓。 -->
-    <div class="icon-btn plain" id="openWorkshop" aria-label="创意工坊">
-      <svg viewBox="0 0 24 24" width="26" height="26" fill="none"
-           stroke="currentColor" stroke-width="1.9"
+    <!-- ★ 右上角：**刷新** ✓ —— 2026-10-20 用户定的 ✓：
+         「将主群聊右上角的 diy 助手聊天功能关闭，将设置左上角的刷新按钮
+           挪到主群聊右上角」✓。
+         ⚠️ 原来这里是四格图标（创意工坊 → diy 聊天 ✓），**整个拿掉了** ✓；
+            刷新用的是设置页那颗**原封不动的按钮** ✓（`#reloadBtn` 这个 id 没改 ✓，
+            下面那段绑定、以及 CSS 里"墨迹离右 23.9px"那个数都原样能用 ✓）。
+         ⚠️ diy 聊天的**代码都留着** ✓（`openUnifiedChat` / `openNewCompChat`
+            仍在 06-workshop.js ✓）—— 以后要恢复，只补一个入口就行 ✓。
+         ⚠️ 图标是 SVG（和 ☰ 同一套画法 ✓）而不是文字或 emoji ✗ ——
+            字形的墨迹位置算不准 ✓，就没法跟左边对齐 ✓。
+         ⚠️ 外面那个 **40px 方框不动** ✓ —— 左中右各 40px 是"群名居中"的保证 ✓。 -->
+    <button class="icon-btn plain" id="reloadBtn" aria-label="重新加载">
+      <!-- 用的是 Feather 那个 rotate-cw ✓（`viewBox 0 0 24 24` ✓）。
+           ⚠️ 别自己拼 ✗ —— 我上一版是算出来的弧 ✓，
+             末端和箭头**差一点点接上** ✗ → 看着就像画歪了 ✓
+             （用户原话："首尾几乎挨上了" ✓）。
+             这个版本的弧线末端**正好落在**箭头那个拐角上 ✓，是接住的 ✓。
+           `19` 而不是 22 ✓ —— 用户："刷新按钮稍微小一些" ✓
+           （22 的描边箭头视觉上比 22 的返回箭头重一档 ✓）。 -->
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+           stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round">
-        <rect x="6" y="6" width="5" height="5" rx="1.4" />
-        <rect x="13" y="6" width="5" height="5" rx="1.4" />
-        <rect x="6" y="13" width="5" height="5" rx="1.4" />
-        <rect x="13" y="13" width="5" height="5" rx="1.4" />
+        <polyline points="23 4 23 10 17 10" />
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
       </svg>
-    </div>
+    </button>
   </header>
   <div id="msgs"></div>
   <div id="composer">
@@ -425,29 +431,10 @@
       </svg>
     </button>
     <h2>设置</h2>
-    <!-- ★ 刷新按钮 —— 2026-10-06 从聊天页右上角**搬过来**的 ✓。
-         它**顶掉了原来那个 `.spacer`** ✓ —— 那个占位本来就是
-         "放一个和返回键等宽的东西、让标题真居中"用的 ✓，
-         现在右边真有一个 40px 的按钮 ✓，占位就是多余的 ✗
-         （留着标题会被挤偏左 ✓，正是它当初要解决的问题 ✓）。
-         用 SVG 而不是 `↻` 字符 ✓ —— 和左边的返回箭头同一套画法 ✓，
-         大小和颜色才对得上 ✓。
-         （`#reloadBtn` 这个 id **没改** ✗ —— 下面那段绑定原样能用 ✓。） -->
-    <button class="icon-btn plain" id="reloadBtn" aria-label="重新加载">
-      <!-- 用的是 Feather 那个 rotate-cw ✓（`viewBox 0 0 24 24` ✓）。
-           ⚠️ 别自己拼 ✗ —— 我上一版是算出来的弧 ✓，
-             末端和箭头**差一点点接上** ✗ → 看着就像画歪了 ✓
-             （用户原话："首尾几乎挨上了" ✓）。
-             这个版本的弧线末端**正好落在**箭头那个拐角上 ✓，是接住的 ✓。
-           `19` 而不是 22 ✓ —— 用户："刷新按钮稍微小一些" ✓
-           （22 的描边箭头视觉上比 22 的返回箭头重一档 ✓）。 -->
-      <svg viewBox="0 0 24 24" width="19" height="19" fill="none"
-           stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="23 4 23 10 17 10" />
-        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-      </svg>
-    </button>
+    <!-- ★ 2026-10-20：刷新按钮**搬去主群聊右上角**了 ✓（用户定的 ✓）。
+         这里换回**等宽占位** ✓（40px ✓）—— 右边空着的话，`h2` 会在
+         "剩余空间"里居中 ✓，看着偏右 ✓（这正是当初放按钮时顺手解决的那个问题 ✓）。 -->
+    <div class="spacer"></div>
   </header>
   <div class="body">
     <!-- ★ **行序**（2026-10-06 用户定的）：
