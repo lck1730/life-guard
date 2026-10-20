@@ -177,17 +177,20 @@
       color: '#0f1115', light: false,
       vars: '--p-bg:#0f1115;--p-panel:#171a21;--p-panel2:#1e222b;'
           + '--p-line:#262b36;--p-text:#e6e8ee;--p-muted:#8b93a7;'
-          + '--p-accent:#6ea8ff;--p-accent-bg:#1e3a5f' },
+          + '--p-accent:#6ea8ff;--p-accent-bg:#1e3a5f;'
+          + '--p-accent-line:#35507a;--p-accent-soft:rgba(90,140,255,.10)' },
     { id: 'cream', name: '奶霜', desc: '暖白与焦糖，像一杯温牛奶',
       color: '#f6f0e4', light: true,
       vars: '--p-bg:#f6f0e4;--p-panel:#fffcf5;--p-panel2:#efe7d8;'
           + '--p-line:#e4d8c5;--p-text:#2d2822;--p-muted:#706658;'
-          + '--p-accent:#9a5b2e;--p-accent-bg:#f2e1cb' },
+          + '--p-accent:#9a5b2e;--p-accent-bg:#f2e1cb;'
+          + '--p-accent-line:#d8be9e;--p-accent-soft:rgba(154,91,46,.10)' },
     { id: 'forest', name: '林深', desc: '深林与苔绿，沉静而有生气',
       color: '#12231a', light: false,
       vars: '--p-bg:#12231a;--p-panel:#1a2f22;--p-panel2:#233a2b;'
           + '--p-line:#2e4836;--p-text:#e6efe3;--p-muted:#90a794;'
-          + '--p-accent:#8be4a0;--p-accent-bg:#2f5739' },
+          + '--p-accent:#8be4a0;--p-accent-bg:#2f5739;'
+          + '--p-accent-line:#477552;--p-accent-soft:rgba(139,228,160,.14)' },
   ];
   const THEME_ALIAS = { light: 'cream' };   // 旧版本存过 'light'，别让老用户掉回默认
   const THEME_DEFAULT = 'dark';
