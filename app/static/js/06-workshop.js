@@ -2164,6 +2164,7 @@
       if (e && e.status === 401) { location.href = '/login'; return; }
       show('login');
       $('#loginErr').textContent = (e && e.message) || '连不上服务器';
+      _bootReady();                    // 连不上就**收掉加载页** ✓，让人看见那句话 ✓
       return;
     }
     // ★ **`/me` 现在也是"进 App + 弹出我的"** ✗→✓（2026-10-09）——
@@ -2173,6 +2174,7 @@
       if (e && e.status === 401) { location.href = '/login'; return; }
       show('login'); tellNative('chat');
       if (e) $('#loginErr').textContent = e.message;
+      _bootReady();
       return;
     }
     // ⚠️ **落到群聊了才进「我的」** ✓ —— 没有空间的人落的是**初始化屏** ✓，
@@ -2184,6 +2186,7 @@
     // 到了就显示登录 ✓，不判、不跳 ✓（票由服务端在这一页清掉 ✓）。
     show('login');
     tellNative('chat');            // **根屏** ✓ → 返回键该走"再滑一次退出 App" ✓
+    _bootReady();                  // 登录页是同步画好的 ✓ → 最短 0.5s 后撤 ✓
   } else if (ROUTE === 'me') {
     bootAtMe();
   } else {
@@ -2199,6 +2202,7 @@
       show('login');
       tellNative('chat');
       if (e) $('#loginErr').textContent = e.message;
+      _bootReady();                  // 失败也要收 ✓ —— 否则人就卡在加载页上了 ✗
     });
   }
 

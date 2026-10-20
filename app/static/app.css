@@ -1686,14 +1686,128 @@
   .ascreen .mh { font-size:22px; font-weight:600; text-align:center;
                  color:var(--text); margin:10px 0 20px; }
 
-  /* 开机占位。**为什么要它**：以前登录页是静态 HTML 里"默认显示"的那一屏，
-     而"到底登录了没"要打一次 /auth/me 才知道——那几百毫秒里，**明明是已登录的
-     用户也会看到登录页一闪而过** ✗ 很影响体验。
-     现在开局什么都不显示，只有一个转圈；**确认完状态再决定进哪一屏**。 */
-  #boot { position:fixed; inset:0; display:grid; place-items:center;
-          background:var(--bg); z-index:200; }
+  /* ── 开局加载页（2026-10-20）──────────────────────────────────────────
+     **为什么要它**：以前开局只有一个延迟 200ms 才亮的转圈 ✓ ——
+     网络慢（过 WireGuard 的 `/bootstrap` + 背景大图 ✓）的时候，
+     用户先对着一片空白 / 深色底等 ✓，然后画面才"啪"地出现 ✓。
+     现在这一屏**从第一帧就在** ✓：品牌 + 宣传语 + 一条细进度条 ✓，
+     直到消息画完、背景图解码完、而且至少亮满 0.5 秒才撤 ✓
+     （见 `01-core.js` 的 `_bootReady` ✓）。
+
+     ⚠️ **颜色全部走主题变量** ✗ —— 夜阑 / 奶霜 / 林深三套自动跟着换 ✓，
+        不另写一份颜色 ✓（否则以后加主题又要改两处 ✓）。
+     ⚠️ `z-index:300` 要比任何屏 / 弹层 / 灯箱都高 ✓ —— 它盖的是"还没进来"那一段 ✓。 */
+  #boot {
+    position:fixed; inset:0; height:100dvh; z-index:300;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:calc(var(--inset-top) + 28px) 28px calc(var(--inset-bottom) + 34px);
+    background:var(--bg); color:var(--text); overflow:hidden;
+    opacity:1; transition:opacity .38s ease;
+  }
   #boot[hidden] { display:none; }
-  #boot i { width:26px; height:26px; border-radius:50%;
-            border:2.5px solid var(--line); border-top-color:var(--accent);
-            animation:bootspin .8s linear infinite; }
-  @keyframes bootspin { to { transform:rotate(360deg); } }
+  #boot.boot-out { opacity:0; pointer-events:none; }
+
+  /* 两团很淡的主题色光晕 ✓ —— 用 `--accent-soft`（三套主题各有一个 ✓），
+     慢速漂移；不抢字，只让底色不是一块死板 ✓。 */
+  #boot .boot-aurora {
+    position:absolute; inset:-22%;
+    background:
+      radial-gradient(34% 30% at 22% 20%, var(--accent-soft), transparent 70%),
+      radial-gradient(30% 28% at 82% 76%, var(--accent-soft), transparent 72%),
+      radial-gradient(42% 36% at 50% 108%, var(--accent-soft), transparent 70%);
+    filter:blur(7px);
+    animation:bootDrift 10s ease-in-out infinite alternate;
+    will-change:transform;
+  }
+  /* 细点阵 ✓ —— 和组件收纳页那块底纹同一个做法（`--line` 的点 ✓），
+     中心亮、四周化开 ✓，像一张很轻的纸 ✓。 */
+  #boot .boot-grid {
+    position:absolute; inset:0;
+    background-image:radial-gradient(circle, var(--line) 1px, transparent 1.35px);
+    background-size:22px 22px; opacity:.55;
+    -webkit-mask-image:radial-gradient(72% 62% at 50% 44%, #000 12%, transparent 78%);
+    mask-image:radial-gradient(72% 62% at 50% 44%, #000 12%, transparent 78%);
+  }
+
+  #boot .boot-main { position:relative; text-align:center; transform:translateY(-2.5vh); }
+
+  /* 徽标：和主题面板同一种材质（面板底 + 一道细边 + 大投影 ✓），
+     里面是屋檐 / 门 / 星光 ✓ —— 线条图标和 App 里那套一致 ✓。 */
+  #boot .boot-mark {
+    position:relative; width:78px; height:78px; margin:0 auto 26px;
+    display:grid; place-items:center; border-radius:24px;
+    background:linear-gradient(155deg, var(--panel), var(--panel2));
+    border:1px solid var(--line);
+    box-shadow:var(--shadow-lg), inset 0 1px 0 var(--line);
+    color:var(--accent);
+    animation:bootRise .8s cubic-bezier(.22,.8,.26,1) both;
+  }
+  #boot .boot-mark svg { width:42px; height:42px; }
+  /* 外面一圈慢慢呼吸的细环 ✓ */
+  #boot .boot-mark::after {
+    content:''; position:absolute; inset:-13px; border-radius:34px;
+    border:1px solid var(--accent); pointer-events:none;
+    animation:bootHalo 3.4s ease-in-out infinite;
+  }
+
+  #boot .boot-title {
+    font-size:29px; font-weight:650; line-height:1.2;
+    letter-spacing:.24em; padding-left:.24em;   /* 补掉最后一字后的字距，视觉才真居中 ✓ */
+    animation:bootRise .8s .06s cubic-bezier(.22,.8,.26,1) both;
+  }
+  #boot .boot-slogan {
+    margin-top:18px; color:var(--muted); font-size:13.5px;
+    letter-spacing:.17em; padding-left:.17em;
+    animation:bootRise .8s .13s cubic-bezier(.22,.8,.26,1) both;
+  }
+  #boot .boot-slogan::before {
+    content:''; display:block; width:24px; height:2px; border-radius:2px;
+    margin:0 auto 15px; background:var(--accent); opacity:.55;
+  }
+
+  /* 底部那条细进度：**不定长** ✓（没法知道还要多久 ✓，就别假装知道 ✓） */
+  #boot .boot-foot {
+    position:absolute; left:0; right:0;
+    bottom:calc(var(--inset-bottom) + 42px);
+    display:flex; flex-direction:column; align-items:center; gap:13px;
+    animation:bootFade .9s .25s ease both;
+  }
+  #boot .boot-bar {
+    width:136px; height:3px; border-radius:999px;
+    background:var(--line); overflow:hidden;
+  }
+  #boot .boot-bar i {
+    display:block; width:44%; height:100%; border-radius:inherit;
+    background:linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation:bootSweep 1.55s ease-in-out infinite;
+  }
+  #boot .boot-tip {
+    color:var(--muted); font-size:11.5px; opacity:.85;
+    letter-spacing:.18em; padding-left:.18em;
+  }
+
+  @keyframes bootRise {
+    from { opacity:0; transform:translateY(12px); }
+    to   { opacity:1; transform:none; }
+  }
+  @keyframes bootFade { from { opacity:0; } to { opacity:1; } }
+  @keyframes bootHalo {
+    0%,100% { opacity:.10; transform:scale(.985); }
+    50%     { opacity:.34; transform:scale(1.035); }
+  }
+  @keyframes bootDrift {
+    from { transform:translate3d(-1.5%,-1%,0) scale(1); }
+    to   { transform:translate3d(1.5%,1.5%,0) scale(1.06); }
+  }
+  @keyframes bootSweep {
+    from { transform:translateX(-110%); }
+    to   { transform:translateX(330%); }
+  }
+  /* 系统开了「减弱动态效果」→ 动画全停 ✓，但字和徽标照样在 ✓。 */
+  @media (prefers-reduced-motion: reduce) {
+    #boot, #boot .boot-aurora, #boot .boot-mark, #boot .boot-mark::after,
+    #boot .boot-title, #boot .boot-slogan, #boot .boot-foot, #boot .boot-bar i {
+      animation:none !important;
+    }
+    #boot { transition-duration:.12s; }
+  }

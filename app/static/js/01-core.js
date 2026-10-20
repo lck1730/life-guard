@@ -262,19 +262,43 @@
     return data;
   };
 
-  // ★ 开机那圈转：**延迟 200ms 才亮** ✗→✓ —— 2026-10-06。
+  // ── 开局加载页的退场（2026-10-20）────────────────────────────────────
   //
-  //   它原来是**写死在 HTML 里**的 ✓ → 第一帧就在屏幕上 ✓ →
-  //   而这一趟加载往往一百多毫秒就完了 ✓ → 转圈**只闪了那么一下** ✓
-  //   —— 用户说的"从我的进来会闪一下"，多半就是它 ✓
-  //   （从「设置」回来不闪 ✓，因为那压根没换文档 ✓）。
+  // ★ 用户要的形状 ✓：**最短亮 0.5 秒；最长一直等到真的加载完** ✓。
+  //   "加载完"不只是 `/bootstrap` 回来 ✓，还要：
+  //     · 消息已经画进 DOM ✓
+  //     · 聊天背景图已经取到 / 缩好 / **解码完** ✓（见 03-auth 的
+  //       `ensureChatBackground` ✓）—— 否则撤掉加载页的第一帧里背景还是空的 ✓，
+  //       用户会看到它"过一下才铺上来" ✓，那正是这次要消掉的 ✓
+  //     · 再等两帧 ✓，确保浏览器真把这一屏画出来了 ✓
+  //   然后才淡出 ✓（淡出 400ms ✓ —— 底下已经是完整画面了 ✓，不是空屏 ✓）。
   //
-  //   现在：先藏着 ✓，200ms 还没好才亮 ✓ ——
-  //   **快的时候它根本不出现** ✓，慢的时候它照常兜住"别让人对着空白等" ✓。
-  let bootTimer = setTimeout(() => {
-    const b = $('#boot');
-    if (b) b.hidden = false;
-  }, 200);
+  // ⚠️ **它不再由 `show()` 收掉** ✗ —— `show('chat')` 只是"这一屏该显示了" ✓，
+  //   这时候消息 / 背景往往还没就位 ✓；收得太早 = 又回到"先空白一下" ✓。
+  //   现在只有 `_bootReady()` 能收它 ✓（各处成功 / 失败的出口各调一次 ✓）。
+  const BOOT_MIN_MS = 500;
+  const _bootT0 = performance.now();
+  let _bootOff = null;
+
+  const _afterPaint = () => new Promise(res => {
+    requestAnimationFrame(() => requestAnimationFrame(res));
+  });
+
+  /** 底下那一屏已经准备好了 → 加载页等满 0.5s 后淡出 ✓（重复调只认第一次 ✓）。 */
+  const _bootReady = () => {
+    if (_bootOff) return _bootOff;
+    _bootOff = (async () => {
+      await _afterPaint();                      // 先让底下的界面真画一帧 ✓
+      const left = BOOT_MIN_MS - (performance.now() - _bootT0);
+      if (left > 0) await new Promise(r => setTimeout(r, left));
+      const b = $('#boot');
+      if (!b || b.hidden) return;
+      b.classList.add('boot-out');
+      await new Promise(r => setTimeout(r, 400));
+      b.hidden = true;
+    })();
+    return _bootOff;
+  };
 
   const toast = (m) => {
     const t = $('#toast'); t.textContent = m; t.classList.add('on');
@@ -314,10 +338,7 @@
    *   交叉淡入最贴切 ✓（用户要的"按场景分类、同类同一种" ✓）。
    */
   const show = (id, anim) => {
-    // 第一屏出现的那一刻，才把开机占位收掉（否则会先闪一下空白/登录页）
-    const boot = $('#boot');
-    if (boot) boot.hidden = true;
-    if (bootTimer) { clearTimeout(bootTimer); bootTimer = null; }
+    // ⚠️ 这里**不碰加载页** ✗ —— 由 `_bootReady()` 统一收 ✓（见上面那段说明 ✓）。
     $$('.screen').forEach(s => {
       s.classList.remove(...ANIM_CLASSES);
       s.classList.toggle('on', s.id === id);

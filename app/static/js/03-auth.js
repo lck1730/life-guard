@@ -296,7 +296,8 @@
       $('#introCard').hidden = true;     // 每次进来都从"只有按钮"那个状态开始 ✓
       $('#init').classList.remove('formopen');
       _initErr('');
-      return;
+      // ★ 加载页：这一屏是同步画好的 ✓（没有图要等 ✓）→ 走最短 0.5s 后撤 ✓
+      _bootReady();
       return;
     }
     group = b.group;
@@ -331,6 +332,17 @@
     //   ⚠️ **不等它** ✓（`preloadWallCss` 自己吞异常 ✓）：这是预热 ✓，
     //      不该挡住"进 App"这件事 ✓。
     preloadWallCss();
+    // ★ 2026-10-20：**加载页要等这一屏真的"能看"** 再撤 ✓ ——
+    //   · 聊天背景图：取到 / 缩好 / **解码完** ✓（`ensureChatBackground` 会复用
+    //     缓存那一趟已经发起的请求 ✓，不会重拉 ✓）
+    //   · 字体：本机字体几乎立刻 ready ✓，等它只是防"字重先跳一下" ✓
+    //   之后再 `_bootReady()` —— 它会再等两帧 + 补足最短 0.5s ✓。
+    //   ⚠️ **消息图片不在这里等** ✗：历史里可能有一堆图 ✓，逐张等会把开屏拖到
+    //      不可控 ✓；它们本来就是滚到才加载的（`loading=lazy` ✓），不属于
+    //      "第一眼就该完整"的那部分 ✓。
+    try { await ensureChatBackground(); } catch (e) {}
+    try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
+    _bootReady();
     // ★ 2026-10-08：这里原来有一段 `sessionStorage['lg_back_to']` 的还原 ✓ ——
     //   **删掉了** ✗→✓。它当初是为了修"从「我的」回来落到群聊首页" ✓，
     //   而根子是：**去「我的」是一次真导航（跨服务）** ✓，回来时壳不知道
@@ -450,6 +462,29 @@
     return null;
   };
 
+  /** 让一张图**先解码好**再交给 CSS ✓ —— 2026-10-20。
+   *
+   *  背景图挂在 `#chat` 的 `background-image` 上时 ✓，浏览器是**画到那一帧才解码** ✓；
+   *  解码 2000px 的图也要几十毫秒 ✓，而这段时间正好落在"加载页撤掉"那一刻 ✓ →
+   *  用户看到的还是"背景晚一步才铺上来" ✓。先拿 `<img>` 预热一遍 ✓，
+   *  CSS 再拿到同一张 blob URL 时就直接命中已解码的那份 ✓。
+   *
+   *  ⚠️ **绝不 reject、也绝不无限等** ✗：图坏了 / 解码慢，最多等 4 秒 ✓ ——
+   *     一张背景图不该把开屏永久卡住 ✓（退回 CSS 自己解码即可 ✓）。
+   */
+  const _decodeImg = (url) => new Promise((res) => {
+    let done = false;
+    const fin = () => { if (!done) { done = true; res(); } };
+    try {
+      const im = new Image();
+      im.onload = fin;
+      im.onerror = fin;
+      im.src = url;
+      if (im.decode) im.decode().then(fin, fin);
+      setTimeout(fin, 4000);
+    } catch (e) { fin(); }
+  });
+
   /** 背景图**只留手机用得上那么大** ✓ —— 2026-10-20。
    *
    *  现在这张是 7469×5265（约 3900 万像素、5.6MB）✓。每次重进都要解码一遍 ✓；
@@ -505,7 +540,10 @@
             }
           }
         }
-        return URL.createObjectURL(hit);   // ★ 不上网 ✓
+        // ★ 先解码 ✓ —— 加载页要等的正是"这张图能立刻画出来" ✓（见 `_decodeImg` ✓）
+        const made = URL.createObjectURL(hit);
+        await _decodeImg(made);
+        return made;                     // ★ 不上网 ✓
       }
     } catch (e) {}
     try {
@@ -513,7 +551,9 @@
       if (!r.ok) return null;
       const blob = await _shrinkBg(await r.blob());
       try { await _bgPut(url, blob); } catch (e) {}
-      return URL.createObjectURL(blob);
+      const made = URL.createObjectURL(blob);
+      await _decodeImg(made);
+      return made;
     } catch (e) { return null; }
   };
 
@@ -555,15 +595,37 @@
       bgKey = url;
     } else {
       // 缓存取不到（第一次 / IndexedDB 坏了）→ 退回网络地址 ✓
+      // ⚠️ 也先解码一遍再挂 ✓ —— 与缓存那条路同一个理由（加载页要等它 ✓）。
+      await _decodeImg(url);
       chat.style.setProperty('--chat-bg', `url("${url}")`);
     }
     chat.classList.add('has-bg');
   };
 
+  // ★ 2026-10-20：**同一张背景的取图只跑一趟，而且能被 `await`** ✓。
+  //
+  //   `renderHeader()` 在开机时会连着调好几次 ✓（缓存那一份一次、网络那一份一次 ✓），
+  //   而 `applyChatBackground` 原来对"正在取的那张"是**直接 return** ✗ ——
+  //   调用方 await 它只会得到 `undefined` ✓，等不到图 ✓。
+  //   这里把"这个地址的任务"记下来 ✓：同一个地址再来就直接复用同一个 Promise ✓；
+  //   地址变了（换了背景图 ✓）才另起一趟 ✓。
+  let bgTask = null, bgTaskKey = null, bgSeq = 0;
+  const ensureChatBackground = () => {
+    const url = (group && group.background) || '';
+    if (bgTask && bgTaskKey === url) return bgTask;
+    const seq = ++bgSeq;
+    bgTaskKey = url;
+    bgTask = applyChatBackground().catch(() => {}).finally(() => {
+      // 只清**自己这一趟** ✓ —— 期间换了图的话，新的那趟不能被清掉 ✓。
+      if (seq === bgSeq) { bgTask = null; bgTaskKey = null; }
+    });
+    return bgTask;
+  };
+
   const renderHeader = () => {
     $('#gname').textContent = group?.name || '';
     setStatus(curStatus);
-    applyChatBackground();
+    ensureChatBackground();
   };
 
   // ★ 三档文案的分工（2026-10-06，见 app/agent_status.py 那段）：

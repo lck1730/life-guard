@@ -20,8 +20,35 @@
 </head>
 <body>
 
-<!-- 开机占位：确认登录状态之前只显示它（见样式里那段说明） -->
-<div id="boot" hidden><i></i></div>
+<!-- ★ 2026-10-20：**开局加载页** ✓ —— 从第一帧就盖住整屏 ✓，
+     直到「消息画完 + 背景图解码完 + 至少 0.5 秒」才撤 ✓（见 01-core.js 的 `_bootReady` ✓）。
+     ⚠️ **它不带 `hidden`** ✗ —— 以前那个转圈是藏着的、200ms 后才亮 ✓，
+        所以慢的时候会先露一截空白 / 深色底 ✓；加载页反过来：**先亮着** ✓。
+     ⚠️ 颜色全部走主题变量 ✓（`--bg` / `--text` / `--accent` / `--line` ✓）——
+        夜阑 / 奶霜 / 林深三套自动跟着换 ✓，不用另写一份 ✓。 -->
+<div id="boot" role="status" aria-label="正在加载生活管家">
+  <div class="boot-aurora" aria-hidden="true"></div>
+  <div class="boot-grid" aria-hidden="true"></div>
+  <div class="boot-main">
+    <div class="boot-mark" aria-hidden="true">
+      <!-- 屋檐 + 门 + 一颗小星光 ✓ —— 和 App 里其它图标同一套画法（细描边、圆端点 ✓） -->
+      <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.1"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.5 23.5 24 11.5l13.5 12"/>
+        <path d="M14 23v12.5h20V23"/>
+        <path d="M20 35.5v-7.5h8v7.5"/>
+        <path d="M35.6 9.2l1.05 2.75 2.75 1.05-2.75 1.05-1.05 2.75-1.05-2.75-2.75-1.05 2.75-1.05z"
+              fill="currentColor" stroke="none"/>
+      </svg>
+    </div>
+    <div class="boot-title">生活管家</div>
+    <div class="boot-slogan">一个越用越懂你的管家</div>
+  </div>
+  <div class="boot-foot">
+    <div class="boot-bar" aria-hidden="true"><i></i></div>
+    <div class="boot-tip">正在准备你的空间…</div>
+  </div>
+</div>
 
 <!-- 登录 -->
 <div class="screen" id="login">
