@@ -81,9 +81,24 @@
     } catch (e) { _wallCss = ''; }
   };
 
+  // ★ 2026-10-20：小屋铺满整屏之后，**状态栏正压在小屋上** ✓ ——
+  //   小屋是浅奶油底 ✓，深色主题下原来那套浅色状态栏图标会**看不见** ✗。
+  //   所以这一摞屏里：停在小屋 → 深色图标 ✓；进组件 / 对话 → 按用户主题还原 ✓。
+  //   ⚠️ 壳那边没有这个 API 时（浏览器里）静默跳过 ✓。
+  const _syncStatusBar = () => {
+    let light = true;
+    try { light = !!themeById(document.documentElement.dataset.theme).light; } catch (e) {}
+    const onScene = $('#workshop').classList.contains('on')
+      && !$('#wsChat').classList.contains('on')
+      && !$('#compView').classList.contains('on')
+      && !$('#diySet').classList.contains('on');
+    try { window.LifeGuardNative?.setLightStatusBar?.(onScene ? true : light); } catch (e) {}
+  };
+
   const openWorkshop = () => {
     pushScreen('workshop');
     applyWallCss();
+    _syncStatusBar();
     // ⚠️ **先推屏、再画** ✗→✓ —— 画要发请求（几十毫秒 ✓）；
     //    反过来的话那几十毫秒里这一屏是空的 ✓，看着像"点了没反应" ✓。
     renderWorkshop();
@@ -101,6 +116,8 @@
     if (ws3DOn) { try { window.Room3D && window.Room3D.unmount(); } catch (e) {} ws3DOn = false; }
     if (wsFlatOn) { wsFlatOn = false; }   // 平面预览也复位 ✓
     popScreen('workshop');
+    // 退场动画还有 ~200ms 才摘 `.on` ✓ → 等它收完再按"最上面是谁"报一次 ✓
+    setTimeout(_syncStatusBar, 220);
   };
 
   // ── 平面小屋（2026-10-20 重画）────────────────────────────────────
@@ -550,6 +567,7 @@
     //   （格子本来就是那个颜色 ✓ —— 服务端 `spot.tint` 给的 ✓，见 `canvasCell` ✓）。
     $('#compView').style.background = tint || '';
     pushScreen('compView');
+    _syncStatusBar();
     let d;
     try { d = await api(`/components/${encodeURIComponent(slug)}?group_id=${group.id}`); }
     catch (e) { wrap.textContent = '打不开：' + e.message; return; }
@@ -605,6 +623,7 @@
   const closeComp = () => {
     compCur = null;
     popScreen('compView');
+    setTimeout(_syncStatusBar, 220);
     // ⚠️ **退回工坊要重画一次** ✗→✓ —— 不然刚才改过的东西还挂在旧样子上 ✓，
     //    用户会以为"点了没用" ✓（这就是那种"明明成功了却像失败"的毛病 ✓）。
     if ($('#workshop').classList.contains('on')) renderWorkshop();
@@ -828,6 +847,7 @@
       if (hint) { toast(hint); return false; }
     }
     if (!$('#wsChat').classList.contains('on')) pushScreen('wsChat', from);
+    _syncStatusBar();
     try {
       const d = await api(`/workshop/${group.id}/tasks/${tid}/open`, { method: 'POST' });
       // ★ **服务端那道闸才是判据** ✓ —— 前端这份可能已经旧了 ✓（见 `wsBusyHint` ✓）。
@@ -900,7 +920,7 @@
       // 第一次进：建那条统一的（**不起名** ✓ —— 名字等真做出组件时由 agent 定 ✓）。
       //   ⚠️ 服务端会替它先开口一句问候 ✓（`_greeting` ✓，见 `tasks_new` ✓）。
       opened = await wsNewTask('', '');
-      if (opened) pushScreen('wsChat', from || 'corner');
+      if (opened) { pushScreen('wsChat', from || 'corner'); _syncStatusBar(); }
     }
     if (opened && prefill) {
       // 只在**输入框还空着**时填 ✓ —— 别把他打到一半的字冲掉 ✓。
@@ -1002,6 +1022,7 @@
    */
   const closeWsChat = () => {
     popScreen('wsChat');
+    setTimeout(_syncStatusBar, 220);
     // ⚠️ 底下的收纳页要**重画 + 重挂外观** ✗→✓ —— 说不定刚刚
     //    （a）做好了一个组件 ✓（b）删了一个 ✓（c）让管家把这一屏改了个样 ✓。
     //    不重挂的话（c）最要命 ✓：他刚让管家改完界面，退出来**还是老样子** ✓
@@ -2017,6 +2038,7 @@
     if (!$('#workshop').classList.contains('on')) pushScreen('workshop');
     applyWallCss();
     renderWorkshop();
+    setTimeout(_syncStatusBar, 220);
   };
 
   $('#openSettings').onclick = openSettings;
