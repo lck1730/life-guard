@@ -373,11 +373,6 @@
     const cur = document.documentElement.dataset.theme || THEME_DEFAULT;
     body.textContent = '';
 
-    const intro = document.createElement('div');
-    intro.className = 'tintro';
-    intro.textContent = '选一个你喜欢的。换主题只影响你这台手机，不会同步给空间里的其他人。';
-    body.appendChild(intro);
-
     THEMES.forEach(t => {
       const card = document.createElement('button');
       card.type = 'button';

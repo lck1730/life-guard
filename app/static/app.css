@@ -1318,8 +1318,6 @@
      所以站在林深里也能看见奶霜长什么样 ✓）。
      ⚠️ 外面那圈选中描边用的是**当前主题**的 `--accent` ✓，
         卡片里面才是**被预览主题**的颜色 ✓ —— 这两套别混 ✓。 */
-  #themeSet .tintro { color:var(--muted); font-size:12.5px; line-height:1.65;
-                      margin:2px 2px 16px; }
   #themeSet .tcard { display:block; width:100%; padding:0; margin-bottom:14px;
     text-align:left; border:1.5px solid var(--line); border-radius:16px;
     background:var(--panel); overflow:hidden; color:var(--text);
