@@ -327,6 +327,29 @@ def _mostly_leaked_thinking(raw: str) -> tuple[str, bool]:
     return text, mostly
 
 
+async def _what_got_done(group_id: int, rec_watermark: int,
+                         rem_watermark: int) -> str:
+    """这一轮正文作废时，用数据库里**真发生了的事**兜一句 ✓。
+
+    ⚠️ 这是防「沉默 → 用户以为没做 → 再说一遍 → 记第二笔」的 ✓：
+      2026-10-20 那笔 12.59 就是这么变成三笔的（两次正文是推理、被我们丢弃，
+      但工具其实已经记上了）。完成与否**只认库里的行**，不认它嘴上说什么。
+    """
+    rec = (await fetch_one(
+        "SELECT COUNT(*) AS n FROM records "
+        "WHERE group_id = ? AND id > ? AND deleted_at IS NULL",
+        (group_id, rec_watermark))) or {}
+    rem = (await fetch_one(
+        "SELECT COUNT(*) AS n FROM reminders WHERE group_id = ? AND id > ?",
+        (group_id, rem_watermark))) or {}
+    done: list[str] = []
+    if int(rec.get("n") or 0) > 0:
+        done.append("记下了")
+    if int(rem.get("n") or 0) > 0:
+        done.append("设好了")
+    return "，".join(done)
+
+
 def _keep_or_drop(out: list[str], cut: list[str], chunk: str) -> None:
     """一段非中文：够长就记进 `cut`（丢掉 ✓），否则原样留着 ✓。
 
@@ -1480,6 +1503,15 @@ async def run_turn(
     agent_name = await agent_name_for(group_id)
     stale = await _has_stale_messages(group_id, pending)
 
+    # ★ 本轮开始前的最大 id —— 正文整段作废时，靠它判断"工具其实做成了没有" ✓
+    #   （见 `_what_got_done`；时间戳有同一秒的边界，id 没有 ✓）。
+    rec_watermark = int(((await fetch_one(
+        "SELECT COALESCE(MAX(id), 0) AS m FROM records WHERE group_id = ?",
+        (group_id,))) or {}).get("m") or 0)
+    rem_watermark = int(((await fetch_one(
+        "SELECT COALESCE(MAX(id), 0) AS m FROM reminders WHERE group_id = ?",
+        (group_id,))) or {}).get("m") or 0)
+
     text_part = (
         f"以下是群里最近的一批消息（按时间顺序）：\n\n{prompt}\n\n"
         f"{_now_stamp()}\n\n"
@@ -1557,8 +1589,14 @@ async def run_turn(
                 text = t2
                 log.info("group=%s 补轮成功，拿到一句人话（%d 字）", group_id, len(t2))
             else:
-                log.warning("group=%s 补轮还是思考，放弃（保留原文）", group_id)
+                # ⚠️ 原文本身就是"只吐了工具调用文本"那种天书 ✗ ——
+                #   再留着它只会把内部实现发出去；丢弃后由下面的
+                #   `_what_got_done` 决定要不要兜一句 ✓。
+                log.warning("group=%s 补轮还是思考，丢弃原文", group_id)
+                text = ""
         except Exception:
+            # 原文已经确认是泄漏的工具调用文本 → 补轮失败也不能把它发出去 ✓
+            text = ""
             log.exception("补轮失败 group=%s", group_id)
     elif mostly_leaked:
         # ★★ 2026-10-20：Hermes 把"正文为空、只有推理"的一轮**提升成最终回复** ✓。
@@ -1595,6 +1633,16 @@ async def run_turn(
                 "group=%s 这一轮把推理当回答发下来了（抠掉 %d 字），没有可用结论，丢弃碎片",
                 group_id, len(raw_text) - len(text))
             text = ""
+
+    # ★ 正文没了，但工具可能已经做成了 ✓ —— 别沉默。
+    #   沉默会让用户以为没做、再说一遍，于是记第二笔（2026-10-20 实测：
+    #   12.59 变成三笔）。这里**只认本轮新写进库的行**，不认它嘴上说的。
+    if not text:
+        done = await _what_got_done(group_id, rec_watermark, rem_watermark)
+        if done:
+            log.info("group=%s 正文被丢弃，但这一轮真的做成了（%s），用确定性回复兜底",
+                     group_id, done)
+            text = done
 
     silent = (not text) or text.lower().strip("。.!！") in _SILENT_MARKERS
 
@@ -1679,6 +1727,17 @@ async def run_turn(
             # （那些**故意留着**，让它们走正常流程）。
             await ctx_buffer.consume_upto(
                 group_id, max(int(m.get("id") or 0) for m in queued))
+
+            # ★★ 复审也要过同一道推理过滤 ✗→✓（2026-10-20 实测）——
+            #   主流程过滤完、复审又把 1581 字的思考当成最终回复塞回来，
+            #   把已经干净的原句盖掉了（消息 561）。复审这一步**能调工具**
+            #   （20:23 那条就顺手记了 7.2），所以上面照样消费这批消息；
+            #   只是**不采纳这段修订**，保留已经过过滤的原句。
+            revised, revised_leaked = _mostly_leaked_thinking(revised)
+            if not revised or revised_leaked or _looks_like_leaked_reasoning(revised):
+                log.warning("group=%s 复审把思考过程当成回复（只剩 %d 字可用），"
+                            "不采纳，保留原句", group_id, len(revised))
+                revised = text
 
             wants_silent = revised.lower().strip("。.!！") in _SILENT_MARKERS
             if wants_silent and not must_speak:
