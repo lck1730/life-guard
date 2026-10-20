@@ -261,24 +261,76 @@
   //   —— 少了它，"正在输入"会变成一个**空的状态条** ✗。
   const STATUS_TEXT = { idle:'正在窥屏…', thinking:'正在思考…', typing:'正在输入…', lurking:'打算继续窥屏…' };
 
+  // ★ 背景图的**本机缓存** ✓ —— 2026-10-20。
+  //   服务端那条 `/api/groups/{id}/background/file` 已经带 `?v=` + `immutable` ✓，
+  //   但安卓 WebView 的 HTTP 缓存**不一定跨重启还在** ✗ → 每次重进都要
+  //   重新走 WireGuard 把那张大图拉一遍 ✓ → 慢 ✓。这里用 **Cache API**
+  //   （`caches`）自己存一份原图 ✓ —— 它和 localStorage 一样是**持久 origin
+  //   存储** ✓，跨重启还在 ✓；地址带版本号 ✓ → 换图必然换 key ✓ → 缓存
+  //   自动失效 ✓。
+  //   ⚠️ `caches` 取不到 / 任何一步抛错 → 退回挂网络地址 ✓（浏览器那层缓存
+  //      可能正好命中 ✓），**绝不因为缓存坏掉就把背景弄没** ✗。
+  let bgObjUrl = null;       // 当前贴上的那张的 blob: URL（换图前 revoke ✓）
+  let bgKey = null;          // 当前已贴上的版本地址（同一张不重贴 ✓）
+
+  const _bgCache = () =>
+    (window.caches ? caches.open('lg-bg-v1') : Promise.reject()).catch(() => null);
+
+  /** 把一个版本地址**变成 blob: URL** ✓ —— 命中本机缓存秒回 ✓；
+   *  没命中就现取、顺手存一份 ✓。取不到返回 null ✓（调用方退回网络地址 ✓）。 */
+  const _materializeBg = async (url) => {
+    const cache = await _bgCache();
+    if (cache) {
+      try {
+        const hit = await cache.match(url);
+        if (hit) return URL.createObjectURL(await hit.blob());   // ★ 不上网 ✓
+      } catch (e) {}
+    }
+    try {
+      const r = await fetch(url, { credentials: 'same-origin' });
+      if (!r.ok) return null;
+      const blob = await r.blob();
+      if (cache) { try { await cache.put(url, new Response(blob)); } catch (e) {} }
+      return URL.createObjectURL(blob);
+    } catch (e) { return null; }
+  };
+
   /** 把这个空间的背景贴到主群聊上 ✓（没有就摘掉 ✓）。
    *
    *  ⚠️ 只改 `#chat` 上的一个 class + 一个 CSS 变量 ✓ —— **不重建节点** ✓
    *    （换背景时消息列表不该闪一下 ✓）。
    *  ⚠️ 地址**只认服务端给的** `group.background` ✓（它带版本号 ✓，
    *    换图必然换 URL ✓）—— 前端不自己拼 ✓。
+   *  ⚠️ **先挂网络地址兜底、再用 blob: 升级** ✓ —— 网络那层缓存可能正好命中 ✓
+   *    就够用了 ✓；本机缓存命中则**秒级**升级成 blob:（重进不闪、不重拉 ✓）。
    */
-  const applyChatBackground = () => {
+  const applyChatBackground = async () => {
     const chat = $('#chat');
     if (!chat) return;
     const url = group && group.background;
-    if (url) {
-      chat.style.setProperty('--chat-bg', `url("${url}")`);
-      chat.classList.add('has-bg');
-    } else {
+    if (!url) {
       chat.classList.remove('has-bg');
       chat.style.removeProperty('--chat-bg');
+      if (bgObjUrl) { URL.revokeObjectURL(bgObjUrl); bgObjUrl = null; }
+      bgKey = null;
+      return;
     }
+    if (bgKey === url) return;                    // 同一张，别重贴 ✓
+
+    // 先挂网络地址兜着 ✓ —— blob: 没回来之前背景不是空的 ✓。
+    chat.style.setProperty('--chat-bg', `url("${url}")`);
+    chat.classList.add('has-bg');
+
+    const made = await _materializeBg(url);       // 命中本机缓存秒回 ✓
+    if (!made) return;                            // 取不到 → 留在网络地址 ✓
+    if ((group && group.background) !== url) {    // 这期间换图了 → 这张作废 ✓
+      URL.revokeObjectURL(made);
+      return;
+    }
+    if (bgObjUrl) URL.revokeObjectURL(bgObjUrl);
+    bgObjUrl = made;
+    chat.style.setProperty('--chat-bg', `url("${bgObjUrl}")`);
+    bgKey = url;
   };
 
   const renderHeader = () => {
