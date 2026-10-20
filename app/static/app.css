@@ -18,9 +18,9 @@
        ⚠️ 用**带 alpha 的底色**，不是整体 `opacity` ✗ ——
           整体透明度会连正文一起变淡，字在照片上更糊 ✓。
        三个值对应：别人的气泡 / 小助手 / 自己 ✓。 */
-    --bubble-bg:rgba(30,34,43,.78);
-    --bubble-agent-bg:rgba(23,26,33,.82);
-    --bubble-mine-bg:rgba(30,58,95,.78);
+    --bubble-bg:rgba(30,34,43,.60);
+    --bubble-agent-bg:rgba(23,26,33,.66);
+    --bubble-mine-bg:rgba(30,58,95,.60);
     --danger-soft:rgba(255,107,107,.4);
     --bg-scrim:rgba(0,0,0,.18);
     --warn2:#d8b06a;
@@ -45,9 +45,9 @@
     --hover:#f3eadb;        --avatar-bg:#e9dfcf;
     --quote-bg:rgba(122,112,99,.12);
     /* 气泡半透明 —— 浅色主题下照片已经有 46% 奶白纱，气泡再压一层 ✓ */
-    --bubble-bg:rgba(239,231,216,.80);
-    --bubble-agent-bg:rgba(255,252,245,.84);
-    --bubble-mine-bg:rgba(242,225,203,.80);
+    --bubble-bg:rgba(239,231,216,.64);
+    --bubble-agent-bg:rgba(255,252,245,.70);
+    --bubble-mine-bg:rgba(242,225,203,.64);
     --danger-soft:rgba(185,71,53,.35);
     --bg-scrim:rgba(255,252,245,.46);   /* 奶白下字是深色 → 照片要压得更白一点才读得清 ✓ */
     --warn2:#8a5f1e;
@@ -66,9 +66,9 @@
     --hover:#1f3326;        --avatar-bg:#1f3326;
     --quote-bg:rgba(144,167,148,.15);
     /* 气泡半透明 —— 同夜阑 ✓ */
-    --bubble-bg:rgba(27,44,32,.78);
-    --bubble-agent-bg:rgba(20,34,25,.82);
-    --bubble-mine-bg:rgba(35,66,44,.78);
+    --bubble-bg:rgba(27,44,32,.60);
+    --bubble-agent-bg:rgba(20,34,25,.66);
+    --bubble-mine-bg:rgba(35,66,44,.60);
     --danger-soft:rgba(227,126,109,.4);
     --bg-scrim:rgba(0,0,0,.25);
     --warn2:#d9c68a;
