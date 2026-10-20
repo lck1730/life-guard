@@ -58,17 +58,17 @@
   /* 林深：墨绿底 + 苔绿强调色 ✓ —— 比夜阑暖一档（偏绿而不是偏蓝 ✓），
      但对比度保持住 ✓（深底上正文不用纯白，带一点绿灰更柔和 ✓）。 */
   [data-theme="forest"] {
-    --bg:#0d1711; --panel:#142219; --panel2:#1b2c20;
-    --text:#e6efe3; --muted:#90a794; --line:#263b2c;
-    --accent:#a2d5a4; --accent-bg:#23422c; --on-accent:#0a150e;
+    --bg:#12231a; --panel:#1a2f22; --panel2:#233a2b;
+    --text:#e6efe3; --muted:#90a794; --line:#2e4836;
+    --accent:#a2d5a4; --accent-bg:#2a4a32; --on-accent:#0a150e;
     --agent:#d9c68a; --danger:#e37e6d;
     --accent-line:#3a5a44;  --accent-soft:rgba(162,213,164,.12);
-    --hover:#1f3326;        --avatar-bg:#1f3326;
+    --hover:#294334;        --avatar-bg:#294334;
     --quote-bg:rgba(144,167,148,.15);
     /* 气泡半透明 —— 同夜阑 ✓ */
-    --bubble-bg:rgba(27,44,32,.60);
-    --bubble-agent-bg:rgba(20,34,25,.66);
-    --bubble-mine-bg:rgba(35,66,44,.60);
+    --bubble-bg:rgba(35,58,43,.60);
+    --bubble-agent-bg:rgba(26,47,34,.66);
+    --bubble-mine-bg:rgba(42,74,50,.60);
     --danger-soft:rgba(227,126,109,.4);
     --bg-scrim:rgba(0,0,0,.25);
     --warn2:#d9c68a;

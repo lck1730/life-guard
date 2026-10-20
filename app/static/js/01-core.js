@@ -184,10 +184,10 @@
           + '--p-line:#e4d8c5;--p-text:#2d2822;--p-muted:#706658;'
           + '--p-accent:#9a5b2e;--p-accent-bg:#f2e1cb' },
     { id: 'forest', name: '林深', desc: '深林与苔绿，沉静而有生气',
-      color: '#0d1711', light: false,
-      vars: '--p-bg:#0d1711;--p-panel:#142219;--p-panel2:#1b2c20;'
-          + '--p-line:#263b2c;--p-text:#e6efe3;--p-muted:#90a794;'
-          + '--p-accent:#a2d5a4;--p-accent-bg:#23422c' },
+      color: '#12231a', light: false,
+      vars: '--p-bg:#12231a;--p-panel:#1a2f22;--p-panel2:#233a2b;'
+          + '--p-line:#2e4836;--p-text:#e6efe3;--p-muted:#90a794;'
+          + '--p-accent:#a2d5a4;--p-accent-bg:#2a4a32' },
   ];
   const THEME_ALIAS = { light: 'cream' };   // 旧版本存过 'light'，别让老用户掉回默认
   const THEME_DEFAULT = 'dark';
