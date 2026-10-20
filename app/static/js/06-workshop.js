@@ -103,30 +103,30 @@
     popScreen('workshop');
   };
 
-  // ── 平面精致屋（2026-10-15 方向调整）──────────────────────────────
-  // <image> 引静态 svg（房 + 猫），不进 app.js 拼接 ✓。组件物件管线
-  // （drawCrate/ledger/polaroid 还是透视的 ✗）暂不接 —— 先把**观感**定下来，
-  // 平面管线下一步再写。猫是出口（.ws-exit → closeWorkshop ✓）。
+  // ── 平面小屋（2026-10-20 重画）────────────────────────────────────
+  // ★ 用户定的新方向：**平面二维 + 宫崎骏式暖光 + 浪漫小屋** ✓，
+  //   并且**铺满整屏** ✓（`#workshop .abody` 的 padding 已经撤掉 ✓）。
+  // <image> 引静态 svg（小屋 + 猫 + 蔷薇 + 灯火），不进 app.js 拼接 ✓。
+  // 账本是唯一热区（点 → 记账 ✓）；其它组件物件的管线以后再接 ✓。
   const buildFlatScene = function () {
     const wrap = document.createElement('div');
     wrap.className = 'ws-scene';
-    // ★ 竖幅 760×1340（贴手机竖屏 ✓）。preserveAspectRatio **slice** ✓ ——
-    //   工坊 .abody 给刘海/底栏留了 padding → 场景区比 760:1340 更窄更高 ✓，
-    //   meet 会按宽度撑满 → 高度剩一段出米色空白条 ✗；slice 竖向填满、左右
-    //   对称裁 ~2%（只裁墙边 ✓，账本热区在正中不受影响 ✓），不产生滚动 ✓。
-    const svg = _svg('svg', { viewBox: '0 0 760 1340',
+    // ★ 竖幅 900×1600（贴手机竖屏 ✓）。preserveAspectRatio **slice** ✓ ——
+    //   场景按高度铺满、左右对称裁边 ✓，不产生滚动 ✓。
+    //   ⚠️ 画面里的关键东西都留在 x=90..810 内 ✓（20:9 的手机也不会裁到它们✓）。
+    const svg = _svg('svg', { viewBox: '0 0 900 1600',
       preserveAspectRatio: 'xMidYMid slice', class: 'ws-flat' });
     svg.innerHTML =
-      // ★ 内层 <image> 用 **meet**（不是 slice！）✓ —— flat-room 本身 760×1340，
-      //   放进 760×1340 盒子是 1:1 精确贴合，meet 即满、slice 在某些 WebView 上
+      // ★ 内层 <image> 用 **meet**（不是 slice！）✓ —— 图本身 900×1600，
+      //   放进同尺寸盒子是 1:1 精确贴合，meet 即满、slice 在某些 WebView 上
       //   会把 <image> 渲成黑块/不铺满 ✗（实测黑边根因 ✓）。真正填满屏幕的是
       //   **外层 svg 的 slice** ✓，内层只管把图原样贴进 viewBox。
-      '<image href="/static/flat-room.svg" x="0" y="0" width="760" height="1340" ' +
+      '<image href="/static/flat-room.svg" x="0" y="0" width="900" height="1600" ' +
         'preserveAspectRatio="xMidYMid meet"/>' +
-      // 账本热区（桌上账本位置 ✓）—— 透明、可点 → 进记账。
+      // 账本热区（桌上摊开的账本 ✓）—— 透明、可点 → 进记账。
       //   ⚠️ <image> 引的 svg 没法点子元素 ✓，所以盖一块透明 rect 当入口 ✓。
-      '<rect class="ws-obj" data-slug="bookkeeping-panel" x="195" y="835" ' +
-        'width="360" height="110" fill="transparent" style="cursor:pointer"/>';
+      '<rect class="ws-obj" data-slug="bookkeeping-panel" x="318" y="1028" ' +
+        'width="268" height="92" fill="transparent" style="cursor:pointer"/>';
     svg.querySelectorAll('.ws-obj').forEach(function (el) {
       el.addEventListener('click', function () {
         const c = wsCanvas.find(function (x) { return x.slug === 'bookkeeping-panel'; });
@@ -399,6 +399,9 @@
   const paintCanvas = () => {
     const box = $('#wsBody');
     box.innerHTML = '';                       // 下面走 createElement ✓（屋是固定串 ✓、物是 DOM 摆 ✓）
+    // ★ 2026-10-20：**空的时候也画小屋** ✓ —— 以前空状态是一屏灰字 ✓，
+    //   新空间进来第一眼像"没做完" ✗；现在小屋照常在，上面浮一张奶油色小卡片 ✓。
+    box.appendChild(buildFlatScene());
     if (!wsCanvas.length) {
       // ★ 空状态那句话 ✓（2026-10-08 用户给的原话）—— 「去创意工坊」入口没了 ✓
       //   （只剩群聊右上角进统一聊天 ✓），后半句改了 ✓。
@@ -408,9 +411,8 @@
       box.appendChild(em);
       return;
     }
-    box.appendChild(buildFlatScene());
-    // ★ 2026-10-15 方向调整：工坊默认 = 精致平面屋（竖幅一屏、不横滑 ✓），
-    //   画面里只有**账本**一件物（点 → openComp 记账 ✓）。二狗先拿掉 ✓。
+    // ★ 工坊默认 = 平面小屋（竖幅一屏、不横滑 ✓），
+    //   画面里只有**账本**一件物（点 → openComp 记账 ✓）。二狗在毯子上睡着 ✓。
     //   其它组件暂不摆进平面屋（平面物件管线 drawCrate/ledger/polaroid 还没接 ✓），
     //   接好后它们也成画面里的物件。旧的透视 buildScene 留着做 fallback ✓。
   };

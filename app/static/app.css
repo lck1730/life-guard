@@ -796,7 +796,7 @@
        组件都在沙箱里、文件之间本来就隔离 ✓，分不分没有实际区别 ✓。
        于是这一屏只剩一件事：**列出来** ✓（「未固化」那套 2026-10-07 深夜也去掉了 ✓）。
        "做"和"改"都在别处（＋ 进的对话屏 / 组件页 ✓）。 */
-  #workshop { z-index:22; }
+  #workshop { z-index:22; background:#f4e5c7; }
   /* ⚠️ **`#compView` 要在 `#wsNav`（24）上面** ✗→✓（2026-10-07 深夜，用户报的：
      「从组件聊天界面点上方组件名称跳转时，会直接到组件聊天导航页面，返回一下才是
        组件界面」✓）。
@@ -907,8 +907,12 @@
   /* ★ 2026-10-08：这两屏的顶栏拆了 ✓ → body 要**自己顶到最上面** ✗→✓，
      并且自己让开刘海/状态栏 ✓（原来是 `.abody` 跟着顶栏走的 ✓）。 */
   #workshop .abody {
-    padding-top: calc(var(--inset-top) + 12px);
-    padding-bottom: calc(var(--inset-bottom) + 12px);
+    /* ★ 2026-10-20：**铺满整屏** ✓ —— 用户要的就是小屋从状态栏一直铺到底 ✓。
+       padding 全撤、也不许滚 ✓（画面自己用 slice 填满 ✓）。
+       ⚠️ 热区（账本/猫……）都画在画面中下部 ✓，不会被刘海或手势条压住 ✓。 */
+    position:relative;
+    padding:0;
+    overflow:hidden;
   }
   #workshop .canvas { display:grid; grid-template-columns:repeat(4, 1fr);
                       grid-auto-rows:92px; gap:12px 10px; padding-top:6px; }
@@ -956,9 +960,8 @@
      ★ 墙/侧墙/地板走**变量** ✓ —— `set_wall_style` 改这几个色就能换肤 ✓
         （不用懂屋里结构 ✓）。 */
   #workshop .ws-scene { position:relative; width:100%; height:100%; min-height:0;
-                        overflow-x:auto; overflow-y:hidden;
-                        -webkit-overflow-scrolling:touch; touch-action:pan-x pan-y;
-                        background:#e9dcc4; }
+                        overflow:hidden;
+                        background:#f4e5c7; }
   #workshop .ws-room { height:100%; width:auto; display:block; min-width:100%; }
   /* ★ 2026-10-15 平面屋：竖幅贴屏 ✓ —— width/height 都 100% +
      preserveAspectRatio slice → 竖向填满、对称裁边、不留米色空白条 ✓
@@ -975,10 +978,16 @@
        （当时看不出来 ✓：收纳页上永远有「组件界面diy」那一格 ✓，这一句**根本轮不到露面** ✓）。
        那一格撤掉之后 ✓，**新空间进来第一眼就是它** ✓ —— 现在它得看起来像
        "这一屏是空的" ✓，而不是像"上面掉下来一行字" ✓。 */
-  #workshop .wsempty { color:var(--muted); text-align:center; line-height:1.9;
-                       font-size:14px; padding:0 18px;
-                       min-height:100%; display:flex; align-items:center;
-                       justify-content:center; }
+  /* ★ 2026-10-20：空状态改成**浮在小屋上的一张奶油色小卡片** ✓ ——
+     小屋照常铺满 ✓（新空间第一眼也不是一屏灰字 ✓），卡片只说话、不抢手势 ✓。 */
+  #workshop .wsempty { position:absolute; left:50%; top:52%;
+                       transform:translate(-50%,-50%); z-index:2;
+                       width:min(78%, 332px); padding:17px 20px;
+                       border:1px solid #ddc49b; border-radius:18px;
+                       background:rgba(255,250,238,.94);
+                       box-shadow:0 16px 38px rgba(97,61,34,.18);
+                       color:#75583a; text-align:center; line-height:1.85;
+                       font-size:14px; pointer-events:none; }
 
   /* ── 组件页：**纯预览**（2026-10-07 晚上改的）─────────────────────────
      ★ 用户定的：这一屏「不要有任何的提示和设置选项」✓，
