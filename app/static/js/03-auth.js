@@ -263,34 +263,90 @@
 
   // ★ 背景图的**本机缓存** ✓ —— 2026-10-20。
   //   服务端那条 `/api/groups/{id}/background/file` 已经带 `?v=` + `immutable` ✓，
-  //   但安卓 WebView 的 HTTP 缓存**不一定跨重启还在** ✗ → 每次重进都要
-  //   重新走 WireGuard 把那张大图拉一遍 ✓ → 慢 ✓。这里用 **Cache API**
-  //   （`caches`）自己存一份原图 ✓ —— 它和 localStorage 一样是**持久 origin
-  //   存储** ✓，跨重启还在 ✓；地址带版本号 ✓ → 换图必然换 key ✓ → 缓存
-  //   自动失效 ✓。
-  //   ⚠️ `caches` 取不到 / 任何一步抛错 → 退回挂网络地址 ✓（浏览器那层缓存
-  //      可能正好命中 ✓），**绝不因为缓存坏掉就把背景弄没** ✗。
+  //   但安卓 WebView 的 HTTP 缓存**不保证跨重启还在** ✗ → 每次重进都要
+  //   重新走 WireGuard 把那张大图拉一遍 ✓ → 慢 ✓。所以自己在本机存一份原图 ✓。
+  //
+  //   ⚠️ 用的是 **IndexedDB**，不是 **Cache API** ✓ —— 这条是重点：
+  //      `caches` 只在**安全上下文**里存在 ✓（HTTPS / localhost ✓），
+  //      而 App 走的是 `http://10.66.66.1:8730` ✓ —— 明文 HTTP + 非 localhost
+  //      → 手机 WebView 里 `window.caches` 是 **undefined** ✗
+  //      → 上一版（Cache API）实际上**一次都没缓存过** ✓，每次都在重拉 ✓。
+  //      IndexedDB 没有这个限制 ✓，http origin 照样能用 ✓。
+  //
+  //   地址带版本号 ✓ → 换图必然换 key ✓ → 缓存自动失效 ✓；同一个群只留最新
+  //   一个版本 ✓（`_bgPut` 里顺手清旧 key ✓，不然每换一次图就多压一份十几 MB ✓）。
+  //   ⚠️ 任何一步失败 → 退回挂网络地址 ✓，**绝不因为缓存坏掉就把背景弄没** ✗。
   let bgObjUrl = null;       // 当前贴上的那张的 blob: URL（换图前 revoke ✓）
   let bgKey = null;          // 当前已贴上的版本地址（同一张不重贴 ✓）
+  let bgPending = null;      // 正在取的那张（开屏时 renderHeader 会连着调好几次 ✓，
+                             //   不挡的话同一张会并发拉两遍 ✓）
 
-  const _bgCache = () =>
-    (window.caches ? caches.open('lg-bg-v1') : Promise.reject()).catch(() => null);
+  const _bgDb = (() => {
+    let p = null;
+    return () => {
+      if (!window.indexedDB) return Promise.reject(new Error('no idb'));
+      if (!p) {
+        p = new Promise((res, rej) => {
+          const r = indexedDB.open('lg-bg', 1);
+          r.onupgradeneeded = () => {
+            const db = r.result;
+            if (!db.objectStoreNames.contains('img')) db.createObjectStore('img');
+          };
+          r.onsuccess = () => res(r.result);
+          r.onerror = () => { p = null; rej(r.error); };
+        });
+        p.catch(() => {});       // 别让它在没人接的时候变成 unhandled rejection ✓
+      }
+      return p;
+    };
+  })();
+
+  /** 读一条本机缓存 ✓ —— 没有就是 null ✓。 */
+  const _bgGet = async (key) => {
+    const db = await _bgDb();
+    return new Promise((res, rej) => {
+      const q = db.transaction('img', 'readonly').objectStore('img').get(key);
+      q.onsuccess = () => res(q.result || null);
+      q.onerror = () => rej(q.error);
+    });
+  };
+
+  /** 存一条本机缓存 ✓，顺手把**这个群**的旧版本清掉 ✓（换图后的残骸 ✓）。
+   *  key 形如 `/api/groups/5/background/file?v=123` ✓。 */
+  const _bgPut = async (key, blob) => {
+    const db = await _bgDb();
+    await new Promise((res, rej) => {
+      const tx = db.transaction('img', 'readwrite');
+      tx.objectStore('img').put(blob, key);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+      tx.onabort = () => rej(tx.error);
+    });
+    try {
+      const base = key.split('?')[0];
+      const tx = db.transaction('img', 'readwrite');
+      const st = tx.objectStore('img');
+      const q = st.getAllKeys();
+      q.onsuccess = () => {
+        for (const k of q.result) {
+          if (k !== key && String(k).split('?')[0] === base) st.delete(k);
+        }
+      };
+    } catch (e) {}
+  };
 
   /** 把一个版本地址**变成 blob: URL** ✓ —— 命中本机缓存秒回 ✓；
    *  没命中就现取、顺手存一份 ✓。取不到返回 null ✓（调用方退回网络地址 ✓）。 */
   const _materializeBg = async (url) => {
-    const cache = await _bgCache();
-    if (cache) {
-      try {
-        const hit = await cache.match(url);
-        if (hit) return URL.createObjectURL(await hit.blob());   // ★ 不上网 ✓
-      } catch (e) {}
-    }
+    try {
+      const hit = await _bgGet(url);
+      if (hit) return URL.createObjectURL(hit);   // ★ 不上网 ✓
+    } catch (e) {}
     try {
       const r = await fetch(url, { credentials: 'same-origin' });
       if (!r.ok) return null;
       const blob = await r.blob();
-      if (cache) { try { await cache.put(url, new Response(blob)); } catch (e) {} }
+      try { await _bgPut(url, blob); } catch (e) {}
       return URL.createObjectURL(blob);
     } catch (e) { return null; }
   };
@@ -301,8 +357,10 @@
    *    （换背景时消息列表不该闪一下 ✓）。
    *  ⚠️ 地址**只认服务端给的** `group.background` ✓（它带版本号 ✓，
    *    换图必然换 URL ✓）—— 前端不自己拼 ✓。
-   *  ⚠️ **先挂网络地址兜底、再用 blob: 升级** ✓ —— 网络那层缓存可能正好命中 ✓
-   *    就够用了 ✓；本机缓存命中则**秒级**升级成 blob:（重进不闪、不重拉 ✓）。
+   *  ⚠️ **不能先把网络地址挂上去** ✗ —— 一挂就是一次真请求 ✓：本机缓存明明
+   *    命中 ✓，也要先把那张 5MB 的图从 WireGuard 上拉一遍 ✓（用户报的
+   *    "每次重进都很慢"就是这么来的 ✓）。所以**先查本机缓存** ✓，
+   *    只有没命中才退回网络地址 ✓。
    */
   const applyChatBackground = async () => {
     const chat = $('#chat');
@@ -315,22 +373,25 @@
       bgKey = null;
       return;
     }
-    if (bgKey === url) return;                    // 同一张，别重贴 ✓
+    if (bgKey === url || bgPending === url) return;   // 同一张，别重贴 / 别重拉 ✓
+    bgPending = url;
 
-    // 先挂网络地址兜着 ✓ —— blob: 没回来之前背景不是空的 ✓。
-    chat.style.setProperty('--chat-bg', `url("${url}")`);
-    chat.classList.add('has-bg');
-
-    const made = await _materializeBg(url);       // 命中本机缓存秒回 ✓
-    if (!made) return;                            // 取不到 → 留在网络地址 ✓
+    const made = await _materializeBg(url);       // 命中本机缓存秒回、不上网 ✓
+    if (bgPending === url) bgPending = null;
     if ((group && group.background) !== url) {    // 这期间换图了 → 这张作废 ✓
-      URL.revokeObjectURL(made);
+      if (made) URL.revokeObjectURL(made);
       return;
     }
-    if (bgObjUrl) URL.revokeObjectURL(bgObjUrl);
-    bgObjUrl = made;
-    chat.style.setProperty('--chat-bg', `url("${bgObjUrl}")`);
-    bgKey = url;
+    if (made) {
+      if (bgObjUrl) URL.revokeObjectURL(bgObjUrl);
+      bgObjUrl = made;
+      chat.style.setProperty('--chat-bg', `url("${bgObjUrl}")`);
+      bgKey = url;
+    } else {
+      // 缓存取不到（第一次 / IndexedDB 坏了）→ 退回网络地址 ✓
+      chat.style.setProperty('--chat-bg', `url("${url}")`);
+    }
+    chat.classList.add('has-bg');
   };
 
   const renderHeader = () => {
