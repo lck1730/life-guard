@@ -60,21 +60,32 @@
   [data-theme="forest"] {
     --bg:#12231a; --panel:#1a2f22; --panel2:#233a2b;
     --text:#e6efe3; --muted:#90a794; --line:#2e4836;
-    --accent:#a2d5a4; --accent-bg:#2a4a32; --on-accent:#0a150e;
-    --agent:#d9c68a; --danger:#e37e6d;
-    --accent-line:#3a5a44;  --accent-soft:rgba(162,213,164,.12);
+    --accent:#8be4a0; --accent-bg:#2f5739; --on-accent:#07150d;
+    --agent:#e3cd82; --danger:#e37e6d;
+    --accent-line:#477552;  --accent-soft:rgba(139,228,160,.14);
     --hover:#294334;        --avatar-bg:#294334;
     --quote-bg:rgba(144,167,148,.15);
     /* 气泡半透明 —— 同夜阑 ✓ */
     --bubble-bg:rgba(35,58,43,.60);
     --bubble-agent-bg:rgba(26,47,34,.66);
-    --bubble-mine-bg:rgba(42,74,50,.60);
+    --bubble-mine-bg:rgba(47,87,57,.60);
     --danger-soft:rgba(227,126,109,.4);
     --bg-scrim:rgba(0,0,0,.25);
     --warn2:#d9c68a;
     --ok:#7bcc8a; --warn:#e6c35c; --bad:#ff8f7c;
     --shadow-md:0 6px 24px rgba(0,0,0,.35);
     --shadow-lg:0 18px 50px rgba(0,0,0,.45);
+  }
+  /* ★ 林深要一点"活气"（2026-10-20）—— 纯平涂的墨绿太"死" ✓。
+     两层极淡的光晕：左上苔绿（像林间漏下的光）✓、右下一点暖金（落叶/阳光）✓。
+     ⚠️ 透明度都压在 10% 以下 ✗→✓ —— 底色一变亮，正文对比度就掉 ✓，
+        所以只做"感觉得到、说不出来"的那一层 ✓。 */
+  [data-theme="forest"] body,
+  [data-theme="forest"] .screen {
+    background:
+      radial-gradient(1200px 800px at 15% -10%, rgba(139,228,160,.10), transparent 60%),
+      radial-gradient(900px 700px at 110% 110%, rgba(227,205,130,.06), transparent 55%),
+      var(--bg);
   }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { margin:0; height:100%; overscroll-behavior:none; }

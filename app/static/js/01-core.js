@@ -187,7 +187,7 @@
       color: '#12231a', light: false,
       vars: '--p-bg:#12231a;--p-panel:#1a2f22;--p-panel2:#233a2b;'
           + '--p-line:#2e4836;--p-text:#e6efe3;--p-muted:#90a794;'
-          + '--p-accent:#a2d5a4;--p-accent-bg:#2a4a32' },
+          + '--p-accent:#8be4a0;--p-accent-bg:#2f5739' },
   ];
   const THEME_ALIAS = { light: 'cream' };   // 旧版本存过 'light'，别让老用户掉回默认
   const THEME_DEFAULT = 'dark';
