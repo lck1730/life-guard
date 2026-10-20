@@ -166,11 +166,45 @@
       <circle cx="398" cy="722" r="2"/><circle cx="452" cy="696" r="1.8"/>
     </g>
 
-    <!-- 鸟 -->
-    <g fill="none" stroke="#6d8190" stroke-width="1.7" stroke-linecap="round" opacity=".75">
-      <path d="M246 352 q5 -5 10 0 q5 -5 10 0"/>
-      <path d="M292 330 q4 -4 8 0 q4 -4 8 0"/>
-      <path d="M338 368 q3 -3 6 0 q3 -3 6 0" opacity=".7"/>
+    <!-- 鸟（会飞 ✓）：三只不同高度横穿天空 ✓，翅膀一拍一拍 ✓。
+         起点/终点都落在窗外 ✓（窗的 winClip 会把它们裁掉 ✓），看不出循环 ✓。 -->
+    <g fill="none" stroke="#6d8190" stroke-linecap="round">
+      <g transform="translate(256,352)" opacity=".78">
+        <g>
+          <animateTransform attributeName="transform" type="translate"
+            values="-300 8;40 -10;380 -46" keyTimes="0;.45;1"
+            dur="46s" begin="-8s" repeatCount="indefinite"/>
+          <g>
+            <animateTransform attributeName="transform" type="scale"
+              values="1 1;1 .42;1 1" dur=".82s" repeatCount="indefinite"/>
+            <path d="M-10 0 q5 -5 10 0 q5 -5 10 0" stroke-width="1.8"/>
+          </g>
+        </g>
+      </g>
+      <g transform="translate(298,326)" opacity=".68">
+        <g>
+          <animateTransform attributeName="transform" type="translate"
+            values="-330 -6;20 10;370 -30" keyTimes="0;.5;1"
+            dur="39s" begin="-24s" repeatCount="indefinite"/>
+          <g>
+            <animateTransform attributeName="transform" type="scale"
+              values="1 1;1 .45;1 1" dur=".92s" begin="-.3s" repeatCount="indefinite"/>
+            <path d="M-8 0 q4 -4 8 0 q4 -4 8 0" stroke-width="1.6"/>
+          </g>
+        </g>
+      </g>
+      <g transform="translate(344,366)" opacity=".6">
+        <g>
+          <animateTransform attributeName="transform" type="translate"
+            values="-290 -12;60 6;410 -34" keyTimes="0;.42;1"
+            dur="52s" begin="-37s" repeatCount="indefinite"/>
+          <g>
+            <animateTransform attributeName="transform" type="scale"
+              values="1 1;1 .4;1 1" dur="1.05s" begin="-.6s" repeatCount="indefinite"/>
+            <path d="M-6 0 q3 -3 6 0 q3 -3 6 0" stroke-width="1.4"/>
+          </g>
+        </g>
+      </g>
     </g>
 
     <!-- 窗边枝叶 -->
@@ -323,8 +357,8 @@
   </g>
 
   <!-- ══ 墙上的画、架子、钟 ═════════════════════════════════════════ -->
-  <!-- 挂画 -->
-  <g transform="translate(604,214)">
+  <!-- 挂画（和挂钟换了位置 ✓：钟上去、画下来 ✓） -->
+  <g transform="translate(632,538)">
     <rect x="0" y="0" width="208" height="164" rx="4" fill="#7d4c2c" stroke="#5f371e" stroke-width="3"/>
     <rect x="12" y="12" width="184" height="140" fill="#dce9e0"/>
     <rect x="12" y="86" width="184" height="66" fill="#a8c18f"/>
@@ -388,8 +422,8 @@
     <path d="M-8 0 h16" stroke="#d7b98c" stroke-width="4" stroke-linecap="round"/>
   </g>
 
-  <!-- 挂钟 -->
-  <g transform="translate(736,620)">
+  <!-- 挂钟（和挂画换了位置 ✓：挪到画原来的位子 ✓） -->
+  <g transform="translate(708,296)">
     <circle cx="0" cy="4" r="54" fill="#b98a5c" opacity=".28" filter="url(#soft)"/>
     <circle cx="0" cy="0" r="54" fill="#8a5733" stroke="#6b3f23" stroke-width="3"/>
     <circle cx="0" cy="0" r="44" fill="#f8eed6" stroke="#d6b98a" stroke-width="2"/>
@@ -497,31 +531,88 @@
     <path d="M319 1010 q10 -12 15 -25" fill="none" stroke="#c9bda2" stroke-width="2" stroke-linecap="round"/>
   </g>
 
-  <!-- 摊开的账本（点它 → 记账） -->
+  <!-- 摊开的账本（点它 → 记账）✓
+       2026-10-20：按「一眼就是账本」重画 ✓ —— 深绿漆布面 + 金边 +
+       页垛厚度 + 横格/竖栏/红边线 + 一列列数字的位置 ✓（仍然不写一个字 ✓）。 -->
   <g>
     <ellipse cx="452" cy="1114" rx="144" ry="16" fill="#4a2c18" opacity=".25" filter="url(#soft2)"/>
-    <!-- 封皮 -->
+
+    <!-- 封皮（深绿漆布，压一道金边） -->
     <path d="M316 1108 L330 1041 L452 1033 L574 1041 L588 1108 L452 1117 Z"
-          fill="#963e3e" stroke="#6f2a2a" stroke-width="2"/>
+          fill="#41675a" stroke="#29453b" stroke-width="2.2"/>
+    <path d="M325 1102 L337 1048 L452 1040 L567 1048 L579 1102 L452 1110 Z"
+          fill="none" stroke="#c9a86a" stroke-width="1.2" opacity=".8"/>
+    <!-- 书脊的暗部 ✓（摊开的地方压深一点，才有厚度 ✓） -->
+    <path d="M452 1036 L452 1114" stroke="#233d34" stroke-width="7" opacity=".22"/>
+
+    <!-- 页垛 ✓：两层错开的纸边，账簿才不是一张纸 ✓ -->
+    <path d="M327 1102 L339 1048 L450 1041 L450 1103 Z" fill="#d9c59e"/>
+    <path d="M329 1100 L340 1047 L450 1040 L450 1102 Z" fill="#e7d5b1"/>
+    <path d="M573 1102 L561 1048 L450 1041 L450 1103 Z" fill="#d3be95"/>
+    <path d="M571 1100 L560 1047 L450 1040 L450 1102 Z" fill="#e2ceaa"/>
+
     <!-- 书页 -->
-    <path d="M330 1098 L341 1050 L450 1043 L450 1105 Z" fill="#fff7e3" stroke="#dccaa6" stroke-width="1.3"/>
-    <path d="M450 1105 L450 1043 L559 1050 L570 1098 Z" fill="#f8efd7" stroke="#dccaa6" stroke-width="1.3"/>
-    <path d="M450 1043 L450 1105" stroke="#c9b58d" stroke-width="2" opacity=".8"/>
-    <path d="M341 1050 L450 1043" stroke="#f2e4c3" stroke-width="2"/>
-    <path d="M450 1043 L559 1050" stroke="#f2e4c3" stroke-width="2"/>
-    <!-- 字迹 -->
-    <g stroke="#b8a581" stroke-width="1.6" stroke-linecap="round" opacity=".85">
-      <path d="M352 1062 q30 -4 58 -4 M352 1072 q36 -3 70 -4 M354 1082 q28 -2 54 -3"/>
-      <path d="M470 1059 q32 1 58 4 M472 1069 q34 2 66 5 M472 1079 q26 2 52 4"/>
+    <path d="M332 1097 L342 1049 L450 1042 L450 1104 Z"
+          fill="#fff9e8" stroke="#d8c6a1" stroke-width="1.1"/>
+    <path d="M450 1104 L450 1042 L558 1049 L568 1097 Z"
+          fill="#fcf4df" stroke="#d4c199" stroke-width="1.1"/>
+    <path d="M450 1042 L450 1104" stroke="#c7b28a" stroke-width="2" opacity=".85"/>
+    <path d="M342 1049 L450 1042" stroke="#fffdf4" stroke-width="2" opacity=".95"/>
+    <path d="M450 1042 L558 1049" stroke="#fffdf4" stroke-width="2" opacity=".9"/>
+
+    <!-- 账页的横格 + 竖栏 + 红边线 ✓（表格结构比一行字更像账本 ✓） -->
+    <g stroke="#b9c2ba" stroke-width="1" opacity=".62">
+      <path d="M341 1059 H447 M340 1067 H447 M339 1075 H447 M338 1083 H447 M337 1091 H447 M336 1098 H447"/>
+      <path d="M455 1059 H559 M455 1067 H560 M455 1075 H561 M455 1083 H562 M455 1091 H563 M455 1098 H564"/>
+      <path d="M413 1054 L412 1097 M514 1054 L515 1097"/>
     </g>
-    <!-- 小涂鸦心 -->
-    <path d="M404 1072 q-7 -8 0 -12 q4 -2 6 2 q2 -4 6 -2 q7 4 0 12 l-6 7 Z"
-          fill="none" stroke="#c07b70" stroke-width="1.6" opacity=".85"/>
-    <!-- 书签 -->
+    <!-- 表头那一道略重 ✓ -->
+    <g stroke="#a7b3ae" stroke-width="2.2" opacity=".5" stroke-linecap="round">
+      <path d="M342 1054 H447 M455 1054 H558"/>
+    </g>
+    <!-- 红边线 ✓ -->
+    <g stroke="#d18d84" stroke-width="1.4" opacity=".8" stroke-linecap="round">
+      <path d="M356 1056 L353 1097 M456 1056 L456 1097"/>
+    </g>
+
+    <!-- 记的账 ✓ —— 摘要一列、金额一列（短笔画表示数字 ✓，不写字 ✓） -->
+    <g stroke="#6b6152" stroke-linecap="round" opacity=".8">
+      <g stroke-width="1.5">
+        <path d="M364 1064 q14 -1 28 -1 M364 1072 q18 -1 24 -1 M364 1080 q12 -1 22 -1
+                 M364 1088 q16 -1 27 -1 M364 1096 q20 -1 30 -1"/>
+        <path d="M456 1064 q14 -1 28 -1 M456 1072 q18 -1 22 -1 M456 1080 q12 -1 20 -1
+                 M456 1088 q16 -1 26 -1 M456 1096 q20 -1 28 -1"/>
+      </g>
+      <g stroke-width="1.7">
+        <path d="M421 1063 v-6 M426 1063 v-6 M431 1063 q3 -6 0 -6 q-3 0 0 6 M436 1063 v-6"/>
+        <path d="M425 1071 v-5 M430 1071 q3 -5 0 -5 q-3 0 0 5 M435 1071 v-5"/>
+        <path d="M429 1079 v-5 M434 1079 q3 -5 0 -5 q-3 0 0 5"/>
+        <path d="M423 1087 v-5 M428 1087 q3 -5 0 -5 q-3 0 0 5 M433 1087 v-5"/>
+        <path d="M419 1095 v-6 M424 1095 q3 -6 0 -6 q-3 0 0 6 M429 1095 v-6 M434 1095 v-6"/>
+        <path d="M521 1063 v-6 M526 1063 q3 -6 0 -6 q-3 0 0 6 M531 1063 v-6"/>
+        <path d="M525 1071 v-5 M530 1071 q3 -5 0 -5 q-3 0 0 5"/>
+        <path d="M529 1079 v-5 M534 1079 v-5 M539 1079 q3 -5 0 -5 q-3 0 0 5"/>
+        <path d="M523 1087 v-5 M528 1087 q3 -5 0 -5 q-3 0 0 5 M533 1087 v-5"/>
+        <path d="M519 1095 v-6 M524 1095 v-6 M529 1095 q3 -6 0 -6 q-3 0 0 6 M534 1095 v-6"/>
+      </g>
+    </g>
+    <!-- 末行合计的双线 ✓ -->
+    <path d="M419 1099 H438 M519 1099 H538" stroke="#8f7c62" stroke-width="1.2" opacity=".7"/>
+
+    <!-- 页角的小涂鸦心 ✓（他的习惯，留着 ✓） -->
+    <path d="M394 1078 q-6 -7 0 -10 q4 -2 5 2 q1 -4 5 -2 q6 3 0 10 l-5 6 Z"
+          fill="none" stroke="#c07b70" stroke-width="1.5" opacity=".8"/>
+
+    <!-- 书签（红丝带，从书脊垂下来 ✓） -->
     <path d="M450 1100 l-6 30 l8 -6 l7 6 l-3 -30 Z" fill="#c2485c" stroke="#8e2f3e" stroke-width="1"/>
-    <!-- 金角 -->
-    <path d="M330 1041 l18 0 l-18 12 Z" fill="#d8b16a" opacity=".8"/>
-    <path d="M574 1041 l-18 0 l18 12 Z" fill="#d8b16a" opacity=".8"/>
+
+    <!-- 四角金色包角 ✓ -->
+    <g fill="none" stroke="#d8b16a" stroke-width="2.4" stroke-linecap="round" opacity=".9">
+      <path d="M336 1048 L331 1043 L339 1044"/>
+      <path d="M568 1048 L573 1043 L565 1044"/>
+      <path d="M322 1103 L318 1109 L326 1110"/>
+      <path d="M582 1103 L586 1109 L578 1110"/>
+    </g>
   </g>
 
   <!-- 桌面右：烛台 + 茶杯 + 信封 -->

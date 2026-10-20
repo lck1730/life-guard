@@ -135,8 +135,9 @@
   //   ⚠️ 搬出来之后它压在 <image> 的**暗角上方** ✓ → 末尾补一层同样的暗角 ✓，
   //      不然猫会比屋里其它东西亮一档 ✓（见下面 `wsVignette` 注释 ✓）。
   //   动作（全 SMIL ✓ —— WebView 里比 CSS transform-box 稳 ✓）：
-  //     · 呼吸（整只上下 1.8）· 尾巴左右甩 · 耳朵偶尔抖
-  //     · 每 9.5 秒醒一次：抬头 + 睁眼 + 偏头 + 打个哈欠 ✓ 再睡回去 ✓
+  //     · 呼吸（整只上下 1.8）· 尾巴左右甩 + 尾巴尖单独抖 · 两只耳朵轮流抖
+  //     · 睡着时踩奶（前爪轻轻转）· 胡须偶尔抖 ✓（2026-10-20 他说「动作多一些」✓）
+  //     · 每 7.2 秒醒一次：抬头 + 睁眼 + 左右看看 + 打个哈欠 + 轻轻侧身 ✓ 再睡回去 ✓
   //     · Zzz 慢慢飘（醒着时退场 ✓）· 身边偶尔闪小星星（不写字 ✓ 不用提示 ✓）
   //     · 身上的暖光晕跟着呼吸明暗 ✓ · 背脊一线窗光 ✓
   //     · **点一下：整只猫蹦起来 + 爱心 + 瞪大眼 → 0.52 秒后回主群聊** ✓
@@ -169,19 +170,32 @@
       '<animateTransform attributeName="transform" type="translate" ' +
       'values="0 0;0 -1.8;0 0" keyTimes="0;.5;1" dur="4.2s" repeatCount="indefinite"/>';
 
+    // 醒来时整只轻轻侧一下身 ✓（和抬眼同一个 7.2s 周期 ✓，幅度很小 ✓）
+    s += '<g class="cat-shift">' +
+      '<animateTransform attributeName="transform" type="rotate" ' +
+      'values="0 -20 18;0 -20 18;1.6 -20 18;-1 -20 18;0 -20 18;0 -20 18" ' +
+      'keyTimes="0;.68;.74;.82;.88;1" dur="7.2s" repeatCount="indefinite"/>';
+
     // 尾巴（在身体后面 ✓，从右侧卷上来 ✓）
     s += '<g class="cat-tail">' +
+      // 整条尾巴甩得比原来勤一点、大一点 ✓
       '<animateTransform attributeName="transform" type="rotate" ' +
-      'values="0 44 10;-7 44 10;0 44 10;6 44 10;0 44 10" keyTimes="0;.22;.45;.72;1" ' +
-      'dur="3.8s" repeatCount="indefinite"/>' +
-      '<path d="M 42 10 Q 68 10 72 -6 Q 75 -22 59 -23 Q 48 -23 47 -13" fill="none" ' +
-      'stroke="#b3733f" stroke-width="16" stroke-linecap="round"/>' +
-      '<path d="M 42 10 Q 68 10 72 -6 Q 75 -22 59 -23 Q 48 -23 47 -13" fill="none" ' +
-      'stroke="#d9955f" stroke-width="12.5" stroke-linecap="round"/>' +
-      '<path d="M 42 8 Q 64 8 69 -5" fill="none" stroke="#f0c08d" stroke-width="3.5" ' +
-      'stroke-linecap="round" opacity=".55"/>' +
-      '<path d="M 59 -19 q 6 2 4 7" fill="none" stroke="#b3733f" stroke-width="3" ' +
-      'stroke-linecap="round" opacity=".5"/></g>';
+      'values="0 44 10;-10 44 10;0 44 10;8 44 10;0 44 10" keyTimes="0;.20;.42;.68;1" ' +
+      'dur="3.2s" repeatCount="indefinite"/>' +
+      // 尾巴尖再单独一抖 ✓（和整条尾巴错开 ✓，看着才不像一根硬棍 ✓）
+      '<g class="cat-tail-tip">' +
+        '<animateTransform attributeName="transform" type="rotate" ' +
+        'values="0 58 -18;0 58 -18;0 58 -18;-5 58 -18;3 58 -18;0 58 -18;0 58 -18" ' +
+        'keyTimes="0;.30;.33;.36;.40;.44;1" dur="2.9s" repeatCount="indefinite"/>' +
+        '<path d="M 42 10 Q 68 10 72 -6 Q 75 -22 59 -23 Q 48 -23 47 -13" fill="none" ' +
+        'stroke="#b3733f" stroke-width="16" stroke-linecap="round"/>' +
+        '<path d="M 42 10 Q 68 10 72 -6 Q 75 -22 59 -23 Q 48 -23 47 -13" fill="none" ' +
+        'stroke="#d9955f" stroke-width="12.5" stroke-linecap="round"/>' +
+        '<path d="M 42 8 Q 64 8 69 -5" fill="none" stroke="#f0c08d" stroke-width="3.5" ' +
+        'stroke-linecap="round" opacity=".55"/>' +
+        '<path d="M 59 -19 q 6 2 4 7" fill="none" stroke="#b3733f" stroke-width="3" ' +
+        'stroke-linecap="round" opacity=".5"/>' +
+      '</g></g>';
 
     // 身体（趴成一团 ✓）
     s += '<path d="M -54 14 Q -57 -10 -36 -19 Q -10 -29 20 -20 Q 46 -12 50 6 ' +
@@ -199,23 +213,29 @@
       '<g fill="none" stroke="#b3733f" stroke-width="4" stroke-linecap="round" opacity=".55">' +
       '<path d="M 18 -17 q 7 8 2 16"/><path d="M 30 -14 q 6 8 2 15"/>' +
       '<path d="M 40 -9 q 5 7 2 13"/></g>' +
-      // 两只前爪 ✓
-      '<ellipse cx="6" cy="21" rx="11" ry="6" fill="#f4d6a8" stroke="#c68a5c" ' +
-      'stroke-width="1.3"/>' +
-      '<ellipse cx="25" cy="22" rx="10" ry="5.5" fill="#f4d6a8" stroke="#c68a5c" ' +
-      'stroke-width="1.3"/>' +
-      '<path d="M 3 20 v 3 M 9 20 v 3 M 23 21 v 3 M 28 21 v 3" stroke="#c68a5c" ' +
-      'stroke-width="1" opacity=".6"/>';
+      // 两只前爪 ✓ —— 睡着睡着轻轻踩两下奶 ✓（幅度只有 3°，像做梦 ✓）
+      '<g class="cat-paw">' +
+        '<animateTransform attributeName="transform" type="rotate" ' +
+        'values="0 16 22;0 16 22;-3 16 22;2 16 22;-2 16 22;0 16 22;0 16 22" ' +
+        'keyTimes="0;.38;.42;.46;.50;.54;1" dur="6.4s" repeatCount="indefinite"/>' +
+        '<ellipse cx="6" cy="21" rx="11" ry="6" fill="#f4d6a8" stroke="#c68a5c" ' +
+        'stroke-width="1.3"/>' +
+        '<ellipse cx="25" cy="22" rx="10" ry="5.5" fill="#f4d6a8" stroke="#c68a5c" ' +
+        'stroke-width="1.3"/>' +
+        '<path d="M 3 20 v 3 M 9 20 v 3 M 23 21 v 3 M 28 21 v 3" stroke="#c68a5c" ' +
+        'stroke-width="1" opacity=".6"/>' +
+      '</g>';
 
     // 头（醒来的那套动作全挂在 `.cat-head` 上 ✓）
     s += '<g class="cat-head">' +
       '<animateTransform attributeName="transform" type="translate" ' +
       'values="0 0;0 0;0 -7;0 -7;0 0;0 0" keyTimes="0;.68;.72;.87;.91;1" ' +
-      'dur="9.5s" repeatCount="indefinite"/>' +
+      'dur="7.2s" repeatCount="indefinite"/>' +
       '<g class="cat-head-tilt">' +
       '<animateTransform attributeName="transform" type="rotate" ' +
-      'values="0 -28 6;0 -28 6;-3 -28 6;2 -28 6;0 -28 6;0 -28 6" ' +
-      'keyTimes="0;.68;.75;.85;.90;1" dur="9.5s" repeatCount="indefinite"/>';
+      // 醒来的那一下不只偏一次头 ✓：左边看看、右边看看，再睡回去 ✓
+      'values="0 -28 6;0 -28 6;-4 -28 6;3 -28 6;-2 -28 6;0 -28 6;0 -28 6" ' +
+      'keyTimes="0;.68;.73;.78;.83;.88;1" dur="7.2s" repeatCount="indefinite"/>';
 
     // 耳朵（各自抖一下 ✓）
     s += '<g class="cat-ear">' +
@@ -226,13 +246,17 @@
       'stroke="#b3733f" stroke-width="1.6" stroke-linejoin="round"/>' +
       '<path d="M -49 -29 Q -52 -42 -43 -38 Q -39 -34 -39 -30 Z" fill="#f7b8c0" ' +
       'opacity=".9"/></g>' +
+      // ★ 右耳 2026-10-20 重画 ✓ —— 原来那只耳朵向右多探出 8px ✓，
+      //   粉色的内耳又几乎盖满外耳 ✓ → 看着像贴了一瓣花 ✗（他说「右耳朵有点奇怪」✓）。
+      //   现在按左耳**镜像**回来 ✓：耳根落在头顶上 ✓、外耳留一圈毛边 ✓、
+      //   内耳只占中间一块 ✓；抖动支点也挪到耳根外侧 ✓（和左耳对称 ✓）。
       '<g class="cat-ear">' +
       '<animateTransform attributeName="transform" type="rotate" ' +
-      'values="0 -12 -28;0 -12 -28;0 -12 -28;7 -12 -28;-2 -12 -28;0 -12 -28" ' +
+      'values="0 -4 -26;0 -4 -26;0 -4 -26;7 -4 -26;-2 -4 -26;0 -4 -26" ' +
       'keyTimes="0;.20;.23;.26;.29;1" dur="7.6s" repeatCount="indefinite"/>' +
-      '<path d="M -12 -28 Q -8 -46 6 -38 Q 11 -33 8 -24 Z" fill="#d9955f" ' +
+      '<path d="M -4 -24 Q 2 -48 -14 -42 Q -21 -37 -22 -28 Z" fill="#d9955f" ' +
       'stroke="#b3733f" stroke-width="1.6" stroke-linejoin="round"/>' +
-      '<path d="M -8 -31 Q -5 -41 2 -36 Q 5 -32 3 -27 Z" fill="#f7b8c0" ' +
+      '<path d="M -7 -29 Q -4 -42 -13 -38 Q -17 -34 -17 -30 Z" fill="#f7b8c0" ' +
       'opacity=".9"/></g>';
 
     // 脸
@@ -245,7 +269,7 @@
     // 睡着的眼睛（大部分时间 ✓）
     s += '<g class="cat-eyes-closed">' +
       '<animate attributeName="opacity" values="1;1;0;0;1;1" ' +
-      'keyTimes="0;.68;.72;.87;.91;1" dur="9.5s" repeatCount="indefinite"/>' +
+      'keyTimes="0;.68;.72;.87;.91;1" dur="7.2s" repeatCount="indefinite"/>' +
       '<path d="M -48 -12 q 7 6 14 0" fill="none" stroke="#7d4a2c" stroke-width="2.2" ' +
       'stroke-linecap="round"/>' +
       '<path d="M -24 -13 q 7 6 14 0" fill="none" stroke="#7d4a2c" stroke-width="2.2" ' +
@@ -254,7 +278,7 @@
     // 醒来的眼睛（和抬头同一个时间轴 ✓）
     s += '<g class="cat-eyes-open" opacity="0">' +
       '<animate attributeName="opacity" values="0;0;1;1;0;0" ' +
-      'keyTimes="0;.68;.72;.87;.91;1" dur="9.5s" repeatCount="indefinite"/>' +
+      'keyTimes="0;.68;.72;.87;.91;1" dur="7.2s" repeatCount="indefinite"/>' +
       '<ellipse cx="-41" cy="-12" rx="6.5" ry="7.5" fill="#fffef5" stroke="#3a2a1c" ' +
       'stroke-width="1.1"/>' +
       '<ellipse cx="-17" cy="-13" rx="6.5" ry="7.5" fill="#fffef5" stroke="#3a2a1c" ' +
@@ -291,13 +315,19 @@
       // 醒来时打一个很轻的哈欠 ✓（和睁眼同一个时间窗 ✓）
       '<g class="cat-yawn" opacity="0">' +
         '<animate attributeName="opacity" values="0;0;1;1;0;0" ' +
-        'keyTimes="0;.70;.735;.86;.90;1" dur="9.5s" repeatCount="indefinite"/>' +
+        'keyTimes="0;.70;.735;.86;.90;1" dur="7.2s" repeatCount="indefinite"/>' +
         '<ellipse cx="-30" cy="5" rx="4.2" ry="5.2" fill="#8d4f55"/>' +
         '<ellipse cx="-30" cy="8.2" rx="3" ry="1.7" fill="#e79aa0"/></g>' +
-      '<path d="M -52 -2 q -10 -2 -15 -4 M -52 3 q -10 1 -15 3" fill="none" ' +
-      'stroke="#9a6a3a" stroke-width="1.2" stroke-linecap="round"/>' +
-      '<path d="M -4 -2 q 10 -2 15 -4 M -4 3 q 10 1 15 3" fill="none" ' +
-      'stroke="#9a6a3a" stroke-width="1.2" stroke-linecap="round"/>' +
+      // 胡须偶尔轻轻抖一下 ✓
+      '<g class="cat-whisker">' +
+        '<animateTransform attributeName="transform" type="rotate" ' +
+        'values="0 -28 -2;0 -28 -2;1.8 -28 -2;-1.2 -28 -2;0 -28 -2;0 -28 -2" ' +
+        'keyTimes="0;.56;.60;.64;.68;1" dur="5.4s" repeatCount="indefinite"/>' +
+        '<path d="M -52 -2 q -10 -2 -15 -4 M -52 3 q -10 1 -15 3" fill="none" ' +
+        'stroke="#9a6a3a" stroke-width="1.2" stroke-linecap="round"/>' +
+        '<path d="M -4 -2 q 10 -2 15 -4 M -4 3 q 10 1 15 3" fill="none" ' +
+        'stroke="#9a6a3a" stroke-width="1.2" stroke-linecap="round"/>' +
+      '</g>' +
       // 红项圈 + 铃铛 ✓（和 3D 那只二狗同一件 ✓）
       '<path d="M -52 8 Q -30 18 -8 8" fill="none" stroke="#c8506a" stroke-width="5" ' +
       'stroke-linecap="round"/>' +
@@ -309,6 +339,7 @@
 
     s += '</g></g>';   // /cat-head-tilt /cat-head
 
+    s += '</g>';       // /cat-shift
     s += '</g>';       // /cat-breathe
     s += '</g></g>';   // /cat-tilt /cat-jump
 
@@ -317,7 +348,7 @@
       'font-weight="bold">' +
       // 醒着的那一下 Zzz 先退场 ✓（不然睁着眼还在冒睡泡 ✗）
       '<animate attributeName="opacity" values="1;1;0;0;1;1" ' +
-        'keyTimes="0;.68;.72;.87;.91;1" dur="9.5s" repeatCount="indefinite"/>' +
+        'keyTimes="0;.68;.72;.87;.91;1" dur="7.2s" repeatCount="indefinite"/>' +
       '<text x="-66" y="-52" font-size="12" opacity="0">' +
       '<animate attributeName="opacity" values="0;0;.75;0" keyTimes="0;.10;.45;.66" ' +
       'dur="4.6s" begin="-1.5s" repeatCount="indefinite"/>' +
