@@ -136,8 +136,9 @@
   //      不然猫会比屋里其它东西亮一档 ✓（见下面 `wsVignette` 注释 ✓）。
   //   动作（全 SMIL ✓ —— WebView 里比 CSS transform-box 稳 ✓）：
   //     · 呼吸（整只上下 1.8）· 尾巴左右甩 · 耳朵偶尔抖
-  //     · 每 9.5 秒醒一次：抬头 + 睁眼 + 偏头 ✓ 再睡回去 ✓
-  //     · Zzz 慢慢飘 · 身边偶尔闪两颗小星星（不写字 ✓ 不用提示 ✓）
+  //     · 每 9.5 秒醒一次：抬头 + 睁眼 + 偏头 + 打个哈欠 ✓ 再睡回去 ✓
+  //     · Zzz 慢慢飘（醒着时退场 ✓）· 身边偶尔闪小星星（不写字 ✓ 不用提示 ✓）
+  //     · 身上的暖光晕跟着呼吸明暗 ✓ · 背脊一线窗光 ✓
   //     · **点一下：整只猫蹦起来 + 爱心 + 瞪大眼 → 0.52 秒后回主群聊** ✓
   const flatCatSvg = function () {
     const T = 'translate(682,1444)';
@@ -145,6 +146,10 @@
       // 点击热区 ✓ —— 猫在屏上本来就小 ✓，热区比它宽一圈 ✓
       //   （pointer-events=all ✓：fill 是透明的不然不算命中 ✓）。
       '<rect x="-100" y="-96" width="196" height="142" fill="transparent" pointer-events="all"/>' +
+      // 身上的暖光晕 ✓ —— 跟着呼吸一起明暗 ✓
+      '<ellipse cx="0" cy="-6" rx="116" ry="68" fill="url(#wsCatGlow)" opacity=".5">' +
+        '<animate attributeName="opacity" values=".38;.62;.38" keyTimes="0;.5;1" ' +
+        'dur="4.2s" repeatCount="indefinite"/></ellipse>' +
       // 地上的软影 ✓（猫窝留在 rsvg 里 ✓，这里只补影子 ✓）
       '<ellipse cx="0" cy="27" rx="78" ry="17" fill="#6a4530" opacity=".22" ' +
         'filter="url(#wsSoft)"/>';
@@ -182,6 +187,9 @@
     s += '<path d="M -54 14 Q -57 -10 -36 -19 Q -10 -29 20 -20 Q 46 -12 50 6 ' +
       'Q 52 18 36 22 L -38 22 Q -50 22 -54 14 Z" fill="url(#wsCatFur)" ' +
       'stroke="#b3733f" stroke-width="1.8"/>' +
+      // 背脊上的一线暖光 ✓ —— 让毛边看起来被窗光照到 ✓
+      '<path d="M -48 8 Q -50 -8 -34 -15 Q -10 -24 18 -16 Q 40 -9 45 3" fill="none" ' +
+      'stroke="#f7d8a8" stroke-width="2.4" stroke-linecap="round" opacity=".42"/>' +
       // 前胸的浅色毛 ✓
       '<path d="M -52 18 Q -46 -6 -30 -8 Q -17 -6 -16 10 Q -18 20 -32 20 Z" ' +
       'fill="#f4d6a8" opacity=".85"/>' +
@@ -202,12 +210,12 @@
     // 头（醒来的那套动作全挂在 `.cat-head` 上 ✓）
     s += '<g class="cat-head">' +
       '<animateTransform attributeName="transform" type="translate" ' +
-      'values="0 0;0 0;0 -7;0 -7;0 0;0 0" keyTimes="0;.70;.745;.855;.90;1" ' +
+      'values="0 0;0 0;0 -7;0 -7;0 0;0 0" keyTimes="0;.68;.72;.87;.91;1" ' +
       'dur="9.5s" repeatCount="indefinite"/>' +
       '<g class="cat-head-tilt">' +
       '<animateTransform attributeName="transform" type="rotate" ' +
       'values="0 -28 6;0 -28 6;-3 -28 6;2 -28 6;0 -28 6;0 -28 6" ' +
-      'keyTimes="0;.70;.755;.83;.88;1" dur="9.5s" repeatCount="indefinite"/>';
+      'keyTimes="0;.68;.75;.85;.90;1" dur="9.5s" repeatCount="indefinite"/>';
 
     // 耳朵（各自抖一下 ✓）
     s += '<g class="cat-ear">' +
@@ -237,7 +245,7 @@
     // 睡着的眼睛（大部分时间 ✓）
     s += '<g class="cat-eyes-closed">' +
       '<animate attributeName="opacity" values="1;1;0;0;1;1" ' +
-      'keyTimes="0;.70;.745;.855;.90;1" dur="9.5s" repeatCount="indefinite"/>' +
+      'keyTimes="0;.68;.72;.87;.91;1" dur="9.5s" repeatCount="indefinite"/>' +
       '<path d="M -48 -12 q 7 6 14 0" fill="none" stroke="#7d4a2c" stroke-width="2.2" ' +
       'stroke-linecap="round"/>' +
       '<path d="M -24 -13 q 7 6 14 0" fill="none" stroke="#7d4a2c" stroke-width="2.2" ' +
@@ -246,7 +254,7 @@
     // 醒来的眼睛（和抬头同一个时间轴 ✓）
     s += '<g class="cat-eyes-open" opacity="0">' +
       '<animate attributeName="opacity" values="0;0;1;1;0;0" ' +
-      'keyTimes="0;.70;.745;.855;.90;1" dur="9.5s" repeatCount="indefinite"/>' +
+      'keyTimes="0;.68;.72;.87;.91;1" dur="9.5s" repeatCount="indefinite"/>' +
       '<ellipse cx="-41" cy="-12" rx="6.5" ry="7.5" fill="#fffef5" stroke="#3a2a1c" ' +
       'stroke-width="1.1"/>' +
       '<ellipse cx="-17" cy="-13" rx="6.5" ry="7.5" fill="#fffef5" stroke="#3a2a1c" ' +
@@ -256,7 +264,10 @@
       '<ellipse cx="-41" cy="-11" rx="1.7" ry="3.2" fill="#2a1b10"/>' +
       '<ellipse cx="-17" cy="-12" rx="1.7" ry="3.2" fill="#2a1b10"/>' +
       '<circle cx="-42.6" cy="-14" r="1.5" fill="#fff"/>' +
-      '<circle cx="-18.6" cy="-15" r="1.5" fill="#fff"/></g>';
+      '<circle cx="-18.6" cy="-15" r="1.5" fill="#fff"/>' +
+      // 睁眼时外眼角的一点细睫毛 ✓
+      '<path d="M -47 -18 q -4 -2 -6 -5 M -11 -19 q 4 -2 6 -5" fill="none" ' +
+      'stroke="#3a2a1c" stroke-width="1" opacity=".55" stroke-linecap="round"/></g>';
 
     // 点下去瞪大的眼睛（只在蹦起那一下 ✓）
     s += '<g class="cat-eyes-pop" opacity="0">' +
@@ -277,6 +288,12 @@
       '<path d="M -31 0 l 6 0 l -3 4 Z" fill="#e07a8c" stroke="#b4526a" stroke-width=".8"/>' +
       '<path d="M -28 4.5 q -5 5 -9 2 M -28 4.5 q 5 5 9 2" fill="none" stroke="#7a4a2a" ' +
       'stroke-width="1.6" stroke-linecap="round"/>' +
+      // 醒来时打一个很轻的哈欠 ✓（和睁眼同一个时间窗 ✓）
+      '<g class="cat-yawn" opacity="0">' +
+        '<animate attributeName="opacity" values="0;0;1;1;0;0" ' +
+        'keyTimes="0;.70;.735;.86;.90;1" dur="9.5s" repeatCount="indefinite"/>' +
+        '<ellipse cx="-30" cy="5" rx="4.2" ry="5.2" fill="#8d4f55"/>' +
+        '<ellipse cx="-30" cy="8.2" rx="3" ry="1.7" fill="#e79aa0"/></g>' +
       '<path d="M -52 -2 q -10 -2 -15 -4 M -52 3 q -10 1 -15 3" fill="none" ' +
       'stroke="#9a6a3a" stroke-width="1.2" stroke-linecap="round"/>' +
       '<path d="M -4 -2 q 10 -2 15 -4 M -4 3 q 10 1 15 3" fill="none" ' +
@@ -284,6 +301,8 @@
       // 红项圈 + 铃铛 ✓（和 3D 那只二狗同一件 ✓）
       '<path d="M -52 8 Q -30 18 -8 8" fill="none" stroke="#c8506a" stroke-width="5" ' +
       'stroke-linecap="round"/>' +
+      '<path d="M -48 10 Q -30 17 -12 10" fill="none" stroke="#f08ba0" ' +
+      'stroke-width="1.4" stroke-linecap="round" opacity=".55"/>' +
       '<circle cx="-30" cy="15" r="4.5" fill="#ffd34d" stroke="#c9931f" stroke-width="1.3"/>' +
       '<circle cx="-30" cy="13.8" r="1" fill="#c9931f"/>' +
       '<path d="M -30 16 v 2.4" stroke="#c9931f" stroke-width="1"/>';
@@ -296,6 +315,9 @@
     // Zzz ✓ —— 睡着的猫旁边才有；不写字 ✓（家里不放字 ✓）
     s += '<g class="cat-zzz" pointer-events="none" fill="#fff7e2" font-family="serif" ' +
       'font-weight="bold">' +
+      // 醒着的那一下 Zzz 先退场 ✓（不然睁着眼还在冒睡泡 ✗）
+      '<animate attributeName="opacity" values="1;1;0;0;1;1" ' +
+        'keyTimes="0;.68;.72;.87;.91;1" dur="9.5s" repeatCount="indefinite"/>' +
       '<text x="-66" y="-52" font-size="12" opacity="0">' +
       '<animate attributeName="opacity" values="0;0;.75;0" keyTimes="0;.10;.45;.66" ' +
       'dur="4.6s" begin="-1.5s" repeatCount="indefinite"/>' +
@@ -358,24 +380,70 @@
       dx + ' ' + dy + ';' + (dx * 2) + ' ' + (dy * 2) + '" keyTimes="0;.5;1" dur="' +
       dur + 's" begin="' + begin + 's" repeatCount="indefinite"/></circle>';
   };
-  const _fxPetal = function (x, y, rx, ry, fill, dur, begin) {
+  // 空气里被光照亮的大颗光斑 ✓（径向渐变，不用滤镜 ✓ 手机上省 ✓）
+  const _fxBokeh = function (x, y, r, dur, begin, dx, dy) {
+    return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="url(#wsBokeh)" opacity="0">' +
+      '<animate attributeName="opacity" values="0;.58;.3;0" keyTimes="0;.22;.62;1" dur="' +
+      dur + 's" begin="' + begin + 's" repeatCount="indefinite"/>' +
+      '<animateTransform attributeName="transform" type="translate" values="0 0;' +
+      dx + ' ' + dy + ';' + (dx * 1.7) + ' ' + (dy * 1.5) + '" keyTimes="0;.55;1" dur="' +
+      dur + 's" begin="' + begin + 's" repeatCount="indefinite"/></circle>';
+  };
+  // 萤火 ✓ —— 一小团暖光，慢慢飘、慢慢明灭 ✓
+  const _fxFirefly = function (x, y, r, dur, begin, dx, dy) {
     return '<g opacity="0">' +
-      '<animate attributeName="opacity" values="0;.8;.8;0" keyTimes="0;.12;.86;1" dur="' +
+      '<animate attributeName="opacity" values="0;.9;.22;.85;0" keyTimes="0;.2;.46;.72;1" dur="' +
+      dur + 's" begin="' + begin + 's" repeatCount="indefinite"/>' +
+      '<animateTransform attributeName="transform" type="translate" values="0 0;' +
+      dx + ' ' + dy + ';' + (dx * .4) + ' ' + (dy * 1.6) + ';' + (dx * 1.5) + ' ' + (dy * .5) +
+      '" keyTimes="0;.3;.66;1" dur="' + dur + 's" begin="' + begin + 's" ' +
+      'repeatCount="indefinite"/>' +
+      '<circle cx="' + x + '" cy="' + y + '" r="' + (r * 3.4) + '" fill="url(#wsFly)"/>' +
+      '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#fff6cf" opacity=".9"/></g>';
+  };
+  // 花瓣 ✓ —— 带一点左右摇曳 ✓；fall = 整段下落多远 ✓（高的那两片从窗光里穿下来 ✓）
+  const _fxPetal = function (x, y, rx, ry, fill, dur, begin, fall) {
+    const f = fall || 420;
+    return '<g opacity="0">' +
+      '<animate attributeName="opacity" values="0;.78;.78;0" keyTimes="0;.12;.88;1" dur="' +
       dur + 's" begin="' + begin + 's" repeatCount="indefinite"/>' +
       '<animateTransform attributeName="transform" type="translate" values="' +
-      x + ' ' + y + ';' + (x + 16) + ' ' + (y + 210) + ';' + (x - 8) + ' ' + (y + 420) +
-      '" keyTimes="0;.55;1" dur="' + dur + 's" begin="' + begin + 's" ' +
+      x + ' ' + y + ';' + (x + 14) + ' ' + (y + f * .34) + ';' +
+      (x - 10) + ' ' + (y + f * .68) + ';' + (x + 8) + ' ' + (y + f) +
+      '" keyTimes="0;.34;.68;1" dur="' + dur + 's" begin="' + begin + 's" ' +
       'repeatCount="indefinite"/>' +
       '<ellipse cx="0" cy="0" rx="' + rx + '" ry="' + ry + '" fill="' + fill + '">' +
-      '<animateTransform attributeName="transform" type="rotate" values="0;-80;-160" ' +
-      'dur="' + dur + 's" begin="' + begin + 's" repeatCount="indefinite"/></ellipse></g>';
+      '<animateTransform attributeName="transform" type="rotate" values="0;-90;-190;-290" ' +
+      'keyTimes="0;.34;.68;1" dur="' + dur + 's" begin="' + begin + 's" ' +
+      'repeatCount="indefinite"/></ellipse></g>';
   };
   const flatFxSvg = function () {
     return '' +
-      // 窗口那束光在轻轻呼吸 ✓
+      // 窗光落在地上的一整片暖意 ✓ —— 几层叠着慢慢明暗 ✓
       '<ellipse cx="305" cy="500" rx="430" ry="380" fill="url(#wsWarm)" opacity=".06">' +
       '<animate attributeName="opacity" values=".04;.09;.04" dur="8s" ' +
       'repeatCount="indefinite"/></ellipse>' +
+      // 两束斜斜落下来的窗光 ✓ —— 拉长 + 微微旋转 ✓，像真的从窗口斜下来 ✓
+      '<ellipse cx="278" cy="1010" rx="140" ry="470" fill="url(#wsWarm)" opacity=".09" ' +
+      'transform="rotate(10 278 1010)">' +
+      '<animate attributeName="opacity" values=".05;.11;.05" dur="11s" begin="-3.4s" ' +
+      'repeatCount="indefinite"/></ellipse>' +
+      '<ellipse cx="438" cy="1050" rx="100" ry="430" fill="url(#wsWarm)" opacity=".08" ' +
+      'transform="rotate(15 438 1050)">' +
+      '<animate attributeName="opacity" values=".04;.09;.04" dur="9.4s" begin="-6.1s" ' +
+      'repeatCount="indefinite"/></ellipse>' +
+      '<ellipse cx="380" cy="1290" rx="315" ry="135" fill="url(#wsWarm)" opacity=".08">' +
+      '<animate attributeName="opacity" values=".05;.1;.05" dur="7.6s" begin="-1.8s" ' +
+      'repeatCount="indefinite"/></ellipse>' +
+      // 空气里被光照亮的小光斑 ✓（大颗、很淡 ✓）
+      _fxBokeh(250, 700, 10, 13, -2.6, 16, -34) +
+      _fxBokeh(392, 618, 7, 10.5, -7.2, -12, -26) +
+      _fxBokeh(472, 792, 12, 14.5, -4.4, 14, -40) +
+      _fxBokeh(300, 946, 9, 12, -9.1, -10, -30) +
+      _fxBokeh(548, 968, 6.5, 11.2, -1.6, 18, -24) +
+      _fxBokeh(206, 1082, 8, 15, -6.8, 12, -36) +
+      _fxBokeh(622, 884, 10, 12.8, -3.1, -14, -28) +
+      _fxBokeh(438, 1176, 7, 13.6, -8.4, 10, -22) +
       // 空气里的浮尘 ✓
       _fxMote(300, 860, 3, 11, -3.2, 14, -34) +
       _fxMote(420, 940, 2.4, 9.5, -6.1, -10, -28) +
@@ -385,10 +453,21 @@
       _fxMote(700, 1120, 2.2, 14, -9.6, -12, -36) +
       _fxMote(360, 1120, 2, 15, -7.2, 10, -22) +
       _fxMote(540, 1060, 2.6, 11.8, -2.1, 18, -32) +
-      // 飘落的花瓣 ✓
-      _fxPetal(250, 980, 7, 3.2, '#e9a7a4', 15, -6) +
-      _fxPetal(650, 960, 6, 2.8, '#f0c4bb', 18, -11) +
-      _fxPetal(430, 1010, 6.5, 3, '#e3a4a2', 13, -2.5);
+      // 飘落的花瓣 ✓ —— 高的那两片从窗光里穿下来 ✓
+      _fxPetal(250, 980, 7, 3.2, '#e9a7a4', 15, -6, 460) +
+      _fxPetal(650, 960, 6, 2.8, '#f0c4bb', 18, -11, 430) +
+      _fxPetal(430, 1010, 6.5, 3, '#e3a4a2', 13, -2.5, 380) +
+      _fxPetal(302, 350, 6, 2.6, '#f2b8b4', 26, -9, 1030) +
+      _fxPetal(455, 292, 5.5, 2.4, '#e8a7ab', 30, -17, 1060) +
+      // 地毯附近的萤火 ✓（在猫后面 ✓）
+      _fxFirefly(560, 1322, 2.2, 7.2, -2.4, -12, -10) +
+      _fxFirefly(792, 1300, 1.8, 8.6, -5.1, -16, 8) +
+      _fxFirefly(262, 1392, 2, 9.4, -7.3, 14, -12);
+  };
+  const flatFgFxSvg = function () {
+    // 前景的两只萤火 ✓ —— 压在猫上面 ✓，近处更亮 ✓（有前后层，画面才深 ✓）
+    return _fxFirefly(646, 1382, 1.7, 6.8, -1.2, -9, 12) +
+      _fxFirefly(776, 1470, 2, 8.2, -4.6, -14, -8);
   };
 
   const buildFlatScene = function () {
@@ -414,6 +493,22 @@
           '<stop offset="0" stop-color="#ffe3a0" stop-opacity=".9"/>' +
           '<stop offset=".6" stop-color="#ffe3a0" stop-opacity=".35"/>' +
           '<stop offset="1" stop-color="#ffe3a0" stop-opacity="0"/></radialGradient>' +
+        '<radialGradient id="wsBokeh" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="0" stop-color="#fff4cf" stop-opacity=".7"/>' +
+          '<stop offset=".45" stop-color="#ffe7ad" stop-opacity=".28"/>' +
+          '<stop offset="1" stop-color="#ffdc94" stop-opacity="0"/></radialGradient>' +
+        '<radialGradient id="wsFly" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="0" stop-color="#fffbe6" stop-opacity=".95"/>' +
+          '<stop offset=".3" stop-color="#ffe9a8" stop-opacity=".6"/>' +
+          '<stop offset="1" stop-color="#ffd678" stop-opacity="0"/></radialGradient>' +
+        '<radialGradient id="wsCatGlow" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="0" stop-color="#ffdda0" stop-opacity=".55"/>' +
+          '<stop offset=".65" stop-color="#ffd18a" stop-opacity=".2"/>' +
+          '<stop offset="1" stop-color="#ffc878" stop-opacity="0"/></radialGradient>' +
+        '<radialGradient id="wsDream" cx="50%" cy="47%" r="74%">' +
+          '<stop offset="0" stop-color="#fff6e0" stop-opacity="0"/>' +
+          '<stop offset=".72" stop-color="#f6dfba" stop-opacity="0"/>' +
+          '<stop offset="1" stop-color="#7a4a2e" stop-opacity=".1"/></radialGradient>' +
       '</defs>' +
       // ★ 内层 <image> 用 **meet**（不是 slice！）✓ —— 图本身 900×1600，
       //   放进同尺寸盒子是 1:1 精确贴合，meet 即满、slice 在某些 WebView 上
@@ -429,6 +524,11 @@
         'width="268" height="92" fill="transparent" style="cursor:pointer"/>' +
       // 二狗 ✓ —— 点它回主群聊 ✓
       flatCatSvg() +
+      // 前景的萤火 ✓ —— 给画面一点前后层次 ✓
+      '<g pointer-events="none">' + flatFgFxSvg() + '</g>' +
+      // 很淡的暖色晕影 ✓ —— 四周略收一点 ✓
+      '<rect x="0" y="0" width="900" height="1600" fill="url(#wsDream)" ' +
+        'pointer-events="none"/>' +
       // ★ 补一层和 rsvg 末尾相同的暗角 ✓ —— 猫是搬出来的 ✓，
       //   不补的话它会比屋里别的角落亮一档 ✓（看着像贴上去的 ✗）。
       '<rect x="0" y="0" width="900" height="1600" fill="none" stroke="#8a5a3a" ' +
