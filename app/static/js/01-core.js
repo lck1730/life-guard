@@ -276,7 +276,7 @@
   // ⚠️ **它不再由 `show()` 收掉** ✗ —— `show('chat')` 只是"这一屏该显示了" ✓，
   //   这时候消息 / 背景往往还没就位 ✓；收得太早 = 又回到"先空白一下" ✓。
   //   现在只有 `_bootReady()` 能收它 ✓（各处成功 / 失败的出口各调一次 ✓）。
-  const BOOT_MIN_MS = 500;
+  const BOOT_MIN_MS = 1000;
   const _bootT0 = performance.now();
   let _bootOff = null;
 
