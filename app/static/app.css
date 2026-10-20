@@ -14,6 +14,13 @@
     --accent-line:#35507a;  --accent-soft:rgba(90,140,255,.10);
     --hover:#1d2129;        --avatar-bg:#232833;
     --quote-bg:rgba(127,127,127,.16);
+    /* ★ 气泡半透明（2026-10-20）—— 让主群聊的背景图透出来 ✓。
+       ⚠️ 用**带 alpha 的底色**，不是整体 `opacity` ✗ ——
+          整体透明度会连正文一起变淡，字在照片上更糊 ✓。
+       三个值对应：别人的气泡 / 小助手 / 自己 ✓。 */
+    --bubble-bg:rgba(30,34,43,.78);
+    --bubble-agent-bg:rgba(23,26,33,.82);
+    --bubble-mine-bg:rgba(30,58,95,.78);
     --danger-soft:rgba(255,107,107,.4);
     --bg-scrim:rgba(0,0,0,.18);
     --warn2:#d8b06a;
@@ -37,6 +44,10 @@
     --accent-line:#d8be9e;  --accent-soft:rgba(154,91,46,.10);
     --hover:#f3eadb;        --avatar-bg:#e9dfcf;
     --quote-bg:rgba(122,112,99,.12);
+    /* 气泡半透明 —— 浅色主题下照片已经有 46% 奶白纱，气泡再压一层 ✓ */
+    --bubble-bg:rgba(239,231,216,.80);
+    --bubble-agent-bg:rgba(255,252,245,.84);
+    --bubble-mine-bg:rgba(242,225,203,.80);
     --danger-soft:rgba(185,71,53,.35);
     --bg-scrim:rgba(255,252,245,.46);   /* 奶白下字是深色 → 照片要压得更白一点才读得清 ✓ */
     --warn2:#8a5f1e;
@@ -54,6 +65,10 @@
     --accent-line:#3a5a44;  --accent-soft:rgba(162,213,164,.12);
     --hover:#1f3326;        --avatar-bg:#1f3326;
     --quote-bg:rgba(144,167,148,.15);
+    /* 气泡半透明 —— 同夜阑 ✓ */
+    --bubble-bg:rgba(27,44,32,.78);
+    --bubble-agent-bg:rgba(20,34,25,.82);
+    --bubble-mine-bg:rgba(35,66,44,.78);
     --danger-soft:rgba(227,126,109,.4);
     --bg-scrim:rgba(0,0,0,.25);
     --warn2:#d9c68a;
@@ -392,7 +407,7 @@
   .who { font-size:12px; color:var(--muted); margin-bottom:3px; padding-left:4px; }
   .row.agent .who { color:var(--agent); }
   .row.mine .who { text-align:right; padding-right:4px; }
-  .bubble { padding:9px 13px; border-radius:14px; background:var(--panel2);
+  .bubble { padding:9px 13px; border-radius:14px; background:var(--bubble-bg);
             word-break:break-word; white-space:pre-wrap; }
   .bubble .at { color:var(--accent); font-weight:600; }
   /* ★ **提到一个真的存在的组件 → 蓝色可点** ✗→✓（2026-10-07 深夜用户定的：
@@ -404,7 +419,7 @@
      而 `.sysrow` **不是气泡** ✗ → 写在 `.bubble .clink` 下**颜色根本不生效** ✓
      （类加上了、点击也绑上了 ✓，就是**不变蓝** ✓ —— 所以看着像"没这个功能"✓）。 */
   .clink { color:var(--accent); }
-  .row.mine .bubble { background:var(--accent-bg); border-bottom-right-radius:4px; }
+  .row.mine .bubble { background:var(--bubble-mine-bg); border-bottom-right-radius:4px; }
   /* 系统提示：居中、灰、无头像无气泡。
      **故障通报必须一眼看出不是管家在说话**——混在气泡里的话，用户会以为
      那是它说的一句怪话，故障就被掩盖过去了。 */
@@ -442,7 +457,7 @@
     -webkit-user-select:none; user-select:none;
     -webkit-touch-callout:none;
   }
-  .row.agent .bubble { background:var(--panel); border:1px solid var(--line);
+  .row.agent .bubble { background:var(--bubble-agent-bg); border:1px solid var(--line);
                        border-left:3px solid var(--agent); border-bottom-left-radius:4px; }
   .row:not(.mine):not(.agent) .bubble { border-bottom-left-radius:4px; }
   .time { font-size:11px; color:var(--muted); margin-top:2px; padding:0 4px; }
