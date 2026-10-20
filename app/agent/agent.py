@@ -226,14 +226,36 @@ _CJK_RE = re.compile(r"[㐀-䶿一-鿿豈-﫿]")
 #:    远不到它 ✓，而实测那几段泄漏是 172 / 1585 / 243 / 46 / 27 ✓，中间空得很开 ✓。
 _NONCJK_MIN_CHARS = 20
 
+#: ★ **Hermes 把"只有推理"的一轮提升成最终回复**时（2026-10-20 实测），
+#:   我们收到的整条就是一段英文思考 + 零散的中文引用 ✓。
+#:   `_strip_leaked_thinking` 会把英文块抠掉 ✓，但剩下的中文碎片照样会发出去 ✗。
+#:   → 抠掉的字数 ≥ 这个数、而且**占整条一半以上**时，认定这一轮是"推理泄漏" ✓，
+#:     不再把碎片当回答发 ✓（要么补一轮，要么按沉默处理 ✓）。
+_REASONING_LEAK_MIN_CHARS = 300
+
+#: "它说这件事已经做完了"的痕迹（和 Hermes 自己那道 claim 守卫同一个形状 ✓）。
+#: ⚠️ 用来识别**嘴上说"记上了"、实际一次工具都没调**的轮次 ✓ ——
+#:    这种轮次光补一句人话没用，账还是没记上 ✓，得让它真的去做 ✓。
+_COMPLETED_ACTION_RE = re.compile(
+    r"(?<![没未不无])"
+    r"(?:"
+    r"已(?:记录|记下|记上|存|设|加|建|提醒|撤销)"
+    r"|记(?:上了|下了|好了)"
+    r"|补(?:记了|上了|存了)"
+    r"|(?:设好|加好|存好|建好|设完|加完|存完|建完)了"
+    r"|(?:帮你|给你|替你|我给你)(?:记|存|设|加|建|提醒)了"
+    r")"
+    r"(?![吗？?])"
+)
+
 #: 连续的**中文**（含扩展区）—— 用它把整条切成"中文块 / 非中文块" ✓。
 #: ⚠️ 从中文字那个正则**派生出**来的 ✓，不重抄一遍那些近形字 ✓
 #:    （抄错一个字符就静默失效，而那种错很难看出来 ✓）。
 _CJK_RUN_RE = re.compile(_CJK_RE.pattern + "+")
 
 
-def _strip_leaked_thinking(text: str) -> str:
-    """把**混在回答里的自言自语**抠掉 ✓；抠完什么都不剩就返回空串 ✓。
+def _strip_leaked_thinking_stats(text: str) -> tuple[str, int]:
+    """把**混在回答里的自言自语**抠掉 ✓，并返回抠掉了多少字 ✓。
 
     ⚠️ **为什么是"抠"、不是"丢掉重来"** ✗ —— 实测那几次，自言自语旁边
       **都跟着一句完全正常的回答** ✓（「好啊，发吧。…」/「设好了，…」/
@@ -258,10 +280,16 @@ def _strip_leaked_thinking(text: str) -> str:
       那道管"**整条都不是人话**"（工具调用文本那种 → 补一轮 ✓）；
       这道管"**人话里混着自言自语**"（→ 抠掉就行 ✓）。
       调用顺序是**先抠、再判** ✓ —— 抠完还是天书的话，那道照样兜住 ✓。
+
+    ★ 2026-10-20 新增返回的**抠掉字数** ✓ —— Hermes 会把"正文为空、只有推理"
+      的一轮**提升成最终回复** ✓，我们收到的就是整段英文思考 ✓。
+      光把英文抠掉，剩下的中文碎片会**粘成一句乱码**发出去 ✗
+      （实测消息 556：`The user (看看 / 看看 / 你现在是老学究了…` ✓）。
+      调用方靠这个字数判断"整条是不是推理泄漏" ✓（见 `_REASONING_LEAK_MIN_CHARS`）。
     """
     t = (text or "").strip()
     if not t:
-        return t
+        return t, 0
     out: list[str] = []
     cut: list[str] = []
     pos = 0
@@ -273,14 +301,30 @@ def _strip_leaked_thinking(text: str) -> str:
     if pos < len(t):
         _keep_or_drop(out, cut, t[pos:])
     if not cut:
-        return t
+        return t, 0
     # ⚠️ **抠掉的那几段要记一笔** ✓ —— 切错了得能查。
     #    这是整条链上**唯一一处"改它说的话"**的地方 ✓，
     #    所以原文必须进日志 ✓（这个项目为"静默改坏"栽过 ✓）。
     log.warning("抠掉了 %d 段不是给他看的文字（共 %d 字）：%.200s",
                 len(cut), sum(len(c) for c in cut), " ｜ ".join(cut[:3]))
     # ⚠️ 丢一个换行、可能连着丢 → 收成一行一个 ✓（别留一串空行 ✗）
-    return re.sub(r"\n[ \t]*\n+", "\n", "".join(out)).strip()
+    return re.sub(r"\n[ \t]*\n+", "\n", "".join(out)).strip(), sum(len(c) for c in cut)
+
+
+def _strip_leaked_thinking(text: str) -> str:
+    """只要抠完的正文（工坊那边还在用这个签名 ✓）。"""
+    return _strip_leaked_thinking_stats(text)[0]
+
+
+def _mostly_leaked_thinking(raw: str) -> tuple[str, bool]:
+    """抠掉推理后，判断这一轮**是不是整条都被推理占了** ✓。
+
+    返回 `(抠完的正文, 是否推理泄漏)` ✓。判据是**抠掉的字数够多、而且占整条一半以上** ✓
+    —— 正常回复里夹一段代码/一段英文，比例远到不了一半 ✓。
+    """
+    text, cut = _strip_leaked_thinking_stats(raw)
+    mostly = bool(cut >= _REASONING_LEAK_MIN_CHARS and cut * 2 >= len(raw or ""))
+    return text, mostly
 
 
 def _keep_or_drop(out: list[str], cut: list[str], chunk: str) -> None:
@@ -302,6 +346,24 @@ def _keep_or_drop(out: list[str], cut: list[str], chunk: str) -> None:
 
 def _looks_like_leaked_reasoning(text: str) -> bool:
     return any(m in text for m in _LEAKED_REASONING_MARKS)
+
+
+#: ★ 2026-10-20：**推理被当回答发下来、而且它还声称"记上了"** 时补的这一轮。
+#:
+#: ⚠️ 和上面那道"只吐出工具调用文本"的补轮**不是一回事** ✗ ——
+#:   那道只要一句能看的话（所以让它"别调工具" ✓）；
+#:   这道的问题是**动作根本没发生** ✓（模型在思考里说"记上了：¥12.59"，
+#:   实际一次 `record_add` 都没调 ✓，实测消息 1134 / 账本里没有那一笔 ✓）。
+#:   所以这一轮必须让它**先真的去做** ✓，再说话 ✓。
+_REASONING_LEAK_ACT_NUDGE = (
+    "\n\n[系统] 你上一轮**只输出了思考过程，正文是空的**——"
+    "用户那边收到的是一段乱掉的碎片。而且你在思考里说已经做完了，"
+    "但这一轮**没有真正调用工具**。现在重新处理这条消息：\n"
+    "1. 先确认这件事有没有真的做完；没做就现在调用对应工具做完"
+    "（记账用 record_add；不确定有没有记过就先用 record_query 查，别重复记）。\n"
+    "2. 做完只用一两句中文把结果告诉用户。\n"
+    "3. 别复述思考过程，别写英文。"
+)
 
 
 def _profile_dir(profile: str) -> Path:
@@ -1466,12 +1528,12 @@ async def run_turn(
         await _idle_status(group_id)
         return
 
-    text = "".join(collected).strip()
+    raw_text = "".join(collected).strip()
 
     # ★ **先把"挂在回答前面的那段自言自语"切掉** ✗→✓（见 `_strip_leaked_thinking` 那段 ✓）。
     #   ⚠️ 顺序是**先切、再判** ✗ —— 切完如果整条还是天书，
     #      下面那道 `_looks_like_leaked_reasoning` 照样会兜住 ✓。
-    text = _strip_leaked_thinking(text)
+    text, mostly_leaked = _mostly_leaked_thinking(raw_text)
 
     # ★ **只吐了思考？补一轮"只说结论"。**
     # 见文件上方 `_LEAKED_REASONING_MARKS` 那段说明：这是 Hermes 故意放行的
@@ -1498,6 +1560,41 @@ async def run_turn(
                 log.warning("group=%s 补轮还是思考，放弃（保留原文）", group_id)
         except Exception:
             log.exception("补轮失败 group=%s", group_id)
+    elif mostly_leaked:
+        # ★★ 2026-10-20：Hermes 把"正文为空、只有推理"的一轮**提升成最终回复** ✓。
+        #   `_strip_leaked_thinking` 只抠掉英文块，剩下的中文碎片会拼成天书 ✗
+        #   （实测消息 556：`The user (看看 / 看看 / 你现在是老学究了…` ✓）。
+        #   ⚠️ 更糟的是模型在推理里**声称"记上了"**、实际一次工具都没调 ✗ ——
+        #      账本里根本没有那一笔（用户 12:35 说"自选菜花了12.59" ✓，
+        #      它 12:36 回"记上了：¥12.59" ✓，账本里查无此账 ✗）。
+        if _COMPLETED_ACTION_RE.search(text):
+            log.warning(
+                "group=%s 这一轮把推理当回答、还声称做完了（抠掉 %d 字，正文只剩碎片），"
+                "补一轮让它真的去做", group_id, len(raw_text) - len(text))
+            try:
+                nudged = text_part + _REASONING_LEAK_ACT_NUDGE
+                fixed: list[str] = []
+                async for piece in _stream_completion(
+                    group_id, nudged, images, profile, deep=deep
+                ):
+                    fixed.append(piece)
+                t2, t2_leaked = _mostly_leaked_thinking("".join(fixed).strip())
+                if t2 and not t2_leaked and not _looks_like_leaked_reasoning(t2):
+                    text = t2
+                    log.info("group=%s 补轮成功，拿到一句人话（%d 字）", group_id, len(t2))
+                else:
+                    # ⚠️ 补不回来就**别把碎片发出去** ✓ —— 发出去只会让用户
+                    #   以为它坏了 ✓，而且那笔账仍然是假的 ✗。
+                    text = ""
+                    log.warning("group=%s 补轮还是推理，丢弃这一轮的碎片", group_id)
+            except Exception:
+                text = ""
+                log.exception("补轮失败 group=%s", group_id)
+        else:
+            log.warning(
+                "group=%s 这一轮把推理当回答发下来了（抠掉 %d 字），没有可用结论，丢弃碎片",
+                group_id, len(raw_text) - len(text))
+            text = ""
 
     silent = (not text) or text.lower().strip("。.!！") in _SILENT_MARKERS
 
@@ -1510,7 +1607,11 @@ async def run_turn(
                 group_id, text_part, images, profile, deep=deep
             ):
                 retry.append(piece)
-            text = "".join(retry).strip()
+            # ⚠️ 重试也要过同一道过滤 ✓ —— 否则推理当回答发下来的那一次
+            #    会绕过上面的检查，把碎片原样发出去 ✗。
+            text, retry_leaked = _mostly_leaked_thinking("".join(retry).strip())
+            if retry_leaked:
+                text = ""
             silent = (not text) or text.lower().strip("。.!！") in _SILENT_MARKERS
         except Exception:
             log.exception("重试失败 group=%s", group_id)
