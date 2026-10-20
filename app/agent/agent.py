@@ -331,9 +331,9 @@ async def _what_got_done(group_id: int, rec_watermark: int,
                          rem_watermark: int) -> str:
     """这一轮正文作废时，用数据库里**真发生了的事**兜一句 ✓。
 
-    ⚠️ 这是防「沉默 → 用户以为没做 → 再说一遍 → 记第二笔」的 ✓：
-      2026-10-20 那笔 12.59 就是这么变成三笔的（两次正文是推理、被我们丢弃，
-      但工具其实已经记上了）。完成与否**只认库里的行**，不认它嘴上说什么。
+    ⚠️ 2026-10-20 实测：12.59 那笔变成三笔，是**两次空闲唤醒**又把旧消息
+      处理了一遍、各记了一次（15:28 / 19:20），而正文是推理、被我们丢弃，
+      所以用户那边没有任何回执。完成与否**只认库里的行**，不认它嘴上说什么。
     """
     rec = (await fetch_one(
         "SELECT COUNT(*) AS n FROM records "
@@ -1511,6 +1511,8 @@ async def run_turn(
     rem_watermark = int(((await fetch_one(
         "SELECT COALESCE(MAX(id), 0) AS m FROM reminders WHERE group_id = ?",
         (group_id,))) or {}).get("m") or 0)
+    # 只有用户真的说了话才兜"记下了" ✓ —— 空闲唤醒是闲聊，不该冒出回执。
+    user_triggered = any((m.get("sender_type") or "") == "user" for m in pending)
 
     text_part = (
         f"以下是群里最近的一批消息（按时间顺序）：\n\n{prompt}\n\n"
@@ -1634,10 +1636,10 @@ async def run_turn(
                 group_id, len(raw_text) - len(text))
             text = ""
 
-    # ★ 正文没了，但工具可能已经做成了 ✓ —— 别沉默。
-    #   沉默会让用户以为没做、再说一遍，于是记第二笔（2026-10-20 实测：
-    #   12.59 变成三笔）。这里**只认本轮新写进库的行**，不认它嘴上说的。
-    if not text:
+    # ★ 用户说了话、正文没了，但工具可能已经做成了 ✓ —— 别沉默。
+    #   这里**只认本轮新写进库的行**，不认它嘴上说的。
+    #   ⚠️ 空闲唤醒不兜 ✓ —— 那是闲聊，冒出「记下了」反而怪。
+    if not text and user_triggered:
         done = await _what_got_done(group_id, rec_watermark, rem_watermark)
         if done:
             log.info("group=%s 正文被丢弃，但这一轮真的做成了（%s），用确定性回复兜底",
