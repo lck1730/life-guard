@@ -241,8 +241,15 @@ class Settings(BaseSettings):
     #   对记账管家来说，这两条都是致命的：宁可慢，也不能说"我去查"然后不查。
     #
     # 所以两个档位都保持"想"。真要提速得换模型，不是调这两个值。
-    agent_effort_casual: str = "medium"
-    agent_effort_mentioned: str = "high"
+    #
+    # 2026-10-20 现状：聊天模型是商汤 sense-nova flash-lite。直接实测 low / medium / high
+    # 三档，调工具都是 3/3，单次耗时都在 2.3–3.4 秒（差别落在噪声里）。所以：
+    #   · 日常闲聊用 low —— 先开口快一点，闲聊不需要长篇推理；
+    #   · 被点名/要查账用 medium —— 保住工具可靠性，不用 high。
+    # `none` 仍然不碰（Dots 的教训：省下的时间是拿正确性换的）。
+    # 现在的大头是上下文（一条会话里堆了大量历史/思考），不是档位。
+    agent_effort_casual: str = "low"
+    agent_effort_mentioned: str = "medium"
 
     # 内部工具接口的共享密钥。Hermes 插件（跑在同一台机器上）用它在
     # /api/internal/tools/* 上读写群记忆与账本。**必须配**，否则内部接口整个关闭。

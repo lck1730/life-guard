@@ -41,6 +41,23 @@ def _lock_for(group_id: int) -> asyncio.Lock:
     return _locks[group_id]
 
 
+async def run_idle_turn(group_id: int, pending: list[dict[str, Any]]) -> None:
+    """跑一次空闲闲聊轮。
+
+    ★ **必须和用户触发的轮次共用同一把群锁** —— 否则空闲轮会和用户轮叠在一起：
+      空闲轮的"禁止写"标记会误伤用户轮，用户轮的新消息也会被空闲轮当成旧消息。
+      标记只在锁内、本轮期间有效（见 core/idle.py 的 is_idle_turn）。
+    """
+    from ..core.idle import set_idle_turn
+
+    async with _lock_for(group_id):
+        set_idle_turn(group_id, True)
+        try:
+            await agent_client.run_turn(group_id, pending, must_speak=False)
+        finally:
+            set_idle_turn(group_id, False)
+
+
 # 持有进行中的任务引用，防止被 GC 提前回收。
 _background: set[asyncio.Task] = set()
 

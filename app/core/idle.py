@@ -43,6 +43,26 @@ log = logging.getLogger("lifeguard.idle")
 # group_id -> 下次该醒的时刻（monotonic 不适用，用 wall clock 便于日志）
 _next_at: dict[int, float] = {}
 
+# group_id -> 当前这一轮是不是"空闲闲聊"轮。
+#
+# 只靠提示词说"别补记账"是不够的：2026-10-20 实测，空闲唤醒把旧消息又处理了一遍，
+# 同一个 ¥12.59 在 15:28 / 19:20 各记了一次；提示词补上了，但它仍然可能不照做。
+# 所以编排层在本轮开始/结束时打标记，内部写接口看到标记就直接拒绝——
+# **能改坏的写操作由代码挡，不靠模型自觉**。
+_idle_turns: set[int] = set()
+
+
+def set_idle_turn(group_id: int, on: bool) -> None:
+    """由编排层在空闲轮开始/结束时调用（见 app/agent/__init__.py）。"""
+    if on:
+        _idle_turns.add(group_id)
+    else:
+        _idle_turns.discard(group_id)
+
+
+def is_idle_turn(group_id: int) -> bool:
+    return group_id in _idle_turns
+
 POLL_SECONDS = 120          # 每两分钟看一眼就够，这不是个精确的东西
 
 
@@ -64,7 +84,7 @@ def _in_window(hour: int) -> bool:
 async def _wake(group_id: int) -> None:
     """唤起它一次。**must_speak=False**——它完全可以决定不吭声，
     硬逼它说话就变成"为了冒泡而冒泡"，那正是要避免的。"""
-    from ..agent import agent as agent_client
+    from ..agent import run_idle_turn
 
     pending = [{
         "group_id": group_id,
@@ -86,7 +106,7 @@ async def _wake(group_id: int) -> None:
         "created_at": int(time.time()),
     }]
     log.info("空闲唤醒了 group=%s", group_id)
-    await agent_client.run_turn(group_id, pending, must_speak=False)
+    await run_idle_turn(group_id, pending)
 
 
 async def tick() -> int:

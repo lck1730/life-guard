@@ -270,6 +270,12 @@ def validate(fields: dict[str, Any], schema: dict[str, Any]) -> tuple[dict | Non
 
 # ── 读写 ──────────────────────────────────────────────────────────────
 
+# 防重的窗口：模型在一轮里把同一条记录调两次工具时，第二次直接复用第一条。
+# 不设更长（比如几小时）—— 那会把"真的又买了一瓶水"吞掉。空闲轮重复处理旧消息
+# 是另一个问题，由 core/idle.py 的硬闸挡，不靠这个窗口。
+_DEDUPE_WINDOW_SECONDS = 180
+
+
 async def add(group_id: int, kind: str, fields: dict[str, Any],
               created_by: int | None = None) -> tuple[dict | None, str | None]:
     schema = await get_kind(group_id, kind)
@@ -280,6 +286,21 @@ async def add(group_id: int, kind: str, fields: dict[str, Any],
     clean, err = validate(fields, schema)
     if err:
         return None, err
+
+    # 同群、同类型、字段完全一致，且就在刚才 → 认为同一次写入被调了两遍。
+    # 返回已有记录（而不是报错），模型那边看到的仍然是成功，不会换着法子重试。
+    recent = await fetch_all(
+        "SELECT id, fields FROM records "
+        "WHERE group_id = ? AND kind = ? AND deleted_at IS NULL AND created_at >= ? "
+        "ORDER BY id DESC LIMIT 5",
+        (group_id, kind, now() - _DEDUPE_WINDOW_SECONDS),
+    )
+    for row in recent:
+        if _parse(row["fields"]) == clean:
+            log.info("group=%s 同一条记录刚记过，复用 id=%s（%s）",
+                     group_id, row["id"], kind)
+            return {"id": row["id"], "kind": kind, "fields": clean, "deduped": True}, None
+
     rid = await execute(
         "INSERT INTO records (group_id, kind, fields, created_by, created_at) "
         "VALUES (?,?,?,?,?)",

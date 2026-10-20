@@ -41,6 +41,7 @@ from pydantic import BaseModel, Field
 from ..config import WALL_SLUG, settings
 from ..core import records as rec
 from ..core import reminders as rem
+from ..core.idle import is_idle_turn
 from ..core.hub import hub
 from ..db import execute, fetch_all, fetch_one, now
 from ..core.messages import create_message
@@ -67,6 +68,26 @@ async def _assert_group(group_id: int) -> None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"群 {group_id} 不存在")
 
 
+def _idle_write_block(group_id: int) -> dict | None:
+    """空闲闲聊轮里，**代码**挡掉所有会改数据的写操作。
+
+    提示词里已经写了"别补记账、别补设提醒"，但那只是请求；2026-10-20 实测
+    空闲唤醒仍把旧消息又处理了一遍，同一笔 ¥12.59 记了三次。这里返回的错误串
+    是**给模型看的**，要让它明白"不是接口坏了，是这一轮不该写"，不要换个工具重试。
+    读操作（record_query / record_kinds / reminder_list）不挡。
+    """
+    if not is_idle_turn(group_id):
+        return None
+    return {
+        "ok": False,
+        "error": (
+            "现在是空闲闲聊轮，不是用户发起的请求；旧消息都已经处理过了。"
+            "**本轮不要补记账、不要补设提醒、不要删改任何东西**。"
+            "想说话就直接说，不想说就回 [SILENT]。"
+        ),
+    }
+
+
 # ── 结构化记录 ────────────────────────────────────────────────────────
 
 class RecordAddIn(BaseModel):
@@ -79,6 +100,9 @@ class RecordAddIn(BaseModel):
 @router.post("/records/add", dependencies=[Depends(require_internal_token)])
 async def records_add(body: RecordAddIn) -> dict:
     await _assert_group(body.group_id)
+    blocked = _idle_write_block(body.group_id)
+    if blocked:
+        return blocked
     record, err = await rec.add(body.group_id, body.kind, body.fields, body.created_by)
     if err:
         # **错误串是要给模型看的**，所以原样返回而不是 400。
@@ -106,6 +130,9 @@ class RecordUpdateIn(BaseModel):
 @router.post("/records/update", dependencies=[Depends(require_internal_token)])
 async def records_update(body: RecordUpdateIn) -> dict:
     await _assert_group(body.group_id)
+    blocked = _idle_write_block(body.group_id)
+    if blocked:
+        return blocked
     row, err = await rec.update(body.group_id, body.record_id, body.fields)
     if err:
         return {"ok": False, "error": err}
@@ -120,6 +147,9 @@ class RecordIdIn(BaseModel):
 @router.post("/records/delete", dependencies=[Depends(require_internal_token)])
 async def records_delete(body: RecordIdIn) -> dict:
     await _assert_group(body.group_id)
+    blocked = _idle_write_block(body.group_id)
+    if blocked:
+        return blocked
     row, err = await rec.delete(body.group_id, body.record_id)
     if err:
         return {"ok": False, "error": err}
@@ -131,6 +161,9 @@ async def records_delete(body: RecordIdIn) -> dict:
 @router.post("/records/restore", dependencies=[Depends(require_internal_token)])
 async def records_restore(body: RecordIdIn) -> dict:
     await _assert_group(body.group_id)
+    blocked = _idle_write_block(body.group_id)
+    if blocked:
+        return blocked
     row, err = await rec.restore(body.group_id, body.record_id)
     if err:
         return {"ok": False, "error": err}
@@ -179,6 +212,9 @@ class KindDefineIn(BaseModel):
 @router.post("/records/define", dependencies=[Depends(require_internal_token)])
 async def records_define(body: KindDefineIn) -> dict:
     await _assert_group(body.group_id)
+    blocked = _idle_write_block(body.group_id)
+    if blocked:
+        return blocked
     err = await rec.define_kind(body.group_id, body.kind, body.schema_)
     if err:
         return {"ok": False, "error": err}
@@ -241,6 +277,9 @@ class ReminderAddIn(BaseModel):
 @router.post("/reminders/add", dependencies=[Depends(require_internal_token)])
 async def reminders_add(body: ReminderAddIn) -> dict:
     await _assert_group(body.group_id)
+    blocked = _idle_write_block(body.group_id)
+    if blocked:
+        return blocked
     fire_at = body.fire_at
     if fire_at is None and body.in_minutes is not None:
         fire_at = now() + int(body.in_minutes) * 60
@@ -288,6 +327,9 @@ class ReminderCancelIn(BaseModel):
 @router.post("/reminders/cancel", dependencies=[Depends(require_internal_token)])
 async def reminders_cancel(body: ReminderCancelIn) -> dict:
     await _assert_group(body.group_id)
+    blocked = _idle_write_block(body.group_id)
+    if blocked:
+        return blocked
     ok = await rem.cancel(body.group_id, body.reminder_id)
     return {"ok": ok} if ok else {"ok": False, "error": f"没有 id={body.reminder_id} 的提醒"}
 
