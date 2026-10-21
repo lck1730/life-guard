@@ -41,7 +41,7 @@ from pydantic import BaseModel, Field
 from ..config import WALL_SLUG, settings
 from ..core import records as rec
 from ..core import reminders as rem
-from ..core.idle import is_idle_turn
+from ..core.idle import is_idle_turn, note_idle_write_blocked
 from ..core.hub import hub
 from ..db import execute, fetch_all, fetch_one, now
 from ..core.messages import create_message
@@ -78,6 +78,9 @@ def _idle_write_block(group_id: int) -> dict | None:
     """
     if not is_idle_turn(group_id):
         return None
+    # ★ 记下"本轮挡过写"——编排层据此把整条正文作废 ✓（2026-10-21）。
+    #   不记的话，它会把被挡的事原样说给群里（"14.21 那笔我没记进去"）。
+    note_idle_write_blocked(group_id)
     return {
         "ok": False,
         "error": (

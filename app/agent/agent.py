@@ -29,6 +29,7 @@ import httpx
 from ..core.agent_status import clean_prompt, normalize, pick
 from ..config import settings
 from ..db import fetch_all, fetch_one
+from ..core.idle import idle_write_blocked, is_idle_turn
 from ..core.spaces import profile_dir
 from ..core.messages import (
     AGENT_STATUS_IDLE,
@@ -1514,8 +1515,18 @@ async def run_turn(
     # 只有用户真的说了话才兜"记下了" ✓ —— 空闲唤醒是闲聊，不该冒出回执。
     user_triggered = any((m.get("sender_type") or "") == "user" for m in pending)
 
+    # ★★ 空闲轮里没有"最近一批消息" ✗→✓（2026-10-21）★★
+    #   原来这里不看轮次，一律写「以下是群里最近的一批消息」——可空闲唤醒的
+    #   pending 只有系统唤醒语，一条用户消息都没有 ✓。二狗那次就是被这句话
+    #   诱导，自己续出了一条「用户说中午吃面 14.21」✓。标题得如实说。
+    idle = is_idle_turn(group_id)
+    header = (
+        "本轮**没有**新的群消息；下面这段是系统的唤醒语，不是谁说的话：\n\n"
+        if idle else
+        "以下是群里最近的一批消息（按时间顺序）：\n\n"
+    )
     text_part = (
-        f"以下是群里最近的一批消息（按时间顺序）：\n\n{prompt}\n\n"
+        f"{header}{prompt}\n\n"
         f"{_now_stamp()}\n\n"
         f"你是「{agent_name}」。{_turn_instruction(must_speak, stale=stale)}"
     )
@@ -1646,6 +1657,19 @@ async def run_turn(
                      group_id, done)
             text = done
 
+    # ★★ 空闲轮里**写操作被挡过** → 这一轮说的话整条丢弃 ✗→✓（2026-10-21）★★
+    #
+    #   二狗那次：空闲轮里自己编了「用户说中午吃面 14.21」，record_add 被
+    #   `_idle_write_block` 挡住（**账本没脏**），但它接着把「14.21 那笔我没记进去」
+    #   发进了群——闸门只挡写库，不挡它嘴里说的。而空闲轮里任何关于"某笔账"的话，
+    #   只要写被挡过，就必然对应一个没发生过的请求。
+    #   这一轮的 pending 只有系统唤醒语，丢弃正文不会丢任何用户的话 ✓。
+    if idle and idle_write_blocked(group_id):
+        log.warning(
+            "group=%s 空闲轮里有写操作被挡（多半是编的），正文整条丢弃：%r",
+            group_id, text[:80])
+        text = ""
+
     silent = (not text) or text.lower().strip("。.!！") in _SILENT_MARKERS
 
     # 被点名了还沉默，多半是模型偷懒，不是真的无话可说——这种情况重试一次。
@@ -1761,6 +1785,16 @@ async def run_turn(
                 text = revised
         # 复审失败时**不消费**——那批消息没被处理过，留着让它们自己触发，
         # 总比悄悄吞掉强（"它不理我了"就是这么来的）。
+
+    # ★ 复审那一步也能调工具 ✓ —— 若它在复审里又试了写并被挡，同样不发 ✗→✓。
+    #   上面那道检查在复审之前；这里定稿前再看一眼，堵住复审这一步。
+    if idle and idle_write_blocked(group_id):
+        log.warning(
+            "group=%s 空闲轮里写操作被挡过（含复审），定稿整条丢弃：%r",
+            group_id, text[:80])
+        await agent_stream(group_id, delta="", done=True)
+        await _silent_status_then_revert(group_id)
+        return
 
     # 分条 + 引用，都在**所有改写定稿之后**、落库之前处理。
     # 放在这里而不是更早：复审可能把整段重写，标记也会跟着变。

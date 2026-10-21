@@ -51,17 +51,38 @@ _next_at: dict[int, float] = {}
 # **能改坏的写操作由代码挡，不靠模型自觉**。
 _idle_turns: set[int] = set()
 
+# group_id -> 本轮空闲唤醒里，有没有**写操作被挡过**。
+#
+# 2026-10-21 二狗凭空说「14.21 那笔我没记进去」：空闲轮里它先编了一条不存在的
+# 用户消息，再去 record_add，被 `_idle_write_block` 挡住——**账本没脏**，
+# 但它随即把"没记进去"说给了群里。闸门只挡了写库，没挡它嘴里的话。
+# 所以本轮只要发生过被挡的写，整条正文都不发（判定在 agent/agent.py）。
+_idle_write_blocked: set[int] = set()
+
 
 def set_idle_turn(group_id: int, on: bool) -> None:
     """由编排层在空闲轮开始/结束时调用（见 app/agent/__init__.py）。"""
     if on:
         _idle_turns.add(group_id)
+        _idle_write_blocked.discard(group_id)   # 新的一轮，重新计
     else:
         _idle_turns.discard(group_id)
+        _idle_write_blocked.discard(group_id)
 
 
 def is_idle_turn(group_id: int) -> bool:
     return group_id in _idle_turns
+
+
+def note_idle_write_blocked(group_id: int) -> None:
+    """空闲轮里挡下一次写操作时调用（见 api/internal.py）。"""
+    if group_id in _idle_turns:
+        _idle_write_blocked.add(group_id)
+
+
+def idle_write_blocked(group_id: int) -> bool:
+    """这一轮空闲唤醒里，有没有写操作被挡过。"""
+    return group_id in _idle_write_blocked
 
 POLL_SECONDS = 120          # 每两分钟看一眼就够，这不是个精确的东西
 
@@ -97,6 +118,8 @@ async def _wake(group_id: int) -> None:
             "你可以说点什么，也可以不说。想说的话没有范围——"
             "接着最近聊过的事说、突然想到的、或者纯粹一句玩梗都行。\n"
             "凭你现在的感觉来。**没什么想说的就回 [SILENT]**，不用为了说话而说话。\n"
+            "⚠️ 这一轮**没有任何新消息**，也没有人叫你：不要编造、"
+            "不要引用不存在的用户发言。\n"
             "⚠️ 这一轮只是闲聊：旧消息里的事**都已经处理过**了，"
             "别补记账、别补设提醒、别补删东西。"
         ),
