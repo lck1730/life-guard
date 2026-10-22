@@ -1104,6 +1104,13 @@ async def _stream_completion(
                         yield piece
 
 
+# 输出里的两个字面标记（和 `[SILENT]` 同源，见 `_split_parts` / `_extract_quote`）。
+# `re.M` 让 `[分条]` 必须**独占一行**；抬头/结尾的空白不算数。
+_SPLIT_RE = re.compile(r"^\s*[\[【]\s*分条\s*[\]】]\s*$", re.M)
+_QUOTE_RE = re.compile(r"^\s*[\[【]\s*引用\s*#(\d+)\s*[\]】]\s*")
+_MAX_PARTS = 3
+
+
 def _split_parts(text: str) -> list[str]:
     parts = [p.strip() for p in _SPLIT_RE.split(text)]
     parts = [p for p in parts if p]
