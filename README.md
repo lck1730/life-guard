@@ -1,6 +1,6 @@
 # 生活管家（life-guard）
 
-「生活管家」的**全部代码**（服务端 + 安卓壳）。运行在 `62.234.43.125`，
+「生活管家」的**全部代码**（服务端 + 安卓壳）。
 仓库就放在运行目录 `/opt/lifeguard-chat`，**以服务器上的这份为唯一权威**，
 通过服务器上的定时任务推送到 GitHub。
 
@@ -17,7 +17,7 @@
 ## 跑在哪
 
 - `lifeguard-chat.service` —— 127.0.0.1:8730
-- `lifeguard-chat-forward.service` —— 经 WireGuard 转发到 10.66.66.1:8730
+- `lifeguard-chat-forward.service` —— 把 8730 转发到私有网络
 - `hermes-gateway.service` —— 127.0.0.1:8642
 
 ## 不在这个仓库里
