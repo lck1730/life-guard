@@ -11,11 +11,13 @@
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import os
 import time
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -62,6 +64,100 @@ async def get_status() -> dict:
             "count": len(d["configs"])}
 
 
+# ── 问供应商"有哪些模型" / 单测一个 ─────────────────────────────────────
+#
+# ★ 2026-10-22 加的（用户：设置页做成和「远程CC」一样，模型名列表也一致）。
+#   两个接口都**先认存着的那一套**，再认传上来的值 —— 界面上 key 是掩码，
+#   原样传回来只会传来一串圆点，拿它去问必然问不动。所以 `cid` 在的时候，
+#   缺的字段一律回落到存着的那份。
+
+class AvailIn(BaseModel):
+    cid: str = ""
+    base_url: str = ""
+    api_key: str = ""
+
+
+class PingIn(BaseModel):
+    cid: str = ""
+    base_url: str = ""
+    api_key: str = ""
+    model: str = ""
+
+
+def _fetch_model_list(base_url: str, api_key: str) -> list[dict]:
+    """问上游 `GET {base_url}/models` —— **照抄，别猜**。
+
+    ⚠️ 这里的 `base_url` 是 **OpenAI 那套**（带 `/v1`，见 `probe._call` 里拼的
+       `/chat/completions`）—— 所以这里只接 `/models`，别再加 `/v1`。
+       （「远程CC」那边是 Anthropic 协议、base 不带 `/v1` —— 两边不同，别照抄那一行。）
+    ★ 只留**支持工具调用**的：生活管家干活全靠工具，一个不调工具的模型放进来，
+      症状是「它答应了但什么都没干」—— 比报错难查。
+    ⚠️ 问不到就回空表，**不抛** —— 这只是锦上添花，不该把编辑页搞失败。
+    """
+    if not (base_url and api_key):
+        return []
+    try:
+        r = httpx.get(base_url.rstrip("/") + "/models", timeout=12,
+                      headers={"Authorization": f"Bearer {api_key}",
+                               "Accept": "application/json"})
+        if r.status_code >= 400:
+            log.info("问模型列表：HTTP %s", r.status_code)
+            return []
+        data = r.json()
+    except Exception as e:  # noqa: BLE001
+        log.info("问不到模型列表：%s", e)
+        return []
+
+    out = []
+    for m in (data.get("data") or []):
+        if not isinstance(m, dict) or not m.get("id"):
+            continue
+        feats = m.get("supported_features") or []
+        if feats and "tools" not in feats:
+            continue
+        try:
+            ctx = int(m.get("context_length") or 0)
+        except (TypeError, ValueError):
+            ctx = 0
+        out.append({"id": str(m["id"]), "context": ctx})
+    out.sort(key=lambda x: (-x["context"], x["id"]))
+    return out
+
+
+def _resolve(body) -> tuple[dict, str, str]:
+    """`(存着的那套, base_url, api_key)` —— 空的一律回落到存着的那份。"""
+    d = store.load()
+    ent = next((x for x in d["configs"] if x["id"] == body.cid), {}) if body.cid else {}
+    base = (body.base_url or "").strip() or str(ent.get("base_url") or "")
+    key = (body.api_key or "").strip() or str(ent.get("api_key") or "")
+    return ent, base.rstrip("/"), key
+
+
+@router.post("/available", dependencies=[Depends(require_admin)])
+async def available(body: AvailIn) -> dict:
+    """这一套方案下，那个端点**有哪些模型能选** —— 给下拉用。"""
+    _, base, key = _resolve(body)
+    rows = await asyncio.to_thread(_fetch_model_list, base, key)
+    return {"ok": True, "list": rows}
+
+
+@router.post("/ping", dependencies=[Depends(require_admin)])
+async def ping(body: PingIn) -> dict:
+    """**测某一个模型名** —— 下拉里每一行那颗「测」用的。
+
+    结果**不落盘**：落盘的是前端那份清单（用户按「保存」时整份交上来）——
+    和「远程CC」一个规矩：测了不等于存了，存了才记得住。
+    """
+    ent, base, key = _resolve(body)
+    model = (body.model or "").strip()
+    if not model:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "得有个模型名")
+    cfg = {**ent, "base_url": base, "api_key": key, "model": model,
+           "name": ent.get("name") or "这一套"}
+    res = await asyncio.to_thread(probe.ping, cfg, model)
+    return {"ok": bool(res.get("ok")), "message": res.get("message") or ""}
+
+
 # ── 写 ────────────────────────────────────────────────────────────────
 
 class ConfigIn(BaseModel):
@@ -69,6 +165,58 @@ class ConfigIn(BaseModel):
     base_url: str = ""
     model: str = ""
     api_key: str = ""
+    # ★ 2026-10-22（设置页学「远程CC」）：
+    #   `context` = 这个模型窗口多大（空 = 不改 / 不填）；
+    #   `models`  = 下拉里那份**他自己维护的模型名清单**（带每个名字的测试结果）。
+    context: str = ""
+    models: list[dict] | None = None
+
+
+def _ctx(v: str) -> str:
+    """上下文长度只收数字（空串 = 不填 / 不改）。"""
+    t = (v or "").strip()
+    if not t:
+        return ""
+    if not t.isdigit():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "上下文长度得是个正整数")
+    return t
+
+
+def _rows(inp: list[dict] | None) -> list[dict]:
+    """把前端交上来的模型名清单**洗一遍**再落盘。
+
+    ⚠️ 这份清单也算外部输入 —— 只收认识的那几个字段，名字去重，长度封顶。
+    """
+    out: list[dict] = []
+    seen: set[str] = set()
+    for r in inp or []:
+        if not isinstance(r, dict):
+            continue
+        mid = str(r.get("id") or "").strip()
+        if not mid or mid in seen:
+            continue
+        seen.add(mid)
+        try:
+            ctx = int(r.get("ctx") or 0)
+        except (TypeError, ValueError):
+            ctx = 0
+        ok = r.get("ok")
+        out.append({"id": mid[:200], "ctx": ctx,
+                    "ok": ok if isinstance(ok, bool) else None,
+                    "at": float(r.get("at") or 0),
+                    "msg": str(r.get("msg") or "")[:300]})
+        if len(out) >= 50:
+            break
+    return out
+
+
+def _with_current(cfg: dict) -> list[dict]:
+    """当前在用的那个模型名必须在清单里 —— 不然下拉里看不见它。"""
+    rows = cfg.get("models") or []
+    if cfg.get("model") and not any(r.get("id") == cfg["model"] for r in rows):
+        rows = [{"id": cfg["model"], "ctx": int(cfg.get("context") or 0),
+                 "ok": None, "at": 0, "msg": ""}] + rows
+    return rows
 
 
 @router.post("/configs", dependencies=[Depends(require_admin)], status_code=201)
@@ -78,9 +226,12 @@ async def create_config(body: ConfigIn) -> dict:
            "base_url": (body.base_url or "").strip().rstrip("/"),
            "model": (body.model or "").strip(),
            "api_key": (body.api_key or "").strip(),
+           "context": _ctx(body.context),
+           "models": _rows(body.models),
            "test": None}
     if not all([cfg["name"], cfg["base_url"], cfg["model"], cfg["api_key"]]):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "四项都要填")
+    cfg["models"] = _with_current(cfg)
     d = store.load()
     d["configs"].append(cfg)
     store.save(d)
@@ -102,6 +253,12 @@ async def edit_config(cid: str, body: ConfigIn) -> dict:
         v = getattr(body, k)
         if v:
             c[k] = v.strip().rstrip("/") if k == "base_url" else v.strip()
+    ctx = _ctx(body.context)
+    if ctx:
+        c["context"] = ctx
+    if body.models is not None:
+        c["models"] = _rows(body.models)
+    c["models"] = _with_current(c)
     c["test"] = None          # 改过就得重测 ✓（旧结论不作数 ✓）
     store.save(d)
     return {"ok": True}

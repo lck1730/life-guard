@@ -170,9 +170,18 @@ def public_view(data: dict) -> dict:
         **掩码串就被当成新 key 存进去了** → key 当场废掉 ✗（用户实测撞到 ✓）
     所以只回"有没有配"和**末 4 位**（够确认是哪把 ✓），**不回可直接提交的值** ✗。
     """
+    # ★ 2026-10-22：每套多回 `context`（窗口多大）和 `models`（模型名清单）——
+    #   界面学「远程CC」：一行一套，模型名后面显示 `模型 · 256K`。
+    #   ⚠️ 老池子里没存过 context（它原来只住在 profile 里）→ 回 profile 那边
+    #     **当前生效**的数（是事实，不是猜的；见 `context_state`）。
+    ctx = context_state()
+    chat_now = (ctx.get("groups") or {}).get("chat") or {}
+    eff = next(iter(chat_now.values()), 0)
     out = []
     for c in data["configs"]:
         k = c.get("api_key") or ""
         out.append({**c, "api_key": "", "has_key": bool(k),
-                    "key_tail": k[-4:] if len(k) > 8 else ""})
-    return {"configs": out, "roles": role_names(data), "context": context_state()}
+                    "key_tail": k[-4:] if len(k) > 8 else "",
+                    "context": str(c.get("context") or eff or ""),
+                    "models": c.get("models") if isinstance(c.get("models"), list) else []})
+    return {"configs": out, "roles": role_names(data), "context": ctx}

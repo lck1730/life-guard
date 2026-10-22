@@ -84,6 +84,34 @@ def _call(cfg: dict, *, with_tools: bool) -> dict:
                 "error": f"{type(e).__name__}: {e}"}
 
 
+def ping(cfg: dict, model: str) -> dict:
+    """单个模型名，快速测一下 —— 设置页下拉里每一行右边那颗「测」用的。
+
+    ★ 2026-10-22 加的（学「远程CC」的设置页）。
+    - `test_config` 测的是**一整套方案**（要连测 3 次工具调用、十几秒）；
+    - 这里测的是**这一套方案下的某一个模型名**（两次请求：连通 + 带工具），
+      目标是快速给个 ✓/✗，不是统计命中率。
+
+    ⚠️ **判的是"能不能调工具"，不是"能不能回话"** ——
+       生活管家干活全靠工具；能聊天却不调工具的模型，症状是
+       「它答应了但什么都没干」，比报错更难查。所以「没调工具」如实算 ✗。
+    """
+    c = {**cfg, "model": model}
+    nm = c.get("name") or "这一套"
+    _say(f"正在测「{nm}」· {model}：连不连得上…")
+    a = _call(c, with_tools=False)
+    if not a.get("ok"):
+        return {"ok": False, "message": f"连不上：{(a.get('error') or '')[:90]}"}
+
+    _say(f"正在测「{nm}」· {model}：能不能调工具…")
+    r = _call(c, with_tools=True)
+    if not r.get("ok"):
+        return {"ok": False, "message": f"连上了，但带工具那一发失败：{(r.get('error') or '')[:90]}"}
+    if r.get("tools"):
+        return {"ok": True, "message": "通 ✓ 调工具"}
+    return {"ok": False, "message": "通，但**没调工具**（回了文字）—— 干活会哑"}
+
+
 def test_config(cfg: dict) -> dict:
     """跑一遍两档测试。**同步阻塞几秒到十几秒** ✓（界面靠 `progress` 轮询给反馈 ✓）。"""
     nm = cfg.get("name") or "这套"

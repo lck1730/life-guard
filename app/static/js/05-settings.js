@@ -1,51 +1,43 @@
-  // ── 模型池（2026-10-11 从独立的「模型服务」并进来）────────────────────
+  // ── 模型（2026-10-11 从独立的「模型服务」并进来；2026-10-22 改成「远程CC」那一版）
   //
-  // 原来整套（池子 / 三个用途槽 / 上下文长度）住在 8722 那个独立网页里 ✓，
-  // 现在搬进这个 App 的一屏 ✓ —— **管理员专属** ✓。
+  // 用户 2026-10-22：设置页做成和「远程CC」一样；只保留商汤；模型名列表一致。
+  //   · 一行 = 一套方案；点一行换过去（后端 role="model" 一次写 chat+aux）
+  //   · 编辑板子里模型是一个下拉；每个名字能单独测；上下文跟着方案走
+  //   · 没有常驻提示文字（用户明确要求去掉「点一行换过去…」）
   //
-  // ⚠️ 这一屏**只由「设置 → 模型」那一行进** ✓（那一行按 `me.is_admin` 显示 ✓）。
-  //    **藏入口只是体验** ✓，闸门在服务端（`/api/models/*` 的 `require_admin` ✓）。
-  //    所以这里**每一处都假设自己可能拿到 403** ✓ → 如实报出来 ✓，
-  //    别装作"池子是空的" ✗（那会让人以为模型丢了 ✓）。
-  let MODELS = null;                 // 最近一次读到的池子
-  // ★ 2026-10-22：只选**一个**模型 ✓ —— 聊天和压缩共用 ✓。
-  //   后端还留着 `chat`/`aux` 两个槽（Hermes 那侧要用 ✓），选一次两个一起写 ✓。
-  //   旧配置只写了其中一个也不会哑：`store.pick()` 会互为兜底 ✓。
-  const M_LABEL = { model: '模型（聊天和压缩共用）' };
+  // ⚠️ 这一屏只由「设置 → 模型」进入；闸门在服务端 require_admin。
+  let MODELS = null;
 
   const openModels = () => { pushScreen('models', 'settings'); renderModels(); };
 
-  const mSec = (t) => mkel('div', 'msec', t);
   const mHint = (t, bad) => mkel('div', 'mhint' + (bad ? ' bad' : ''), t);
   const mBtn = (t, cls, fn) => { const b = mkel('button', 'mbtn' + (cls ? ' ' + cls : ''), t); b.onclick = fn; return b; };
 
-  // ★ 2026-10-12 极客风：动作按钮只要 SVG 图标 ✓（字挪进 aria-label / title ✓）。
-  //   线条图标，stroke=currentColor —— 颜色跟着按钮类走（删 = danger 红 ✓）。
-  const M_ICON = {
-    test: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 12 7 12 10 5 14 19 17 12 22 12"/></svg>',
-    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
-    del:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
-    chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 5 16 12 9 19"/></svg>',
-  };
-  const mSvg = (name) => { const s = mkel('span', 'chev'); s.innerHTML = M_ICON[name]; return s; };
-  const mIconBtn = (icon, label, cls, fn) => {
-    const b = mkel('button', 'mbtn icon' + (cls ? ' ' + cls : ''));
-    b.innerHTML = M_ICON[icon];
-    b.setAttribute('aria-label', label); b.title = label;
-    b.onclick = fn;
-    return b;
+  /** 262144 → 256K / 1048576 → 1M */
+  const fmtCtx = (n) => {
+    const v = parseInt(n || '0', 10);
+    if (!v) return '';
+    return v >= 1048576 ? (v / 1048576).toFixed(v % 1048576 ? 1 : 0) + 'M'
+                        : Math.round(v / 1024) + 'K';
   };
 
-  // 状态点：没测过 / 通 / 不稳 / 不通 —— **和原来那个界面同一套口径** ✓
-  // `tag` = 右上角那块 ASCII 状态牌 ✓（[OK] / [!!] / [ERR] / [??] ✓）
-  const mStateOf = (c) => {
-    if (!c.test) return { cls: '', tag: '[??]', text: '还没测过' };
-    const t = c.test;
-    if (!t.ok) return { cls: 'bad', tag: '[ERR]', text: '不通 · ' + (t.error || '').slice(0, 42) };
-    const ms = t.connect_ms ? ' · ' + t.connect_ms + 'ms' : '';
-    if (t.tools) return { cls: 'ok', tag: '[OK]', text: '通 ✓ 调工具 ' + (t.tools_hits || '') + ms };
-    if (t.tools_any) return { cls: 'warn', tag: '[!!]', text: '调工具不稳 ' + (t.tools_hits || '') + ms };
-    return { cls: 'warn', tag: '[!!]', text: '调不了工具 ' + (t.tools_hits || '') + ms };
+  /** 铅笔（feather edit-2）—— 和远程CC 那颗同一个形状 */
+  const mPencil = () => {
+    const s = mkel('span');
+    s.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
+    return s;
+  };
+
+  /** 哪一套在用：chat 槽（换的时候两个槽一起写） */
+  const activeId = (d) => ((((d || MODELS || {}).roles || {}).chat || {}).id) || '';
+
+  /** 换过去后把窗口大小也排一次队（profile 归 root，只能排队） */
+  const queueCtx = async (v) => {
+    const n = parseInt(v || '0', 10);
+    if (!n) return;
+    try {
+      await api('/models/context', { method: 'POST', body: JSON.stringify({ group: 'chat', tokens: n }) });
+    } catch (e) { toast('模型换了，但上下文没排上队'); }
   };
 
   const renderModels = async () => {
@@ -62,192 +54,244 @@
     }
     const d = MODELS;
     body.textContent = '';
-
-    // ① 模型：只有一行 ✓ —— 聊天和压缩共用 ✓（点它挑一个 ✓）
-    body.appendChild(mSec('模型'));
-    {
-      const r = (d.roles || {});
-      const cur = (r.chat && r.chat.name ? r.chat : (r.aux || {}));
-      const row = mkel('div', 'mitem');
-      row.appendChild(mkel('span', 'k', M_LABEL.model));
-      row.appendChild(mkel('span', 'v' + (cur.name ? '' : ' empty'), cur.name || '还没选'));
-      row.appendChild(mSvg('chev'));
-      row.onclick = () => pickRole('model');
-      body.appendChild(row);
+    const on = activeId(d);
+    if (!d.configs.length) {
+      body.appendChild(mHint('还没有模型。点右上角「＋」加一套。'));
+      return;
     }
-
-    // ② 模型池
-    body.appendChild(mSec('模型池'));
-    if (!d.configs.length) body.appendChild(mHint('池子是空的 —— 点右上角加一个。'));
-    d.configs.forEach(c => body.appendChild(mCard(c)));
-
-    // ③ 上下文长度
-    body.appendChild(mSec('上下文长度'));
-    body.appendChild(mCtx(d.context));
-
-    body.appendChild(mHint('聊天、压缩、起标题都走这一个模型；没选就没法说话。'
-                           + '下面单独设上下文长度。'));
+    d.configs.forEach(c => body.appendChild(mRow(c, c.id === on)));
   };
 
-  const mCard = (c) => {
-    const box = mkel('div', 'mcard');
-    const top = mkel('div', 'top');
-    const st = mStateOf(c);
-    top.appendChild(mkel('span', 'mdot ' + st.cls));
-    top.appendChild(mkel('span', 'nm', c.name || '(没名字)'));
-    top.appendChild(mkel('span', 'mtag ' + st.cls, st.tag));
-    box.appendChild(top);
-    box.appendChild(mkel('div', 'meta', (c.model || '') + ' @ ' + (c.base_url || '')));
-    box.appendChild(mkel('div', 'meta', st.text + (c.has_key ? ' · key:…' + (c.key_tail || '') : ' · key:未填')));
-    const acts = mkel('div', 'acts');
-    acts.appendChild(mIconBtn('test', '测一下', '', () => testModel(c.id)));
-    acts.appendChild(mIconBtn('edit', '改', '', () => editForm(c)));
-    acts.appendChild(mIconBtn('del', '删', 'danger', () => delModel(c)));
-    box.appendChild(acts);
-    return box;
+  /** 一套方案 = 一行；整行可点，右边一颗铅笔 */
+  const mRow = (c, on) => {
+    const row = mkel('div', 'mrow' + (on ? ' on' : ''));
+    row.appendChild(mkel('span', 'mk', on ? '●' : '○'));
+    const mid = mkel('div', 'mid');
+    mid.appendChild(mkel('div', 'nm', c.name || '(没名字)'));
+    const sub = [c.model, fmtCtx(c.context)].filter(Boolean).join(' · ');
+    mid.appendChild(mkel('div', 'sub', sub || '（没填模型）'));
+    row.appendChild(mid);
+    const ed = mkel('button', 'edit');
+    ed.setAttribute('aria-label', '改');
+    ed.appendChild(mPencil());
+    ed.onclick = (ev) => { ev.stopPropagation(); editForm(c); };
+    row.appendChild(ed);
+    row.onclick = on ? null : () => switchTo(c);
+    return row;
   };
 
-  // 挑模型 —— 一张底部弹层 ✓（测过通的排前面 ✓）
-  const pickRole = (role) => {
-    const d = MODELS || { configs: [] };
-    const panel = $('#sheetPanel');
-    panel.textContent = '';
-    panel.appendChild(mkel('div', 'msec', M_LABEL[role]));
-    const sorted = d.configs.slice().sort((a, b) =>
-      ((b.test && b.test.ok) ? 1 : 0) - ((a.test && a.test.ok) ? 1 : 0));
-    sorted.forEach(c => {
-      const row = mkel('div', 'mitem');
-      row.appendChild(mkel('span', 'k', c.name || '(没名字)'));
-      const st = mStateOf(c);
-      row.appendChild(mkel('span', 'mdot ' + st.cls));
-      row.onclick = async () => {
-        try { await api('/models/roles', { method: 'POST', body: JSON.stringify({ role, id: c.id }) }); }
-        catch (e) { closeSheet(); toast((e && e.message) || '没选上'); return; }
-        closeSheet(); renderModels();
-      };
-      panel.appendChild(row);
-    });
-    const none = mkel('div', 'mitem');
-    none.appendChild(mkel('span', 'k empty', '（不选模型）'));
-    none.onclick = async () => {
-      try { await api('/models/roles', { method: 'POST', body: JSON.stringify({ role, id: '' }) }); }
-      catch (e) { closeSheet(); toast((e && e.message) || '没改成'); return; }
-      closeSheet(); renderModels();
-    };
-    panel.appendChild(none);
-    openSheet();
+  const switchTo = async (c) => {
+    let r;
+    try {
+      r = await api('/models/roles', { method: 'POST', body: JSON.stringify({ role: 'model', id: c.id }) });
+    } catch (e) { toast((e && e.message) || '换不了'); return; }
+    await queueCtx(c.context);
+    toast('换成「' + ((r && r.roles && r.roles.chat && r.roles.chat.name) || c.name) + '」，下一句话生效');
+    renderModels();
   };
 
-  // 新建 / 改一个模型 —— 同一张表单 ✓（**key 留空 = 不改** ✓，见后端那段说明 ✓）
+  // 新建 / 改一套 —— key 留空 = 不改
   const editForm = (c) => {
+    const isNew = !c;
     const panel = $('#sheetPanel');
     panel.textContent = '';
-    panel.appendChild(mkel('div', 'msec', c ? '改这一套' : '加一套'));
+    if (isNew) panel.appendChild(mkel('div', 'msec', '加一套模型'));
+
     const form = mkel('div', 'mform');
     const mk = (label, val, ph) => {
       form.appendChild(mkel('label', null, label));
       const i = mkel('input', 'field');
-      i.value = val || ''; i.placeholder = ph || '';
+      i.value = val || '';
+      i.placeholder = ph || '';
+      i.autocapitalize = 'off'; i.autocomplete = 'off'; i.spellcheck = false;
       form.appendChild(i);
       return i;
     };
-    const iName = mk('名字（自己认的）', c && c.name, '如：商汤');
-    const iUrl = mk('接口地址', c && c.base_url, 'https://…/v1');
-    const iModel = mk('模型名', c && c.model, '如：sensenova-6.8-flash-lite');
-    const iKey = mk('密钥' + (c ? '（留空 = 不改）' : ''), '', c ? '' : 'sk-…');
+    const iName = mk('名字', isNew ? '' : c.name, '如：商汤');
+    const iUrl = mk('接口地址', isNew ? '' : c.base_url, 'https://…/v1');
+    // 密钥用 text，绝不用 password（用户明确要求，安全键盘输入太累）
+    const iKey = mk('密钥' + (isNew ? '' : '（留空 = 不改）'), '',
+                    isNew ? 'sk-…' : (c.has_key ? '••••••' + (c.key_tail || '') : '（还没填）'));
+    iKey.type = 'text';
+    const iCtx = mk('上下文长度（留空 = 不改）', isNew ? '' : (c.context || ''), '如 262144');
+    iCtx.inputMode = 'numeric';
+
+    form.appendChild(mkel('label', null, '模型'));
+    const pick = mkel('div', 'mpick');
+    form.appendChild(pick);
+
+    const ST = { model: isNew ? '' : (c.model || '') };
+    const rows = (c && Array.isArray(c.models) ? c.models : []).map(x => ({ ...x }));
+    if (ST.model && !rows.some(r => r.id === ST.model)) {
+      rows.unshift({ id: ST.model, ctx: parseInt((c && c.context) || 0, 10) || 0,
+                     ok: null, at: 0, msg: '' });
+    }
+
     const acts = mkel('div', 'acts');
-    acts.appendChild(mBtn('取消', '', () => closeSheet()));
+    if (!isNew) {
+      acts.appendChild(mBtn('删除', 'danger', async () => {
+        const yes = await confirmBox({
+          title: '删掉「' + (c.name || '') + '」？',
+          body: '它的密钥只存在这儿，删了就找不回来了。', danger: true, ok: '删掉' });
+        if (!yes) return;
+        closeSheet();
+        try {
+          const r = await api('/models/configs/' + c.id, { method: 'DELETE' });
+          if (r && r.freed && r.freed.length) toast('删了 —— 现在没有模型可用了');
+          renderModels();
+        } catch (e) { toast((e && e.message) || '没删掉'); }
+      }));
+    }
     acts.appendChild(mBtn('保存', 'pri', async () => {
-      const payload = { name: iName.value.trim(), base_url: iUrl.value.trim(),
-                        model: iModel.value.trim(), api_key: iKey.value.trim() };
+      const payload = {
+        name: iName.value.trim(), base_url: iUrl.value.trim(),
+        api_key: iKey.value.trim(), model: ST.model,
+        context: iCtx.value.trim(), models: rows,
+      };
+      if (!payload.name) { toast('得有个名字'); return; }
+      if (!payload.model) { toast('选一个模型'); return; }
+      if (payload.context && !/^\d+$/.test(payload.context)) { toast('上下文长度得是数字'); return; }
       if (!c && !payload.api_key) { toast('新建要填密钥'); return; }
+      let saved;
       try {
-        if (c) await api('/models/configs/' + c.id, { method: 'PATCH', body: JSON.stringify(payload) });
-        else await api('/models/configs', { method: 'POST', body: JSON.stringify(payload) });
+        saved = c
+          ? await api('/models/configs/' + c.id, { method: 'PATCH', body: JSON.stringify(payload) })
+          : await api('/models/configs', { method: 'POST', body: JSON.stringify(payload) });
       } catch (e) { toast((e && e.message) || '没存上'); return; }
-      closeSheet(); renderModels();
+      closeSheet();
+      const id = c ? c.id : (saved && saved.id);
+      const wasActive = c ? (activeId() === c.id) : true;
+      if (!c && id) {
+        try { await api('/models/roles', { method: 'POST', body: JSON.stringify({ role: 'model', id }) }); }
+        catch (e) { /* 存上了就行 */ }
+      }
+      if (wasActive) await queueCtx(payload.context);
+      renderModels();
+      toast('存好了');
     }));
+    acts.appendChild(mBtn('取消', '', () => closeSheet()));
     form.appendChild(acts);
     panel.appendChild(form);
     openSheet();
+    // 不自动聚焦（不要一点开就弹键盘）
+    loadAvail(pick, { url: iUrl, key: iKey, ctx: iCtx }, c, rows, ST);
   };
 
-  const delModel = async (c) => {
-    const yes = await confirmBox({
-      title: '删掉「' + (c.name || '') + '」？',
-      body: '它的密钥只存在这儿，删了就找不回来了。', danger: true, ok: '删掉' });
-    if (!yes) return;
-    try {
-      const r = await api('/models/configs/' + c.id, { method: 'DELETE' });
-      if (r && r.freed && r.freed.length) toast('删了 —— 现在没有模型可用了');
-      renderModels();
-    } catch (e) { toast((e && e.message) || '没删掉'); }
-  };
+  /** 模型下拉：默认收着；点开才展开。已存过的方案先问一次供应商。 */
+  const loadAvail = async (box, inputs, c, rows, ST) => {
+    box.textContent = '';
+    const head = mkel('button', 'mpicktoggle');
+    head.type = 'button';
+    const body = mkel('div', 'mpickbody');
+    body.hidden = true;
+    head.onclick = () => { body.hidden = !body.hidden; head.classList.toggle('on', !body.hidden); };
+    box.appendChild(head);
+    box.appendChild(body);
 
-  // 测一套：**要好几秒** ✓ —— 轮询 `/progress` 把"现在在干什么"显示出来 ✓
-  //（不给反馈的话用户会以为卡死了 ✓，这是原来那个界面的教训 ✓）。
-  const testModel = async (cid) => {
-    const body = $('#modelsBody');
-    const line = mHint('正在测…');
-    let timer = null;
-    const stop = () => { if (timer) clearInterval(timer); timer = null; };
-    try {
-      timer = setInterval(async () => {
-        try {
-          const p = await api('/models/progress');
-          if (p && p.text) line.textContent = p.text;
-        } catch (e) { /* 轮询失败就算了 ✓，别打断测试 */ }
-      }, 600);
-      await api('/models/configs/' + cid + '/test', { method: 'POST' });
-    } catch (e) {
-      stop(); toast((e && e.message) || '测不了'); return;
-    }
-    stop();
-    line.remove();
-    renderModels();
-  };
+    const cur = () => (ST.model || '').trim();
 
-  // 上下文长度：**只知道排队了、不知道成没成** ✓ —— root 写完之后状态文件里才有 ✓。
-  // 所以这里点完要**轮询一会儿** ✓（原来那个界面就是这么干的 ✓）。
-  const mCtx = (ctx) => {
-    const box = mkel('div', 'mform');
-    const cur = ((ctx && ctx.groups && ctx.groups.chat) || {});
-    const vals = Object.keys(cur).map(k => cur[k]);
-    const now = vals.length ? Math.round(vals[0] / 1000) + 'k' : '还没同步过';
-    box.appendChild(mkel('label', null, '所有群共用（现在：' + now + '）'));
-    const i = mkel('input', 'field');
-    i.type = 'number'; i.min = '64'; i.max = '2000'; i.placeholder = '填 k，如 128';
-    box.appendChild(i);
-    const line = mHint(ctx && ctx.last && ctx.last.note
-      ? ('上次：' + (ctx.last.group || '') + ' → ' + Math.round((ctx.last.want || 0) / 1000)
-         + 'k，' + (ctx.last.ok ? '成了' : '没成') + (ctx.last.note ? '（' + ctx.last.note + '）' : ''))
-      : '');
-    const acts = mkel('div', 'acts');
-    acts.appendChild(mBtn('保存', 'pri', async () => {
-      const k = parseInt(i.value, 10);
-      if (!k || k < 64 || k > 2000) { toast('填 64 ~ 2000 之间的数（单位 k）'); return; }
-      try { await api('/models/context', { method: 'POST', body: JSON.stringify({ group: 'chat', tokens: k * 1000 }) }); }
-      catch (e) { toast((e && e.message) || '没排上队'); return; }
-      toast('排上队了，root 那边改完才生效');
-      // 轮询一会儿看它成没成（root 的 worker 是几秒量级 ✓）
-      for (let n = 0; n < 12; n++) {
-        await new Promise(r => setTimeout(r, 1500));
-        try {
-          const d = await api('/models/configs');
-          MODELS = d;
-          const last = d.context && d.context.last;
-          if (last && last.ok !== null && last.ok !== undefined) break;
-        } catch (e) { break; }
+    async function testRow(r) {
+      try {
+        const d = await api('/models/ping', { method: 'POST', body: JSON.stringify({
+          cid: (c && c.id) || '',
+          base_url: (inputs.url.value || '').trim(),
+          api_key: (inputs.key.value || '').trim(),
+          model: r.id,
+        }) });
+        r.ok = !!d.ok; r.at = Date.now() / 1000; r.msg = d.message || '';
+      } catch (e) {
+        r.ok = false; r.at = Date.now() / 1000; r.msg = (e && e.message) || '测不了';
       }
-      renderModels();
-    }));
-    box.appendChild(acts);
-    if (line.textContent) box.appendChild(line);
-    return box;
+      toast((r.ok ? '通了' : '不通') + ' · ' + r.id + (r.msg ? '（' + r.msg + '）' : ''));
+    }
+
+    function paint() {
+      head.textContent = '';
+      head.appendChild(mkel('span', 'cur', cur() || '选一个模型'));
+      head.appendChild(mkel('span', 'arr', '›'));
+      body.textContent = '';
+      rows.forEach(r => {
+        const row = mkel('div', 'mpickrow' + (r.id === cur() ? ' on' : ''));
+        const pk = mkel('button', 'mpk');
+        pk.type = 'button';
+        pk.appendChild(mkel('span', 'mpid', r.id));
+        if (r.ctx) pk.appendChild(mkel('span', 'mpctx', fmtCtx(r.ctx)));
+        pk.onclick = () => {
+          ST.model = r.id;
+          if (r.ctx) inputs.ctx.value = String(r.ctx);
+          paint();
+        };
+        row.appendChild(pk);
+
+        const tb = mkel('button', 'ptest' + (r.ok === true ? ' good' : r.ok === false ? ' bad' : ''),
+                        r.ok === true ? '✓' : r.ok === false ? '✗' : '测');
+        tb.type = 'button';
+        if (r.msg) tb.title = r.msg;
+        tb.onclick = async (ev) => {
+          ev.stopPropagation();
+          tb.disabled = true; tb.textContent = '…';
+          await testRow(r);
+          paint();
+        };
+        row.appendChild(tb);
+
+        const del = mkel('button', 'pdel', '×');
+        del.type = 'button';
+        del.onclick = (ev) => {
+          ev.stopPropagation();
+          const i = rows.indexOf(r);
+          if (i >= 0) rows.splice(i, 1);
+          if (ST.model === r.id) ST.model = '';
+          paint();
+        };
+        row.appendChild(del);
+        body.appendChild(row);
+      });
+
+      const add = mkel('div', 'padd');
+      const inp = mkel('input', 'field');
+      inp.placeholder = '加一个模型名…';
+      inp.autocomplete = 'off'; inp.spellcheck = false;
+      const ab = mkel('button', 'paddbtn', '＋');
+      ab.type = 'button';
+      const go = () => {
+        const v = (inp.value || '').trim();
+        if (!v) return;
+        if (!rows.some(x => x.id === v)) rows.push({ id: v, ctx: 0, ok: null, at: 0, msg: '' });
+        ST.model = v;   // 加完就选中它
+        inp.value = '';
+        paint();
+      };
+      ab.onclick = go;
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+      add.appendChild(inp);
+      add.appendChild(ab);
+      body.appendChild(add);
+    }
+
+    paint();
+
+    // 已存过、但没有清单 → 问一次供应商；之后就只认他自己那份（删掉的不会回来）
+    if (c && c.id && !(Array.isArray(c.models) && c.models.length)) {
+      try {
+        const d = await api('/models/available', { method: 'POST',
+                                                   body: JSON.stringify({ cid: c.id }) });
+        ((d && d.list) || []).forEach(x => {
+          const have = rows.find(r => r.id === x.id);
+          if (have) {
+            if (x.context) have.ctx = x.context;
+          } else {
+            rows.push({ id: x.id, ctx: x.context || 0, ok: null, at: 0, msg: '' });
+          }
+        });
+        paint();
+      } catch (e) { /* 问不到就算了，手填也能用 */ }
+    }
   };
 
   $('#modelsBack').onclick = () => popScreen('models');
   $('#modelsAdd').onclick = () => editForm(null);
+
 
   // ── 聊天背景（2026-10-19）───────────────────────────────────────────
   //
