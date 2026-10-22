@@ -28,10 +28,17 @@
     return s;
   };
 
-  /** 测一下（脉冲线）—— 之前模型页那颗，和远程CC 保持同一个形状 */
-  const mTestIcon = () => {
+  /** 测试按钮：未测=脉冲，通过=对号，失败=叉号；和远程CC 同一个形状 */
+  const mTestIcon = (ok) => {
     const s = mkel('span');
-    s.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 12 7 12 10 5 14 19 17 12 22 12"/></svg>';
+    const head = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';
+    if (ok === true) {
+      s.innerHTML = head + '<polyline points="20 6 9 17 4 12"/></svg>';
+    } else if (ok === false) {
+      s.innerHTML = head + '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    } else {
+      s.innerHTML = head + '<polyline points="2 12 7 12 10 5 14 19 17 12 22 12"/></svg>';
+    }
     return s;
   };
 
@@ -233,7 +240,7 @@
         const tb = mkel('button', 'ptest' + (r.ok === true ? ' good' : r.ok === false ? ' bad' : ''));
         tb.type = 'button';
         tb.setAttribute('aria-label', '测一下');
-        tb.appendChild(mTestIcon());
+        tb.appendChild(mTestIcon(r.ok));
         if (r.msg) tb.title = r.msg;
         tb.onclick = async (ev) => {
           ev.stopPropagation();
