@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider 的可见目录。
+
+     拍照必须走 FileProvider：Android 7+ 不允许把 file:// URI 交给别的 App，
+     必须换成 content:// 并显式授权。少了这层，相机 App 拿不到写入位置。 -->
+<paths>
+    <cache-path name="cam" path="cam/" />
+    <cache-path name="voice" path="voice/" />
+    <!-- 应用内更新：下载好的 APK 放在私有目录，再由 FileProvider 交给系统安装器。
+         Android 7+ 不许把 file:// 给别的 App，必须走 content:// + 显式授权。 -->
+    <files-path name="update" path="update/" />
+</paths>

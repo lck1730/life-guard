@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  目前后端是明文 HTTP（还没有 TLS），所以必须显式允许 cleartext，
+  否则 Android 9+ 会直接拒绝连接。
+
+  这里**只对局域网和保留地址开洞**，公网域名仍强制 HTTPS——
+  等 Phase 2 给服务器上了 Let's Encrypt 证书，就把这段整个删掉。
+
+  本机联调时，手机连的是开发机在局域网里的地址（隧道绑到 0.0.0.0）。
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>      <!-- Android 模拟器里的宿主机 -->
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+
+    <!-- 局域网地址段用一个宽松的 base-config 兜住，避免每换一次 IP 都要改这里 -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
