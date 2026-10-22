@@ -174,6 +174,30 @@ async def _silent_status_then_revert(group_id: int, duration: float = SILENT_DIS
 # 那套需要 reply_expected=False，API Server 不会设置）。
 _SILENT_MARKERS = {"[silent]", "silent", "no_reply", "[静默]", "静默", "[沉默]", "沉默"}
 
+# ★ 空闲轮里它有时**不输出 [SILENT]，而是吐一个"状态词"** ✗→✓（2026-10-22 用户报的：
+#   「有时候改发个（已回复），这有点抽象」）。
+#   实测消息 584「（已回复）」、593「[已回复]」——都是没人说话的空闲轮 ✓。
+#   这些词对群里的人来说就是一条没头没脑的气泡，语义上等于"不想说" ✓，
+#   所以**空闲轮里见到它们就按沉默处理**（见 run_turn 里那道判断）✓。
+_META_ONLY_MARKERS = {
+    "已回复", "已回应", "已答复", "已处理", "已读",
+    "无需回复", "不用回复", "不必回复", "不需要回复", "无需回应", "无需回答",
+    "无回复", "无回应", "无内容", "没有内容", "无话可说",
+    "没什么要说的", "没什么想说的", "没有想说的", "没事", "无", "略", "同上",
+    "nothing", "no reply", "none", "silent",
+}
+
+
+def _is_meta_only(text: str) -> bool:
+    """整条正文只是个"状态词"（括号、句末标点都不算内容）。"""
+    t = (text or "").strip().lower()
+    prev = None
+    while t and t != prev:
+        prev = t
+        t = t.strip(" \t\r\n。.!！?？~～…,，:：;；")
+        t = t.strip("()（）[]【】「」『』<>《》\"'“”‘’")
+    return t in _META_ONLY_MARKERS
+
 # ★ 模型偶尔**只输出"思考"就收工**——那一轮它把工具调用写成了文本，
 # 然后 stop。Hermes 日志里叫 `Reasoning-only clean stop`。
 #
@@ -896,7 +920,8 @@ def _render_transcript(messages: list[dict[str, Any]], agent_name: str) -> str:
     return "\n".join(lines)
 
 
-def _turn_instruction(must_speak: bool, *, stale: bool = False) -> str:
+def _turn_instruction(must_speak: bool, *, stale: bool = False,
+                      idle: bool = False) -> str:
     """本轮的行动指令。
 
     **这里不再规定"该不该说"了。** 那件事整个交给了它自己——规则写在
@@ -912,6 +937,21 @@ def _turn_instruction(must_speak: bool, *, stale: bool = False) -> str:
     实测就是"同一件事回两遍，第二遍还很呆"。它看不见自己"刚说过"这件事，
     因为那不在本轮 prompt 里；Hermes 的会话历史虽然带着，但它不会主动去比对时间序。
     """
+    if idle:
+        # ★ 空闲轮是**闲聊**，不是"回应谁" ✗→✓（2026-10-22 用户报的：
+        #   「它会幻想不存在的东西然后问我们」——18:52 那次凭空冒出一句
+        #   「记什么？没看到金额和类别」，前一小时根本没人让它记账 ✓）。
+        #   光说"别编造"不够：**没有素材**的时候模型就会自己续剧情 ✓。
+        #   所以 run_turn 会把**真实聊天记录**一起给它 ✓，这里再收紧用法 ✓。
+        return (
+            "这一轮是**你自己想开口**，不是回应谁——没有新消息，"
+            "也没有人在等你回答。\n"
+            "只就上面**真实聊过**的事随口接一句（最多两句），"
+            "像群里的人插一句话那样。\n"
+            "不要开新话题；不要提记录里没有的人、事、数字；"
+            "不要假装有人刚问过你什么、让你记账或等你确认。\n"
+            "没什么想说的就回 [SILENT]。"
+        )
     if must_speak:
         # 被点名就照旧必须回应：用户是明确在叫它，哪怕消息是排队下来的，
         # 也该给个交代，而不是拿 [SILENT] 挡回去。
@@ -1488,6 +1528,47 @@ async def _has_stale_messages(group_id: int, pending: list[dict[str, Any]]) -> b
     return any(int(m["created_at"]) < last_reply for m in pending if m.get("created_at"))
 
 
+#: 空闲轮带多少条真实聊天当素材。20 条够看清"刚在聊什么"，又不至于把
+#: 一整天的流水塞进去（那反而会让它抓不住重点）。
+_IDLE_RECENT_MESSAGES = 20
+
+
+async def _recent_chat_for_idle(group_id: int, agent_name: str) -> str:
+    """给空闲闲聊轮取一段**真实聊天记录**当素材。
+
+    ★★ 为什么必须显式给 ✗→✓（2026-10-22 用户报的「主动冒泡会幻想不存在的东西」）★★
+
+      空闲轮的 `pending` 只有一条系统唤醒语 ✓ —— 正文里**一条真实消息都没有** ✗。
+      它手里只剩 Hermes 的会话历史 ✓，而它不会主动去比对"哪句是最近说的" ✓，
+      没有素材的时候就**自己续剧情** ✗：
+        · 2026-10-21 14:11 凭空说「14.21 那笔我没记进去」✓（没人说过 14.21 ✓）；
+        · 2026-10-22 18:54 凭空问「记什么？没看到金额和类别」✓（前一小时没人让它记账 ✓）。
+      用户要的主动冒泡是「**接着已有的聊天随口说一句**」✓ ——
+      所以"已有的聊天"必须**明确放进这一轮正文** ✓，而不是指望它从历史里自己翻 ✓。
+
+    只取 user / agent 两类：system 里混着提醒、失败通报，放进闲聊素材会串味 ✓。
+    """
+    # ⚠️ `messages` 表里**没有** `sender_nickname` 这一列 ✗ —— 昵称在
+    #    users / group_members 上 ✓（见 core/messages.py 的 `_SELECT` ✓）。
+    #    直接 SELECT 那一列会 OperationalError，**每一轮空闲唤醒都会炸** ✗。
+    rows = await fetch_all(
+        "SELECT m.id, m.sender_type, m.msg_type, m.content, m.media_path, "
+        "       m.media_meta, m.created_at, "
+        "       COALESCE(gm.nickname, u.nickname) AS sender_nickname "
+        "FROM messages m "
+        "LEFT JOIN users u ON u.id = m.sender_id "
+        "LEFT JOIN group_members gm "
+        "       ON gm.group_id = m.group_id AND gm.user_id = m.sender_id "
+        "WHERE m.group_id = ? AND m.sender_type IN ('user', 'agent') "
+        "ORDER BY m.id DESC LIMIT ?",
+        (group_id, _IDLE_RECENT_MESSAGES),
+    )
+    rows.reverse()                      # 查的时候倒序取最近，给它的时候正序 ✓
+    # 「（已回复）」这类状态词不算聊天内容 ✓ —— 留在素材里只会让它学样 ✗
+    rows = [r for r in rows if not _is_meta_only(r.get("content") or "")]
+    return _render_transcript(rows, agent_name)
+
+
 async def run_turn(
     group_id: int,
     pending: list[dict[str, Any]],
@@ -1530,15 +1611,29 @@ async def run_turn(
     #   pending 只有系统唤醒语，一条用户消息都没有 ✓。二狗那次就是被这句话
     #   诱导，自己续出了一条「用户说中午吃面 14.21」✓。标题得如实说。
     idle = is_idle_turn(group_id)
-    header = (
-        "本轮**没有**新的群消息；下面这段是系统的唤醒语，不是谁说的话：\n\n"
-        if idle else
-        "以下是群里最近的一批消息（按时间顺序）：\n\n"
-    )
+    if idle:
+        # ★ 空闲轮也得有**真实的**聊天素材 ✗→✓（见 `_recent_chat_for_idle`）。
+        #   唤醒语 + 真实记录分开放：前者是"系统在叫你"，后者是"群里说过的话"，
+        #   混成一段它会分不清哪句是新的 ✓。
+        recent = await _recent_chat_for_idle(group_id, agent_name)
+        material = (
+            "—— 群里最近的真实聊天（**旧消息，只作接话的素材**；"
+            "不是新消息，也不是在问你）——\n"
+            f"{recent or '（这个群最近还没聊过什么。）'}\n"
+            "—— 素材到此为止 ——\n\n"
+        )
+        header = (
+            "本轮**没有**新的群消息；下面第一段是系统的唤醒语，"
+            "第二段是给你接话用的真实记录：\n\n"
+        )
+    else:
+        material = ""
+        header = "以下是群里最近的一批消息（按时间顺序）：\n\n"
     text_part = (
-        f"{header}{prompt}\n\n"
+        f"{header}{prompt}\n\n{material}"
         f"{_now_stamp()}\n\n"
-        f"你是「{agent_name}」。{_turn_instruction(must_speak, stale=stale)}"
+        f"你是「{agent_name}」。"
+        f"{_turn_instruction(must_speak, stale=stale, idle=idle)}"
     )
     images = _image_parts(pending)
 
@@ -1681,6 +1776,17 @@ async def run_turn(
         text = ""
 
     silent = (not text) or text.lower().strip("。.!！") in _SILENT_MARKERS
+
+    # ★★ 空闲轮里只回了「（已回复）」这种状态词 → **按沉默处理** ✗→✓（2026-10-22）★★
+    #
+    #   用户原话：「有时候改发个（已回复），这有点抽象」✓。
+    #   它语义上等于"我没话说" ✓，但发出去就是群里一条没头没脑的气泡 ✗。
+    #   只在**空闲轮**拦 ✓ —— 被点名/提醒时真回了这句，说明另有问题，
+    #   那边该走"必须回应"的兜底，不能悄悄咽掉 ✓。
+    if idle and not silent and _is_meta_only(text):
+        log.warning("group=%s 空闲轮只回了状态词（%r），按沉默处理", group_id, text[:40])
+        text = ""
+        silent = True
 
     # 被点名了还沉默，多半是模型偷懒，不是真的无话可说——这种情况重试一次。
     if silent and must_speak:
