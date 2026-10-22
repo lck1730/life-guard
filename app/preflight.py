@@ -78,6 +78,31 @@ def _bound_names(tree: ast.AST) -> set[str]:
     return names
 
 
+#: 模块自带的那些名字（`__file__` 等）不在 `builtins` 里 ✓ ——
+#: 不补的话，任何用了 `Path(__file__)` 的文件都会被误报 ✓。
+_MODULE_DUNDERS = {"__file__", "__name__", "__doc__", "__package__", "__spec__", "__loader__"}
+
+
+def _annotation_nodes(tree: ast.AST) -> set[int]:
+    """注解里的名字**不算运行时引用** ✓。
+
+    `from __future__ import annotations` 之后注解不会在导入时求值 ✗ ——
+    所以 `def f(x: Any)` 里没 import 的 `Any` 不会炸 ✓，这里也不该报 ✓。
+    """
+    ids: set[int] = set()
+    for n in ast.walk(tree):
+        ann = None
+        if isinstance(n, ast.arg):
+            ann = n.annotation
+        elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            ann = n.returns
+        elif isinstance(n, ast.AnnAssign):
+            ann = n.annotation
+        if ann is not None:
+            ids.update(id(x) for x in ast.walk(ann))
+    return ids
+
+
 def _check_imports(tree: ast.AST, dotted: str) -> list[str]:
     """`from X import Y` 里的 X 和 Y 到底存不存在。
 
@@ -144,11 +169,21 @@ def check() -> list[str]:
             problems.append(f"{rel}:{e.lineno} **语法错**：{e.msg}")
             continue
 
-        bound = _bound_names(tree)
+        bound = _bound_names(tree) | _MODULE_DUNDERS
+        annotations = _annotation_nodes(tree)
         for n in ast.walk(tree):
-            if (isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
-                    and n.func.id not in bound):
-                problems.append(f"{rel}:{n.lineno} 调用了 `{n.func.id}()` —— **这个名字没定义**")
+            # ★ **查所有"读这个名字"的地方，不只查函数调用。**
+            #
+            # 2026-10-22 的教训：拿掉了 DIY 那套代码时把模块级常量 `_SPLIT_RE`
+            # 一起删了 ✗，但 `_split_parts()` 里还写着 `_SPLIT_RE.split(text)` ✓。
+            # 它不是 `xxx()` 的调用形式 ✗，原来这道检查**看不见** ✗ ——
+            # 部署自检全过、服务正常起来，然后**每一轮回复都在最后一步炸掉** ✗
+            # （用户连收两条「中途失败了」）✓。
+            #
+            # 现在按"任何一次读取"来查 ✓：变量、常量、函数名一视同仁 ✓。
+            if (isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
+                    and n.id not in bound and id(n) not in annotations):
+                problems.append(f"{rel}:{n.lineno} 引用了 `{n.id}` —— **这个名字没定义**")
         problems += [f"{rel}: {x}" for x in _check_imports(tree, ".".join(rel.with_suffix("").parts))]
     return problems
 
