@@ -8,7 +8,10 @@
   //    所以这里**每一处都假设自己可能拿到 403** ✓ → 如实报出来 ✓，
   //    别装作"池子是空的" ✗（那会让人以为模型丢了 ✓）。
   let MODELS = null;                 // 最近一次读到的池子
-  const M_LABEL = { chat: '生活管家·chat', aux: '辅助·压缩' };
+  // ★ 2026-10-22：只选**一个**模型 ✓ —— 聊天和压缩共用 ✓。
+  //   后端还留着 `chat`/`aux` 两个槽（Hermes 那侧要用 ✓），选一次两个一起写 ✓。
+  //   旧配置只写了其中一个也不会哑：`store.pick()` 会互为兜底 ✓。
+  const M_LABEL = { model: '模型（聊天和压缩共用）' };
 
   const openModels = () => { pushScreen('models', 'settings'); renderModels(); };
 
@@ -60,17 +63,18 @@
     const d = MODELS;
     body.textContent = '';
 
-    // ① 用途分配：两行，点一行挑一个模型 ✓
-    body.appendChild(mSec('用途分配'));
-    Object.keys(M_LABEL).forEach(k => {
-      const r = (d.roles || {})[k] || {};
+    // ① 模型：只有一行 ✓ —— 聊天和压缩共用 ✓（点它挑一个 ✓）
+    body.appendChild(mSec('模型'));
+    {
+      const r = (d.roles || {});
+      const cur = (r.chat && r.chat.name ? r.chat : (r.aux || {}));
       const row = mkel('div', 'mitem');
-      row.appendChild(mkel('span', 'k', M_LABEL[k]));
-      row.appendChild(mkel('span', 'v' + (r.name ? '' : ' empty'), r.name || '还没选'));
+      row.appendChild(mkel('span', 'k', M_LABEL.model));
+      row.appendChild(mkel('span', 'v' + (cur.name ? '' : ' empty'), cur.name || '还没选'));
       row.appendChild(mSvg('chev'));
-      row.onclick = () => pickRole(k);
+      row.onclick = () => pickRole('model');
       body.appendChild(row);
-    });
+    }
 
     // ② 模型池
     body.appendChild(mSec('模型池'));
@@ -81,8 +85,8 @@
     body.appendChild(mSec('上下文长度'));
     body.appendChild(mCtx(d.context));
 
-    body.appendChild(mHint('两个用途各挑一个模型：chat 负责聊天、'
-                           + 'aux 负责压缩和起标题。没选的那一档会哑。'));
+    body.appendChild(mHint('聊天、压缩、起标题都走这一个模型；没选就没法说话。'
+                           + '下面单独设上下文长度。'));
   };
 
   const mCard = (c) => {
@@ -103,7 +107,7 @@
     return box;
   };
 
-  // 挑某个用途用哪个模型 —— 一张底部弹层 ✓（测过通的排前面 ✓）
+  // 挑模型 —— 一张底部弹层 ✓（测过通的排前面 ✓）
   const pickRole = (role) => {
     const d = MODELS || { configs: [] };
     const panel = $('#sheetPanel');
@@ -124,7 +128,7 @@
       panel.appendChild(row);
     });
     const none = mkel('div', 'mitem');
-    none.appendChild(mkel('span', 'k empty', '（这一档不选）'));
+    none.appendChild(mkel('span', 'k empty', '（不选模型）'));
     none.onclick = async () => {
       try { await api('/models/roles', { method: 'POST', body: JSON.stringify({ role, id: '' }) }); }
       catch (e) { closeSheet(); toast((e && e.message) || '没改成'); return; }
@@ -175,7 +179,7 @@
     if (!yes) return;
     try {
       const r = await api('/models/configs/' + c.id, { method: 'DELETE' });
-      if (r && r.freed && r.freed.length) toast('删了 —— 这几个用途现在是空的：' + r.freed.join('、'));
+      if (r && r.freed && r.freed.length) toast('删了 —— 现在没有模型可用了');
       renderModels();
     } catch (e) { toast((e && e.message) || '没删掉'); }
   };
@@ -210,7 +214,7 @@
     const cur = ((ctx && ctx.groups && ctx.groups.chat) || {});
     const vals = Object.keys(cur).map(k => cur[k]);
     const now = vals.length ? Math.round(vals[0] / 1000) + 'k' : '还没同步过';
-    box.appendChild(mkel('label', null, '生活管家这一档（现在：' + now + '）'));
+    box.appendChild(mkel('label', null, '所有群共用（现在：' + now + '）'));
     const i = mkel('input', 'field');
     i.type = 'number'; i.min = '64'; i.max = '2000'; i.placeholder = '填 k，如 128';
     box.appendChild(i);

@@ -11,7 +11,6 @@ import json
 import hashlib
 import logging
 import re
-import shutil
 
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -54,9 +53,7 @@ from .core.messages import current_status_for
 from .models.proxy import router as models_proxy_router
 from .models.routes import router as models_router
 from .api.groups import router as groups_router
-from .api.internal import (_HTML_MAX, _prune_component_versions,
-                           _records_spec,
-                           _validate_component_html, router as internal_router)
+from .api.internal import _records_spec, router as internal_router
 from .api.media import router as media_router
 from .api.shell import router as shell_router
 from .api.shell import sweep_leaving as shell_router_sweep
@@ -867,171 +864,9 @@ async def component_spots_save(
             "ignored": [s for s in body.order if str(s).strip().lower() not in known]}
 
 
-class ComponentRenameIn(BaseModel):
-    #: 新名字 ✓。**只改显示名，不动 `slug`** ✗ —— slug 是目录名和 URL 的一部分 ✓，
-    #: 改名会让磁盘上的目录、已经存过的路径全对不上 ✓（而且组件是**一个 HTML 文件**，
-    #: 里面可能自己写死了什么 ✓ —— 那更不该由一次改名去动 ✓）。
-    title: str = Field(min_length=1, max_length=40)
-
-
-@app.post("/api/components/{name}/rename")
-async def component_rename(
-    name: str, body: ComponentRenameIn, group_id: int = Query(...),
-    user: dict = Depends(current_user),
-) -> dict:
-    """**重命名** ✓ —— 用户 2026-10-07 晚上定的：「重命名会同步所有地方」✓。
-
-    ⚠️ **改的是 `components.title`，而且是这个 slug 的**每一版** ✓** ✗→✓ ——
-       名字是**这个东西**的名字 ✓，不是"第几版的名字" ✓。
-       只改最新那一版的话，界面上会**看人下菜** ✓：
-       列表取的是 live 那版的标题 ✓、笔记头部取的是最后一版 ✓、
-       某处兜底又用第一版 ✓ —— 于是同一个组件在不同地方叫不同名字 ✓。
-       一次全改是**唯一**能保证"同步所有地方"的做法 ✓。
-
-    ⚠️ 它**不需要谁"拥有"这个组件** ✓ —— 组件是**全群共有**的 ✓
-       （谁做的、谁改的，只在 `enabled_by` 那种地方留痕 ✓）。
-       两个人都能改名 ✓，这是对的 ✓。
-
-    ⚠️ **只改显示名，不动 `slug`** ✗ —— 见 `ComponentRenameIn` 那段 ✓。
-    """
-    await require_member(group_id, user["id"])
-    if not valid_slug(name):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
-    # ★ 「组件界面diy」**改名放行** ✗→✓（2026-10-11 又改回来了）——
-    #   2026-10-08 那轮把它锁死的理由是"它是进组件界面的那条对话" ✗，
-    #   用户后来改了主意 ✓（原话：「重名的加上吧，自由度高一些，反正只是显示」✓）。
-    #   **只锁删除** ✗ —— 「不能删除」是他明确要的 ✓（见 `component_delete` ✓）；
-    #   改名是**显示名** ✓，认路靠的是那条对话**还在** ✓，不叫什么都行 ✓。
-    #   ⚠️ 这个接口里**曾经有一道 `if name == WALL_SLUG: raise 403`** ✗ ——
-    #   那正是"改不了名"的来源 ✓。删掉之后就只剩 `valid_slug` 这一道 ✓。
-    title = body.title.strip()
-    if not title:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "名字不能是空的")
-    # ⚠️ **`execute_rc` 不是 `execute`** ✗→✓（2026-10-07 深夜，见 db.py 那段）——
-    #    `execute` 返回的是 `lastrowid` ✓，拿它判"改到没改到"**永远非零** ✗ →
-    #    给一个不存在的组件改名会**安静地成功** ✓（这里本来该报 404 ✓）。
-    n = await execute_rc("UPDATE components SET title = ? WHERE group_id = ? AND slug = ?",
-                         (title, group_id, name))
-    if not n:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"没有 `{name}` 这个组件")
-    log.info("组件改名：群 %s 的 %s → %r（用户 %s，%d 版一起改）",
-             group_id, name, title, user["id"], n)
-    return {"ok": True, "slug": name, "title": title, "versions": int(n)}
-
-
-# ── 导出 / 导入（2026-10-11 用户定的）────────────────────────────────────
-#
-# 「每个组件存三份」✓ 的上限一加上，"想留一份"就只能**出仓库**了 ✗→✓：
-#   用户的话是「可以支持导出当前版本，用户觉得不错就导出自己存，
-#   觉得改不好了就将版本手动重新应用」✓。
-# ⚠️ 所以这条链路的**两端都是他手里的文件** ✓ —— 出来是一次浏览器下载 ✓，
-#   进去是他挑的一份文件 ✓。**仓库不替他存** ✗（那等于又多了一个"保留" ✗，
-#   而"保留"整套刚被撤掉 ✗，见上面 `/keep` 那段 ✓）。
-
-
-@app.get("/api/components/{name}/export")
-async def component_export(
-    name: str, group_id: int = Query(...), v: int | None = Query(None),
-    user: dict = Depends(current_user),
-) -> Response:
-    """把**某一版**的 HTML 原文交出去，让浏览器**存成文件** ✓。
-
-    ⚠️ **只给 HTML 原文** ✗，不给包了元数据的 JSON ✗ ——
-      组件本来就是**一个自包含的文件** ✓（`var/components/g<N>/<slug>/v<M>/index.html` ✓）。
-      记账那边的数据是**渲染时才注入的** ✓（前端把 `__LG_DATA__` 塞进去 ✓），
-      不在这个文件里 ✓。所以"这一版"就等于这一个文件 ✓ ——
-      一份文件进、一份文件出，才是"我能自己存一份"该有的样子 ✓。
-
-    ⚠️ **导出**不占对话、不通知群、不打扰任何人 ✗ —— 它是**他一个人在备份** ✓，
-      群里不需要知道 ✓（"有人导出了记账"这种通知只会让人困惑 ✓）。
-    """
-    await require_member(group_id, user["id"])
-    if not valid_slug(name):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
-    row = await _pick_component_version(group_id, name, v)
-    if not row:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"没有 `{name}` 这个组件")
-    base = group_components_dir(group_id).resolve()
-    d = component_version_dir(group_id, name, int(row["version"])).resolve()
-    if not d.is_relative_to(base):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"没有 `{name}` 这个组件")
-    html_file = d / "index.html"
-    try:
-        html = html_file.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "组件读不出来")
-    fname = f"{name}-v{int(row['version'])}.html"
-    return Response(
-        html, media_type="text/html; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="' + fname + '"',
-                 "Cache-Control": "no-store"})
-
-
-class ComponentImportIn(BaseModel):
-    #: 一份组件的 HTML 全文 ✓ —— 前端把文件读成文本交上来 ✓。
-    #: ⚠️ **不收 multipart** ✗ —— 文件本来就在浏览器里 ✓（`FileReader` ✓），
-    #:   交给一个 `text` 字段就够了 ✓。链路上多一种输入格式，
-    #:   就多一种"读不出来"的可能 ✗，而这里没有任何理由要它 ✗。
-    html: str = Field(min_length=1, max_length=_HTML_MAX)
-
-
-@app.post("/api/components/{name}/import")
-async def component_import(
-    name: str, body: ComponentImportIn, group_id: int = Query(...),
-    user: dict = Depends(current_user),
-) -> dict:
-    """把**他手里的一份文件**当成**新一版**落进仓库 ✓。
-
-    ⚠️ **一定是新版本（max+1），不是覆盖** ✗ —— 用户 2026-10-11：
-      「觉得改不好了就将版本手动重新应用」✓。重新应用 = **多一版** ✓，
-      上一版还在 ✓（在"只留三份"的上限内 ✓）。要是覆盖掉，
-      他就再也回不到刚才那版了 ✗ —— 而"回不去了"正是他来导入的原因 ✗。
-
-    ⚠️ **`title` / `icon` / `data_json` / `note` / `spot_json`
-      全部沿用当前那版** ✗ —— 导入是**同一个组件的一次修订** ✓，
-      不是新组件 ✗。只换 HTML ✓；换名字走**重命名** ✓。
-
-    ⚠️ **校验在服务端做** ✗（见 `internal._validate_component_html` 那段）——
-      这个接口认的是**登录 + 成员** ✓，前端那道校验只是让他早点看见 ✗。
-      绕过去就是把一段 HTML 直接写进仓库，而它会被**渲染到群里每个人的手机上** ✗。
-    """
-    await require_member(group_id, user["id"])
-    if not valid_slug(name):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
-    cur = await _pick_component_version(group_id, name, None)
-    if not cur:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"没有 `{name}` 这个组件")
-
-    why = _validate_component_html(body.html)
-    if why:
-        log.warning("组件导入被拒：群 %s 的 %s —— %s（用户 %s）",
-                    group_id, name, why, user["id"])
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "导入的数据不可用：" + why)
-
-    ver = int(cur["version"]) + 1
-    base = group_components_dir(group_id).resolve()
-    d = component_version_dir(group_id, name, ver).resolve()
-    if not d.is_relative_to(base):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"没有 `{name}` 这个组件")
-    try:
-        d.mkdir(parents=True, exist_ok=True)
-        (d / "index.html").write_text(body.html, encoding="utf-8")
-    except OSError as exc:
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            "写不进组件仓库：" + str(exc))
-    await execute(
-        "INSERT INTO components(group_id, slug, version, state, title, icon,"
-        " data_json, note, created_at, spot_json)"
-        " VALUES(?,?,?,'draft',?,?,?,?,?,?)",
-        (group_id, name, ver, str(cur["title"] or name), str(cur["icon"] or "🧩"),
-         cur["data_json"], cur["note"], now(), cur["spot_json"]))
-    pruned = await _prune_component_versions(group_id, name)
-
-    log.info("组件导入：群 %s 的 %s → v%s（用户 %s）"
-             + ("，收掉 v%s" if pruned else ""),
-             group_id, name, ver, user["id"], pruned)
-    return {"ok": True, "version": ver, "title": str(cur["title"] or name),
-            "pruned": pruned}
+# ★ 2026-10-22：组件**管理**整套删了 ✓ —— 改名 / 导出 / 导入 / 删除四个接口
+#   和界面上的 ⋯ 一起下线 ✓。组件现在是**纯展示**：列表 + 打开看 ✓，
+#   要改就由服务器管家在服务端做 ✓。磁盘上的历史组件**一个都没动** ✓。
 
 
 @app.get("/api/wall-css")
@@ -1051,54 +886,6 @@ async def wall_css(group_id: int = Query(...), user: dict = Depends(current_user
         css = ""
     return {"css": css[:200_000]}
 
-
-@app.delete("/api/components/{name}")
-async def component_delete(
-    name: str, group_id: int = Query(...), v: int | None = Query(None),
-    user: dict = Depends(current_user),
-) -> dict:
-    """**不传 `v` = 删掉整个组件**（连它的对话 ✓）；传 `v` = 只删那一版。
-
-    ★ 2026-10-07 晚上改的语义 ✗→✓ —— 用户定的：「删除组件**等于删除对话**」✓。
-      所以"不传版本号"从我原来的"删掉未固化那几版"改成了**整块删** ✓：
-      `components` 全部版本 + 磁盘上的目录 + 排版记录 ✓。
-      界面上那条路只有一处（组件管理页的 ⋯ ✓），而且是**两下才删** ✓。
-    """
-    await require_member(group_id, user["id"])
-    if not valid_slug(name):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
-    where = "group_id = ? AND slug = ?" + (" AND version = ?" if v else "")
-    params = (group_id, name, int(v)) if v else (group_id, name)
-    rows = await fetch_all(f"SELECT version, state FROM components WHERE {where}", params)
-    if not rows:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "没有可删的版本")
-
-    for r in rows:
-        await execute("DELETE FROM components WHERE group_id = ? AND slug = ? AND version = ?",
-                      (group_id, name, int(r["version"])))
-        d = component_version_dir(group_id, name, int(r["version"]))
-        if d.is_relative_to(group_components_dir(group_id)) and d.is_dir():
-            shutil.rmtree(d, ignore_errors=True)
-    # ⚠️ **排版也要一起收掉** ✗→✓ —— `component_spots` 里的 `slug` **不是外键** ✓
-    #    （一个 slug 在 `components` 里是好几十行 ✓，没有"那一行"可以指 ✓），
-    #    所以它不会跟着级联删 ✓。忘了这一步的后果：下次同一个 slug 被做出来时，
-    #    它会**接着用上一次的位置** ✓ —— 看着像"它自己跑到那儿去了" ✓。
-    if not v:
-        await execute("DELETE FROM component_spots WHERE group_id = ? AND slug = ?",
-                      (group_id, name))
-    # ⚠️ 版本删光之后，那个 **slug 目录也要收掉** ✗→✓ ——
-    #    不然仓库里会留一堆空壳 ✓（界面看不见 ✓，因为列表是从库读的 ✓，
-    #    但下次同一个 slug 再做一版时，`mkdir(parents=True)` 会**默默复用它** ✓ ——
-    #    于是"删干净了没有"这件事就没法从目录上看出来 ✓）。
-    #    `rmdir` **只在空的时候才成功** ✓ —— 不用自己判空 ✓，也不会误删有内容的 ✓。
-    try:
-        (group_components_dir(group_id) / name).rmdir()
-    except OSError:
-        pass                                    # 还有别的版本在，那就该留着 ✓
-    log.info("组件删除：群 %s 的 %s，%d 版（连对话 %s 条）",
-             group_id, name, len(rows), len(wiped))
-    return {"ok": True, "deleted": [int(r["version"]) for r in rows],
-            "tasks_deleted": wiped}
 
 async def _user_from_token(token: str) -> dict | None:
     # ⚠️⚠️ **这一行就是 WebSocket 连不上的原因** ✗→✓ —— 2026-10-07。

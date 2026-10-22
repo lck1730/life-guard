@@ -114,14 +114,14 @@ async def delete_config(cid: str) -> dict:
     d["configs"] = [x for x in d["configs"] if x["id"] != cid]
     # 指着它的用途槽一起清掉 ✓ —— 留着死 id 不会出事 ✓（`pick`/`role_names` 都当空处理 ✓），
     # 但那是垃圾 ✓，而且直接看 `models.json` 的时候**误导人** ✗。
-    freed = [store.ROLE_LABEL[r] for r in store.ROLES
-             if (d.get("roles") or {}).get(r) == cid]
+    freed = ["模型"] if any((d.get("roles") or {}).get(r) == cid
+                           for r in store.ROLES) else []
     for r in store.ROLES:
         if (d.get("roles") or {}).get(r) == cid:
             d["roles"].pop(r, None)
     store.save(d)
     if freed:
-        log.warning("删掉的这一条还被「%s」用着 —— 那些用途现在是空的", "、".join(freed))
+        log.warning("删掉的是正在用的模型 —— 现在没有模型可用了")
     return {"ok": len(d["configs"]) < before, "freed": freed}
 
 
@@ -148,28 +148,38 @@ class RoleIn(BaseModel):
 
 @router.post("/roles", dependencies=[Depends(require_admin)])
 async def set_role(body: RoleIn) -> dict:
+    """选模型 / 清空模型 ✓。
+
+    ★ 2026-10-22：界面只发 `role="model"` ✓ —— **一次写两个槽** ✓
+      （Hermes 的聊天走 `chat`、压缩走 `aux` ✓，两边必须指同一个 ✓）。
+    旧名 `chat` / `aux` 仍然收 ✓（兼容以前的前端 / 手工调用 ✓），
+    但界面上不会再用到 ✓。
+    """
     role = (body.role or "").strip()
-    if role not in store.ROLES:
+    if role not in store.ROLES and role != "model":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"没有这个用途：{role}")
     rid = (body.id or "").strip()
     d = store.load()
     if rid and not any(x["id"] == rid for x in d["configs"]):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "池子里没有这一套")
+    targets = store.ROLES if role == "model" else (role,)
     d.setdefault("roles", {})
-    if rid:
-        d["roles"][role] = rid
-    else:
-        # 空 = **这一档不选** ✓（不是清空整个表 ✓）→ 那个用途就没有模型可用 ✓
-        d["roles"].pop(role, None)
+    for r in targets:
+        if rid:
+            d["roles"][r] = rid
+        else:
+            # 空 = 没有模型 ✓（两个槽一起清 ✓，不留一半 ✓）
+            d["roles"].pop(r, None)
     store.save(d)
     names = store.role_names(d)
     picked = next((x for x in d["configs"] if x["id"] == rid), None) if rid else None
     # **不拦，但要说** ✓：选一个测不通的也能选 ✓（可能是网络抖了一下 ✓），
-    # 只是那一档会哑 ✓ —— 所以把这件事回给界面 ✓，别让它以为万事大吉 ✗。
+    # 只是它会哑 ✓ —— 所以把这件事回给界面 ✓，别让它以为万事大吉 ✗。
     warn = ""
     if picked and not (picked.get("test") or {}).get("ok"):
-        warn = f"「{picked['name']}」现在测不通 —— 这一档会哑"
-    log.info("用途 %s → %s", role, names[role]["name"] or "（这一档空着）")
+        warn = f"「{picked['name']}」现在测不通 —— 会哑"
+    log.info("模型 → %s", (names.get("chat") or names.get("aux") or {}).get("name")
+             or "（空着）")
     return {"ok": True, "roles": names, "warn": warn}
 
 

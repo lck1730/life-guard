@@ -14,18 +14,15 @@ from ..config import settings
 
 log = logging.getLogger("lifeguard.models")
 
-#: 两个用途 —— ⚠️ **约定**：这边分流，调用方（profile 的 `model.default` /
-#: `delegation.model` / `auxiliary.*.model`）标自己是谁 ✓。
+#: 两个槽 —— **只保留给 Hermes 的分流用** ✓：调用方（profile 的 `model.default` /
+#: `delegation.model` / `auxiliary.*.model`）会把 `chat` / `aux` 写进请求的 `model` ✓。
+#: 界面上**不再区分** ✓ —— 用户 2026-10-22 定的：聊天和压缩共用一个模型 ✓。
+#: 选一次会同时写两个槽 ✓；`pick()` 里任一槽空着会用另一个兜底 ✓。
 #: **改名字要三处一起改** ✗（`tools/set-profile-role.sh`、`set-context-length.sh` 各有一份 ✓）。
-#:
-#: ★ `aux` 为什么必须有：**Hermes 的辅助调用默认跟着主模型走** ✓ ——
-#:   没有它，"把 chat 换成某个模型"会**连带把压缩也换掉** ✗，
-#:   而压缩写不出摘要时 Hermes 退回"丢弃历史" ✓（用户感知＝它变笨了 ✓）。
 ROLES = ("chat", "aux")
 
-#: 给人看的名字 —— 报错、界面、日志都用它 ✓。
-#: ⚠️ 界面上那两个名字是**用户自己定的** —— **中间那个点是 `·`（U+00B7）** ✗
-#:    不是 `.` ✗，别自作主张改 ✓。
+#: 给人看的名字 —— 报错、日志用它 ✓。
+#: ⚠️ 界面上不显示这两个名字了 ✓（只有一个「模型」）—— 这里留着只为日志能分得清 ✓。
 ROLE_LABEL = {"chat": "生活管家·chat", "aux": "辅助·压缩"}
 
 #: 能配上下文长度的组 —— **和 `tools/set-context-length.sh` 里那份一致** ✓。
@@ -52,7 +49,13 @@ def load() -> dict:
         return {"configs": [], "roles": {}}
     try:
         d = json.loads(conf.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        # ★ 2026-10-22：**读失败必须吭声** ✗→✓ —— 这里以前是**静默**返回空池 ✓，
+        #   于是"文件权限不对 / 读不出来"在界面上长得跟**"我存的模型没了"**一模一样 ✗
+        #   （实测：`var/models.json` 被 root 改成 600 之后，商汤就这么"消失"了 ✓）。
+        #   池子空着本身是合法的（还没选模型 ✓），所以**不能**靠"空不空"报警 ✗，
+        #   只能在这一步说 ✓。
+        log.error("模型池读不出来（%s）：%s —— 界面会显示成没配过", conf, e)
         return {"configs": [], "roles": {}}
     if not isinstance(d.get("roles"), dict):
         d["roles"] = {}
@@ -109,16 +112,20 @@ def save(data: dict) -> None:
 def pick(data: dict, want: str) -> tuple[dict | None, str]:
     """按用途挑配置。返回 `(配置|None, 实际按哪个用途走的)`。
 
-    ⚠️ **没有"回落"这一说了** ✗ —— 池子里不存在"当前模型" ✓：
-       每个用途**自己决定** ✓，槽空着就是**没有模型可用** ✓，直接报出来 ✓。
-       原来那个"悄悄走 active"恰恰是最坏的一种：界面上看到"选了 A"、实际用 B ✓，
-       **而且一声不响** ✗。
+    ★ 2026-10-22：界面只选一个模型 ✓，所以这里**两个槽互为兜底** ✓ ——
+      `aux` 空着就借 `chat` 的、`chat` 空着就借 `aux` 的 ✓。
+      为什么：Hermes 的压缩走 `aux` ✓，如果只写了 `chat`、压缩那一路就会 503 ✓，
+      而 Hermes 压缩失败会**静默丢历史** ✗（用户只知道它变笨了 ✓）。
+      共用一个模型之后，这种"一半有、一半没有"只可能是旧配置或写失败 ✓，
+      兜底比报错好 ✓（`models.json` 里两个槽正常是同进同退的 ✓）。
     没标用途的那些还是走 `chat` ✓（最"主"的一档 ✓）。
     ⚠️ 槽里指着的模型**被删掉**之后返回 `None` ✓（界面显示成"还没选" ✓，
        而不是继续装作选着 ✓）。
     """
     role = want if want in ROLES else "chat"
-    rid = (data.get("roles") or {}).get(role)
+    roles = data.get("roles") or {}
+    other = "aux" if role == "chat" else "chat"
+    rid = roles.get(role) or roles.get(other)
     c = next((x for x in data["configs"] if x["id"] == rid), None) if rid else None
     return c, role
 

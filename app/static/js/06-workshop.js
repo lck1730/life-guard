@@ -7,7 +7,9 @@
   //     · **不分区了** ✓（"不需要分实验区和使用区，右上角点击进入就只是单纯地
   //       罗列组件" ✓ —— 理由他自己给了：都在沙箱里、组件之间本来就隔离 ✓）
   //     · 这一屏**只剩"列出来"** ✓：一行一个组件 ✓
-  //     · 改名 / 导入 / 导出 / 删除在右上角 ⋯（`#wsManage` ✓）
+  //     · ★ 2026-10-22：**管理也不做了** ✓ —— 右上角 ⋯（改名/导入/导出/删除）
+  //       连同对应接口一起删了 ✓。这一屏现在是**纯展示** ✓：
+  //       点开看内容 ✓，改组件由服务器管家在服务端做 ✓。
   // ── ★ 「组件界面」自己的外观（2026-10-08）─────────────────────────────
   //
   // 由服务端写入的一段 CSS ✓（存 `var/wall/g<群>/style.css` ✓，
@@ -1148,72 +1150,6 @@
     if ($('#workshop').classList.contains('on')) renderWorkshop();
   };
 
-  /** 收纳页右上角 ⋯ 的「管理组件」✓ —— 改名 / 导出 / 导入 / 删除都在这里 ✓。
-   *  ⚠️ wall **不在这儿管** ✓ —— 它是界面外观，不是普通组件 ✓。 */
-  const openCompManager = async () => {
-    let comps = [];
-    try {
-      comps = (await api(`/components?group_id=${group.id}`)).components || [];
-    } catch (e) { toast('打不开组件列表：' + e.message); return; }
-    comps = comps.filter(c => c.slug !== WALL_SLUG);
-    const p = $('#sheetPanel');
-    p.innerHTML = '';
-    p.appendChild(mkel('h3', null, comps.length ? '管理组件' : '还没有组件'));
-    const grp = mkel('div', 'wsmenu');
-    comps.forEach((c) => {
-      const row = mkel('button', null, c.title || c.slug);
-      row.onclick = () => openCompActions(c.slug, c.title || c.slug);
-      grp.appendChild(row);
-    });
-    p.appendChild(grp);
-    const acts = mkel('div', 'actions');
-    const back = mkel('button', 'btn-ghost', '返回');
-    back.onclick = closeSheet;          // 关掉弹层 ✓
-    acts.appendChild(back);
-    p.appendChild(acts);
-    openSheet();
-  };
-
-  /** 一个组件的动作页 ✓（改名/导出/导入/删除 ✓）—— 「管理组件」里点哪格进它 ✓。 */
-  const openCompActions = (slug, title) => {
-    const p = $('#sheetPanel');
-    p.innerHTML = '';
-    p.appendChild(mkel('h3', null, title || slug));
-    const grp = mkel('div', 'wsmenu');
-    const mk = (label, fn, danger) => {
-      const b = mkel('button', null, label);
-      b.onclick = fn;
-      if (danger) b.style.color = '#e06a6a';
-      grp.appendChild(b);
-    };
-    mk('重命名', () => openRenameSheet(slug, title));
-    mk('导出当前版本', () => wsExport(slug));
-    mk('导入新版本', () => wsImport(slug));
-    mk('删除组件', async () => {
-      closeSheet();
-      const ok = await confirmBox({
-        title: '删除组件',
-        body: '将会删除这个组件',
-        ok: '删除',
-        danger: true,
-      });
-      if (!ok) return;
-      try {
-        await api(`/components/${encodeURIComponent(slug)}?group_id=${group.id}`,
-                  { method: 'DELETE' });
-      } catch (e) { toast('没删掉：' + e.message); return; }
-      toast('删了');
-      openCompManager();              // 删完刷新清单 ✓
-    }, true);
-    p.appendChild(grp);
-    const acts = mkel('div', 'actions');
-    const back = mkel('button', 'btn-ghost', '返回');
-    back.onclick = openCompManager;   // 回上一层 ✓
-    acts.appendChild(back);
-    p.appendChild(acts);
-    openSheet();
-  };
-
   /**
    * 一个**居中的确认框** ✓ —— 返回 `Promise<boolean>` ✓（点了删除就是 true ✓）。
    *
@@ -1263,142 +1199,7 @@
     m.classList.add('on');
   });
 
-  /**
-   * 一个"起名字"的弹层 ✓ —— **两处都在用** ✓：新建组件时问名字 ✓、⋯ 里的重命名 ✓。
-   *
-   * ⚠️ 抽成一个是因为**它俩一模一样** ✓（一个输入框、两个按钮 ✓）——
-   *    抄一份的话，将来"名字不能超过几个字""空名字怎么办"这类规矩
-   *    就会在两处各说各话 ✓（这个项目在别的地方吃过这个亏 ✓）。
-   *
-   * ⚠️ 输入框的值走 `.value` **不进 innerHTML** ✓ —— 那是用户打的字 ✓。
-   */
-  const openNameSheet = ({ heading, initial, cta, hint, save }) => {
-    const p = $('#sheetPanel');
-    p.innerHTML = '';
-    const h = document.createElement('h3');
-    h.textContent = heading;
-    p.appendChild(h);
-    if (hint) {
-      const d = document.createElement('div');
-      d.className = 'rnhint';
-      d.textContent = hint;
-      p.appendChild(d);
-    }
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.maxLength = 40;
-    inp.value = initial || '';
-    inp.placeholder = '比如：记账面板';
-    inp.className = 'rninput';
-    p.appendChild(inp);
-    const acts = document.createElement('div');
-    acts.className = 'actions';
-    const cancel = document.createElement('button');
-    cancel.className = 'btn-ghost';
-    cancel.textContent = '取消';
-    cancel.onclick = closeSheet;
-    const go = document.createElement('button');
-    go.className = 'btn-solid';
-    go.textContent = cta || '保存';
-    const submit = async () => {
-      const name = (inp.value || '').trim();
-      if (!name) { toast('先起个名字'); inp.focus(); return; }
-      go.disabled = true;
-      try {
-        await save(name);
-      } catch (e) {
-        go.disabled = false;
-        toast('没成：' + e.message);
-        return;
-      }
-      closeSheet();
-    };
-    go.onclick = submit;
-    inp.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); submit(); } };
-    acts.append(cancel, go);
-    p.appendChild(acts);
-    openSheet();
-    setTimeout(() => inp.focus(), 120);      // 省一次点击 ✓（和别的弹层一个做法 ✓）
-  };
-
-  /** 把一份文本当**文件下载**下来 ✓（手机 WebView 上唯一可靠的方式 ✓）。 */
-  const downloadText = (filename, text, mime) => {
-    const url = URL.createObjectURL(new Blob([text], { type: mime }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    // ⚠️ **晚一拍再收回 URL** ✗ —— 点击之后下载是异步起头的 ✓，
-    //    立刻 `revokeObjectURL` 有机会把那次下载掐断 ✓。
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
-  /** ⋯ 里的**导出当前版本** ✓ —— 把一个 HTML 文件交到用户手里 ✓。 */
-  const wsExport = async (slug) => {
-    closeSheet();
-    let text, ver;
-    try {
-      const r = await fetch(`/api/components/${encodeURIComponent(slug)}?group_id=${group.id}`,
-                            { credentials: 'same-origin' });
-      if (!r.ok) { toast('没拿到：' + (await r.text())); return; }
-      text = await r.text();
-      ver = (JSON.parse(text) || {}).version;
-    } catch (e) { toast('没拿到：' + e.message); return; }
-    downloadText(`${slug}-v${ver || 'latest'}.html`, text,
-                 'text/html;charset=utf-8');
-    toast('导出了一份文件');
-  };
-
-  /** ⋯ 里的**导入新版本** ✓ —— 挑一份文件，当**新一版**落进仓库 ✓。 */
-  const wsImport = (slug) => {
-    closeSheet();
-    const inp = document.createElement('input');
-    inp.type = 'file';
-    inp.accept = '.html,.htm,text/html';
-    inp.onchange = async () => {
-      const f = inp.files && inp.files[0];
-      if (!f) return;
-      // ⚠️ **40 万字符** 和后端那个上限对齐 ✓ —— 不先拦一道的话，
-      //    手机上读一个几十兆的 HTML 到内存里 ✓，然后才被服务端拒掉 ✗。
-      if (f.size > 400000) {
-        toast('太大了（40 万字符以内）');
-        return;
-      }
-      const text = await f.text();
-      try {
-        const d = await api(`/components/${encodeURIComponent(slug)}/import?group_id=${group.id}`,
-                            { method: 'POST', body: JSON.stringify({ html: text }) });
-        toast('导入成功：现在是 v' + d.version);
-        if ($('#workshop').classList.contains('on')) renderWorkshop();
-      } catch (e) {
-        // ⚠️ **服务端原话直接给出来** ✗ —— 它说的是"哪一条不行" ✓
-        //    （缺 html/body ✓、引了外部脚本 ✓…），不是笼统的"数据不可用"✗。
-        toast('导入失败：' + e.message);
-      }
-      inp.value = '';
-    };
-    inp.click();
-  };
-
-  /** ⋯ 里的重命名 ✓ —— 「重命名会同步所有地方」✓（用户 2026-10-07 晚上定的 ✓）。 */
-  const openRenameSheet = (slug, current) => openNameSheet({
-    heading: '重命名',
-    initial: current,
-    cta: '保存',
-    save: async (name) => {
-      await api(`/components/${encodeURIComponent(slug)}/rename?group_id=${group.id}`,
-                { method: 'POST', body: JSON.stringify({ title: name }) });
-      // ★ 服务端把**每一版**的标题一起改了 ✓，所以这里只要把**已经画出来的
-      //   那一堆**重新拉一遍就行 ✓（收纳页的组件名 ✓）。
-      if ($('#workshop').classList.contains('on')) renderWorkshop();
-      toast('改好了');
-    },
-  });
-
   $('#openSettings').onclick = openSettings;
-  $('#wsManage').onclick = openCompManager;
   $('#backChat').onclick = closeSettings;
 
   // ⚠️ **退出登录**那一段的说明留在上面那个 `logout()` 里 ✓（2026-10-08 合并时

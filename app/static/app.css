@@ -809,19 +809,6 @@
        组件都在沙箱里、文件之间本来就隔离 ✓，分不分没有实际区别 ✓。
        于是这一屏只剩一件事：**列出来** ✓（「未固化」那套 2026-10-07 深夜也去掉了 ✓）。 */
   #workshop { z-index:22; background:#f4e5c7; }
-  /* ⋯ 组件管理：挂在工坊右上角 ✓（`#wsManage` ✓，见 `openCompManager`）。
-     ⚠️ 让开状态栏 ✓（`--inset-top` 由壳报进来 ✓）；半透明底、不抢小屋 ✓；
-        `touch-action:manipulation` 去掉双击缩放那 300ms ✓。 */
-  #wsManage { position:absolute; z-index:3;
-              top:calc(var(--inset-top) + 8px); right:12px;
-              width:38px; height:38px; border-radius:50%;
-              display:flex; align-items:center; justify-content:center;
-              border:1px solid rgba(117,88,58,.22);
-              background:rgba(255,250,238,.82); color:#75583a;
-              font-size:20px; line-height:1; letter-spacing:1px;
-              box-shadow:0 4px 12px rgba(97,61,34,.12);
-              touch-action:manipulation; }
-  #wsManage:active { background:rgba(255,250,238,.96); }
   /* 组件页压着工坊 ✓（返回时先关它，露出的就是工坊 ✓）。 */
   /* ★ 2026-10-08 合并那次新加的三屏（登录/初始化/我的）✓ —— z-index 的排法：
         · `#login` / `#init` 是**根**（用 `show()` 整屏替换 ✓，不叠加 ✓）→ 1 和 2 ✓
@@ -1352,24 +1339,6 @@
                   padding:18px 18px; max-height:100%; overflow-y:auto; }
   .sheet h3 { margin:0 0 14px; font-size:16px; }
 
-  /* 工坊那个 ⋯ 菜单 —— 它住在 `.sheet .panel` 里 ✓，
-     ⚠️ **不能借 `.ascreen .row` 那套** ✗（那一套是按 `.ascreen` 限定的 ✓，
-        弹层不是 `.ascreen` ✓）—— 借了就是"点了没样式、像一行光字" ✓。 */
-  /* ⚠️ **居中** ✓（用户 2026-10-07 深夜看着截图定的 ✓）——
-     原来靠左 ✓，他说要居中 ✓。底下那个「取消」本来就是居中的 ✓，
-     于是这一列从上到下就齐了 ✓。 */
-  .wsmenu { display:flex; flex-direction:column; }
-  .wsmenu button { width:100%; text-align:center; background:none; border:0;
-                   border-bottom:1px solid var(--line); padding:15px 4px;
-                   color:var(--text); font:inherit; font-size:15.5px; }
-  .wsmenu button:last-child { border-bottom:0; }
-  .wsmenu button:active { background:var(--panel2); }
-  /* 重命名那个输入框 —— 和群聊输入框同一套观感 ✓（16px 是**防 iOS 聚焦缩放**的 ✓） */
-  .rninput { width:100%; box-sizing:border-box; padding:12px 14px; margin-bottom:4px;
-             background:var(--panel2); border:1px solid var(--line); border-radius:12px;
-             color:var(--text); font:inherit; font-size:16px; }
-  .rninput:focus { outline:none; border-color:var(--accent); }
-  .rnhint { color:var(--muted); font-size:13px; line-height:1.7; margin:-6px 0 12px; }
 
   /* ── 一个居中的确认框 ✓ ──────────────────────────────────────────────
      ⚠️ **不用弹层那套** ✗（`.sheet` 是从底下升上来的 ✓，那是"选点什么"的姿势 ✓）：

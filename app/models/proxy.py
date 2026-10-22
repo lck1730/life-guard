@@ -190,10 +190,9 @@ async def v1_proxy(path: str, request: Request):
     data = store.load()
     chosen, role = store.pick(data, want)
     if not chosen:
-        # 说清楚**是哪一档缺** ✓ —— 泛泛一句"没配模型"等于让人自己猜三个槽哪个空着 ✗
+        # 2026-10-22 起只有一个模型 ✓ —— 不再是"哪一档缺" ✗
         return JSONResponse(
-            {"error": {"message": f"「{store.ROLE_LABEL[role]}」这一档还没选模型"
-                                  "（App 的「设置 → 模型」里选一下）",
+            {"error": {"message": "还没选模型（App 的「设置 → 模型」里选一下）",
                        "type": "lifeguard_models"}},
             status_code=503)
 
