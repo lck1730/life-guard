@@ -942,19 +942,17 @@ def _turn_instruction(must_speak: bool, *, stale: bool = False,
     因为那不在本轮 prompt 里；Hermes 的会话历史虽然带着，但它不会主动去比对时间序。
     """
     if idle:
-        # ★ 空闲轮是**闲聊**，不是"回应谁" ✗→✓（2026-10-22 用户报的：
-        #   「它会幻想不存在的东西然后问我们」——18:52 那次凭空冒出一句
-        #   「记什么？没看到金额和类别」，前一小时根本没人让它记账 ✓）。
-        #   光说"别编造"不够：**没有素材**的时候模型就会自己续剧情 ✓。
-        #   所以 run_turn 会把**真实聊天记录**一起给它 ✓，这里再收紧用法 ✓。
+        # ★ 空闲轮是**活人随口说话**，不是"回应谁"，更不是做任务 ✓
+        #   （2026-10-22 用户纠正：不要拿最近聊天当素材接话 —— 群里大多在记账，
+        #    喂什么它就说回什么，出来全是记账，很机械 ✓）。
+        #   给它的是**自由**：按自己的性子和对群里人的印象挑话题，吐槽/玩笑/梗/
+        #   冷笑话/废话都行 ✓。唯一守的是**事实**：不能把没发生的事说成发生过 ✓。
         return (
-            "这一轮是**你自己想开口**，不是回应谁——没有新消息，"
-            "也没有人在等你回答。\n"
-            "只就上面**真实聊过**的事随口接一句（最多两句），"
-            "像群里的人插一句话那样。\n"
-            "不要开新话题；不要提记录里没有的人、事、数字；"
-            "不要假装有人刚问过你什么、让你记账或等你确认；"
-            "也不用引用旧消息。\n"
+            "这一轮是**你自己想开口** —— 不是回应谁，也没有任务要完成。\n"
+            "按你的性子和对群里这几个人的了解，想说什么就说什么："
+            "吐槽、玩笑、梗、冷笑话、一句没意义的废话都行，最多两句。\n"
+            "别为了接话去翻旧聊天；也别把没发生过的事说成发生过 ——"
+            "不要假装有人刚说过/问过什么，不要凭空提某笔账、某个数字。\n"
             "没什么想说的就回 [SILENT]。"
         )
     if must_speak:
@@ -1533,61 +1531,6 @@ async def _has_stale_messages(group_id: int, pending: list[dict[str, Any]]) -> b
     return any(int(m["created_at"]) < last_reply for m in pending if m.get("created_at"))
 
 
-#: 空闲轮带多少条真实聊天当素材。20 条够看清"刚在聊什么"，又不至于把
-#: 一整天的流水塞进去（那反而会让它抓不住重点）。
-_IDLE_RECENT_MESSAGES = 20
-
-
-async def _recent_chat_for_idle(group_id: int, agent_name: str) -> str:
-    """给空闲闲聊轮取一段**真实聊天记录**当素材。
-
-    ★★ 为什么必须显式给 ✗→✓（2026-10-22 用户报的「主动冒泡会幻想不存在的东西」）★★
-
-      空闲轮的 `pending` 只有一条系统唤醒语 ✓ —— 正文里**一条真实消息都没有** ✗。
-      它手里只剩 Hermes 的会话历史 ✓，而它不会主动去比对"哪句是最近说的" ✓，
-      没有素材的时候就**自己续剧情** ✗：
-        · 2026-10-21 14:11 凭空说「14.21 那笔我没记进去」✓（没人说过 14.21 ✓）；
-        · 2026-10-22 18:54 凭空问「记什么？没看到金额和类别」✓（前一小时没人让它记账 ✓）。
-      用户要的主动冒泡是「**接着已有的聊天随口说一句**」✓ ——
-      所以"已有的聊天"必须**明确放进这一轮正文** ✓，而不是指望它从历史里自己翻 ✓。
-
-    只取 user / agent 两类：system 里混着提醒、失败通报，放进闲聊素材会串味 ✓。
-    """
-    # ⚠️ `messages` 表里**没有** `sender_nickname` 这一列 ✗ —— 昵称在
-    #    users / group_members 上 ✓（见 core/messages.py 的 `_SELECT` ✓）。
-    #    直接 SELECT 那一列会 OperationalError，**每一轮空闲唤醒都会炸** ✗。
-    rows = await fetch_all(
-        "SELECT m.id, m.sender_type, m.msg_type, m.content, m.media_path, "
-        "       m.media_meta, m.created_at, "
-        "       COALESCE(gm.nickname, u.nickname) AS sender_nickname "
-        "FROM messages m "
-        "LEFT JOIN users u ON u.id = m.sender_id "
-        "LEFT JOIN group_members gm "
-        "       ON gm.group_id = m.group_id AND gm.user_id = m.sender_id "
-        "WHERE m.group_id = ? AND m.sender_type IN ('user', 'agent') "
-        "ORDER BY m.id DESC LIMIT ?",
-        (group_id, _IDLE_RECENT_MESSAGES),
-    )
-    rows.reverse()                      # 查的时候倒序取最近，给它的时候正序 ✓
-    # 「（已回复）」这类状态词不算聊天内容 ✓ —— 留在素材里只会让它学样 ✗
-    rows = [r for r in rows if not _is_meta_only(r.get("content") or "")]
-    # ★ **掐掉最后一条用户消息之后那些"很久之后才冒出来的 agent 发言"** ✓
-    #   它们大多是主动冒泡/提醒 ✓（实测：用户 12:30 说完，它 18:54 凭空问
-    #   「记什么？没看到金额和类别」✓）。把这种句子当素材喂回去，
-    #   等于**把它自己编的提问再确认一遍** ✗ —— 下一轮更可能接着编 ✓。
-    #   判据只对**末尾**的 agent 发言生效：正常回复不会隔 15 分钟以上 ✓
-    #   （模型一轮几秒到几十秒 ✓；后台重启/断流的补发也远到不了这个量级 ✓）。
-    last_user = max((i for i, r in enumerate(rows)
-                     if r.get("sender_type") == "user"), default=None)
-    if last_user is not None:
-        anchor = int(rows[last_user].get("created_at") or 0)
-        rows = [
-            r for i, r in enumerate(rows)
-            if i <= last_user
-            or int(r.get("created_at") or 0) - anchor <= 15 * 60
-        ]
-    return _render_transcript(rows, agent_name)
-
 
 async def run_turn(
     group_id: int,
@@ -1630,27 +1573,20 @@ async def run_turn(
     #   原来这里不看轮次，一律写「以下是群里最近的一批消息」——可空闲唤醒的
     #   pending 只有系统唤醒语，一条用户消息都没有 ✓。二狗那次就是被这句话
     #   诱导，自己续出了一条「用户说中午吃面 14.21」✓。标题得如实说。
+    #
+    # ★ 2026-10-22 再改：**不要给最近聊天当素材** ✗ —— 群里大多在记账，
+    #   喂什么它就说回什么，冒出来全是记账，很机械 ✓（用户原话：
+    #   「插话讲究活人感……它应该根据人的性格选择一个话题」✓）。
+    #   空闲轮只给唤醒语和当前时间，话题由它自己挑 ✓
+    #   （见 `_turn_instruction(idle=True)`）；事实只往下守、不往上引 ✓。
     idle = is_idle_turn(group_id)
-    if idle:
-        # ★ 空闲轮也得有**真实的**聊天素材 ✗→✓（见 `_recent_chat_for_idle`）。
-        #   唤醒语 + 真实记录分开放：前者是"系统在叫你"，后者是"群里说过的话"，
-        #   混成一段它会分不清哪句是新的 ✓。
-        recent = await _recent_chat_for_idle(group_id, agent_name)
-        material = (
-            "—— 群里最近的真实聊天（**旧消息，只作接话的素材**；"
-            "不是新消息，也不是在问你）——\n"
-            f"{recent or '（这个群最近还没聊过什么。）'}\n"
-            "—— 素材到此为止 ——\n\n"
-        )
-        header = (
-            "本轮**没有**新的群消息；下面第一段是系统的唤醒语，"
-            "第二段是给你接话用的真实记录：\n\n"
-        )
-    else:
-        material = ""
-        header = "以下是群里最近的一批消息（按时间顺序）：\n\n"
+    header = (
+        "本轮**没有**新的群消息；下面这段是系统的唤醒语，不是谁说的话：\n\n"
+        if idle else
+        "以下是群里最近的一批消息（按时间顺序）：\n\n"
+    )
     text_part = (
-        f"{header}{prompt}\n\n{material}"
+        f"{header}{prompt}\n\n"
         f"{_now_stamp()}\n\n"
         f"你是「{agent_name}」。"
         f"{_turn_instruction(must_speak, stale=stale, idle=idle)}"
