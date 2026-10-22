@@ -28,6 +28,13 @@
     return s;
   };
 
+  /** 测一下（脉冲线）—— 之前模型页那颗，和远程CC 保持同一个形状 */
+  const mTestIcon = () => {
+    const s = mkel('span');
+    s.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 12 7 12 10 5 14 19 17 12 22 12"/></svg>';
+    return s;
+  };
+
   /** 哪一套在用：chat 槽（换的时候两个槽一起写） */
   const activeId = (d) => ((((d || MODELS || {}).roles || {}).chat || {}).id) || '';
 
@@ -223,9 +230,10 @@
         };
         row.appendChild(pk);
 
-        const tb = mkel('button', 'ptest' + (r.ok === true ? ' good' : r.ok === false ? ' bad' : ''),
-                        r.ok === true ? '✓' : r.ok === false ? '✗' : '测');
+        const tb = mkel('button', 'ptest' + (r.ok === true ? ' good' : r.ok === false ? ' bad' : ''));
         tb.type = 'button';
+        tb.setAttribute('aria-label', '测一下');
+        tb.appendChild(mTestIcon());
         if (r.msg) tb.title = r.msg;
         tb.onclick = async (ev) => {
           ev.stopPropagation();

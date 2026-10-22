@@ -1341,7 +1341,9 @@
   .mpickrow.on .mpid { color:var(--accent); }
   .mpctx { flex:none; font-family:var(--mono); font-size:11px; line-height:1; color:var(--muted); }
   .ptest { flex:none; width:30px; height:28px; border-radius:7px; background:var(--panel);
-           border:1px solid var(--line); color:var(--muted); font-size:11px; }
+           border:1px solid var(--line); color:var(--muted);
+           display:grid; place-items:center; }
+  .ptest svg { width:16px; height:16px; }
   .ptest.good { color:var(--accent); border-color:var(--accent); }
   .ptest.bad { color:var(--danger); border-color:var(--danger); }
   .ptest[disabled] { opacity:.5; }
