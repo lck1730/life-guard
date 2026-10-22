@@ -60,10 +60,6 @@ from .api.internal import (_HTML_MAX, _prune_component_versions,
 from .api.media import router as media_router
 from .api.shell import router as shell_router
 from .api.shell import sweep_leaving as shell_router_sweep
-from .api.workshop import note_component_task
-from .api.workshop import poke_component_task
-from .api.workshop import poke_loop
-from .api.workshop import router as workshop_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -91,10 +87,6 @@ async def lifespan(app: FastAPI):
     tasks = [
         asyncio.create_task(reminders.ticker_loop()),
         asyncio.create_task(idle.loop()),
-        # ★ 工坊的「等子代理交付」✓（2026-10-07 深夜 ✓）——
-        #   子代理的结果**只有下一轮才看得到** ✓，而工坊的下一轮只有用户说话才会来 ✓
-        #   → 得有人替它开口 ✓。见 `routes_workshop.poke_loop` 那段 ✓。
-        asyncio.create_task(poke_loop()),
     ]
     try:
         yield
@@ -137,7 +129,6 @@ app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 app.include_router(groups_router)
 app.include_router(media_router)
 app.include_router(internal_router)
-app.include_router(workshop_router)
 # ★ 2026-10-08 合并：**「壳」那一半搬进来了** ✓（登录 / 注册 / 账号 / 生活空间 ✓）。
 #   路径一个字没改 ✓ —— 手机上缓存着老页面、老书签 ✓。
 #   ⚠️ 挂载顺序有讲究 ✗：它必须在 `groups_router` **之后** ——
@@ -701,65 +692,6 @@ async def _spots_of(group_id: int) -> dict[str, int]:
 
 
 
-async def _ensure_wall(group_id: int) -> None:
-    """保证这个群有「组件界面diy」那一格 ✓，而且**排在第一个** ✓。
-
-    ★ 用户 2026-10-08 定的 ✓（原话：「提供一个默认组件聊天入口，名字叫[组件界面diy]…
-       **并且这个不可删除**，其他的依旧按照原来的进行」✓）。
-
-    ⚠️ 它**不是一个真的组件** ✗ —— 它没有 HTML 文件 ✓、点了也不会去渲染什么 ✓
-       （前端认这个 slug ✓，点了就直接进它那条对话 ✓）。
-       库里那一行只是"让它在收纳页上有一格"✓、以及"让那条对话有个 slug 可挂"✓。
-    ⚠️ **懒建** ✓：谁先进收纳页/谁先下拉，谁就把它建出来 ✓ ——
-       不需要在开通工作区那一步多写一段 ✓（老空间也不用补数据 ✓）。
-    """
-    await _ensure_wall_task(group_id)      # ← 顺手把对话建出来 ✓（见它那段 ✓）
-    row = await fetch_one(
-        "SELECT id FROM components WHERE group_id = ? AND slug = ? LIMIT 1",
-        (group_id, WALL_SLUG))
-    if row:
-        return
-    await execute(
-        "INSERT INTO components(group_id, slug, version, state, title, icon, "
-        "data_json, created_at) VALUES(?,?,?,?,?,?,?,?)",
-        (group_id, WALL_SLUG, 1, "live", "组件界面diy", "🎨", "{}", now()))
-    # ★ 排在**第一个** ✓ —— 位置表里给个 -1 ✓（`_scan_components` 按 pos 排 ✓，
-    #   没排过的垫底 ✓，所以 -1 稳在开头 ✓）。
-    await execute(
-        "INSERT INTO component_spots(group_id, slug, pos, updated_at) VALUES(?,?,?,?) "
-        "ON CONFLICT(group_id, slug) DO UPDATE SET pos=excluded.pos",
-        (group_id, WALL_SLUG, -1, now()))
-    log.info("群 %s：建出了「组件收纳页」那一格", group_id)
-
-
-async def _ensure_wall_task(group_id: int) -> int | None:
-    """保证「组件收纳页」在**创意工坊里也有一条对话** ✓（2026-10-09 用户定的：
-    「没有[组件收纳页]的修改入口，应该在创意工坊里默认存在且不可删除」✓）。
-
-    ⚠️ 它和普通对话有两点不同 ✗：
-      · **每个人都能看见** ✓（`_my_tasks` 里对它不做 user_id 过滤 ✓）——
-        它不是"谁开的对话" ✓，它是这个群的一件东西 ✓。
-      · **删不掉** ✓（`task_delete` 里拦 ✓）—— 删了那一屏就没人能改了 ✓。
-    归属写成**建群那个人** ✓（库里得有个 user_id ✓，反正是共用的 ✓）。
-    """
-    row = await fetch_one(
-        "SELECT id FROM workshop_tasks WHERE group_id = ? AND slug = ? ORDER BY id LIMIT 1",
-        (group_id, WALL_SLUG))
-    if row:
-        return int(row["id"])
-    owner = await fetch_one(
-        "SELECT user_id FROM group_members WHERE group_id = ? ORDER BY joined_at LIMIT 1",
-        (group_id,))
-    if not owner:
-        return None
-    tid = await execute(
-        "INSERT INTO workshop_tasks(group_id, user_id, slug, title, created_at, updated_at) "
-        "VALUES(?,?,?,?,?,?)",
-        (group_id, int(owner["user_id"]), WALL_SLUG, "组件收纳页", now(), now()))
-    log.info("群 %s：建出了「组件收纳页」那条对话（id=%s）", group_id, tid)
-    return int(tid)
-
-
 async def _scan_components(group_id: int) -> list[dict]:
     """这个群有哪些组件 —— **以库为准** ✓。
 
@@ -771,7 +703,6 @@ async def _scan_components(group_id: int) -> list[dict]:
       所以每个 slug 回的就是**最新的那一版**长什么样 ✓
       （名字、图标、怎么摆 ✓）—— 界面上不再有任何"状态"要表达 ✓。
     """
-    await _ensure_wall(group_id)
     rows = await fetch_all(
         "SELECT slug, version, state, title, icon, note, spot_json, created_at"
         " FROM components WHERE group_id = ? ORDER BY slug ASC, version DESC",
@@ -781,11 +712,8 @@ async def _scan_components(group_id: int) -> list[dict]:
     out: dict[str, dict] = {}
     for r in rows:
         slug = str(r["slug"])
-        # ★ **「组件界面diy」不进这一列** ✗→✓（2026-10-09 用户定的：
-        #   「组件收纳界面不要有组件界面diy这个图标和入口，它本身点进去
-        #     不是一个独立组件」✓）。
-        #   ⚠️ 它那一行**还在库里** ✓（`_ensure_wall` 照旧建 ✓ ——
-        #      改名/删除那两道闸门认的就是这个 slug ✓），只是**不列出来** ✓。
+        # 老数据里的「组件界面diy」占位行不再列出来。
+        #   ⚠️ 老库里可能还留着这个 slug 的那一行 ✓，只是**不列出来** ✓。
         #   ⚠️ 也不用前端过滤 ✗ —— 过滤写在显示层的话，
         #      "空状态"就成了前端自己的判断 ✓（只有这一格时该说"还没有组件"✓）。
         if slug == WALL_SLUG:
@@ -887,32 +815,10 @@ async def component_render(
         log.warning("组件 %s v%s 的 data 声明取不到任何东西：%s",
                     name, row["version"], row["data_json"])
 
-    # ★ 这一版是**哪条对话**做出来的（2026-10-07 ✓）—— 「继续改」靠它回到
-    #   当初那条对话 ✓（不然每次点"继续改"都是一条全新的、什么都不记得的对话 ✓）。
-    #
-    # ★ **2026-10-11：谁都能回那条对话** ✗→✓（不再"只在自己那条上返回"）。
-    #   对话变成**群共享**之后（`routes_workshop._own_task` 只认 `group_id` ✓），
-    #   这个组件的来龙去脉就**只有一条线** ✓ —— 任何人点「继续改」都进**同一条** ✓，
-    #   前面那个人说的话才在上下文里 ✓。
-    #
-    #   原来的判法是：`task_id` 指的不是**当前用户**的那条就返回 None ✗ →
-    #   前端去开一条**新的** ✓。那正是"一人一条"造成的结果：
-    #   同一个组件在群里长出**好几个人各一条**的对话，互相看不见对方说过什么 ✗。
-    #
-    #   现在只认**同一个群** ✓（挡住跨群串门 ✓）；那条对话被删了（404）
-    #   就返回 None ✓，前端照旧走"开条新的"✓ —— 降级路径不变 ✓。
-    task_id = row["task_id"] if "task_id" in row.keys() else None
-    mine = None
-    if task_id:
-        own = await fetch_one(
-            "SELECT id FROM workshop_tasks WHERE id = ? AND group_id = ?",
-            (int(task_id), group_id))
-        mine = int(own["id"]) if own else None
     return {"name": name, "version": int(row["version"]), "state": row["state"],
             "title": str(row["title"] or name),
             "icon": str(row["icon"] or "🧩"),
             "note": str(row["note"] or ""),
-            "task_id": mine,
             "html": html,
             "data": data}
 
@@ -1036,7 +942,7 @@ async def component_export(
       不在这个文件里 ✓。所以"这一版"就等于这一个文件 ✓ ——
       一份文件进、一份文件出，才是"我能自己存一份"该有的样子 ✓。
 
-    ⚠️ **导出**不占对话、不通知群、不顶 diy 助手 ✗ —— 它是**他一个人在备份** ✓，
+    ⚠️ **导出**不占对话、不通知群、不打扰任何人 ✗ —— 它是**他一个人在备份** ✓，
       群里不需要知道 ✓（"有人导出了记账"这种通知只会让人困惑 ✓）。
     """
     await require_member(group_id, user["id"])
@@ -1081,7 +987,7 @@ async def component_import(
       上一版还在 ✓（在"只留三份"的上限内 ✓）。要是覆盖掉，
       他就再也回不到刚才那版了 ✗ —— 而"回不去了"正是他来导入的原因 ✗。
 
-    ⚠️ **`title` / `icon` / `data_json` / `note` / `spot_json` / `task_id`
+    ⚠️ **`title` / `icon` / `data_json` / `note` / `spot_json`
       全部沿用当前那版** ✗ —— 导入是**同一个组件的一次修订** ✓，
       不是新组件 ✗。只换 HTML ✓；换名字走**重命名** ✓。
 
@@ -1098,13 +1004,6 @@ async def component_import(
 
     why = _validate_component_html(body.html)
     if why:
-        # ★ **失败也要让 diy 助手知道** ✗→✓ —— 用户原话：
-        #   「校验失败会让 diy 助手提示导入数据不可用」✓。
-        #   走 `note_component_task`（**不发起模型回合**）✓，不走 poke ✗：
-        #   那句话得**原样**落在屏上 ✓，而 poke 轮本来就设计成可以 `[SILENT]` ✗。
-        await note_component_task(
-            group_id, name,
-            "（有人试过把一份文件导入成新一版，**没通过校验**：" + why + "。）")
         log.warning("组件导入被拒：群 %s 的 %s —— %s（用户 %s）",
                     group_id, name, why, user["id"])
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "导入的数据不可用：" + why)
@@ -1122,27 +1021,22 @@ async def component_import(
                             "写不进组件仓库：" + str(exc))
     await execute(
         "INSERT INTO components(group_id, slug, version, state, title, icon,"
-        " data_json, note, created_at, task_id, spot_json)"
-        " VALUES(?,?,?,'draft',?,?,?,?,?,?,?)",
+        " data_json, note, created_at, spot_json)"
+        " VALUES(?,?,?,'draft',?,?,?,?,?,?)",
         (group_id, name, ver, str(cur["title"] or name), str(cur["icon"] or "🧩"),
-         cur["data_json"], cur["note"], now(), cur["task_id"], cur["spot_json"]))
+         cur["data_json"], cur["note"], now(), cur["spot_json"]))
     pruned = await _prune_component_versions(group_id, name)
 
-    # ★ **成功后顶它一下** ✗→✓ —— 用户原话：
-    #   「导入成功后也要让 diy 助手感知，以防下次修改发现不对会疑惑」✓。
-    #   ⚠️ **忙的时候不顶** ✗ → `poke_component_task` 返回 False ✓：
-    #   不是故障 ✓，是"等下一轮它自然就会读到" ✓（对话里有那句话 ✓）。
-    poked = await poke_component_task(group_id, name)
-    log.info("组件导入：群 %s 的 %s → v%s（用户 %s，顶了=%s）"
+    log.info("组件导入：群 %s 的 %s → v%s（用户 %s）"
              + ("，收掉 v%s" if pruned else ""),
-             group_id, name, ver, user["id"], poked, pruned)
+             group_id, name, ver, user["id"], pruned)
     return {"ok": True, "version": ver, "title": str(cur["title"] or name),
-            "pruned": pruned, "poked": poked}
+            "pruned": pruned}
 
 
 @app.get("/api/wall-css")
 async def wall_css(group_id: int = Query(...), user: dict = Depends(current_user)) -> dict:
-    """这一屏（[组件]界面）自己的外观 ✓ —— 由「组件界面diy」那条对话写 ✓。
+    """这一屏（[组件]界面）自己的外观 ✓ —— 由组件仓库维护 ✓。
 
     ⚠️ **要登录 + 要是成员** ✓（`require_member` ✓）—— 这段 CSS 属于**这个群** ✓，
        别的群的人不该读到 ✓（虽然 CSS 本身不敏感 ✓，但"谁有什么组件"是隐私 ✓）。
@@ -1167,25 +1061,10 @@ async def component_delete(
 
     ★ 2026-10-07 晚上改的语义 ✗→✓ —— 用户定的：「删除组件**等于删除对话**」✓。
       所以"不传版本号"从我原来的"删掉未固化那几版"改成了**整块删** ✓：
-      `components` 全部版本 + 磁盘上的目录 + 它名下的 `workshop_tasks` 和气泡 ✓。
+      `components` 全部版本 + 磁盘上的目录 + 排版记录 ✓。
       界面上那条路只有一处（组件管理页的 ⋯ ✓），而且是**两下才删** ✓。
-
-      ⚠️ **按版本删的那条路不删对话** ✓ —— "删掉 v2 这一版"是**改组件** ✓，
-         不是"把这个东西连同它的来龙去脉一起抹掉"✓。两者混起来的话，
-         用户删掉一个旧版本会连带丢掉整段对话 ✓ —— 那是个很难查的意外 ✓。
-
-    ⚠️ **整块删没有任何"先降下来"的保护** ✓（原来有 ✓ —— 那个时候"不传版本号"
-       删的是实验版 ✓，误删代价小 ✓）。现在它就是"把这个东西抹掉" ✓，
-       保护在**界面上**：两下才删 ✓，而且第一次点完之后按钮上写着
-       "再点一下：连它的对话一起删" ✓ —— **说清代价比拦一道更管用** ✓。
     """
     await require_member(group_id, user["id"])
-    # ★ **「组件界面diy」删不掉** ✗→✓（用户原话："并且这个不可删除"✓）——
-    #   它删不得还有个更硬的理由 ✓：它是**唯一**能改组件界面外观的入口 ✓
-    #   （见 `routes_internal` 的 `_wall_task_ok` ✓）→ 删了那个能力就没人够得着了 ✓。
-    if name == WALL_SLUG:
-        raise HTTPException(status.HTTP_403_FORBIDDEN,
-                            "「组件界面diy」删不掉 —— 组件界面本身要靠它来改")
     if not valid_slug(name):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "组件名不合法")
     where = "group_id = ? AND slug = ?" + (" AND version = ?" if v else "")
@@ -1193,20 +1072,6 @@ async def component_delete(
     rows = await fetch_all(f"SELECT version, state FROM components WHERE {where}", params)
     if not rows:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "没有可删的版本")
-
-    # ★ 整块删（没给版本号）时，把挂在它名下的对话一起收掉 ✓。
-    #   ⚠️ 在 DELETE 之前查 ✓ —— 查完就没人知道这些组件是哪条对话做的了 ✓。
-    wiped: list[int] = []
-    if not v:
-        tids = await fetch_all(
-            "SELECT DISTINCT task_id FROM components"
-            " WHERE group_id = ? AND slug = ? AND task_id IS NOT NULL",
-            (group_id, name))
-        for t in tids:
-            tid = int(t["task_id"])
-            await execute("DELETE FROM workshop_messages WHERE task_id = ?", (tid,))
-            await execute("DELETE FROM workshop_tasks WHERE id = ?", (tid,))
-            wiped.append(tid)
 
     for r in rows:
         await execute("DELETE FROM components WHERE group_id = ? AND slug = ? AND version = ?",
@@ -1221,20 +1086,6 @@ async def component_delete(
     if not v:
         await execute("DELETE FROM component_spots WHERE group_id = ? AND slug = ?",
                       (group_id, name))
-        # ★ **把"冲着它开过"的那些对话的指针清掉** ✗→✓（2026-10-07 深夜，
-        #   用户报的"有些显示删不掉" ✓）。
-        #   ⚠️ 上面删的是**用它做出来的那条对话** ✓（`task_id` 指回来的 ✓）——
-        #      而**别的**对话也可能挂着这个 slug ✓（别人开过、或者开过没做成的 ✓），
-        #      它们**不在** `task_id` 那张名单里 ✗ → 不清的话就留着一个**悬空指针** ✓：
-        #      导航上那一行还以为自己是个组件 ✓、⋯ 里给的是「删除组件」✓、
-        #      一点就 404 ✓ —— 而用户完全看不出为什么 ✗。
-        #   清成空之后，那些对话就老实变成"还没做出组件" ✓（可以正常删掉 ✓）。
-        n = await execute_rc(
-            "UPDATE workshop_tasks SET slug = NULL WHERE group_id = ? AND slug = ?",
-            (group_id, name))
-        if n:
-            log.info("组件删除：顺手把 %d 条对话的悬空指针清了（群 %s 的 %s）",
-                     n, group_id, name)
     # ⚠️ 版本删光之后，那个 **slug 目录也要收掉** ✗→✓ ——
     #    不然仓库里会留一堆空壳 ✓（界面看不见 ✓，因为列表是从库读的 ✓，
     #    但下次同一个 slug 再做一版时，`mkdir(parents=True)` 会**默默复用它** ✓ ——

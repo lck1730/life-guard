@@ -4,7 +4,7 @@
         值只存在这台设备上 ✓，不经过服务端 ✓、不跟空间共享 ✓。
      下面那几个辅助变量（`--hover` / `--accent-line` / `--quote-bg` …）是
      这次顺手收进来的 ✓ —— 原来那些颜色写死在规则里 ✓，浅色主题下会
-     "一块深蓝浮在奶白上" ✗（见 `#wsChat .qchip` 之类 ✓）。 */
+     "一块深蓝浮在奶白上" ✗（见下面那些浅色辅助变量 ✓）。 */
   :root, [data-theme="dark"] {
     --bg:#0f1115; --panel:#171a21; --panel2:#1e222b;
     --text:#e6e8ee; --muted:#8b93a7; --line:#262b36;
@@ -279,7 +279,7 @@
   @keyframes popIn { from { opacity:0; transform:translate(-50%,-50%) scale(.92); }
                      to   { opacity:1; transform:translate(-50%,-50%) scale(1); } }
 
-  /* ── 「我的」那一屏：数据由 JS 画（照 `#agent` / `#diySet` 的规矩 ✓）──
+  /* ── 「我的」那一屏：数据由 JS 画（照 `#agent` 的规矩 ✓）──
      ⚠️⚠️ **这里原来有一条 `#me .abody, #meAccount .abody { padding:8px 0 24px; }`
      —— 2026-10-09 删掉了** ✗→✓，它就是"顶部改两次都没生效"的真凶：
 
@@ -452,8 +452,7 @@
 
      ⚠️ **要连子元素一起开**（`*` ✓）—— 气泡正文里的 `**粗体**` / `` `代码` ``
         那种是**自带颜色的子元素** ✓，只开父级的话那几段还是选不中 ✓。 */
-  .row .bubble, .row .bubble *,
-  .mkrow .mkbub, .mkrow .mkbub * {
+  .row .bubble, .row .bubble * {
     -webkit-user-select:text; user-select:text;
     -webkit-touch-callout:default;
   }
@@ -462,8 +461,7 @@
      那条路和刚加的「保存到相册」按钮**是同一件事的第二个入口** ✓，
      两个入口存到**两个地方**（那个进相册 ✓、系统那个看各家 ROM ✓），
      只会让人问"我到底存哪去了" ✓。**存图片走灯箱那个按钮** ✓（它还会回你一句存哪了 ✓）。 */
-  .row .bubble.media, .row .bubble.media *,
-  .mkrow .mkbub.media, .mkrow .mkbub.media * {
+  .row .bubble.media, .row .bubble.media * {
     -webkit-user-select:none; user-select:none;
     -webkit-touch-callout:none;
   }
@@ -499,16 +497,6 @@
   #qbar .qwho { color:var(--accent); font-size:12px; margin-bottom:2px; }
   #qbar .qtext { color:var(--muted); font-size:13px; white-space:nowrap;
                  overflow:hidden; text-overflow:ellipsis; }
-  /* 工坊那条引用条**用同一套 class** ✓（`.qbody` / `.qwho` / `.qtext` ✓）——
-     只是它是 `#wsQbar` ✓（两屏各有各的 ✓，形状一致 ✓，改一处两边一起变 ✓）。 */
-  #wsQbar { display:flex; align-items:center; gap:8px; background:var(--panel2);
-            border:1px solid var(--line); border-radius:10px; padding:6px 10px;
-            margin:0 12px 6px; }
-  #wsQbar[hidden] { display:none; }   /* 上面写了 display:flex，得显式盖回来 */
-  #wsQbar .qbody { min-width:0; flex:1; }
-  #wsQbar .qwho { color:var(--accent); font-size:12px; margin-bottom:2px; }
-  #wsQbar .qtext { color:var(--muted); font-size:13px; white-space:nowrap;
-                   overflow:hidden; text-overflow:ellipsis; }
   #qbar .qx { background:none; border:none; color:var(--muted); font-size:15px;
               cursor:pointer; padding:2px 4px; line-height:1; }
 
@@ -652,7 +640,7 @@
      ⚠️ 容器**不盖住整个屏幕** ✗（`pointer-events:none` ✓）—— 盖住的话
         手指就滚不动列表了 ✓；收起靠"点别处 / 滚动 / 返回键" ✓（见 JS ✓）。
      z-index 58：在弹层(50)之上 ✓、确认框(60)之下 ✓ —— 和长按那一族保持一致 ✓。 */
-  /* ★ 文件卡片 / 音频条（2026-10-08）—— 群聊和组件对话**共用**这两种样子 ✓ */
+  /* ★ 文件卡片 / 音频条（2026-10-08） */
   .filecard { display:flex; align-items:center; gap:10px; min-width:190px; }
   .filecard .fi { font-size:22px; line-height:1; flex-shrink:0; }
   .filecard .fc { display:flex; flex-direction:column; min-width:0; flex:1; }
@@ -677,8 +665,8 @@
         描行看着像"选中了整个列表项"✓，不是"引用这一条"✓。
      ⚠️ 用 `outline` 不用 `border` ✗ —— border 会改尺寸 ✓，
         在一张正在跟着手滑的列表里，尺寸一变就是"跳一下" ✓。 */
-  .row.swiping, .mkrow.swiping { will-change:transform; }
-  .row.quoteready .bubble, .mkrow.quoteready .mkbub {
+  .row.swiping { will-change:transform; }
+  .row.quoteready .bubble {
     outline:1px dashed var(--accent); outline-offset:2px;
   }
 
@@ -726,7 +714,7 @@
         聊天页照旧垫在底下 ✓，推进来的过程里看得见它 ✓（不然推一半后面是空的 ✗）。
 
      四类：
-       ① **同层推入/推出** —— 设置 → 我的/管家/生活空间；工坊 → 导航 → 对话
+       ① **同层推入/推出** —— 设置 → 我的/管家/生活空间；工坊 → 组件页
           （`pushScreen`/`popScreen` ✓，就是下面这两个关键帧 ✓）
        ② **沉浸式横滑** —— 主群聊 ⇄ 组件界面：**跟手**，不是 CSS 动画 ✓（P7 ✓）
        ③ **弹层/浮卡** —— `+` sheet 从底部上滑（沿用 ✓）、确认框淡入、
@@ -761,7 +749,7 @@
   .ascreen.anim-corner, .ascreen.anim-corner-out,
   #settings.anim-in, #settings.anim-out { will-change: transform; }
   /* ★ **下拉进来的那一屏：从上方滑入** ✗→✓（2026-10-09 用户定的：
-     「下滑以编辑该界面，然后组件界面diy的聊天**从上面滑入**，动效丝滑」✓）。
+     「下滑以编辑该界面，然后组件界面**从上面滑入**，动效丝滑」✓）。
      ⚠️ 它是①那一类（推入/推出）的**同族** ✓，不是新的一类 ✓ ——
         方向不同是因为**手势来的方向不同** ✓：右滑来的从右边进 ✓，
         下拉来的就从上面进 ✓（"动效要说的是它从哪儿来"✓）。
@@ -810,8 +798,8 @@
   .ascreen.anim-corner-out { animation:cornerOut .2s  cubic-bezier(.4,0,1,1) forwards; }
 
   /* ── 创意工坊（右上角那个入口）────────────────────────────────────────
-     三屏：工坊（#workshop，**只罗列组件**）+ 组件页（#compView，压在上面）
-     + 对话屏（#wsChat，从输入框的 ＋ 进 ✓）。
+     两屏：工坊（#workshop，**只罗列组件**）+ 组件页（#compView，压在上面）。
+     工坊右上角那个 ⋯ 进组件管理（改名/导入/导出/删除 ✓）。
      ⚠️ z-index 要**比 .ascreen 的 20 高** ✗ —— 工坊是从群聊进的独立去处 ✓，
         和"管家"那三屏不是一层 ✓（但它进来的时候那三屏都是关着的 ✓，
         高了只是保险 ✓）。
@@ -819,34 +807,39 @@
      ★ 2026-10-07：**分区整个废掉了** ✗→✓（用户定的："不需要分实验区和
        使用区，右上角点击进入就只是单纯地罗列组件" ✓）。理由他自己给了 ✓：
        组件都在沙箱里、文件之间本来就隔离 ✓，分不分没有实际区别 ✓。
-       于是这一屏只剩一件事：**列出来** ✓（「未固化」那套 2026-10-07 深夜也去掉了 ✓）。
-       "做"和"改"都在别处（＋ 进的对话屏 / 组件页 ✓）。 */
+       于是这一屏只剩一件事：**列出来** ✓（「未固化」那套 2026-10-07 深夜也去掉了 ✓）。 */
   #workshop { z-index:22; background:#f4e5c7; }
-  /* ⚠️ **`#compView` 要在 `#wsNav`（24）上面** ✗→✓（2026-10-07 深夜，用户报的：
-     「从组件聊天界面点上方组件名称跳转时，会直接到组件聊天导航页面，返回一下才是
-       组件界面」✓）。
-     原因：导航屏**还开着**（聊天就是从它进去的 ✓）—— 而组件的层级比它低 ✓ →
-     关掉聊天之后**露出的是导航** ✓，组件被压在底下 ✓ ✗。
-     一个固定值要同时满足两个方向 ✓：从导航进组件（要在它上面 ✓）、
-     从组件页那个图标进聊天（聊天要在组件上面 ✓，那是 25 一档 ✓）。 */
+  /* ⋯ 组件管理：挂在工坊右上角 ✓（`#wsManage` ✓，见 `openCompManager`）。
+     ⚠️ 让开状态栏 ✓（`--inset-top` 由壳报进来 ✓）；半透明底、不抢小屋 ✓；
+        `touch-action:manipulation` 去掉双击缩放那 300ms ✓。 */
+  #wsManage { position:absolute; z-index:3;
+              top:calc(var(--inset-top) + 8px); right:12px;
+              width:38px; height:38px; border-radius:50%;
+              display:flex; align-items:center; justify-content:center;
+              border:1px solid rgba(117,88,58,.22);
+              background:rgba(255,250,238,.82); color:#75583a;
+              font-size:20px; line-height:1; letter-spacing:1px;
+              box-shadow:0 4px 12px rgba(97,61,34,.12);
+              touch-action:manipulation; }
+  #wsManage:active { background:rgba(255,250,238,.96); }
+  /* 组件页压着工坊 ✓（返回时先关它，露出的就是工坊 ✓）。 */
   /* ★ 2026-10-08 合并那次新加的三屏（登录/初始化/我的）✓ —— z-index 的排法：
         · `#login` / `#init` 是**根**（用 `show()` 整屏替换 ✓，不叠加 ✓）→ 1 和 2 ✓
         · `#me` / `#meAccount` 是**压上去的**（从设置页进 ✓）→ 12 / 13 ✓
           放在 `#settings`(10) 上面 ✓、`#agent`(20) 下面 ✓ ——
           它们和管家那三屏不会同时开 ✓，档位只是留个次序 ✓。 */
-  /* ⚠️⚠️ **这六屏必须在工坊那一摞（22–29）上面** ✗→✓（2026-10-09 用户实测报的：
-     「在组件聊天界面点击我的头像，**不会立刻进去我的界面，没有反应**」✓）。
-     真因就是这一档 z-index ✗：`#me` 原来是 **12** ✓，而组件对话是 **28** ✓ →
-     推是推上去了 ✓（`#me` 的 `.on` 真的加上了 ✓），**但它排在对话底下** ✗ →
+  /* ⚠️⚠️ **这六屏必须在工坊那一摞（22–26）上面** ✗→✓（2026-10-09 用户实测报的：
+     「在组件界面点击我的头像，**不会立刻进去我的界面，没有反应**」✓）。
+     真因就是这一档 z-index ✗：`#me` 原来是 **12** ✓，而组件页是 **26** ✓ →
+     推是推上去了 ✓（`#me` 的 `.on` 真的加上了 ✓），**但它排在组件页底下** ✗ →
      屏幕上什么都不变 ✓ —— 正是这个项目最怕的"点了没反应"型 ✓。
      更坏的是它**留下了状态** ✗：`#me` 一直开着 →
-       · 组件页上"下滑进对话"**从此失效** ✓（手势第一句就问 `_OTHER_SCREENS` ✓，
-         `#me` 在里面 ✓ → 认不出这一屏 ✓）
+       · 手势识别**从此认不出这一屏** ✓（`_OTHER_SCREENS` 里有 `#me` ✓）
        · 返回时它比谁都晚被关 ✓ → 关完工坊那几屏，**露出的是「我的」** ✗
          （用户报的"本该是主群聊，现在却是我的界面"✓）。
      → 所以这几个"detail 屏"一律提到**工坊那一摞的最上面** ✓：
        它们永远是"最上面那一屏" ✓（只会从设置页/我的/别人/工坊里推进来 ✓，
-       推上来就该盖住一切 ✓）。`#diySet`(29) 在它们下面一档 ✓（两者不会同时开 ✓）。 */
+       推上来就该盖住一切 ✓）。 */
   #me       { z-index:30; }
   #meAccount{ z-index:31; }
   #meEdit   { z-index:31; }   /* 和账号那一屏同档 ✓（不会同时开 ✓） */
@@ -860,21 +853,8 @@
                       margin:-2px 2px 4px; }
   #init     { z-index:2; }
   #compView { z-index:26; }
-  #wsNav    { z-index:24; }
-  /* ⚠️ **`#wsChat` 提到 28（原来 25）** ✗→✓（2026-10-09）——
-     用户定的：「在具体组件内时…下滑进入各自组件的编辑页，且返回时回到各自组件」✓。
-     也就是说**组件页要留在底下开着** ✓（以前是"先关组件页再推对话"✓，
-     因为 `#compView`（26）比 `#wsChat`（25）**高** ✗ → 不关就看不见对话 ✗）。
-     现在改成"聊天严格压在组件页上面" ✓ —— 那正是两个方向都成立的那个值 ✓
-     （从导航进组件：26 > 24 ✓；从组件进聊天：28 > 26 ✓）。
-     ⚠️ `#diySet` 必须跟着**再高一档** ✓（27 → 29）——
-        它原来只保证"比聊天高" ✓，聊天一挪它就压不住了 ✗
-        （症状是老毛病：点了头像，屏幕上什么都不变 ✓）。
-     ⚠️ `__goBack` 那个表要**照着新顺序**改 ✓（见它那段注释 ✓）。 */
-  #wsChat   { z-index:28; }
   /* ⚠️ 下拉的提示条（见 JS 里 `showPullHint`）——
-     只在**收纳页/组件页**上浮现 ✓，所以它要压过这两屏（22 / 26 ✓）、
-     又必须在**聊天屏（28）之下** ✓（聊天一滑进来就该把它盖住 ✓）。
+     只在**工坊/组件页**上浮现 ✓，所以它要压过这两屏（22 / 26 ✓）。
      它 `pointer-events:none` ✓ —— 绝不抢手势 ✓。 */
   #pullHint { position:fixed; left:50%; top:calc(var(--inset-top) + 10px);
               transform:translate(-50%,-140%); opacity:0; z-index:27;
@@ -895,32 +875,6 @@
   /* 拉满了：变色 ✓ —— "现在松手就进去" ✓（不给这个反馈的话，
      用户不知道要拉多远 ✓，只会觉得"拉了没反应" ✓）。 */
   #pullHint.ready { color:var(--accent); border-color:var(--accent-line); }
-  /* ⚠️ **`#diySet` 原来没写 z-index** ✗→✓（2026-10-07 深夜，用户报的：
-     「导航界面点击右上角没有显示 diy 助手的界面」✓）——
-     它落在 `.ascreen` 的默认值（20）上 ✓，而它只可能从 `#wsNav`（24）进去 ✓ →
-     **推上来了，但排在导航屏底下** ✓ —— 屏幕上什么都不变 ✓，
-     看着像"点了没反应" ✓（最像坏掉的一种 ✓）。
-     ⚠️ **"它和 `#wsChat` 不会同时开"是错的** ✗→✓（2026-10-08 用户报的：
-     「在组件聊天界面，我点击 diy 助手头像没反应」✓）——
-     组件聊天里**点头像也进这一屏** ✓（那是用户定的"点头像进详情"✓），
-     于是两屏**确实会同时开着** ✓，而 `#wsChat`（25）在 DOM 里**排在它后面** ✗ →
-     同档时后者压前者 ✓ → 推上来了，屏幕上什么都不变 ✓ —— 和当初那个
-     "点了没反应"一模一样 ✓（同一个坑，从另一条边掉进来 ✓）。
-     所以它必须**比 `#wsChat` 高一档** ✓；`#compView` 是 26 ✓，
-     这两屏不会同时开 ✓，但留一档差更不容易再踩 ✓。 */
-  #diySet   { z-index:29; }    /* 见上面那段：聊天提到 28 → 它跟着到 29 ✓ */
-
-  /* 「＋ 做一个新的」—— 全宽、最显眼 ✓（它是这一屏的主行动 ✓） */
-  /* ★ 用户 2026-10-08：「新建组件距离上方距离小一些，目前有些空」✓ ——
-     把那一列整体往上收一点 ✓（`#wsNav .abody` 的顶距 ✓）。 */
-  #wsNav .abody { padding-top: calc(var(--inset-top) + 6px); }
-
-  #workshop .wsnew { display:flex; align-items:center; justify-content:center; gap:9px;
-                     width:100%; border:1px dashed var(--accent-line); background:var(--accent-soft);
-                     color:var(--accent); border-radius:14px; padding:15px;
-                     font:inherit; font-size:16px; font-weight:600; }
-  #workshop .wsnew:active { background:var(--accent-bg); }
-
   /* ★ 「组件容纳界面」= 一块**画布**（2026-10-07 晚上用户定的 ✓）——
      用户的原话：「整个组件容纳界面就像一张纸」✓，
      默认每个组件「上面是图标，下面是组件名称」✓（跟手机桌面上的应用一样 ✓），
@@ -1000,7 +954,7 @@
   /* 「这个群还没有组件」那一句 ✓（只有收纳页用得到 ✓）。
      ★ **2026-10-09 补成真的"居中"** ✗→✓ —— 用户 2026-10-08 的原话就是
        「只会在界面**居中位置**提示」✓，而这段样式一直只是"顶上一块带内边距的字" ✗
-       （当时看不出来 ✓：收纳页上永远有「组件界面diy」那一格 ✓，这一句**根本轮不到露面** ✓）。
+       （当时看不出来 ✓：收纳页上永远有「组件界面」那一格 ✓，这一句**根本轮不到露面** ✓）。
        那一格撤掉之后 ✓，**新空间进来第一眼就是它** ✓ —— 现在它得看起来像
        "这一屏是空的" ✓，而不是像"上面掉下来一行字" ✓。 */
   /* ★ 2026-10-20：空状态改成**浮在小屋上的一张奶油色小卡片** ✓ ——
@@ -1017,220 +971,20 @@
   /* ── 组件页：**纯预览**（2026-10-07 晚上改的）─────────────────────────
      ★ 用户定的：这一屏「不要有任何的提示和设置选项」✓，
        也**没有**保留/继续改/删除那几个按钮了 ✓（"界面就被压缩了"✓）——
-       那些全搬去了创意工坊的组件管理页 ✓。
-       只留**顶栏右上角一个图标** ✓，指向它在工坊里那条对话 ✓。 */
+       那些全搬去了创意工坊的组件管理页（工坊右上角 ⋯ ✓）。
+       现在整屏**只有组件本身** ✓（连顶栏都没有 ✓）。 */
   /* ★ 2026-10-12：组件预览**铺满整屏** ✗→✓（用户：「组件总是没全屏适配」✓）——
      原来 `.cpwrap` 是一张**带边框圆角、左右各让 14px、上下还 +12** 的卡片 ✗ →
      组件永远只占中间一块 ✓。改成**整屏铺满** ✓：左右贴边 ✓、上下只留**安全区**
      （状态栏 / 导航键 ✓），卡片边框圆角全撤 ✓。
      ⚠️ 安全区**由壳给** ✓ —— 组件自己那套用的是 `position:absolute;inset:0` ✗，
         没读 `env(safe-area-inset-*)` ✗，所以得由这层把它框在安全区里 ✓。
-        （「让它学」= 他去教 diy 助手在组件里自己读 env ✓ —— 学会之后这层
-         的 padding 也能再撤 ✓，现在先兜住 ✓。） */
+        （组件哪天自己读 env 了 ✓，这一层的 padding 就能再撤 ✓，现在先兜住 ✓。） */
   #compView .cpwrap { flex:1; min-height:0; margin:0;
                       padding:var(--inset-top) 0 var(--inset-bottom);
                       overflow:hidden; background:transparent; }
   #compView iframe { width:100%; height:100%; border:0; display:block; }
 
-  /* ── 对话屏（工坊里的那段对话）───────────────────────────────────────
-     和群聊那屏**不是一套东西** ✓：这里是**你一个人对着它** ✓，
-     所以没有"该不该接话"那些东西 ✓ —— 只有消息、状态、输入框 ✓。
-
-     ★ 2026-10-07：入口从**群聊右上角**挪到了**输入框的 ＋** ✓（和 相册/拍摄 并列 ✓），
-       所以它现在是**从群聊直接进**的一屏 ✓（右上角那个还在 ✓，但那个只列组件 ✓）。
-       顶栏多两样：**切换对话**（≡ ✓）和 **⋯**（保留/删除 ✓）。 */
-  #wsChat .mkbody { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain;
-                    padding:14px; display:flex; flex-direction:column; gap:10px; }
-  /* ★ 气泡旁边**带头像**（2026-10-07 深夜 ✓）—— 用户定的：
-     「组件聊天界面也需要有用户区别」✓。左边是小助手、右边是你 ✓
-     （和群聊那套一个朝向 ✓，不用重新学 ✓）。
-     ⚠️ 名字**只写在小助手那边** ✓ —— 你的名字你自己知道 ✓，
-        而它叫什么**是能改的** ✓（改了要立刻看得见 ✓）。 */
-  #wsChat .mkrow { display:flex; gap:8px; max-width:90%; align-items:flex-start; }
-  #wsChat .mkrow.mine { align-self:flex-end; flex-direction:row-reverse; }
-  #wsChat .mkrow .av { width:34px; height:34px; flex:0 0 34px; border-radius:10px;
-                       background:var(--panel2); color:var(--muted);
-                       display:flex; align-items:center; justify-content:center;
-                       font-size:14px; background-size:cover; background-position:center; }
-  #wsChat .mkrow .wrap2 { min-width:0; }
-  #wsChat .mkrow .who { font-size:11.5px; color:var(--muted); margin:0 3px 3px; }
-  #wsChat .mkbub { background:var(--panel); border-radius:14px; padding:9px 13px;
-                   white-space:pre-wrap; word-break:break-word; font-size:15px; }
-  #wsChat .mkrow.mine .mkbub { background:var(--accent-bg); }
-  #wsChat .mkrow.agent .mkbub { background:var(--panel2); }
-  /* 「问题 2/3」那个小标签 —— 让他一眼看见"还有几个" ✓（用户点名的可视化 ✓） */
-  #wsChat .qchip { display:inline-block; margin-right:7px; padding:1px 8px;
-                   border-radius:999px; font-size:12px; font-weight:600;
-                   color:var(--accent); border:1px solid var(--accent-line); background:var(--accent-soft); }
-  #wsChat .mkbub b { color:var(--text); font-weight:600; }
-  #wsChat .mkbub code { font-family:ui-monospace,Menlo,Consolas,monospace;
-                        font-size:13.5px; background:var(--panel2); border:1px solid var(--line);
-                        border-radius:5px; padding:0 4px; }
-  /* 列表项前面那个小圆点（正文里的 `- …`） */
-  #wsChat .mli::before { content:'·'; color:var(--muted); margin-right:7px; font-weight:700; }
-
-  /* ★ 2026-10-12 极客风两件套：代码块 = 终端窗口 ✓ · 流式光标 ✓
-     （用户：「diy 助手聊天设计成极客风，代码渲染搬上来」✓；点阵底 2026-10-12 撤了 ✓）
-     ⚠️ 代码块在**浅色主题下也是深色** ✓ —— 终端就该是黑的 ✓（故意的 ✓）。
-     ⚠️ 全程用 `--mono` ✓（models 屏挂 :root 的那个 ✓），`fillBubble` 那边
-        `mkCodeCard` 全 createElement/textContent ✓，模型写的字不进 innerHTML ✓。 */
-  #wsChat .mkrow.agent .mkbub { border:1px solid var(--line); }
-  /* 流式中的气泡尾巴上带个光标 —— "还在长" ✓（落地那帧摘掉 ✓，见 04 那段 ✓） */
-  @keyframes mblink { 50% { opacity:0; } }
-  #wsChat .mkbub.streaming::after { content:'▍'; margin-left:1px; color:var(--agent);
-                                    animation:mblink 1.06s steps(1) infinite; }
-  #wsChat .mcode { margin:7px 0 2px; border:1px solid #30363d; border-radius:10px;
-                   background:#0d1117; overflow:hidden; }
-  #wsChat .mchead { display:flex; align-items:center; gap:8px; padding:6px 10px;
-                   background:#161b22; border-bottom:1px solid #30363d; }
-  #wsChat .mcdots { display:inline-flex; }
-  #wsChat .mcdots svg { width:38px; height:10px; display:block; }
-  #wsChat .mclang { flex:1; font-family:var(--mono); font-size:11.5px; color:#7d8590;
-                    letter-spacing:.06em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #wsChat .mccopy { width:26px; height:26px; padding:0; border-radius:6px;
-                    display:inline-flex; align-items:center; justify-content:center; color:#7d8590; }
-  #wsChat .mccopy:active { background:#21262d; }
-  #wsChat .mccopy svg { width:14px; height:14px; }
-  #wsChat .mccopy.done { color:#3fb950; }
-  #wsChat .mcbody { margin:0; padding:10px 12px; overflow-x:auto;
-                    font-family:var(--mono); font-size:12.5px; line-height:1.65;
-                    color:#c9d1d9; white-space:pre; }
-  /* 开场那句提示：淡淡的一行，不是消息 */
-  #wsChat .mknote { color:var(--muted); font-size:13.5px; line-height:1.8;
-                    background:var(--panel); border:1px solid var(--line);
-                    border-radius:12px; padding:12px 14px; }
-  /* 顶栏中间那一块：组件名 + 下面一行状态 ✓（和群聊顶栏同一个位置 ✓）。 */
-  #wsChat .hmid { flex:1; min-width:0; display:flex; flex-direction:column;
-                  align-items:center; gap:1px; }
-  /* 名字是个**按钮** ✓（点了直达组件界面 ✓）—— 但长得和原来的标题一模一样 ✓，
-     不然"这里能点"会变成一条要学的规矩 ✗。 */
-  #wsChat .nmtap { background:none; border:0; padding:0; margin:0; color:inherit;
-                   font:inherit; font-size:17px; font-weight:600; max-width:100%;
-                   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #wsChat .nmtap[disabled] { color:inherit; }   /* 没得跳的那种：**照旧是标题** ✓ */
-  #wsChat .nmtap:not([disabled]):active { opacity:.6; }
-  /* ★ 状态：**组件名下面、居中** ✓（用户定的 ✓）。
-     ⚠️ 它说的是"这个组件在干什么" ✓ —— 所以两个状态要**分得开** ✓：
-        · 思考中 → 图标是转圈 ✓（短暂 ✓）
-        · 组件制作中 → 图标是**实心小锤子/方块**那种"在干活"的样子 ✓
-          （转圈和"思考"没区别 ✗，而这一个是**完全不同的性质** ✓：
-           那不是在等它想，是**子代理在写代码** ✓，可能十几分钟 ✓）。 */
-  #wsChat .wsstat { display:flex; align-items:center; gap:5px; max-width:100%;
-                    font-size:11.5px; color:var(--muted); line-height:1.3; }
-  #wsChat .wsstat[hidden] { display:none; }
-  #wsChat .wsstat i { width:11px; height:11px; flex:0 0 11px; border-radius:50%;
-                      border:1.8px solid var(--line); border-top-color:var(--accent);
-                      animation:spin .8s linear infinite; }
-  /* 「组件制作中」那一档：**不转圈，换成一个稳稳的点** ✓ ——
-     转圈的意思是"马上就好"✓，而那一段恰恰是**最久的** ✓；
-     更重要的是：转圈让两档看起来是同一件事的两种强度 ✗，
-     而它们其实一件是"等它说话"、一件是"它在干活" ✓。 */
-  #wsChat .wsstat.busy { color:var(--accent); }
-  #wsChat .wsstat.busy i { border:0; background:var(--accent); animation:pulse 1.4s infinite; }
-  /* ★ **停止按钮**（2026-10-14）—— 原来"停掉"是顶栏一个小胶囊 ✗，
-     用户改成"思考过程就是右边那个可中断的按钮"✓：思考/制作中时，
-     右边的发送**变成停止** ✓（顶栏那个不要了 ✓）。只有在跑的时候露 ✓。 */
-  #wsChat .mkfoot { flex:0 0 auto; display:flex; align-items:flex-end; gap:8px;
-                    padding:10px 12px calc(10px + var(--inset-bottom));
-                    border-top:1px solid var(--line); background:var(--panel); }
-  #wsChat textarea { flex:1; min-width:0; padding:10px 13px; background:var(--panel2);
-                     border:1px solid var(--line); border-radius:16px; color:var(--text);
-                     font:inherit; font-size:16px; resize:none; max-height:120px; line-height:1.4; }
-  #wsChat textarea:focus { outline:none; border-color:var(--accent); }
-  /* ★ 左边固定的 ＋ ✓（添加附件 ✓，和生活管家同款面板 ✓）。 */
-  #wsChat .mkplus { width:44px; height:44px; flex:0 0 auto; display:flex;
-                    align-items:center; justify-content:center; color:var(--muted); }
-  /* ★ 右边固定的发送 ✓（不再和加图来回切 ✓）。思考/制作中时 JS 把它藏掉、
-     露出下面的 .mkstop ✓。 */
-  #wsChat .mksend { width:44px; height:44px; flex:0 0 auto; display:flex;
-                    align-items:center; justify-content:center; color:var(--accent); }
-  /* ★ 思考/制作中的**停止**按钮 ✓ —— 取代发送 ✓，可中断 ✓。
-     稍红一点提示"这是中断、不是发送"✓。 */
-  #wsChat .mkstop { width:44px; height:44px; flex:0 0 auto; display:flex;
-                    align-items:center; justify-content:center; color:var(--danger); }
-  #wsChat .mkstop[hidden] { display:none; }
-  #wsChat .mkstop[disabled] { opacity:.45; }
-  /* 待发的那张图 —— 缩略图 + 一个 ✕ ✓（和生活管家的待发区一个意思 ✓） */
-  #wsChat .mkpend { flex:0 0 auto; display:flex; gap:8px; padding:8px 12px 0; }
-  #wsChat .mkpend[hidden] { display:none; }
-  #wsChat .mkpend .pv { position:relative; width:62px; height:62px; border-radius:10px;
-                        overflow:hidden; border:1px solid var(--line);
-                        background:var(--panel2); }
-  #wsChat .mkpend .pv img { width:100%; height:100%; object-fit:cover; display:block; }
-  #wsChat .mkpend .rm { position:absolute; top:-1px; right:-1px; width:20px; height:20px;
-                        border-radius:0 10px 0 10px; background:rgba(0,0,0,.62);
-                        color:#fff; font-size:12px; line-height:20px; text-align:center; }
-  /* 气泡里的图 ✓ —— 和小管家那边同一套尺寸规矩（max-width 别撑破气泡 ✓） */
-  #wsChat .mkbub.media { padding:6px; }
-  #wsChat .mkbub.media img { max-width:100%; border-radius:10px; display:block; }
-  #wsChat .mkbub .cap { white-space:pre-wrap; padding:7px 7px 3px; }
-
-  /* ── 导航屏（工坊的门口）─────────────────────────────────────────────
-     ★ 2026-10-07 晚上用户定的形状 ✗→✓：＋ 进来**先是这一屏** ✓ ——
-       「导航界面就是比较规整了，**按照顺序**展示了所有组件聊天的入口，
-         点击后就是组件聊天界面，然后还有个新建组件」✓。
-     ⚠️ **是"规整的列表"，不是"图标网格"** ✗→✓ —— 我上一版做成了网格 ✓，
-        用户这一版说的是按顺序排 ✓。和右上角那个"容纳界面"**刻意不一样** ✓：
-        那个是给人看的（爱怎么摆怎么摆 ✓），这个是给人**用**的 ✓
-        （顺序稳定、一眼找到、名字看得全 ✓）。 */
-  #wsNav .navlist { display:flex; flex-direction:column; gap:2px; }
-  #wsNav .navrow { display:flex; align-items:center; gap:12px; width:100%;
-                   background:none; border:0; border-radius:12px;
-                   padding:13px 10px; color:var(--text); font:inherit;
-                   font-size:16px; text-align:left; }
-  #wsNav .navrow:active { background:var(--panel2); }
-  #wsNav .navrow .ico { width:38px; height:38px; flex:0 0 38px; border-radius:11px;
-                        background:var(--panel2); display:flex; align-items:center;
-                        justify-content:center; font-size:20px; line-height:1; }
-  #wsNav .navrow .col { flex:1; min-width:0; }
-  #wsNav .navrow .nm { display:block; overflow:hidden; text-overflow:ellipsis;
-                       white-space:nowrap; }
-  #wsNav .navrow .sub { display:block; font-size:11.5px; margin-top:2px;
-                        color:var(--warn2); }
-  #wsNav .navrow .chev { color:var(--muted); font-size:22px; line-height:1; }
-  /* ★ 参与过这个组件的人的头像（2026-10-07 深夜 ✓）—— 用户定的：
-     「对于每个组件，需要标注其由群里哪些用户参与构建，在导航界面，
-      每个组件的右侧标注头像」✓。
-     ⚠️ 叠着排（后一个压前一个的边 ✓）而不是并排铺开 ✓ ——
-        人一多（比如四个人都参与过 ✓）铺开会把名字挤没 ✓。 */
-  /* ⚠️ `flex:0 0 auto` = **别被挤** ✓ —— 名字再长，头像和 `›` 也保持原样 ✓
-     （名字那一格是 `flex:1` ✓，它先让 ✓）。 */
-  #wsNav .navrow .avs { display:flex; flex:0 0 auto; padding-right:6px; }
-  /* 还没做出组件的那种：**同一个图标、淡一点** ✓（见 `navRow` 那段 ✓）。 */
-  #wsNav .navrow .ico.off { opacity:.45; }
-  /* ★ 图标是**一张图**的时候 ✗→✓（2026-10-07 深夜 ✓）：铺满那个方块 ✓。
-     ⚠️ 用 `object-fit:cover` ✓ —— `contain` 会让方形的图四周留一圈缝 ✓，
-        在一列小方格里看着像"没对齐" ✓（那排图标就不再是一排了 ✓）。 */
-  .imgi img { width:100%; height:100%; object-fit:cover; border-radius:inherit;
-              display:block; }
-  #wsNav .navrow .avs .av { width:26px; height:26px; border-radius:8px;
-                            background:var(--panel2); color:var(--muted);
-                            display:flex; align-items:center; justify-content:center;
-                            font-size:11.5px; border:2px solid var(--bg);
-                            background-size:cover; background-position:center; }
-  #wsNav .navrow .avs .av + .av { margin-left:-9px; }
-  /* diy 小助手在导航右上角那个头像 ✓ */
-  #wsNav .icon-btn .diyav { width:30px; height:30px; border-radius:50%;
-                            background:var(--panel2); color:var(--muted);
-                            display:flex; align-items:center; justify-content:center;
-                            font-size:13px; background-size:cover;
-                            background-position:center; }
-  /* 「新建组件」那一行**跟别的不一样** ✓ —— 虚线框、加号、强调色 ✓。
-     它是这一屏唯一"不是东西"的入口 ✓，长得一样就找不着了 ✓。 */
-  #wsNav .navrow.new { border:1.5px dashed var(--accent-line); color:var(--accent); }
-  #wsNav .navrow.new .ico { background:none; border:1.5px dashed var(--accent-line);
-                            color:var(--accent); font-size:22px; }
-  #wsNav .navlist .navrow.new { margin-bottom:10px; }
-
-  /* 组件管理屏的标题：就是那个组件的名字 ✓。
-     ⚠️ 里面是**两个**元素 ✓，所以要自己摆平 —— `header.sub h2` 只管
-        "占满中间并居中" ✓，不负责里面怎么排 ✓。名字长短不一，**必须能缩** ✓
-        （群里做过的组件名可能是七八个字 ✓，撑不下就把右边的 ⋯ 顶出去 ✓）。 */
-  #wsChat .sub h2 { display:flex; align-items:center; justify-content:center;
-                    gap:7px; min-width:0; }
-  #wsChat .sub h2 .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  /* ⚠️ 这里原来有一条「未固化」的小牌子样式 ✓ —— 2026-10-07 深夜跟着"固化"
-     整套一起删了 ✓（用户定的：组件聊天没有所谓的固化和非固化概念了 ✓）。 */
   /* ⚠️ 顶上那个数是**试出来的** ✓，只影响"没有顶栏"的那几屏
      （我的 / 改资料 / 空间 / 别人 / 自我介绍 ✓），调它不会动到别处 ✓：
        14px（原来那条按 id 写的老规则把它压住了 ✗，改它根本没生效 ✓）
@@ -1244,7 +998,7 @@
                     padding:calc(var(--inset-top) + 30px) 14px calc(var(--inset-bottom) + 24px); }
   /* ⚠️ **有顶栏的那几屏不用再让一次状态栏** ✗→✓（2026-10-09）——
      `header.sub` 自己已经带 `padding-top: calc(var(--inset-top) + 10px)` ✓，
-     把上面那条再叠一次就是**顶栏下面多空出一条状态栏那么高** ✗（`#diySet` 就是这样 ✓）。
+     把上面那条再叠一次就是**顶栏下面多空出一条状态栏那么高** ✗。
      只有**没有顶栏**的那几屏（我的 / 改资料 / 空间 / 别人 … ✓）才需要自己让 ✓。 */
   .ascreen > header.sub ~ .abody { padding-top:14px; }
 
@@ -1408,8 +1162,8 @@
   #themeSet .thint { color:var(--muted); font-size:12.5px; line-height:1.6;
                      text-align:center; margin:2px 8px 18px; }
   /* ★ 2026-10-14：这里原有一对 `.ascreen .swap`（保存下面那颗「取消/返回」小字的样式）✗
-     —— 四屏的 `swap` 块全删了 ✓（改管家资料 · 我的 · 备注 · diy 小助手，见
-     02-agent.js / 05-settings.js / 06-workshop.js ✓），样式跟着拿掉 ✓。
+     —— 几屏的 `swap` 块全删了 ✓（改管家资料 · 我的 · 备注，见
+     02-agent.js / 05-settings.js ✓），样式跟着拿掉 ✓。
      ⚠️ `#login .swap` 是**登录 ⇄ 注册**那个切换 ✓ —— 不同选择器，**别碰** ✓。 */
   .ascreen .btn-save { display:block; width:100%; padding:14px; background:var(--accent);
                        color:var(--on-accent); font-weight:600; font-size:16px;
@@ -1512,7 +1266,7 @@
         所以那条 `.ascreen { z-index:20 }` **没套上它** ✗ → 它**没有任何 z-index** ✓；
         而 `#settings` 是 **10** ✓ → 它**确实被推上去了** ✓，却**压在设置页底下** ✗
         → 屏幕上什么都不动 ✓ —— 用户看到的就是"点了没反应" ✓。
-     （这一类在这个项目里出过好几次：`#me` 被组件对话压住那次 ✓、
+     （这一类在这个项目里出过好几次：`#me` 被组件页压住那次 ✓、
        灯箱被工坊压住那次 ✓ —— **都是"该盖住的没盖住"，而且症状都像"点了坏了"** ✓。）
 
      ⚠️ **不给它加 `.ascreen` 这个类** ✗ —— 那一串 `.ascreen .row` / `.ascreen .abody`
@@ -1645,13 +1399,6 @@
   .modal .box .acts { display:flex; gap:10px; }
   .modal .box .acts button { flex:1; padding:12px; border-radius:12px;
                              font:inherit; font-size:15px; font-weight:600; }
-
-  /* ⚠️ diy 小助手的设置屏**没有自己的样式** ✓ —— 它整屏照抄
-     改管家资料那一屏（`.card.avcard` / `.bigav` / `.tip` / `.field` /
-     `.btn-save` ✓，都在 `.ascreen` 底下 ✓；`.swap` 2026-10-14 已删 ✓）。
-     ⚠️ **别在这儿另发明一套** ✗ —— 两屏一旦各有一套，改一边的间距
-        另一边不跟 ✓，而那是用户**看得见**的不一致 ✓。（原来那几条
-        `.diyhead` / `.diyav2` / `.diychange` 就是这么删掉的 ✓。） */
 
   /* 「+」面板：微信那种横向网格 —— 圆角方块图标 + 下方小字 */
   .plus-grid { display:flex; gap:16px; flex-wrap:wrap; }

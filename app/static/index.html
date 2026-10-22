@@ -130,9 +130,9 @@
   </div>
 </div>
 
-<!-- 我的（数据由 JS 画 ✓ 和 `#agent` / `#diySet` 一个做法 ✓） -->
+<!-- 我的（数据由 JS 画 ✓ 和 `#agent` 一个做法 ✓） -->
 <div class="screen ascreen" id="me"><div class="abody" id="meBody"></div></div>
-<!-- 改资料（头像 + 昵称 ✓）—— 和管家、diy 小助手同一批 class ✓ -->
+<!-- 改资料（头像 + 昵称 ✓）—— 和管家同一批 class ✓ -->
 <div class="screen ascreen" id="meEdit"><div class="abody" id="meEditBody"></div></div>
 <!-- 生活空间：改名 / 邀请码 / 退出该空间（用户 2026-10-08 定的三样 ✓） -->
 <!-- 自我介绍（≤500 字 ✓，可空 ✓）—— 跟着每一轮进它脑子 ✓ -->
@@ -166,13 +166,10 @@
       <div class="status" id="status"><span class="dot"></span><span id="statusText"></span></div>
     </div>
     <!-- ★ 右上角：**刷新** ✓ —— 2026-10-20 用户定的 ✓：
-         「将主群聊右上角的 diy 助手聊天功能关闭，将设置左上角的刷新按钮
-           挪到主群聊右上角」✓。
-         ⚠️ 原来这里是四格图标（创意工坊 → diy 聊天 ✓），**整个拿掉了** ✓；
+         「将设置左上角的刷新按钮挪到主群聊右上角」✓。
+         ⚠️ 原来这里是四格图标，**整个拿掉了** ✓；
             刷新用的是设置页那颗**原封不动的按钮** ✓（`#reloadBtn` 这个 id 没改 ✓，
             下面那段绑定、以及 CSS 里"墨迹离右 23.9px"那个数都原样能用 ✓）。
-         ⚠️ diy 聊天的**代码都留着** ✓（`openUnifiedChat` / `openNewCompChat`
-            仍在 06-workshop.js ✓）—— 以后要恢复，只补一个入口就行 ✓。
          ⚠️ 图标是 SVG（和 ☰ 同一套画法 ✓）而不是文字或 emoji ✗ ——
             字形的墨迹位置算不准 ✓，就没法跟左边对齐 ✓。
          ⚠️ 外面那个 **40px 方框不动** ✓ —— 左中右各 40px 是"群名居中"的保证 ✓。 -->
@@ -282,141 +279,36 @@
 <div class="screen ascreen" id="agent"><div class="abody" id="agentBody"></div></div>
 <div class="screen ascreen" id="agentEdit"><div class="abody" id="agentEditBody"></div></div>
 
-<!-- ★ 创意工坊（2026-10-07）—— 群聊右上角那个入口进的就是这一屏。
+<!-- ★ 组件收纳页（id 仍叫 `workshop` ✓）—— 群聊左滑 / 点猫回来进的就是这一屏。
      它展示**这个群自己**的组件（服务端按 group_id 分目录 ✓），
      空的时候就是"尚未创建组件" ✓。
-     ⚠️ 报给原生的屏名走 pushScreen ✓，这里不用管 ✓。 -->
-<!-- ⚠️ 这个 id 还叫 `workshop` ✗，但它**不再是"创意工坊"** ✓——
-     它是用户说的 **[组件收纳页]** ✓（2026-10-08 定的 ✓）。
-     改 id 要动 6 处调用点 ✓（CSS / `__goBack` / `pushScreen` ✓…），
-     而收益只是"名字好看" ✗ —— 所以留着 id ✓，把名字写在这儿 ✓。
-     创意工坊（那一列对话 + 新建组件）是 `#wsNav` ✓。 -->
+     ⚠️ 报给原生的屏名走 pushScreen ✓，这里不用管 ✓。
+     ⚠️ 这一屏**没有顶栏** ✓：返回靠右滑 / 点猫 ✓，所以管理组件只留右上角
+        一颗很轻的 ⋯ ✓（`#wsManage` ✓）—— 删、改名、导出、导入都在那里 ✓。 -->
 <div class="screen ascreen" id="workshop">
   <!-- ★ **顶部一个字都没有、左上角一个按钮都没有** ✗→✓（用户 2026-10-08：
        「进入后，整个界面没有任何分割，纯然一体」✓）。
        原来这里有个 `header.sub`（返回箭头 + "创意工坊" + 调整位置的十字 ✓）——
        整个删了 ✓：返回靠**右滑** ✓，调整位置靠**长按拖动** ✓，
-       去某条对话靠**下拉** ✓（三个动作都不需要按钮 ✓）。 -->
+       管理组件靠右上角那颗 ⋯ ✓（都不需要顶栏 ✓）。 -->
   <div class="abody" id="wsBody"></div>
+  <button class="ws-manage" id="wsManage" aria-label="管理组件">⋯</button>
 </div>
 
 
-<!-- ★ diy 小助手的设置 ✓（2026-10-07 深夜）—— 从导航屏右上角那个头像进来 ✓。
-     用户定的：「可以设置头像，昵称和一些其他规则，**暂时只有头像和昵称**」✓。 -->
-<div class="screen ascreen" id="diySet">
-  <header class="sub">
-    <button class="icon-btn back" id="diyBack" aria-label="返回">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-           stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 4.5 8.5 12 15 19.5" />
-      </svg>
-    </button>
-    <h2>diy 小助手</h2>
-    <div class="spacer"></div>
-  </header>
-  <div class="abody" id="diyBody"></div>
-</div>
-
-<!-- ★ 组件页（2026-10-07）—— **纯预览** ✓：只有组件本身 + 右上角一个图标。
-     ★ 2026-10-07 晚上：底下那三条按钮（保留 / 继续改 / 删除）**全搬走了** ✓ ——
-       用户定的：「不要有任何的提示和设置选项…这样界面就被压缩了」✓。
-       那些事现在只在创意工坊的组件管理页里做 ✓（顶栏 ⋯ 里 ✓）。 -->
-<!-- ★ 单个组件页 —— **也没有任何 chrome** ✗→✓（2026-10-08）——
-     原来顶部有：返回箭头 ✓、组件名 ✓、右上角"和它对话"那个气泡图标 ✓。
-     三样**全删** ✓：返回靠右滑 ✓，去对话靠**下拉** ✓，名字……组件自己会显示 ✓。 -->
+<!-- ★ 单个组件页 —— **纯预览、没有任何 chrome** ✓（2026-10-08 定的）——
+     返回靠右滑 ✓；组件的删 / 改名 / 导出 / 导入都在收纳页右上角的 ⋯ 里 ✓。
+     名字由组件自己显示 ✓。 -->
 <div class="screen ascreen" id="compView">
   <div class="cpwrap" id="compWrap"></div>
 </div>
 
-<!-- ★ **下拉的提示条** ✗→✓（2026-10-09 用户定的：
-     「下滑时，会出现顶部会慢慢出现一个提示，下滑以编辑该界面」✓）。
+<!-- ★ **左滑的提示条** ✓（用户 2026-10-09 定的：「从群聊主界面左滑进入组件界面时，
+     也要有提示『继续左滑进入创意工坊』和滑入阈值」✓）。
      ⚠️ 它是**一根独立的条** ✓，不是哪一屏的一部分 ✗ ——
-        下拉这个手势在**收纳页**（`#workshop`）和**组件页**（`#compView`）上
-        是同一件事 ✓（都是"去底下那条对话"✓），
-        文案不同而已（见 JS 里 `_pullHintText` ✓）。
-     ⚠️ **不在任何一屏里** ✗ —— 塞进某一屏的话，那一屏一退场它就跟着没了 ✓，
-        而它恰恰要在"聊天从上面滑进来"的过程中**还看得见**（然后被盖住 ✓）。
+        它要在收纳页从右边滑进来的过程中一直看得见 ✓。
      它 `pointer-events:none` ✓（见 CSS ✓）—— 绝不抢手势 ✓。 -->
 <div id="pullHint"></div>
-
-<!-- ★ 对话屏（2026-10-07）—— 工坊里的那段对话，**从输入框的 ＋ 进** ✓。
-     ⚠️ 它是**一条对话自己的页** ✓（不是"所有对话"✓）：
-        ＋ 进来的默认是**上次那条** ✓，点顶栏中间那个名字可以换一条、或者开一条新的 ✓。
-     ⚠️ 顶栏中间那块**是个按钮**（连着个小箭头 ✓），不是死标题 ✓。 -->
-<div class="screen ascreen" id="wsChat">
-  <header class="sub">
-    <button class="icon-btn back" id="wsBack" aria-label="返回">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-           stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 4.5 8.5 12 15 19.5" />
-      </svg>
-    </button>
-    <!-- ★ 状态**放在组件名下面、居中** ✗→✓（2026-10-07 深夜用户定的 ✓）——
-         和群聊顶栏那套一个位置 ✓（那边也是群名下面一行小字 ✓）。
-         ⚠️ 原来它吊在输入框上面 ✓ —— 那个位置属于"你正在打的东西" ✓，
-            状态是**这个组件在干什么** ✓，该跟名字在一起 ✓。 -->
-    <div class="hmid">
-      <!-- ★ **点名字直达组件界面** ✗→✓（2026-10-07 深夜用户定的：
-           「点击聊天界面正上方的组件名称后可以直达该组件界面」✓）。
-           ⚠️ 还没做出组件的那种（没有 slug ✓）**不点得动** ✓ —— 没有东西可直达 ✓，
-              做成可点会让它点一下什么都不发生 ✓（那比不可点更让人犯嘀咕 ✓）。 -->
-      <h2><button class="nmtap" id="wsTitle">组件</button></h2>
-      <div class="wsstat" id="wsStatus" hidden><i></i><span id="wsStatusText"></span></div>
-    </div>
-    <button class="icon-btn" id="wsMore" aria-label="更多">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-        <circle cx="5.2" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/>
-        <circle cx="18.8" cy="12" r="1.9"/>
-      </svg>
-    </button>
-  </header>
-  <div class="mkbody" id="wsMsgs"></div>
-  <!-- ★ 待发的图（2026-10-07 深夜 ✓）—— 和生活管家同一条规矩：
-       选完**不立刻发** ✓，停在这儿等你把它要说的话打完 ✓，点发送才一起走 ✓。
-       ⚠️ 放在输入框**上面** ✓：它和输入框是**一件事的两个部分** ✓
-          （就像引用条那样 ✓），塞进输入框里会把输入框搅乱 ✗。 -->
-  <div class="mkpend" id="wsPend" hidden></div>
-  <!-- 引用条 —— 和群聊那条**同一个形状** ✓（见 CSS 那段 ✓）。
-       ⚠️ 它是**输入状态**的一部分 ✓（微信也是），发完就没 ✓。 -->
-  <div id="wsQbar" hidden>
-    <div class="qbody">
-      <div class="qwho" id="wsQwho"></div>
-      <div class="qtext" id="wsQtext"></div>
-    </div>
-    <button class="qx" id="wsQclose" aria-label="取消引用">✕</button>
-  </div>
-  <div class="mkfoot">
-    <!-- ★ 2026-10-14：左边固定一个 ＋ ✓（用户定的）—— 点开和生活管家群聊同款的
-         附件面板（相册/拍摄/视频/文件/音频 ✓），选完先停在上面待发区 ✓。 -->
-    <button class="mkplus" id="wsPlus" aria-label="添加">
-      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
-           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>
-      </svg>
-    </button>
-    <textarea id="wsText" rows="1" placeholder="想做个什么？"></textarea>
-    <!-- ★ 右边固定**发送** ✓（用户定的：右边发送按钮 ✓）—— 不再和加图来回切 ✓。
-         思考/制作中时它**变成停止** ✓（可中断 ✓，见 #wsStopBtn ✓）。 -->
-    <button class="mksend" id="wsSend" aria-label="发送">
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
-           stroke="currentColor" stroke-width="1.8"
-           stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21.4 12 3.6 21 8.4 12 3.6 3z"/>
-      </svg>
-    </button>
-    <button class="mkstop" id="wsStopBtn" aria-label="停止" hidden>
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-        <rect x="6" y="6" width="12" height="12" rx="3"/>
-      </svg>
-    </button>
-  </div>
-</div>
-<input type="file" id="fileWs" accept="image/*" hidden>
-<!-- ★ 2026-10-14：视频 ✓ —— 用户定的"支持图片和视频" ✓。视频在客户端抽一帧
-     成图（网关没视频模型 ✓），那一帧走和图片同一条路（flash-lite 看图 → glm-5.2）✓。 -->
-<input type="file" id="fileWsVideo" accept="video/*" hidden>
 
 <!-- 设置 -->
 <div class="screen" id="settings">
@@ -600,7 +492,7 @@
      ⚠️ **根因是层叠上下文** ✗：它原来住在主群聊那一屏（`div.screen#chat`）**里面** ✓，
         而 `.screen` 是 `position:fixed` ✓ —— 那本身就**自成一个层叠上下文** ✓ →
         灯箱那个 `z-index:80` **只在那一屏内部有效** ✗，跟别的屏比不了 ✓。
-        于是（用户在**工坊**那条对话里点图 ✓，`#wsChat` 是 28）：灯箱**真的亮了** ✓，
+        于是（用户在**工坊**里点图 ✓，工坊是 22）：灯箱**真的亮了** ✓，
         但整块被压在工坊底下 ✓ → **看不见** ✗（"点了没法放大"）。
         更要命的是那个 `.on` **一直挂着** ✓ —— 一退回主群聊 ✓，工坊一关 ✓，
         群聊那一屏露出来 ✓ → 那个亮着的灯箱**当场现身** ✓ → "主群聊变成了那张图片" ✓。

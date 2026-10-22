@@ -767,8 +767,7 @@ async def _hard_delete_space(uuid: str, gid: int) -> None:
     """
     import shutil
 
-    for table in ("component_spots", "component_tickets", "components",
-                  "workshop_messages", "workshop_tasks"):
+    for table in ("component_spots", "components"):
         try:
             await execute(f"DELETE FROM {table} WHERE group_id = ?", (gid,))
         except Exception:  # noqa: BLE001

@@ -8,7 +8,7 @@
   //    所以这里**每一处都假设自己可能拿到 403** ✓ → 如实报出来 ✓，
   //    别装作"池子是空的" ✗（那会让人以为模型丢了 ✓）。
   let MODELS = null;                 // 最近一次读到的池子
-  const M_LABEL = { chat: '生活管家·chat', diy: '生活管家·diy', aux: '辅助·压缩' };
+  const M_LABEL = { chat: '生活管家·chat', aux: '辅助·压缩' };
 
   const openModels = () => { pushScreen('models', 'settings'); renderModels(); };
 
@@ -60,7 +60,7 @@
     const d = MODELS;
     body.textContent = '';
 
-    // ① 用途分配：三行，点一行挑一个模型 ✓
+    // ① 用途分配：两行，点一行挑一个模型 ✓
     body.appendChild(mSec('用途分配'));
     Object.keys(M_LABEL).forEach(k => {
       const r = (d.roles || {})[k] || {};
@@ -81,7 +81,7 @@
     body.appendChild(mSec('上下文长度'));
     body.appendChild(mCtx(d.context));
 
-    body.appendChild(mHint('三个用途各挑一个模型：chat 负责聊天、diy 负责做组件、'
+    body.appendChild(mHint('两个用途各挑一个模型：chat 负责聊天、'
                            + 'aux 负责压缩和起标题。没选的那一档会哑。'));
   };
 
@@ -530,7 +530,7 @@
   //   退出登录上面）回到设置页」✓）。
   //
   //   ⚠️ 这三件事原来住在 `#space` 那一屏里 ✓ —— 那一屏**现在没有入口了** ✗
-  //      （和 `#wsNav` 一样留着不删 ✓，理由见 `openMeSheet` 上面那段 ✓）。
+  //      （和其它没有入口的老屏一样留着不删 ✓，理由见 `openMeSheet` 上面那段 ✓）。
   //      所以我特意把它们**抽成函数**（而不是在设置页重写一份 ✗）：
   //      `renderSpace` 也调同一批 ✓（"同一件事两处实现"是这个项目反复栽过的 ✓）。
 
@@ -826,7 +826,7 @@
   //   ⚠️ 壳那版**一个函数全包** ✓ —— 这段也照做 ✓。
   //      原来这里是两屏 ✗（`#meEdit` 管头像和昵称、`#meAccount` 管账号密码 ✓）——
   //      那是 2026-10-08 合并时**我自己分的** ✗，不是他要的形状 ✓
-  //      （`#meAccount` 现在**没有入口了** ✓，和 `#space`/`#wsNav` 一样留着不删 ✓）。
+  //      （`#meAccount` 现在**没有入口了** ✓，和 `#space` 一样留着不删 ✓）。
   let meEditKind = 'nickname';
   const openMeEdit = (kind) => {
     meEditKind = kind || 'nickname';
@@ -1043,13 +1043,11 @@
   // ── ★ 屏之间那一套手势（用户 2026-10-08 定的）─────────────────────────
   //
   // 用户原话：「(8)…这个界面叫[组件]，但是顶部没有任何字，左上角也没有任何按钮，
-  //   回到群聊全靠右滑，目的:提供一个纯粹的界面供用户diy，不受限制」✓；
-  //   以及「这两种页，都可以有个特殊的动作进入组件聊天页，那就是从上往下滑」✓。
+  //   回到群聊全靠右滑，目的:提供一个纯粹的界面，不受限制」✓。
   //
-  // 所以三件事：
+  // 所以两件事：
   //    主群聊 --左滑--> [组件收纳页] --点一下--> [单个组件页]
   //    回来**逐层右滑**（单个组件 → 收纳页 → 群聊 ✓，iOS 那种手感 ✓）
-  //    **在任一个组件页往下拉** → 进它的那条对话 ✓
   //
   // ## 三条硬规矩（都是踩过才有的）
   //
@@ -1070,17 +1068,6 @@
   //:   它现在也要**跟手出一条提示**（「继续左滑进入创意工坊」✓）✓，
   //:   所以这个数同时是"阈值"和"那根条走满格的行程" ✓。
   const SW_TRIG = 96;
-  //: ★ 下拉：拉过这么多就进那条对话 ✓（2026-10-09）。
-  //:   ⚠️ 比横滑那个**大一档** ✗→✓ —— 下拉是一根**要跟手**的手势 ✓：
-  //:      从 0 拉到这个数，顶部那条提示才从"看不见"走到"看得见、并且变色" ✓
-  //:      （见 `showPullHint` ✓）。给小了就是"手一动就跳进去" ✓，
-  //:      用户根本没机会看见那行字 ✓ —— 而提示正是他点名要的 ✓。
-  //:   ★ **96 → 144**（2026-10-09 用户上手试过之后定的 ✓）——
-  //:      他要的是"**拉得足够靠下才进去**" ✓（手感他觉得已经对了 ✓，
-  //:      所以只动这一个数 ✓，动画一个字没改 ✓）。
-  //:      ⚠️ 这个值同时决定"提示条走到满格要拉多远" ✓ —— 它俩是同一个数 ✓，
-  //:      改它同时改两件事（阈值 + 那根条的行程 ✓），别只按"阈值"想 ✓。
-  const PULL_TRIG = 144;
   //: ★ **右滑引用**的阈值 ✓（2026-10-11 用户：「将引用变为右滑消息」）——
   //:   ⚠️ 比左滑那个(96) **小得多** ✗ —— 它们不是一类动作 ✓：
   //:      左滑是**换一整个界面** ✓（要拉得够、要那条跟手提示走满格 ✓）；
@@ -1121,7 +1108,7 @@
   //:    判据改成"**最上面那一屏**是不是这三屏之一" ✓。
   const _OTHER_SCREENS = [
     '#settings', '#bgSet', '#themeSet', '#me', '#meAccount', '#space', '#peer', '#selfIntro',
-    '#agent', '#agentEdit', '#diySet', '#wsNav', '#wsChat', '#login', '#init',
+    '#agent', '#agentEdit', '#login', '#init',
   ];
 
   const _whichScreen = () => {
@@ -1132,45 +1119,25 @@
     return '';
   };
 
-  //: 收纳页**滚到顶了没有** ✓ —— 下拉那一条**只在顶上认** ✗→✓。
-  //:   ⚠️ 不判的话，组件一多、列表滚到一半时往下一拉 ✗ →
-  //:      本该是"往回滚" ✓ 却会一路把编辑页拉出来 ✓（滚都滚不动了 ✓）。
-  //:   （`overscroll-behavior:contain` 让容器**不橡皮筋** ✓，所以 `scrollTop`
-  //:     在顶上就是 0 ✓，判断很干净 ✓。）
-  const _wallAtTop = () => {
-    const b = $('#wsBody');
-    return !b || b.scrollTop <= 0;
-  };
-
-  //: 顶部那条提示写什么 ✓ —— **按手势方向说各自的话** ✓
-  //:   （用户 2026-10-09 定的原话：「继续左滑进入创意工坊」✓ /
-  //:     「下滑以编辑该界面」/「下滑以编辑该组件」✓）。
-  const _pullHintText = (dir) => {
-    // ⚠️ **只回后半句** ✗→✓（2026-10-10 用户：「阈值未到时是"**继续**左滑/继续下滑…"，
-    //   到了阈值后应该变成"**松开**…"」✓）—— 前半句由 `showPullHint` 按进度现拼 ✓。
-    // ⚠️ 「下滑以编辑」里的那个「以」也去掉了 ✓（他的原话：「那个"以编辑"的以字去掉」✓）。
-    if (dir === 'L') return '进入创意工坊';
-    return _whichScreen() === 'comp' ? '编辑该组件' : '编辑该界面';
-  };
+  //: 左滑提示的后半句 ✓。
+  const _pullHintText = () => '进入创意工坊';
 
   /** 顶部那条提示 —— **跟着手指浮现** ✓（`p` 0→1 就是"拉了多少" ✓）。
    *
-   *  ⚠️ `trig` 要**跟着方向传** ✗→✓（2026-10-09：左滑那条也用它 ✓）——
-   *    横滑是 96 ✓、下拉是 144 ✓，条子走到满格的行程得跟本方向一致 ✓
-   *    （用死一个数的话：其中一个方向**永远到不了变色那一步** ✗，
-   *      而"该松手了"正是靠变色告诉他的 ✓）。
+   *  ⚠️ `trig` 就是本方向的阈值 ✓ —— 条子走到满格的行程要和它一致 ✓
+   *    （"该松手了"正是靠变色告诉他的 ✓）。
    */
   const showPullHint = (tail, dist, trig, side) => {
     const el = $('#pullHint');
     if (!el) return;
-    const p = Math.max(0, Math.min(1, (dist || 0) / (trig || PULL_TRIG)));
+    const p = Math.max(0, Math.min(1, (dist || 0) / (trig || 1)));
     if (!p) { hidePullHint(); return; }
     // ★ **两段文案** ✓（用户 2026-10-10 定的 ✓）：
     //   还差一点 → 「继续左滑 / 继续下滑 …」✓（在催他接着拉 ✓）
     //   拉够了   → 「松开 …」✓（在催他松手 ✓）
     //   ⚠️ 分界就是 `p >= 1` ✓ —— 而那根条**同一个点变蓝** ✓（见 `.ready` ✓）：
     //      "变色"和"换字"是**同一件事的两个说法** ✓，别只改一个 ✗。
-    el.textContent = (p >= 1 ? '松开' : (side ? '继续左滑' : '继续下滑')) + tail;
+    el.textContent = (p >= 1 ? '松开' : '继续左滑') + tail;
     el.classList.toggle('side', !!side);      // ★ 竖排贴右边（横滑那条 ✓）
     el.style.opacity = String(p);
     if (side) {
@@ -1201,7 +1168,7 @@
     //      那会儿手指已经移开 ✓，`ev.target` 是**那一刻手指底下那个元素** ✓
     //      （早就不是刚按下去那一条了 ✓，最常见的是滑到了隔壁行 ✓）。
     const row = ev.target && ev.target.closest
-      ? ev.target.closest('#msgs .row[data-id], #wsMsgs .mkrow[data-id]') : null;
+      ? ev.target.closest('#msgs .row[data-id]') : null;
     pgSw = { x0: x, y0: y, dir: '', d: 0, row };
   }, { passive: true });
 
@@ -1229,9 +1196,6 @@
       else { pgSw = null; hidePullHint(); return; }
       // ③ 这一屏上这个方向有没有意义？没有就把手势丢掉 ✓（免得吃掉正常滚动 ✓）
       const s = _whichScreen();
-      // ⚠️ 工坊那条对话**不在这三屏里** ✓（它在 `_OTHER_SCREENS` 里 ✓ → `s` 是空 ✓）——
-      //    所以右滑引用要**单独问一句** ✓（`#wsChat` 开着没有 ✓）。
-      const wsOn = $('#wsChat').classList.contains('on');
       const ok = (pgSw.dir === 'L' && s === 'chat')
               || (pgSw.dir === 'R' && s === 'comp')
               // ★ 2026-10-14：**右滑 `'wall'`（组件界面）不再认** ✗→✓ ——
@@ -1239,24 +1203,16 @@
               //   认了的话 `preventDefault` 会把原生横滚吃掉 ✗ → 滑不动 ✗。
               //   退出改走**点猫 → 回主群聊** ✓ + 系统返回 ✓（见 `06-workshop.js:catNode` ✓）。
               // ★ **右滑引用** ✗→✓（2026-10-11）—— 两个条件**缺一不可** ✓：
-              //   ① 屏幕是群聊 / 工坊那条对话 ✓
+              //   ① 屏幕是群聊 ✓
               //   ② **起手按着的是一条消息** ✓（`pgSw.row` ✓）
               //   ⚠️ 少了② 的话：在**顶栏、输入框、空白处**右滑也会被认下 ✓ →
               //      `preventDefault` 吃掉那一下 ✓、松手又什么都没发生 ✓
               //      —— 用户在那些地方右滑本来是有用的（比如选字 ✓），
               //      被我们白白吞掉 ✓。**认了就得给个交代** ✓，给不出就别认 ✓。
-              || (pgSw.dir === 'R' && !!pgSw.row && (s === 'chat' || wsOn));
+              || (pgSw.dir === 'R' && !!pgSw.row && s === 'chat');
       // ★ 2026-10-13：**下拉那一条撤了** ✗→✓ —— 只留群聊右上角一个入口进统一聊天 ✓
       //   （用户：「只留右上角入口」✓）。'D' 不再算手势 ✓ —— 下拉回到正常滚动 ✓。
       if (!ok) { pgSw = null; hidePullHint(); return; }
-      // ★ **手里正拎着一个格子**（长按 ≥450ms 之后在拖动换位置 ✓）→ 别认下拉 ✗→✓
-      //   （2026-10-09 想到的一个交界处 ✓）：不然"把一个格子往下拖"会
-      //   **同时**被当成这条手势 ✓ —— 松手既换了位置 ✓、又把编辑页拉了出来 ✓
-      //   （两件事都对 ✓，合在一起就没人说得清发生了什么 ✗）。
-      //   ⚠️ 判方向发生在那一下"动"的时候 ✓：正常下拉在 450ms 之内就动了 ✓
-      //      （那时 `wsDrag` 还是 null ✓ → 不受影响 ✓）；
-      //      而"长按再拖"是**先按住不动 450ms** ✓ → 到它动的时候 `wsDrag` 已经在了 ✓。
-      if (pgSw.dir === 'D' && wsDrag) { pgSw = null; hidePullHint(); return; }
       ev.preventDefault();      // ★ 认了之后**才**拦 ✓（早了会把滚动卡死 ✗）
     } else {
       ev.preventDefault();
@@ -1268,7 +1224,7 @@
     //    也要有提示"继续左滑进入创意工坊"和滑入阈值」✓）。
     // ⚠️ `'R'`（右滑退出那两条）**不给** ✓ —— 用户没要 ✓，
     //    而且"退出"是往回走 ✓ 不需要一句"继续滑"来鼓励 ✓。
-    if (pgSw.dir === 'L') showPullHint(_pullHintText('L'), -dx, SW_TRIG, true);
+    if (pgSw.dir === 'L') showPullHint(_pullHintText(), -dx, SW_TRIG, true);
     // ★ **右滑那一条：行跟着手走一点** ✗→✓（2026-10-11）——
     //   ⚠️ **不跟手是不行的** ✗：右滑是个"短划" ✓，划完手指就抬了 ✓，
     //      中间没有任何反馈的话，用户根本分不清"我是划了还是滚了一下"✓
@@ -1302,11 +1258,7 @@
     //   写在最前头最不容易看错 ✓。
     if (s.dir === 'R' && s.row) {
       if (Math.abs(s.dx || 0) >= QUOTE_TRIG) {
-        // ⚠️ **群聊和工坊各一套引用状态** ✗（`pendingQuote` vs `wsQuote` ✓）——
-        //    按这一行属于哪个列表分 ✓。两条对话**可能同时开着** ✓
-        //    （组件页底下压着群聊 ✓），认错了就是"在这儿滑、引用条出现在那儿"✓。
-        if (s.row.closest('#wsMsgs')) quoteWsMsg(Number(s.row.dataset.id));
-        else quoteChatMsg(Number(s.row.dataset.id));
+        quoteChatMsg(Number(s.row.dataset.id));
       }
       return;
     }
@@ -1315,16 +1267,14 @@
     const scr = _whichScreen();
     if (s.dir === 'L' && scr === 'chat') { openWorkshop(); return; }
     if (s.dir === 'R' && scr === 'comp') { closeComp(); return; }
-    if (s.dir === 'R' && scr === 'wall') { closeWorkshop(); return; }
   };
   document.addEventListener('touchend', _endSwipe);
   // ⚠️ 取消（来电、系统抢手势…）也要**把那行收回原位** ✓ —— 不然它会**永远歪着** ✓
   //    （`touchend` 不一定会来 ✓，这种"少一个事件"的坑这个项目栽过 ✓）。
   document.addEventListener('touchcancel', () => { pgSw = null; hidePullHint(); _endQuoteDrag(); });
 
-  // ★ 2026-10-13：**下拉进编辑整套撤了** ✗→✓ —— `openCompChat` / 下拉桥 / message
-  //   监听一起删了 ✓。进统一聊天只留**群聊右上角**一个入口 ✓（用户定的 ✓）。
-  //   wall（组件界面本身）的外观也改在统一聊天里改 ✓（服务端松了 `_wall_task_ok` ✓）。
+  // ★ DIY 助手整套已经撤掉 ✓ —— 工坊只剩组件展示 / 管理 ✓，
+  //   组件和界面外观的修改现在由管理员在服务端做 ✓。
 
   /** 改账号（用户名 / 密码）✓ —— 和「我的」同构的一屏 ✓。 */
   const _rb = $('#reloadBtn');

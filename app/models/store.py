@@ -14,20 +14,19 @@ from ..config import settings
 
 log = logging.getLogger("lifeguard.models")
 
-#: 三个用途 —— ⚠️ **约定**：这边分流，调用方（profile 的 `model.default` /
+#: 两个用途 —— ⚠️ **约定**：这边分流，调用方（profile 的 `model.default` /
 #: `delegation.model` / `auxiliary.*.model`）标自己是谁 ✓。
 #: **改名字要三处一起改** ✗（`tools/set-profile-role.sh`、`set-context-length.sh` 各有一份 ✓）。
 #:
 #: ★ `aux` 为什么必须有：**Hermes 的辅助调用默认跟着主模型走** ✓ ——
 #:   没有它，"把 chat 换成某个模型"会**连带把压缩也换掉** ✗，
 #:   而压缩写不出摘要时 Hermes 退回"丢弃历史" ✓（用户感知＝它变笨了 ✓）。
-ROLES = ("chat", "diy", "aux")
+ROLES = ("chat", "aux")
 
 #: 给人看的名字 —— 报错、界面、日志都用它 ✓。
-#: ⚠️ 界面上那两个名字是**用户自己定的**（2026-10-07）——**中间那个点是 `·`（U+00B7）** ✗
+#: ⚠️ 界面上那两个名字是**用户自己定的** —— **中间那个点是 `·`（U+00B7）** ✗
 #:    不是 `.` ✗，别自作主张改 ✓。
-ROLE_LABEL = {"chat": "生活管家·chat", "diy": "生活管家·diy",
-              "aux": "辅助·压缩"}
+ROLE_LABEL = {"chat": "生活管家·chat", "aux": "辅助·压缩"}
 
 #: 能配上下文长度的组 —— **和 `tools/set-context-length.sh` 里那份一致** ✓。
 #: 两边都把关 ✓：这边挡"别把脏东西排进队" ✓，那边挡"排进来的也别信" ✓。

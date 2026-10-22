@@ -92,13 +92,11 @@
     //      （原生把键盘高度算进 `bottom` 里报上来 ✓，见上面那段注释 ✓）。
     //      只在**弹起**时强拉到底 ✓；收键盘时**不**强拉 ✗
     //      （不然他正翻着上面的记录、一收键盘就被拽到底 ✓）。
-    //   ⚠️ **两个聊天都要** ✗→✓：主群聊 `#msgs` ✓ + 组件对话 `#wsMsgs` ✓
-    //      （组件那边以前**一次都没滚过** ✓ —— 键盘弹起来它纹丝不动 ✓）。
     const kbJustOpened = bottom > lastKbBottom + 1;
     lastKbBottom = bottom;
     r.setProperty('--inset-bottom', bottom + 'px');
     r.setProperty('--kb', '0px');
-    if (kbJustOpened) { scrollDown(true); scrollWsDown(); }
+    if (kbJustOpened) scrollDown(true);
     else scrollDown();
   };
   window.__onInsets = applyInsets;
@@ -120,15 +118,14 @@
 
   // ⚠️ **再补一道兜底** ✗→✓（2026-10-09）：**聚焦输入框**那一下也滚一次 ——
   //    万一原生那次 insets 报得不够及时 ✓（或者浏览器里根本没有原生 ✓），
-  //    这一下能兜住 ✓。两个聊天各一个输入框 ✓。
+  //    这一下能兜住 ✓。
   //    ⚠️ 延后 260ms：键盘的升降有动画 ✓，立刻滚会在动画中途算高度 ✓（不准 ✓）。
-  ['#text', '#wsText'].forEach((sel) => {
-    const el = $(sel);
-    if (!el) return;
-    el.addEventListener('focusin', () => {
-      setTimeout(() => { scrollDown(true); scrollWsDown(); }, 260);
+  const chatText = $('#text');
+  if (chatText) {
+    chatText.addEventListener('focusin', () => {
+      setTimeout(() => scrollDown(true), 260);
     });
-  });
+  }
 
   // ⚠️ **聚焦一个输入框之后，把它滚进看得见的地方** ✗→✓（2026-10-09 用户定的：
   //   「展开后，顺便打开了编辑，此时**输入法也该顶起**」✓）——

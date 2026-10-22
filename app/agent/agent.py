@@ -515,38 +515,6 @@ def session_id_for(group_id: int) -> str:
     return f"lifeguard-group-{group_id}"
 
 
-def diy_session_id_for(group_id: int, task_id: int) -> str:
-    """创意工坊那条会话 —— **一条任务一条** ✓。
-
-    ⚠️ **每用户一条** 是不够的 ✗→✓（2026-10-07 改）。原来只带 uid，
-    于是**同一个人的两条对话在 Hermes 那边是同一条历史** ✗ ——
-    界面上看着隔开了 ✓（`workshop_messages` 按任务分 ✓），但它脑子里是混的 ✓：
-    做 A 时说过的话，在做 B 的时候还在上下文里 ✓。
-
-    带上任务号之后**真的分开了** ✓。插件那边的 `_SESSION_RE` 是 `search` ✓，
-    `…-diy-t7` 照样解析出群号 ✓（任务号另有一个正则 ✓，见插件 ✓）。
-
-    ★ **2026-10-11：不带用户号了** ✗→✓ —— 对话变成**群共享**之后
-      （见 `routes_workshop._my_tasks` ✓），两个人看的是**同一条对话** ✓，
-      那就必须是**同一条历史** ✗✓：一个组件的来龙去脉写在一条线里，
-      换个人接着改，前面的话才在 ✓。
-      ⚠️ **连参数也删了** ✗→✓（2026-10-12）—— 2026-10-11 那次改的时候
-      我只删了 id 里的用户号 ✓，参数留着没删 ✓，而 `workshop.py` 的两个调用处
-      已经按「不带 user_id」在传了 ✗ →
-      **整个工坊从此每一轮都在这一行抛 TypeError** ✗，
-      又被 `_run_turn` 的 `try` 吞成一句「（这一轮没跑通…）」✗
-      —— `py_compile`、preflight、import 检查全都不看**参数个数** ✗，
-      只有真跑一轮才撞得见 ✗。少一个参数比留一个废参数安全得多 ✓：
-      留着的这个谁都想不起来要传 ✗，删了之后传多了当场就报错 ✓。
-
-    ⚠️ **session key 不改** ✓ —— 见 `session_key_for` ✓：
-       共用它 = **记忆**是同一份 ✓（它能想起主群聊里说过什么 ✓ ——
-       用户点名的"同一份 profiles 是对的"就在这儿 ✓），
-       而**历史是按任务分开的** ✓。
-    """
-    return f"lifeguard-group-{group_id}-diy-t{int(task_id)}"
-
-
 def session_key_for(group_id: int) -> str:
     """长期记忆作用域。同一群共一份记忆；换群即天然隔离。"""
     return f"lifeguard:group:{group_id}"
@@ -743,8 +711,6 @@ async def _group_persona(group_id: int) -> str:
         "## 现在做不了的（**别去试** ✗）\n"
         "· 打电话、开别的 App 这类外部动作 —— 不支持 ✓\n"
         "· 生成图片 / 视频 / 语音 —— 还得看模型，先不接 ✓\n"
-        "· **写代码、做界面** —— 那是**创意工坊里「diy 助手」的活** ✓，\n"
-        "  跟他们说去那边做 ✓（别说「我做不到」就完了 ✗，那儿是真能做 ✓）\n"
         "\n"
         "★ **这就是你能力范围的边界** ✓：\n"
         "  · 落在上面的 → **直接按流程做，别绕弯子** ✓（他们要的首先是**快** ✓）\n"
@@ -1067,9 +1033,6 @@ async def _stream_completion(
     profile: str,
     *,
     deep: bool = False,
-    system: str | None = None,
-    session_id: str | None = None,
-    role: str | None = None,
 ) -> AsyncIterator[str]:
     """SSE 流式补全，逐段 yield 正文。
 
@@ -1078,11 +1041,6 @@ async def _stream_completion(
     （见 `_reconsider`）要走同一条通道，而它的措辞完全是另一套。
     早先把 prompt 拼装焊死在这里，复审就只能另写一份发送逻辑，那必然会长歪。
 
-    ★ 2026-10-07 又开了两个口子（`system` / `session_id`）✓，给**创意工坊**用 ✓：
-      那边要的是**另一个人格**（"现在在做组件，按 skill 走"✓）
-      + **另一条会话**（`…-diy-u<uid>` ✓，历史分开 ✓）。
-      ⚠️ 但 **session key 不动** ✓ —— 那个是长期记忆的作用域 ✓，
-        共用它 = 它还记着这个群的事 ✓（用户要的"方便询问细节"就在这儿 ✓）。
     """
     # 有图片就发多模态内容：文字在前、图片跟在后面。
     # Hermes 的 API 接受 image_url（http(s) 或 data:），我们给的是内联 data URL。
@@ -1090,28 +1048,11 @@ async def _stream_completion(
     if images:
         content = [{"type": "text", "text": text_part}] + images
 
-    # ★★ **按用途选模型：必须连 `provider` 一起给** ✗→✓（2026-10-07 深夜，
-    #   用户报的「diy 管家频繁报错，似乎和 dots 有关系，但我 diy 不是用的商汤吗」✓）。
-    #
-    #   ⚠️ **根因**：Hermes 那条 OpenAI 兼容面上，**单独给 `model` 会被它丢掉** ✗
-    #      （`api_server_openai_routes` 的 `direct_model_requests` 默认关 ✓）。
-    #      所以我们原来只能把"用途"写进 **profile 的 `model.default`** ✓ ——
-    #      可那是**一个 profile 一个值** ✗，而 diy 和群聊**住同一个 profile** ✗ →
-    #      diy 那一轮带的是 `chat` ✓ → 网关按 chat 路由 ✓ → **走了 dots** ✗ ✓
-    #      （dots 是那个写不出摘要、老报错的 ✓，用户说的"和 dots 有关系"就是这个 ✓）。
-    #
-    #   ★ 但读源码发现：`_request_agent_overrides` 里 `if provider:` ✓ 时会认 `model` ✓
-    #     （`if model and model != virtual_model and (provider or allow_bare_model)` ✓）。
-    #     → **带上 `provider: "custom"` + 用途名当 model** 就被认 ✓ ✓
-    #       （`custom` = 用 profile 里那套 base_url/api_key ✓，也就是我们自己的模型网关 ✓）。
-    #     ⚠️ **只在给了 `role` 时才这么做** ✗ —— 群聊那条路保持原样 ✓
-    #        （它本来就是 profile 默认 ✓，改它是没有收益的额外风险 ✓）。
     payload = {
-        "model": role if role else "hermes-agent",
+        "model": "hermes-agent",
         "stream": True,
         "messages": [
-            {"role": "system",
-             "content": system if system is not None else await _group_persona(group_id)},
+            {"role": "system", "content": await _group_persona(group_id)},
             {"role": "user", "content": content},
         ],
         # 推理档位。**必须放在 `model_options` 里**——Hermes 只认这个键，
@@ -1126,14 +1067,12 @@ async def _stream_completion(
             )
         },
     }
-    if role:
-        payload["provider"] = "custom"
     base_url, api_key = _endpoint_for(profile)
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         # 一个群一个会话：历史与人格延续
-        "X-Hermes-Session-Id": session_id or session_id_for(group_id),
+        "X-Hermes-Session-Id": session_id_for(group_id),
         # 长期记忆作用域：每群一份
         "X-Hermes-Session-Key": session_key_for(group_id),
     }
@@ -1163,312 +1102,6 @@ async def _stream_completion(
                     piece = (choice.get("delta") or {}).get("content")
                     if piece:
                         yield piece
-
-
-# ── DIY 编码执行器：httpx 直连商汤 /v1/messages（glm-5.2）──────────────────
-#
-# ★ 2026-10-14：从 ``claude -p`` 子进程换成 httpx 直连 ✓。两条原因：
-#   ① 子进程的 stream-json **不出 delta** ✓（assistant 整块出来 ✓）→ 做不到逐字 ✓；
-#   ② 子进程 -p 文本模式**喂不了图** ✓。直连两件都行 ✓（实测 text_delta 逐 token 来 ✓、
-#      tool_use 流式 ✓、image 块收得下 ✓）。
-#
-#   ⚠️ **不碰 butler 的 ANTHROPIC_AUTH_TOKEN**（硬底线 ✓）——用 ``var/models.json``
-#      里 lifeguard 自己那把商汤 key ✓。**不落第二次记忆** ✓（[[shadow-test-deleted-a-real-profile]]）：
-#      直连是纯 API 调用 ✓、不写任何 ~/.claude ✓（比子进程那套更干净 ✓）；
-#      状态在进程内 ``_CLAUDE_SESSIONS``（task_id → messages ✓，重启丢 ✓，靠每轮注入补 ✓）。
-#
-#   ★ 工具循环自己写 ✓（替代 CLI 的 MCP 循环）：工具定义/派发复用 ``mcp_components`` 那套 ✓
-#      （进程内 import ✓，不起子进程 ✓）。读组件源码靠新加的 ``read_component_html`` ✓
-#      ——没它就只能凭空重写 ✓，会丢掉之前几版的修复 ✓（diy 助手搞乱组件那个老毛病的根 ✓）。
-#      ★ 看图 ✓：glm-5.2 纯文本 ✓，图先过一道 flash-lite 描述成文字 ✓，再喂主模型 ✓。
-#: task_id → messages（assistant/用户/工具往返 ✓）。内存里 ✓（重启丢 ✓）。
-_CLAUDE_SESSIONS: dict[int, list[dict]] = {}
-#: 历史超这阈值就压缩 ✓（粗估 token ≈ 字符/2 ✓；glm-5.2 窗口 200k ✓，留够系统+新轮+输出余量 ✓）。
-_HISTORY_COMPACT_CHARS = 200_000
-#: 压缩时最近几轮原样留 ✓（别把正在做的事压没 ✓）。
-_HISTORY_KEEP_TURNS = 6
-#: 工具往返上限 ✓（够改一个组件 ✓，挡死循环 ✓）。
-_MAX_TOOL_TURNS = 12
-
-
-def _load_diy_model_cfg() -> dict:
-    """读 ``var/models.json``，拿编码那档的 api_key + base_url + 两个模型名 ✓。
-
-    - ``model``：编码主模型 ✓，默认 ``glm-5.2``（命门验过比 lite 强 ✓）。
-    - ``vision_model``：看图用 ✓，默认 ``sensenova-6.8-flash-lite``（网关上
-      **唯一**带视觉的模型 ✓ —— glm-5.2 是纯文本 ✓，看不了图 ✓）。
-      两档用**同一把 key、同一个网关** ✓（商汤 token.sensenova.cn ✓）。
-    config 里 ``claude_model`` / ``claude_vision_model`` 能覆盖 ✓（换模型不改代码 ✓）。
-    """
-    try:
-        data = json.loads(settings.models_conf.read_text("utf-8"))
-        cfgs = {c["id"]: c for c in data.get("configs", [])}
-        cid = (data.get("roles") or {}).get("diy")
-        cfg = cfgs.get(cid) or (next(iter(cfgs.values())) if cfgs else {})
-        base = (cfg.get("base_url") or "").rstrip("/")
-        if base.endswith("/v1"):  # Anthropic 协议端点不带 /v1 ✓
-            base = base[:-3]
-        return {
-            "base_url": base,
-            "api_key": cfg.get("api_key", ""),
-            "model": cfg.get("claude_model", "glm-5.2"),
-            "vision_model": cfg.get("claude_vision_model", "sensenova-6.8-flash-lite"),
-        }
-    except Exception as exc:  # noqa: BLE001
-        log.warning("读 models.json 给编码执行器用失败了：%s", exc)
-        return {}
-
-
-def _sdk_tools() -> list[dict]:
-    """把 ``mcp_components.TOOLS`` 转成 Anthropic messages API 的 tools 形状 ✓。
-
-    差一处 ✓：``inputSchema`` → ``input_schema``（API 那边叫这个 ✓）。
-    """
-    from .mcp_components import TOOLS
-    return [{"name": t["name"], "description": t["description"],
-             "input_schema": t["inputSchema"]} for t in TOOLS]
-
-
-async def _describe_images(cfg: dict, media_paths: list[str]) -> str:
-    """用视觉模型把图描述成文字 ✓ —— glm-5.2 看不了图 ✓，得先过一道眼睛 ✓。
-
-    ★ 眼睛归眼睛、手归手 ✓：图先让 flash-lite 看一眼、写成描述 ✓，
-      再把描述喂给编码主模型 ✓ —— 拿文字干活的还是主模型 ✓。
-    """
-    blocks: list[dict] = []
-    for mp in media_paths:
-        p = settings.media_dir / mp
-        try:
-            raw = p.read_bytes()
-        except OSError:
-            continue
-        if len(raw) > 4 * 1024 * 1024:  # 单张 4MB 上限 ✓（同 _image_parts ✓）
-            continue
-        ext = p.suffix.lower()
-        mime = {".png": "image/png", ".webp": "image/webp",
-                ".gif": "image/gif"}.get(ext, "image/jpeg")
-        blocks.append({"type": "image",
-                       "source": {"type": "base64", "media_type": mime,
-                                  "data": base64.b64encode(raw).decode()}})
-    if not blocks:
-        return ""
-    blocks.append({"type": "text", "text":
-        "这是一张截图。用两三句话描述画面上的界面/内容/布局，给一个编码者"
-        "照着复现或改动用。只描述能看到的，别猜看不见的。"})
-    url = (cfg.get("base_url") or "https://token.sensenova.cn").rstrip("/") + "/v1/messages"
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as cli:
-            r = await cli.post(url, json={
-                "model": cfg.get("vision_model", "sensenova-6.8-flash-lite"),
-                "max_tokens": 400,
-                "messages": [{"role": "user", "content": blocks}]},
-                headers={"x-api-key": cfg.get("api_key", ""),
-                         "anthropic-version": "2023-06-01"})
-        if r.status_code >= 400:
-            log.warning("看图失败 %s: %s", r.status_code, r.text[:200])
-            return ""
-        for blk in r.json().get("content", []):
-            if blk.get("type") == "text" and blk.get("text"):
-                return blk["text"].strip()
-    except Exception as exc:  # noqa: BLE001
-        log.warning("看图那一路挂了：%s", exc)
-    return ""
-
-
-def _history_chars(msgs: list[dict]) -> int:
-    """粗估历史占用 ✓（token ≈ 字符/2 ✓）。"""
-    return sum(len(json.dumps(m, ensure_ascii=False)) for m in msgs)
-
-
-async def _compact_history(msgs: list[dict], cfg: dict) -> list[dict]:
-    """历史太长时把**老的**那批压成一段摘要 ✓，最近几轮原样留 ✓。
-
-    ★ 统一聊天是长寿命的 ✓（一群一条、连续着聊 ✓）——不压会几十轮撑爆 200k 窗口 ✓
-      → API 413 ✓ → 这条聊天下不来 ✓。
-    ⚠️ 压缩本身是一次模型调用 ✓（用主模型自己 ✓），产一段 recap ✓，顶在前面 ✓；
-       压失败就照原样 ✓（最坏下一轮 413，不至于整条瘫 ✓）。
-    """
-    if len(msgs) <= _HISTORY_KEEP_TURNS * 2 or _history_chars(msgs) <= _HISTORY_COMPACT_CHARS:
-        return msgs
-    keep = msgs[-_HISTORY_KEEP_TURNS * 2:]
-    old = msgs[:-_HISTORY_KEEP_TURNS * 2]
-    prompt = ("下面是这条工坊对话**较早的**经过（已省略）。压成一段简短回顾，"
-        "只留：做过哪些组件、改过什么、用户明确要过什么、踩过的坑。一两百字以内，"
-        "别复述细节。\n\n") + json.dumps(old, ensure_ascii=False)[:_HISTORY_COMPACT_CHARS]
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as cli:
-            r = await cli.post(
-                (cfg.get("base_url") or "https://token.sensenova.cn").rstrip("/") + "/v1/messages",
-                json={"model": cfg.get("model", "glm-5.2"), "max_tokens": 600,
-                      "messages": [{"role": "user", "content": prompt}]},
-                headers={"x-api-key": cfg.get("api_key", ""), "anthropic-version": "2023-06-01"})
-        if r.status_code < 400:
-            txt = next((b["text"] for b in r.json().get("content", [])
-                        if b.get("type") == "text" and b.get("text")), "")
-            if txt:
-                return [{"role": "user",
-                         "content": f"[这是之前对话的回顾，细节已省略]\n{txt}"},
-                        {"role": "assistant", "content": "好，我接着来。"}] + keep
-    except Exception as exc:  # noqa: BLE001
-        log.warning("历史压缩那一路挂了，跳过：%s", exc)
-    return msgs
-
-
-async def _stream_one_turn(cfg: dict, system: str, msgs: list[dict],
-                           tools: list[dict], out_content: list[dict],
-                           out_tools: list[dict]) -> AsyncIterator[str]:
-    """跑一次 messages.create（流式 ✓）：**逐字** yield 文字 delta ✓，
-    把这一轮的 content 块 / tool_use 收进 out_content / out_tools ✓。
-
-    ⚠️ 工具过程不外露 ✓（只 yield text_delta ✓ —— 工具调用是它和后端之间的事 ✓）。
-    ⚠️ thinking 块也**不外露** ✓（内部推理 ✓），但**收进 out_content** ✓
-       （回传给下一轮要带签名 ✓，不然 API 报 thinking 块不匹配 ✗）。
-    """
-    url = (cfg.get("base_url") or "https://token.sensenova.cn").rstrip("/") + "/v1/messages"
-    body = {"model": cfg.get("model", "glm-5.2"), "max_tokens": 8000,
-            "stream": True, "system": system, "messages": msgs, "tools": tools}
-    headers = {"x-api-key": cfg.get("api_key", ""), "anthropic-version": "2023-06-01",
-               "content-type": "application/json"}
-    cur: dict | None = None
-    async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=10.0)) as cli:
-        async with cli.stream("POST", url, json=body, headers=headers) as r:
-            if r.status_code >= 400:
-                raw = await r.aread()
-                raise RuntimeError(f"模型 {r.status_code}: {raw.decode('utf-8','replace')[:300]}")
-            async for line in r.aiter_lines():
-                if not line or not line.startswith("data:"):
-                    continue
-                data = line[5:].strip()
-                if not data:
-                    continue
-                try:
-                    ev = json.loads(data)
-                except json.JSONDecodeError:
-                    continue
-                t = ev.get("type")
-                if t == "content_block_start":
-                    cb = ev.get("content_block", {}) or {}
-                    cur = dict(cb)
-                    if cb.get("type") == "tool_use":
-                        cur["_json"] = ""
-                elif t == "content_block_delta":
-                    d = ev.get("delta", {}) or {}
-                    dt = d.get("type")
-                    if dt == "text_delta" and d.get("text"):
-                        yield d["text"]
-                        if cur is not None and cur.get("type") == "text":
-                            cur["text"] = cur.get("text", "") + d["text"]
-                    elif dt == "thinking_delta" and cur is not None:
-                        cur["thinking"] = cur.get("thinking", "") + d.get("thinking", "")
-                    elif dt == "signature_delta" and cur is not None:
-                        cur["signature"] = cur.get("signature", "") + d.get("signature", "")
-                    elif dt == "input_json_delta" and cur is not None:
-                        cur["_json"] = cur.get("_json", "") + d.get("partial_json", "")
-                elif t == "content_block_stop":
-                    if cur is not None:
-                        if cur.get("type") == "tool_use":
-                            try:
-                                cur["input"] = json.loads(cur.pop("_json", "") or "{}")
-                            except json.JSONDecodeError:
-                                cur["input"] = {}
-                            out_tools.append(cur)
-                        else:
-                            cur.pop("_json", None)
-                        out_content.append(cur)
-                        cur = None
-                elif t == "message_stop":
-                    break
-
-
-async def _stream_claude(
-    group_id: int,
-    task_id: int,
-    text: str,
-    system: str,
-    media_paths: list[str] | None = None,
-) -> AsyncIterator[str]:
-    """编码执行器 ✓：httpx 直连商汤 ``/v1/messages``，**逐字流** ✓ + **看图** ✓。
-
-    ★ 工具循环自己跑 ✓：模型一轮里要调工具就执行（进程内 ``call_tool`` ✓），
-      把结果喂回去再让它接着说 ✓，直到它不再调工具（``end_turn``）✓。
-      起票/落版走正规 ``components/save``（版本自增 / 票据 / 校验全不绕 ✓）✓。
-    """
-    from .mcp_components import configure, call_tool
-
-    cfg = _load_diy_model_cfg()
-    if not cfg.get("api_key"):
-        # 没 key 就别硬撑 ✓ —— 回退 Hermes（diy 那档弱，但能跑 ✓）。
-        log.warning("工坊：读不到商汤 key，回退 Hermes group=%s", group_id)
-        async for p in _stream_completion(
-            group_id, text, [], await _group_profile(group_id),
-            system=system, session_id=diy_session_id_for(group_id, task_id), role="diy",
-        ):
-            yield p
-        return
-
-    # 进程内配好 token / 群号 / 后端 ✓（工具派发走 localhost internal API ✓）
-    configure(token=settings.internal_token, group_id=group_id,
-              api_base="http://127.0.0.1:8730")
-
-    # 图片：先让 flash-lite 看一眼、描述成文字 ✓ —— 主模型拿文字干活 ✓
-    if media_paths:
-        desc = await _describe_images(cfg, media_paths)
-        if desc:
-            text = (f"（用户发了一张图，画面内容：{desc}）\n\n{text}"
-                    if text and text.strip()
-                    else f"（用户发了一张图，画面内容：{desc}）")
-
-    tools = _sdk_tools()
-    msgs = _CLAUDE_SESSIONS.get(int(task_id)) or []
-    msgs = await _compact_history(msgs, cfg)  # 太长先压 ✓
-    msgs = msgs + [{"role": "user", "content": text}]
-
-    log.info("工坊直连起来 group=%s task=%s hist=%d", group_id, task_id, len(msgs))
-    for _ in range(_MAX_TOOL_TURNS):
-        content: list[dict] = []
-        tool_uses: list[dict] = []
-        try:
-            async for piece in _stream_one_turn(cfg, system, msgs, tools, content, tool_uses):
-                yield piece
-        except RuntimeError as exc:
-            log.warning("工坊模型那一路挂了 group=%s task=%s %s", group_id, task_id, exc)
-            yield f"\n\n[出了点问题：{exc}]"
-            return
-        # 这轮 assistant 的完整 content 落进历史 ✓（thinking 带签名 ✓、text ✓、tool_use ✓）
-        msgs.append({"role": "assistant", "content": content})
-        if not tool_uses:
-            break
-        # 执行工具 ✓（进程内 ✓）→ 结果喂回去 ✓ → 下一轮接着说 ✓
-        for tu in tool_uses:
-            res = await call_tool(tu.get("name", ""), tu.get("input") or {})
-            rtext = json.dumps(res, ensure_ascii=False)
-            if len(rtext) > 30000:  # 大 HTML 截一段 ✓（别把上下文撑爆 ✓）
-                rtext = rtext[:30000] + "\n…（已截断）"
-            is_err = bool(res.get("error") or res.get("ok") is False)
-            msgs.append({"role": "user", "content": [{
-                "type": "tool_result", "tool_use_id": tu.get("id", ""),
-                "content": rtext, "is_error": is_err}]})
-            log.info("工坊工具 %s group=%s err=%s", tu.get("name"), group_id, is_err)
-    else:
-        log.warning("工坊工具循环到上限还没收尾 group=%s task=%s", group_id, task_id)
-
-    _CLAUDE_SESSIONS[int(task_id)] = msgs
-
-
-# 引用标记：它可以在回复**开头**写 `[引用 #157]` 来引用某条消息。
-_QUOTE_RE = re.compile(r"^\s*[\[【]\s*引用\s*#(\d+)\s*[\]】]\s*")
-
-# 分条标记：一行只写 `[分条]` 就把回复切成两条发出去。
-#
-# 为什么需要它：两个人**各问了一件不相干的事**，合成一条回答会搅在一起、
-# 读起来很累。微信里真人遇到这种情况也是分开回两条，各自引用一下对应的问题。
-# 用"字面标记"而不是多给一个工具，理由和 `[SILENT]` / `[引用 #N]` 一样：
-# 工具每多一个，它每次的选择题就多一道。
-_SPLIT_RE = re.compile(r"^\s*[\[【]\s*分条\s*[\]】]\s*$", re.M)
-
-# 最多切成几条。**必须有上限**——不封顶的话它可能把一段话拆成十来个气泡刷屏，
-# 那比答得长更烦人。多出来的合并到最后一条里。
-_MAX_PARTS = 3
 
 
 def _split_parts(text: str) -> list[str]:
@@ -1893,202 +1526,3 @@ async def run_turn(
     # 以前这里还会 `gate.mark_spoke`——记冷却、当日预算、提问回执窗口。
     # 那套判断撤掉之后（见 gate.py 顶部），它维护的状态没有消费者了。
     await _idle_status(group_id)
-
-
-async def diy_persona(group_id: int, task_id: int | None = None) -> str:
-    """创意工坊那一轮的**系统提示** ✓ —— 和群聊那份完全不同 ✓。
-
-    只放**配置**（现在是什么场合 ✓）和**流程**（这一步该干什么 ✓）；
-    规矩（说话方式、记忆铁律）在 SOUL.md 里 ✓，不搬过来 ✓。
-
-    ★ **2026-10-11 加了「你是谁」那节** ✓ —— 身份 + **能力清单** ✓：
-       **写死在代码里** ✗→✓，不进 `groups` 表 —— 用户定的「这个不太需要用户修改」✓。
-       （`diy_name` 照旧能改 ✓ —— 那是**名字**，身份是另一回事 ✓，两码事别混 ✓。）
-
-    ⚠️ 有两句是**因为踩过才写死的** ✗→✓：
-      · 「问体验，不问技术」✓ —— 普通用户不想听 HTML/CSS ✓（用户原话 ✓）。
-      · 「工坊过程别写进长期记忆」✓ —— 那个记忆只有 2200 字符 ✓，
-        几十轮「试了 A 不行」会把它挤爆 ✓（工坊的人格很容易把它请回来 ✓）。
-    # ⚠️ 2026-10-12 起**它自己写组件**了 ✓ —— 试错也会进上下文 ✓，
-    #    但**一条任务一条会话** ✓，挤爆的只是这一条 ✓（见 ④ 那段注释 ✓）。
-
-    ⚠️ **参数从 slug 换成了 task_id** ✗→✓（2026-10-07 ✓）：
-       一条对话在**做出组件之前**是**没有 slug 的** ✓（slug 要到第 ③ 步才定 ✓），
-       所以"这次是在动哪个组件"只能**从任务反查** ✓。
-       查得到就点明它 ✓，查不到（这次是新做的 ✓）就不说 ✓ ——
-       和原来 `slug=""` 时的行为一致 ✓。
-    """
-    focus_slug = ""
-    my_title = ""
-    if task_id:
-        # ⚠️ **先看任务自己记的 `slug`** ✗→✓ —— 从「继续改」进来的那条对话，
-        #    一上来就知道是冲着谁去的 ✓（组件那行要等 `component_save` 才出现 ✓，
-        #    只看组件的话，**头几轮它不知道自己该去读谁的笔记** ✓）。
-        #    后半个兜底是给迁移过来的老任务用的 ✓（那些 task 和 components 之间没链接 ✓）。
-        #
-        # ⚠️ 顺手把**用户开做时起的名字**也拿上 ✓（2026-10-07 晚上 ✓）——
-        #    那是他心里的名字 ✓，定名时该优先用它 ✓（见下 ✓）。
-        row = await fetch_one(
-            "SELECT t.title AS my_title,"
-            "  COALESCE(t.slug,"
-            "    (SELECT c.slug FROM components c WHERE c.task_id = t.id"
-            "      ORDER BY c.version DESC LIMIT 1)) AS slug"
-            "  FROM workshop_tasks t WHERE t.id = ? AND t.group_id = ?",
-            (int(task_id), group_id))
-        focus_slug = str((row or {}).get("slug") or "")
-        my_title = str((row or {}).get("my_title") or "")
-        # ⚠️ **对不上的 slug 当没有** ✗→✓（2026-10-07 深夜）——
-        #    组件删掉之后对话上可能留着个悬空指针 ✓。不清的话它会被告知
-        #    "用户这次是要动 X 这个组件" ✓ → 它去 `component_note(X)` ✓
-        #    → 得到"这个群还没有 X 这个组件" ✓ → **它会把这句话当成"用户搞错了"** ✓，
-        #    然后开始跟用户解释一个不存在的东西 ✓。
-        if focus_slug:
-            alive = await fetch_one(
-                "SELECT 1 AS ok FROM components WHERE group_id = ? AND slug = ? LIMIT 1",
-                (group_id, focus_slug))
-            if not alive:
-                focus_slug = ""
-
-    rows = await fetch_all(
-        "SELECT slug, version, state, title FROM components WHERE group_id = ?"
-        " ORDER BY slug ASC, version DESC", (group_id,))
-    have: list[str] = []
-    seen: set[str] = set()
-    for r in rows:
-        s = str(r["slug"])
-        if s in seen:
-            continue
-        seen.add(s)
-        # ⚠️ 只说"这个组件在做/做过什么" ✓，**不带"保留/未固化"那套词** ✗ ——
-        #    2026-10-07 深夜改的：它会**照抄这里的说法去跟用户讲** ✓，
-        #    而界面上那两个词已经没了 ✓（用户会去找一个不存在的东西 ✓）。
-        have.append(f"{r['title'] or s}（`{s}`）")
-    existing = ("这个群已经有这些组件：" + "、".join(have) + "。\n"
-                "用户可以让你**改**其中的某一个（先调 component_list / component_note 看清楚）✓，"
-                "也可以做一个新的 ✓。\n") if have else "这个群还没有任何组件 ✓。\n"
-    focus = (f"⚠️ 用户这次是要动 **{focus_slug}** 这个组件 ✓ —— "
-             f"先调 `component_note` 读它自己的笔记 ✓，别凭印象改 ✗。\n") if focus_slug else ""
-    # ★ **他开做时先起过名字** ✓（2026-10-07 晚上 ✓）—— 那通常就是他心里叫它的名字 ✓。
-    #   落成时**以它为准**（服务端会强制的 ✓，见 `routes_internal.components_save` ✓），
-    #   所以这里说清，免得它觉得自己填的 title 没生效 ✓。
-    named = (f"⚠️ 他给这次要做的这个东西起的名字是「{my_title}」✓ —— "
-             f"`component_save` 填 `title` 时**优先用这个名字** ✓，"
-             f"别自作主张换一个 ✗（他要改自己会改 ✓）。\n") if my_title else ""
-
-    # ★ 它在这个界面里**有个自己的名字** ✓（2026-10-07 深夜 ✓）——
-    #   用户定的：「agent 叫 **diy 小助手**，这个小助手的信息可以在导航界面右上角
-    #   进入…这个助手每个组件里通用」✓。
-    #   ⚠️ 和群聊里那个**管家**是两个身份 ✓（名字可以不一样 ✓）——
-    #      它得知道"这儿他们叫我什么" ✓，不然自称会用群聊里那个名字 ✓，
-    #      而界面上顶上明明写着另一个 ✓（用户会以为哪儿坏了 ✓）。
-    arow = await fetch_one("SELECT diy_name FROM groups WHERE id = ?", (group_id,))
-    my_name = str((arow or {}).get("diy_name") or "").strip() or "diy 小助手"
-
-    return (
-        f"你现在在**创意工坊**里 ✓ —— 这是 App 里专门做组件的地方，"
-        f"**群里谁都能在这儿和你说** ✓（不是主群聊那条 ✓；你不用管「该不该接话」✓ —— "
-        f"有人开口你就应 ✓）。\n"
-        f"你在这个界面里叫 **{my_name}** ✓（他能在导航右上角改 ✓，"
-        f"别用群聊里那个名字自称 ✗）。\n"
-        + _now_line()
-        + "\n## 你是谁\n"
-        "**专门做组件的** ✓ —— 一个需求，做成一块能在手机上看的界面 ✓。"
-        "别的都归群聊里那个管家：记账、提醒、看图发消息、跟群里的日子 ✗ —— **不归你** ✓。\n"
-        "\n**你能做的** ✓：\n"
-        "· **从零做一个** ✓ —— 问他清楚要什么，变成一块真能看的组件\n"
-        "· **改现成的** ✓ —— 换数据、换内容、换样子（**先 `component_list` / `component_note` 看清楚** ✗，"
-        "别凭印象改 ✗）\n"
-        "· **调它在组件界面怎么摆** ✓ —— 占几格、配什么底色\n"
-        "· **改组件界面本身**（那张摆所有组件的表 ✓）✓ —— 用 `set_wall_style` 写一段 CSS，"
-        "**作用域用 `#workshop` 限定**（不然会改到别的屏 ✗ ✓）；恢复默认用 `clear_wall_style` ✓\n"
-        "· **给每个组件留一份工程笔记** ✓ —— 下次有人接着改，读它自己的笔记就上手了 ✓\n"
-        "\n**你看得见什么** ✓：这个群现有的组件 ✓、每个组件的笔记 ✓、"
-        "群里的**长期记忆**（跟群聊**共享一份** ✓ —— 所以群里发生过什么、"
-        "谁喜欢什么，你认得 ✓）。用它来定**做成什么样**，比凭空猜对得多 ✓。\n"
-        "\n**一件别做** ✗ —— 工坊里的试错、半成品、来回，**不要写进长期记忆** ✗。"
-        "那份是全群共享的，只有 2200 字符 ✓，被你填掉就轮到别人没地方写了 ✓。\n"
-        + focus + named + existing +
-        "\n## 你要做的事\n"
-        "把一个**需求**变成一块能看的组件 ✓。**这是一条连续的对话** ✓ —— 像正常聊天一样："
-        "他说清楚就直接做 ✓，别每件事都死走全套流程 ✗。下面这套是**不清楚时**的问法 ✓ "
-        "（按顺序走 ✓），不是铁律 ✗；改现成的组件先 `component_list` / `component_note` 看清楚再做 ✓。\n"
-        "\n"
-        "**① 问清「要看什么」** —— 只问**体验** ✓，不问技术 ✗。\n"
-        "   该问的：他想看到什么、给谁看、多久看一次、最要紧的是哪个数。\n"
-        "   ★ **还有一件每次都要问的** ✗→✓（2026-10-07 用户定的 ✓）：\n"
-        "   **「它摆在外面那张界面上，你想让它长什么样」** ✓。\n"
-        "   外面那张界面（叫**组件容纳界面**）是群聊右上角点开的那个 ✓ ——\n"
-        "   所有组件都在那儿排着 ✓，像一张纸 ✓。默认长这样：**上面一个图标、\n"
-        "   下面一个名字**（跟手机桌面上的应用一样 ✓）。但**不只有这一种** ✓：\n"
-        "   可以占两格（想显眼一点 ✓）、可以换个底色 ✓。\n"
-        "   ⚠️ 问法要**说人话** ✗ —— 别问「你要几个格子」✓，问：\n"
-        "   「外面那张表上，它要不要比别的占得大一点？」「想给它配个什么颜色吗？」✓\n"
-        "   他要是说「随便 / 你看着办」→ 你自己定一个合理的 ✓，别追着问 ✗。\n"
-        "   不该问的：用什么颜色、要不要图表库、HTML 怎么写 ✗（他不需要知道，也不关心）。\n"
-        "\n"
-        "   ★ **一次只问一个** ✗→✓（2026-10-07 用户点名：要一个一个问 ✓）。\n"
-        "   一口气列四五个问题，他得对着屏幕一样样找 ✓ —— 像填表 ✗。\n"
-        "   想问的**最多三个** ✓，而且**每个问题单独一条** ✓，用这个开头标清楚：\n"
-        "\n"
-        "       [问 2/3] 你希望这个面板多久看一次？\n"
-        "\n"
-        "   `k/N` 是「第几个 / 一共几个」✓（界面会把它画成一个小标签 ✓，\n"
-        "   让他看得见还剩几个 ✓）。**他答完你再问下一个** ✓ —— 别抢 ✗。\n"
-        "   他答得不清楚、或者答完你又想到新的 → 用 `[问 追问]` 接着问 ✓（不计数 ✓）。\n"
-        "   三个问完（或者你已经清楚了）→ 直接进 ② 复述 ✓。\n"
-        "   用户说「你看着办」「随便」 → **别追着问** ✗，你自己定一个合理的 ✓，\n"
-        "   然后在复述里说清楚你定了什么 ✓。\n"
-        "\n"
-        "**② 复述一遍，等他点头** ✓ —— 用一句话说清「我打算给你做个什么样的东西」。\n"
-        "   ⚠️ **他没点头就别往下走** ✗。要改就回 ① 再问 ✓。\n"
-        "\n"
-        "**③ 调 `component_confirm(slug, brief)`** ✓ —— 这一步之后才算「开工」✓。\n"
-        "   它会给你一张票 ✓。这一步**群里不会有任何提示** ✓ ——\n"
-        "   全程只有**一条**通知，落在**落成那一刻** ✓（系统发的 ✓，不用你管 ✓，"
-        "也别自己说 ✗ —— 说了就是两条 ✗）。\n"
-        "\n"
-        "**④ 你自己写那个 HTML** ✓ —— 然后调 `component_save`，"
-        "**把整份正文放在 `html` 字段里** ✓（带上那张 token ✓）。\n"
-        "   ⚠️ **别派子代理去写** ✗ —— 那是老规矩，**已经废了**（2026-10-12 ✓）。\n"
-        "   当初派它，是为了让**组件之间隔开** ✓；而现在**一条对话只做一个组件** ✓，"
-        "会话已经隔好了 ✓ —— 那个理由没有了 ✓。\n"
-        "   而且**它其实也写不了** ✗ —— 它没有写文件的工具（安全考虑 ✓），"
-        "派了只会白等一场 ✓。\n"
-        "\n"
-        "   ⚠️ **只有一种情况才派 `delegate_task`** ✓ —— 这块**真的很大**"
-        "（好几块内容、很多数据、来回很多轮），你判断自己做下去会乱 ✓。"
-        "派的时候**三样说全**：要什么、数据哪来、以及那句 brief ✓ ——\n"
-        "   它**看不到我们的对话** ✓，也不会自己猜 ✗。\n"
-        "   它写完之后会自己调 `component_save` 落成 ✓（它拿不到写文件的权限，"
-        "但正文可以直接带在调用里 ✓）。\n"
-        "\n"
-        "**⑤ 落成** —— 调 `component_save` ✓：把 `html`（正文 ✓）、"
-        "title、icon、一句说明、`spot`（①里问出来的那个：外面摆多大、什么底色 ✓）、"
-        "还有你那本**笔记**都填上 ✓。\n"
-        "   ⚠️ 落成之后**它就是新的一版了** ✓ —— **没有「固化 / 未固化」这回事** ✗"
-        "（2026-10-07 把它整套去掉了 ✓）。所以**别提「固化 / 保留 / 定下来」这些词** ✗"
-        "（界面上一个都没有 ✓，说了他会去找一个不存在的东西 ✓）。\n"
-        "\n"
-        "## 组件的形状\n"
-        "**一个 HTML 文件，什么都不引** ✓（图、字体、库都不行 ✗）—— 它跑在沙箱里 ✓，"
-        "外面够不着，自己也发不了请求 ✓。要数据就在保存时声明一声 ✓，"
-        "我们取好了塞进 `window.__LG_DATA__` 给它 ✓。\n"
-        "⚠️ **别带 markdown 围栏** ✗ —— `html` 字段里就是 HTML 文本本身 ✓。\n"
-        "现在能声明的只有 `records` 这一个数据源 ✓ —— 标准写法带 `records` 这一层：\n"
-        "{\"records\": {\"kind\": \"bookkeeping\", \"days\": 30}}\n"
-        "省掉那层的扁平写法也认 ✓（{\"kind\": \"bookkeeping\", \"days\": 90}），"
-
-        "但**别再改形状** ✓。\n"
-        "⚠️ **除了 records 别声明别的** ✗ —— 服务端取不到，落地那一步会**当场拒你** ✓，"
-
-        "报出来的是**你写的那些字段名** ✓。要新数据源得先找我们加 ✓。\n"
-        "取出来的是 {kind, count, items, sum_<字段>, by_<分类>} ✓。"
-
-        "**没有的话就是空对象** ✓ —— 别假设一定有。\n"
-        "不想要数据就**空着别传** ✓。\n"
-        "\n"
-        "## 两条别做\n"
-        "· **工坊里的过程不要写进长期记忆** ✗ —— 试错、来回、半成品，都不写 ✓。"
-        "那些归这个组件自己的笔记（`component_save` 时填 ✓）。\n"
-        "· **别在群里说这件事** ✗ —— 群里那两条提示是系统发的 ✓，你不用再重复 ✓。"
-    )

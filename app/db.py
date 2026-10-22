@@ -212,11 +212,6 @@ CREATE TABLE IF NOT EXISTS components (
     created_at INTEGER NOT NULL,
     enabled_at INTEGER,                   -- 什么时候转正的
     enabled_by INTEGER,                   -- 谁点的（2-10 人的群里，这个信息有用）
-    -- ★ 是**哪个任务**做出来的（2026-10-07 ✓）。
-    --   用途只有一个："继续改这个组件"要回到**当初那条对话** ✓。
-    --   ⚠️ 允许为空 ✓ —— 迁移前的老组件补不出来 ✓，而且插件拿不到任务号时
-    --   也要能照常落地 ✓。"链接断了"是**降级**（回到一条新对话），不是故障 ✓。
-    task_id    INTEGER,
     -- ★ 这一版**在"组件容纳界面"里怎么展示**（2026-10-07 晚上 ✓）——
     --   用户定的：「每次组件创意时，都要问的一件事是如何在组件容纳界面展示，
     --   可以传统的上面图标下面名称，也可以其他」✓。
@@ -247,132 +242,6 @@ CREATE INDEX IF NOT EXISTS idx_components_group
     ON components(group_id, state, id DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_components_one_live
     ON components(group_id, slug) WHERE state = 'live';
-
--- 「做组件」那张一次性票。**它是硬校验①的全部依据** ✓ ——
--- 用户在工作坊里确认细节之前，**世界上不存在任何可用的票** ✓；
--- 写入组件必须带票 ✓，票只能用一次 ✓、30 分钟过期 ✓。
---
--- ⚠️ **必须落库，不能放内存** ✗→✓ —— agent 手里有 `restart_backend` 工具 ✓
---    而且它会用 ✓。内存里的票会被它自己重启掉 ✓，症状是
---    "用户确认了、子代理也写完了，却被拒" ✓ —— 而**两边都不知道为什么** ✓。
---
--- ⚠️ `group_id` 在这张表里不是多余的 ✗→✓：`component_save` 的群号
---    **从票反查** ✓，不从会话标识推 ✓ —— 因为真正动手写文件的是**子代理** ✓，
---    而子代理的会话标识里**没有群号** ✓（见 2026-10-07 那条实测）。
-CREATE TABLE IF NOT EXISTS component_tickets (
-    token      TEXT PRIMARY KEY,
-    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    slug       TEXT    NOT NULL,
-    brief      TEXT,                      -- 用户确认下来的那句需求（子代理的 brief 就靠它）
-    handle     TEXT,                      -- ⚠️ **2026-10-12 起不再填** ✗→✓ ——
-                                          --    正文改走 `component_save` 的 `html` 字段 ✓。
-                                          --    列留着是为了**老票兼容** ✓（老票里是路径 ✓，
-                                          --    `components_save` 只在没带 `html` 时才会去看它 ✓）。
-    created_at INTEGER NOT NULL,
-    used_at    INTEGER,                   -- 用过一次就填上，**再用就拒**
-    expires_at INTEGER NOT NULL,
-    -- ★ 是哪条对话派出去的这张票（2026-10-07 ✓）。
-    --   用途只有一个：**用户切走的时候按它作废** ✓ —— "切换 = 终止"里
-    --   唯一能由我们持久保证的一半 ✓（见 `routes_workshop.py` 那段 ✓）。
-    task_id    INTEGER
-);
-
--- 创意工坊的对话。**和群聊消息是两张表** ✗→✓ —— 2026-10-07。
---
--- 为什么不给 `messages` 加一列 `channel` ✗：那张表的 `_SELECT` 是唯一列清单 ✓，
--- 而 WHERE 有**五处** ✓ —— 加列就要改五处 ✓，**漏一处工坊的话就漏进群聊历史** ✗。
--- 而"不进群聊"本来只要 `broadcast=False` 就够了 ✓（见 messages.py ✓）；
--- 列只为"重连、翻历史不串"服务 ✓ —— 不值那个风险 ✓。
---
--- ⚠️ **按 `user_id` 分开** ✓ —— 工坊的会话是**每用户一条** ✓
---    ⚠️ **2026-10-11：不再按 user_id 分** ✗→✓ —— 见 `diy_session_id_for` ✓：
---    会话是 `…-diy-t<任务>`，不带用户号 ✓（对话群共享了 ✓，
---    同一条对话必须是同一条历史 ✓）。这里 `user_id` 只记录"是谁开的"✓。
---
--- ★ 2026-10-07：**钥匙从 `slug` 换成了 `task_id`** ✗→✓。
---
---   为什么换：`slug` 要到流程第 ③ 步（用户确认）才由 agent 定下来 ✓，
---   而"＋做一个新的"在那之前就得有身份 ✗ —— 于是两次"新的"slug 都是空 ✓，
---   两条对话**在界面上也混在一起** ✗；更糟的是 Hermes 那边的会话是按人分的 ✗，
---   同一个人做 A 再做 B，**它脑子里是同一段上下文** ✗。
---
---   ⚠️ `slug` **是死列了，但留着不删** ✓ —— 和 `groups` 那四列同一个理由
---      （见 `_migrate_agent_status` 那段 ✓）：SQLite 删列要重建整张表 ✓，
---      风险不值当 ✓。而且它还有最后一个用处：**迁移时按它把老消息分堆** ✓。
---      代码里从此一个引用都不留 ✓（"同一份数据两处 = 迟早走岔" ✓）。
-CREATE TABLE IF NOT EXISTS workshop_tasks (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    user_id    INTEGER NOT NULL,          -- 谁的对话（Hermes 会话也按它分）
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,          -- 最近动过：既排"上次那个"，也排切换列表
-    -- ★ 用户**开做时给它起的名字**（2026-10-07 晚上 ✓）—— 用户定的：
-    --   「点击后会提示命名，后续也可以在右上角的组件管理界面重命名」✓。
-    --   用处：① 导航那一列上有个说得出口的名字 ✓（不然是一串"还没起名"✓）
-    --        ② 传给 `diy_persona` ✓ —— 它定名前先知道用户想叫它什么 ✓
-    --        ③ `component_save` 落成时**以它为准** ✓（用户起的名字优先 ✓）
-    --   ⚠️ 组件真正落地之后，名字以 `components.title` 为准 ✓（那个是能改的、
-    --      而且改一处同步所有地方 ✓，见 `main.py` 的 `component_rename` ✓）。
-    title      TEXT,
-    -- ★ ★ 2026-10-07 深夜：「固化 / 未固化」**整套去掉了** ✗→✓（用户定的 ✓）——
-    --   「组件聊天没有所谓的固化和非固化概念了，只要新建了组件，就会进入一个对话」✓。
-    --   `components.state` 那一列**留着不动** ✓（它现在只服务内部：
-    --   哪一版是最新的 ✓、旧版归档 ✓），但**界面上一个字都不再提** ✓，
-    --   "未固化最多 3 个"那条额度也跟着废了 ✓（概念没了，它就没法表达了 ✓）。
-    --
-    -- ★ **在等子代理交付**（2026-10-07 深夜 ✓）—— 记的是"从哪一刻开始等的" ✓；
-    --   落成了就清空 ✓。
-    --   ⚠️ **必须落库，不能只放内存** ✗→✓ —— 用户实测踩到的：他在 21:27 派了子代理 ✓、
-    --      我 21:30 部署重启了一次 ✓ → 内存里那份登记**没了** ✓ →
-    --      "做好了"再也没人替他问 ✓（他得自己说一句"还没好吗"✦）。
-    --      而**"他做组件的时候我正好在部署"是最常发生的一种** ✓。
-    --   用处只有一个：服务起来时**把还欠着的那些捡回来** ✓（见 `poke_loop` ✓）。
-    awaiting   INTEGER,
-    -- 这条对话是**冲着哪个组件**去的（可以还不知道 ✓）。
-    --   · 从「继续改这个组件」开的，一上来就填上 ✓
-    --   · "＋做一个新的"开的，等 agent 在 `component_save` 时定了名再填 ✓
-    -- ⚠️ 它**不是** `components` 的外键 ✓ —— 定名之前那个 slug 还不存在任何行 ✓。
-    --    它的用处是两件事：① `diy_persona` 从第一轮就知道"这次是动它" ✓
-    --    ② （原来还有一条：计"未固化"额度时好分清两种对话 ✓ —— 那道闸
-    --        2026-10-07 深夜跟着"固化"整套撤了 ✓，这条用途也就没了 ✓）
-    --       —— 不然改一个已保留的组件会白占一个名额 ✓（那是用户最烦的那种拦 ✓）。
-    slug       TEXT,
-    -- ★ **上一次在主群聊里报过「做好了 / 改好了」的那一刻** ✓（2026-10-12 ✓）。
-    --   它只干一件事：算「**这一版是谁一起做的**」✓。
-    --   落成时把**这一刻之后发过话的成员**全标出来 ✓，再把这条推进到此刻 ✓
-    --   → 下一版就只算**报过之后**发话的人 ✓（用户定的
-    --     「标完后状态清楚，下次谁修改标谁」✓）。
-    --   ⚠️ **NULL = 从没报过** ✗→✓ —— 老对话补出来就是 NULL ✓，
-    --      按「**从这条对话一开始就算**」处理（`COALESCE(…, 0)` ✓）。
-    --      猜成「只有最后一个人」比说全了糟 ✗ —— 那是编 ✗。
-    notified_at INTEGER
-);
-CREATE INDEX IF NOT EXISTS idx_workshop_tasks
-    ON workshop_tasks(group_id, user_id, updated_at DESC);
-
-CREATE TABLE IF NOT EXISTS workshop_messages (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    user_id     INTEGER NOT NULL,          -- 谁的工坊（会话也是按他分的）
-    slug        TEXT    NOT NULL DEFAULT '',-- ★ 死列（见上面那段）；迁移用完就不读了
-    sender_type TEXT    NOT NULL,          -- 'user' | 'agent'
-    content     TEXT    NOT NULL,
-    created_at  INTEGER NOT NULL,
-    task_id     INTEGER,                   -- 属于哪条对话（迁移前的老行是 NULL）
-    -- ★ ★ 2026-10-07 深夜：**把群聊那套聊天能力搬过来** ✗→✓ ——
-    --   用户定的：「组件 diy 界面的聊天界面的功能应该套用生活管家的模板，
-    --   比如…底部聊天框的右边加个添加图片按钮…图片也和生活管家一样
-    --   添加后不立刻发送，而是等文字后一起发送」✓。
-    -- ⚠️ **和 `messages` 那几张列同名同义** ✓ —— 两边形状一致，
-    --    `_image_parts` / `_quote` 那些现成件才搬得动 ✓（见 routes_workshop.py ✓）。
-    msg_type    TEXT    NOT NULL DEFAULT 'text',   -- 'text' | 'image'
-    media_path  TEXT,                      -- 相对 media_dir
-    media_meta  TEXT,                      -- JSON
-    reply_to    INTEGER,                   -- 引用的是**本表**哪一条
-    mentions    TEXT                       -- JSON（工坊里没有 @ 的对象，留列备用）
-);
-CREATE INDEX IF NOT EXISTS idx_workshop_msgs
-    ON workshop_messages(group_id, user_id, id);
 
 -- ★ 2026-10-08：这两张表从壳搬过来 ✓（合并那次）。形状照抄壳那份 ✓，
 --   连注释里那条"为什么"也一起搬 —— 它们是当初踩过才写下来的 ✓。
@@ -495,47 +364,8 @@ _MIGRATIONS: list[tuple[str, str, str]] = [
     # ★ 「给管家的话」✓ —— 每个空间一段，每一轮自动注入 ✓（见 orchestrator/agent.py
     # 的 `_group_persona` ✓）。用户自己写的、关于**他们是谁**的一段话 ✓。
     ("groups", "agent_user_prompt", "TEXT"),
-    # ★ 创意工坊的总开关（2026-10-07）✓ —— 出问题能**一键关**，而且**不影响主群聊** ✓。
-    #   默认开 ✓（工坊已经部署了 ✓）。关掉之后：工坊那两屏还在 ✓，
-    #   但"做组件"的对话入口会说还没接上 ✓（比整片白屏好 ✓）。
-    ("groups", "workshop_enabled", "INTEGER NOT NULL DEFAULT 1"),
-    # ★ 「diy 小助手」的名字和头像（2026-10-07 深夜 ✓）—— 用户定的：
-    #   「agent 叫 diy 小助手，这个小助手的信息可以在导航界面右上角进入…
-    #     这个助手每个组件里通用」✓。
-    #   ⚠️ **和 `agent_name` / `agent_avatar` 分开** ✗ —— 那是**群里那个管家** ✓
-    #      （群聊里说话的、APP 里到处都用的那个身份 ✓）；
-    #      这是**做组件时跟他对话的那个** ✓。两个身份、两套名字 ✓，
-    #      共用一个的话，改这边的名字会顺手把群聊里管家的名字也改了 ✓
-    #      —— 而用户完全没料到会那样 ✓。
-    ("groups", "diy_name", "TEXT"),
-    ("groups", "diy_avatar", "TEXT"),
-    # ★ 三处 `task_id`（2026-10-07 ✓）—— "对话挂到任务上"那次改动 ✓。
-    #
-    # ⚠️ **新库靠 SCHEMA、老库靠这里，两处都要有** ✗ —— 只写一处就是
-    #    "新装的没事、在用的崩" ✓（这个项目最烦那种：测试环境永远碰不到 ✓）。
-    #
-    # ⚠️ 顺序上必须**先有 `workshop_tasks` 这张表** ✓ —— 但这里只是加列 ✓，
-    #    真正回填在 `_migrate_workshop_tasks`（跑在 `_apply_migrations` 之后 ✓）。
-    ("workshop_messages", "task_id", "INTEGER"),
-    ("components", "task_id", "INTEGER"),
-    ("component_tickets", "task_id", "INTEGER"),
-    # 这条对话冲着哪个组件去的（见 SCHEMA 里那段 ✓）。定名之前是空的 ✓。
-    ("workshop_tasks", "slug", "TEXT"),
-    # 用户开做时给它起的名字（见 SCHEMA 里那段 ✓）。
-    ("workshop_tasks", "title", "TEXT"),
-    # 在等子代理交付（见 SCHEMA 里那段 ✓）—— 落库是为了**重启后能捡回来** ✓。
-    ("workshop_tasks", "awaiting", "INTEGER"),
-    # 「上一次在主群聊里报过做好了」的那一刻（见 SCHEMA 里那段 ✓）。
-    # 老对话补出来是 NULL ✓ = 从没报过 ✓ = 按「从一开始就算」处理 ✓。
-    ("workshop_tasks", "notified_at", "INTEGER"),
     # 这一版在"容纳界面"里怎么展示（见 SCHEMA 里那段 ✓）。
     ("components", "spot_json", "TEXT"),
-    # 工坊聊天的图片和引用（2026-10-07 深夜，见 SCHEMA 里那段 ✓）。
-    ("workshop_messages", "msg_type", "TEXT NOT NULL DEFAULT 'text'"),
-    ("workshop_messages", "media_path", "TEXT"),
-    ("workshop_messages", "media_meta", "TEXT"),
-    ("workshop_messages", "reply_to", "INTEGER"),
-    ("workshop_messages", "mentions", "TEXT"),
     # ★ 合并那次（2026-10-08）：用户表从"按需镜像"变成"权威" ✓。
     #   老库里这两列都不存在 ✓（它们原本在**壳**那张 users 表上 ✓），
     #   所以要在这里补 —— 老行补出来是 0 / NULL ✓（迁移脚本随后回填 ✓）。
@@ -602,51 +432,6 @@ async def _migrate_agent_status(conn: aiosqlite.Connection) -> None:
         log.info("把 %d 个群的旧状态文案并进了新配置 ✓", moved)
 
 
-async def _migrate_workshop_tasks(conn: aiosqlite.Connection) -> None:
-    """把老的工坊消息**按 `(群, 用户, slug)` 分堆**，每堆补一条任务 ✓ —— 跑一次完 ✓。
-
-    为什么按这个分：老数据的钥匙就是 `slug` ✓（在组件维度上是分得开的 ✓），
-    而**同一个人"＋做一个新的"两次**那两条（slug 都空 ✓）在库里已经分不开了 ✗ ——
-    那两条会被合并成**一条**任务 ✓。这是这次迁移**唯一补不回来的东西** ✓，
-    所以在这里写明白 ✓，别当作"迁完了、跟原来一样" ✓。
-
-    **幂等** ✓：只看 `task_id IS NULL` 的行 ✓ —— 跑过的堆不会再动 ✓。
-    所以它随启动跑也无所谓 ✓（和新库上什么事都不做是一个效果 ✓）。
-
-    跑完 `slug` 就是**死列**了 ✓ —— 代码里一个引用都不留 ✓（列本身留着不删 ✓，
-    和 `groups` 那四列同一个理由 ✓：SQLite 删列要重建整张表 ✓，风险不值当 ✓）。
-    """
-    try:
-        async with conn.execute(
-            "SELECT group_id, user_id, COALESCE(slug, '') AS s,"
-            "       MIN(created_at), MAX(created_at)"
-            "  FROM workshop_messages WHERE task_id IS NULL"
-            " GROUP BY group_id, user_id, COALESCE(slug, '')"
-            " ORDER BY MIN(id)"
-        ) as cur:
-            piles = await cur.fetchall()
-    except Exception:  # noqa: BLE001
-        return                          # 表还没建出来（全新库 ✓）→ 没什么可迁的 ✓
-
-    # ⚠️ 任务上的 `slug` **一并填上** ✓ —— 迁移过来的任务本来就是冲着
-    #    某一个组件去的 ✓（不然它们会全部算进"没做成的半成品" ✓，
-    #    凭空占掉那 3 个名额里的几个 ✓ —— 用户会看到额度莫名其妙没了 ✓）。
-    #    slug 是空的那种（老数据里"＋做一个新的"之后说的话 ✓）留空 ✓，那是对的 ✓。
-    for gid, uid, slug, t0, t1 in piles:
-        ins = await conn.execute(
-            "INSERT INTO workshop_tasks(group_id, user_id, created_at, updated_at, slug)"
-            " VALUES(?,?,?,?,?)",
-            (gid, uid, int(t0 or now()), int(t1 or t0 or now()), slug or None))
-        await conn.execute(
-            "UPDATE workshop_messages SET task_id = ?"
-            " WHERE task_id IS NULL AND group_id = ? AND user_id = ?"
-            "   AND COALESCE(slug, '') = ?",
-            (ins.lastrowid, gid, uid, slug))
-    if piles:
-        await conn.commit()
-        log.info("把 %d 堆老的工坊消息补成了任务 ✓", len(piles))
-
-
 async def _ensure_profile_unique(conn: aiosqlite.Connection) -> None:
     """兜住"一个群 ⇄ 一个记忆空间"这条硬约束。
 
@@ -703,9 +488,6 @@ async def init_db() -> None:
     await conn.executescript(SCHEMA)
     await _apply_migrations(conn)
     await _migrate_agent_status(conn)
-    # ⚠️ **必须在 `_apply_migrations` 之后** ✗ —— 它要读 `task_id` 那一列 ✓
-    #    （老库那一列是刚加上去的 ✓，新库在 SCHEMA 里就有 ✓）。
-    await _migrate_workshop_tasks(conn)
     await _ensure_profile_unique(conn)
     await _drop_retired_tables(conn)
     await conn.commit()

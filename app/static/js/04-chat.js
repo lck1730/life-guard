@@ -13,17 +13,6 @@
     if (stickBottom) m.scrollTop = m.scrollHeight;
   };
 
-  /**
-   * **组件对话那个列表也滚到底** ✓（用户 2026-10-09：「组件聊天和主聊天，
-   * 聊天的**输入法要能够顶起最新的消息**」✓）。
-   * ⚠️ 它**不学** `#msgs` 那套"贴不贴底"的判断 ✗ —— 组件对话本来就是
-   *    "它当着你的面在做东西" ✓，新内容永远该跟着看 ✓
-   *    （那边别处也都是**硬滚** ✓，见流式那段 ✓），这里跟它们保持一致 ✓。
-   */
-  const scrollWsDown = () => {
-    const m = $('#wsMsgs');
-    if (m) m.scrollTop = m.scrollHeight;
-  };
   const fmtTime = s => {
     if (!s) return '';
     const d = new Date(s * 1000);
@@ -629,10 +618,6 @@
         const st = (d.agent_status || {})[String(group && group.id)];
         if (st) setStatusTimed(st);        // 重连补状态：文字自己从配置挑 ✓
         syncMissed();
-        // ★ **工坊那条也得补** ✗→✓（2026-10-11）—— 见 `wsResync` 那段：
-        //   原来重连只补群聊 ✓，工坊丢掉的收尾消息**永远回不来** ✓，
-        //   而流式气泡**只有它才会被摘掉** ✓ → 屏幕上卡着半截回复 ✗。
-        wsResync();
         return;
       }
       if (pkt.type === 'message') { if (d.group_id === group.id) addMsg(d); }
@@ -642,79 +627,6 @@
       else if (pkt.type === 'agent_stream') {
         if (d.group_id !== group.id) return;
         if (d.done) { clearStream(); setStatus('idle'); } else appendStream(d.delta);
-      }
-      // ★ 工坊那三个（2026-10-07）—— **只在对话屏开着、而且是对的那条对话时**才理 ✓。
-      //   群聊页对这几个类型是**直接忽略**的 ✓（未知类型落空 ✓）——
-      //   所以工坊里说的话，群聊那边一个字都不会冒出来 ✓。
-      //
-      // ⚠️ **判据是 task_id，不是 slug** ✗→✓（2026-10-07）——
-      //   对话的钥匙换成了任务 ✓（见 routes_workshop.py 那段 ✓）。
-      //   而且**必须逐个对任务号** ✓：切换之后，被掐掉的那一轮还会推几条收尾消息 ✓
-      //   （它的 `finally` 里那条 `idle` ✓）—— 不对任务号的话，
-      //   那些会**落在刚打开的那条对话上** ✓（用户看到"它明明没在跑，却说在跑" ✗）。
-      else if (pkt.type === 'ws_message') {
-        if (!$('#wsChat').classList.contains('on')) return;
-        if (d.group_id !== group.id) return;
-        if (Number(d.task_id) !== Number(wsCur.task)) return;
-        if (d.sender_type === 'agent') {
-          // ⚠️ **先把流式那条摘掉** ✗→✓ —— 2026-10-07 用户报的「回复两句重复的，
-          //    刷新过后只会留一句」✓：流式过程中已经画了一条气泡 ✓，
-          //    落库之后 `ws_message` 又画一条 ✓ → 两条一模一样的 ✓；
-          //    刷新时只从库里读 ✓ → 只剩一条 ✓。**这就是那个症状的全部原因** ✓。
-          if (wsCur.streaming) {
-            const r = wsCur.streaming.closest('.mkrow');
-            if (r) r.remove();
-            wsCur.streaming = null;
-          }
-          wsCur.streamBuf = '';
-          setWsStatus('idle');
-        }
-        addWsMsg(d);
-      }
-      else if (pkt.type === 'ws_stream') {
-        if (!$('#wsChat').classList.contains('on')) return;
-        if (d.group_id !== group.id) return;
-        if (Number(d.task_id) !== Number(wsCur.task)) return;
-        // ⚠️ **第一片是空的就先别开气泡** ✗→✓（2026-10-07 深夜，用户报的：
-        //    「思考的时候先返回了一个空消息占位」✓）。
-        //    服务端那边也堵了（空片段不推 ✓），这里再堵一道 ✓ ——
-        //    因为"第一片"完全可能只是**一个换行** ✓（`''.trim()` 拦住它 ✓），
-        //    那种照样会开出一个看着像坏了的空气泡 ✓。
-        // ★ **`reset`：把那个脏气泡整个摘掉** ✗→✓（2026-10-11）——
-        //   服务端发现这一轮**只吐了"天书"**（`<dots_function_call>…` ✓）时会
-        //   补问一轮干净的 ✓，补之前先推这一帧 ✓。
-        //   ⚠️ 不摘的话，补出来的话会**接在天书后面** ✓ → 屏幕上还是那坨 ✓
-        //      （用户看到的就是"回复有问题"✓）。
-        //   ⚠️ 只摘**流式那条** ✓（还在跑的那个气泡 ✓）—— 落库的历史一条都不动 ✓。
-        if (d.reset) {
-          if (wsCur.streaming) {
-            const row = wsCur.streaming.closest('.mkrow');
-            if (row) row.remove();
-            wsCur.streaming = null;
-          }
-          wsCur.streamBuf = '';
-          return;
-        }
-        // ★ 2026-10-12：**边流边渲染** ✗→✓（用户：「流式响应，代码渲染搬上来」✓）——
-        //   原来是 `textContent +=` ✗ → 流式全程都是一堆 `**` 和 ``` 的原文 ✗，
-        //   落地那一刻才"刷"地变好看 ✗。现在每一片都重跑一遍 `fillBubble` ✓ ——
-        //   粗体、代码块**边长边成形** ✓，气泡尾巴上带个光标 ✓（`.streaming` ✓）。
-        wsCur.streamBuf = (wsCur.streamBuf || '') + (d.delta || '');
-        if (!wsCur.streaming) {
-          if (!wsCur.streamBuf.trim()) { wsCur.streamBuf = ''; return; }  // 还全是空白 ✓ → 等有字再开 ✓
-          wsCur.streaming = addWsMsg({ sender_type: 'agent', content: '' });
-          wsCur.streaming.classList.add('streaming');
-        }
-        fillBubble(wsCur.streaming, wsCur.streamBuf);
-        const box = $('#wsMsgs'); box.scrollTop = box.scrollHeight;
-      }
-      else if (pkt.type === 'ws_status') {
-        if (!$('#wsChat').classList.contains('on')) return;
-        if (d.group_id !== group.id) return;
-        // ⚠️ `task_id` 是 null 的是**广播**（迁移前的老路径 ✓，见服务端那段 ✓）——
-        //    那种情况没法认人 ✓，照收 ✓（宁可多显示一行状态，也不要漏掉"它开始做了" ✓）。
-        if (d.task_id != null && Number(d.task_id) !== Number(wsCur.task)) return;
-        setWsStatus(d.state);
       }
       else if (pkt.type === 'group_update') { if (d.group_id === group.id) refreshGroup(); }
       else if (pkt.type === 'unauthorized') logout();
@@ -972,53 +884,11 @@
     document.body.classList.toggle('hasPending', pending.length > 0);
   };
 
-  /** 选完一个附件 → 按 `pickFor` 决定进哪个待发区 ✓（2026-10-08）✓。 */
-  const pickAdd = (file, kind, meta) => {
+  /** 选完一个附件 → 进群聊的待发区 ✓。 */
+  const pickAdd = (file, kind) => {
     if (!file) return;
-    if (pickFor === 'ws') setWsPending(file, kind, meta);
-    else addPending(file, kind, meta);
+    addPending(file, kind);
   };
-
-  /** 组件对话那个待发框：**同时只有一张** ✓（见 `#fileWs` 那段说明 ✓）。
-   *  ★ 2026-10-14：`meta` 透传 ✓（视频抽帧后要带个 `fromVideo` 标记，
-   *    待发区好画个「视频」角标 ✓ —— 网关没视频模型 ✓，发出去的是抽出来的那一帧 ✓）。 */
-  const setWsPending = (file, kind, meta) => {
-    if (wsPending) URL.revokeObjectURL(wsPending.url);
-    wsPending = { file, kind: kind || 'image', url: URL.createObjectURL(file), ...(meta || {}) };
-    syncWsPending();
-    syncWsSend();
-  };
-
-  /** ★ 2026-10-14：视频抽一帧成图 ✓ —— 网关上没有能看视频的模型 ✓
-   *  （glm-5.2 纯文本 ✓、flash-lite 只收图 ✓）✓，所以**在客户端**把视频
-   *  抽一帧、当成图发 ✓，走和图片同一条路（flash-lite 看图 → glm-5.2）✓。
-   *  ⚠️ 取**靠前**的一帧 ✓（第 ~0.1s ✓）—— 录的是界面/操作的话，开头往往是静止状态 ✓，
-   *     比中间随便一帧稳 ✓。 */
-  const videoFrameFile = (videoFile) => new Promise((resolve, reject) => {
-    const v = document.createElement('video');
-    v.muted = true; v.playsInline = true; v.preload = 'auto';
-    const url = URL.createObjectURL(videoFile);
-    let done = false;
-    const cleanup = () => { URL.revokeObjectURL(url); };
-    v.onerror = () => { if (done) return; done = true; cleanup(); reject(new Error('视频读不出')); };
-    v.onloadedmetadata = () => { try { v.currentTime = Math.min(0.1, (v.duration || 1) / 2); } catch (e) {} };
-    v.onseeked = () => {
-      if (done) return;
-      try {
-        const c = document.createElement('canvas');
-        c.width = v.videoWidth || 360; c.height = v.videoHeight || 240;
-        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
-        c.toBlob(b => {
-          if (done) return; done = true; cleanup();
-          if (b) resolve(new File([b], 'video-frame.jpg', { type: 'image/jpeg' }));
-          else reject(new Error('抽帧失败'));
-        }, 'image/jpeg', 0.85);
-      } catch (e) { done = true; cleanup(); reject(new Error('抽帧失败')); }
-    };
-    v.src = url;
-    // 兜底：10s 还没出帧就放弃 ✓（别让 UI 一直转 ✓）
-    setTimeout(() => { if (!done) { done = true; cleanup(); reject(new Error('视频太久没出帧')); } }, 10000);
-  });
 
   const addPending = (file, kind, meta) => {
     if (!file || !group) return;
@@ -1039,31 +909,9 @@
   $('#fileCamera').addEventListener('change', e => { pickAdd(e.target.files[0], 'image'); e.target.value = ''; });
   $('#fileGallery').addEventListener('change', e => { pickAdd(e.target.files[0], 'image'); e.target.value = ''; });
   // ★ 文件 / 音频 ✓ —— 和相册那条同一个套路 ✓（选完**先不发**，进待发区 ✓）。
-  //   ⚠️ 去处看 `pickFor` ✗：群聊进 `pending` 队列 ✓、组件对话进 `wsPending`（单个 ✓）。
+  //   ⚠️ 全部进群聊的 `pending` 队列 ✓。
   $('#fileDoc').addEventListener('change', e => { pickAdd(e.target.files[0], 'file'); e.target.value = ''; });
   $('#fileAudio').addEventListener('change', e => { pickAdd(e.target.files[0], 'audio'); e.target.value = ''; });
-  // ★ 2026-10-14：视频 ✓ —— 客户端抽一帧成图 ✓（网关没视频模型 ✓），再进待发区 ✓。
-  //    抽帧要 await ✓，所以单独一段 ✓（别的 change 都是同步 pickAdd ✓）。
-  $('#fileWsVideo').addEventListener('change', async (e) => {
-    const f = e.target.files && e.target.files[0];
-    e.target.value = '';
-    if (!f) return;
-    if (pickFor !== 'ws') return;          // 群聊那条路不收视频 ✓
-    try {
-      const frame = await videoFrameFile(f);
-      pickAdd(frame, 'image', { fromVideo: true, videoName: f.name });
-    } catch (err) {
-      toast('视频没发出去：' + err.message);
-    }
-  });
-
-  // ★ 这个 ＋ 面板**两处共用** ✗→✓（2026-10-08）——
-  //   用户定的：「组件聊天界面里，底部聊天框右边的照片还是要改成[主群聊]同款+，
-  //   并且支持相机和相册」✓ → 那就**同一块面板** ✓，
-  //   靠 `pickFor` 记住"这次是给谁挑的" ✓（两边选完之后的去处不一样 ✓）。
-  let pickFor = 'chat';       // 'chat' | 'ws'
-  const openPickSheet = (who) => { pickFor = who; $('#pickMedia').click(); };
-
   $('#pickMedia').onclick = () => {
     const p = $('#sheetPanel');
     // 微信的排布：横向一排，圆角方块图标 + 下方小字。顺序也是 相册 在前、拍摄 在后。
@@ -1114,23 +962,6 @@
         </button>
       </div>
       <div class="actions"><button class="btn-ghost" id="pkCancel">取消</button></div>`;
-    // ★ 2026-10-14：**视频**只给工坊（diy）那条 ✗→✓ —— 群聊后端没接视频 ✗，
-    //    而工坊这边视频是客户端抽一帧成图 ✓（见 `videoFrameFile` ✓）。
-    //    所以这项只在 `pickFor === 'ws'` 时露出来 ✓（主群聊看不到它 ✓）。
-    if (pickFor === 'ws') {
-      const grid = p.querySelector('.plus-grid');
-      const vb = document.createElement('button');
-      vb.className = 'plus-item'; vb.id = 'pkVideo';
-      vb.innerHTML = `<span class="ico">
-          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
-               stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="5" width="14" height="14" rx="2.5"/>
-            <path d="M17 9l4-2.2v10.4L17 15z"/>
-          </svg>
-        </span><span class="lbl">视频</span>`;
-      grid.appendChild(vb);
-      vb.onclick = () => { closeSheet(); $('#fileWsVideo').click(); };
-    }
     // 拍照必须走原生：`<input capture>` 在 MIUI 上会被忽略，点开是相册。
     p.querySelector('#pkCamera').onclick = () => {
       closeSheet();

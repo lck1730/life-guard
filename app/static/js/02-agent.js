@@ -470,14 +470,10 @@
     //    复制行为」✓）→ 返回键也就没有它们要关的了 ✓。
     if ($('#sheet').classList.contains('on')) { closeSheet(); return; }
     // ★ 创意工坊那几屏（2026-10-07）—— **压在管家那三屏上面** ✓：
-    //   diy 助手 > 组件页 > 聊天 > 导航 > 工坊 > 编状态 > 改资料 > 管家列表 > 群设置 ✓。
+    //   组件页 > 工坊 > 编状态 > 改资料 > 管家列表 > 群设置 ✓。
     // ⚠️ **顺序必须严格等于 z-index 从大到小** ✗→✓（2026-10-08 重排过一次）——
     //    它是"先关最上面那一屏"的意思 ✓；写反了的话按一下返回会**隔着两层
     //    关掉底下那层** ✓（屏幕上那一屏不动 ✓ —— 用户看到的是"按了没反应"✓）。
-    //    这天报的两个毛病都是这条：`#diySet` 从 25 提到 27 ✓、
-    //    `#compView`（26）从 `#wsChat`（25）**后面**挪到**前面** ✓
-    //    （点上方组件名进组件页时，两屏是**同时开着**的 ✓ —— 原来会隔着它
-    //     把下面的聊天关掉 ✓）。
     //    加新屏时**照 z-index 插进来** ✓，别凭感觉往后面追加 ✗。
     // ★★ **2026-10-09：`#me` 那一族提到 30/31** ✗→✓ —— 它们现在**比工坊那一摞还高** ✓
     //    （用户报的"在组件聊天里点我的头像没反应"就是这条 ✓，见 CSS 那一段 ✓）。
@@ -485,12 +481,6 @@
     if ($('#meEdit').classList.contains('on')) { closeMeEdit(); return; }
     if ($('#me').classList.contains('on')) { closeMe(); return; }
     if ($('#peer').classList.contains('on')) { closePeer(); return; }
-    if ($('#diySet').classList.contains('on')) { closeDiySet(); return; }
-    // ⚠️ **`#wsChat`（28）现在在 `#compView`（26）上面** ✗→✓（2026-10-09）——
-    //    这两行的**先后跟着 z-index 反过来了** ✓（见 CSS 那段：组件页要留在
-    //    底下开着 ✓，聊天压在它上面 ✓）。写反了还是老毛病：按一下返回
-    //    **隔着聊天把底下那个组件页关掉** ✓，屏幕上聊天纹丝不动 ✓。
-    if ($('#wsChat').classList.contains('on')) { closeWsChat(); return; }
     if ($('#compView').classList.contains('on')) { closeComp(); return; }
     if ($('#workshop').classList.contains('on')) { closeWorkshop(); return; }
     if ($('#agentEdit').classList.contains('on')) { closeAgentEdit(); return; }
