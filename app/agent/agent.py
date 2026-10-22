@@ -916,7 +916,11 @@ def _render_transcript(messages: list[dict[str, Any]], agent_name: str) -> str:
                 if prev_day:
                     lines.append(f"—— {day} ——")
                 prev_day = day
-            lines.append(f"[#{m.get('id')} {name}] {text}")
+            # ⚠️ 合成消息（空闲唤醒语、提醒）**没有 id** ✗ —— 早先会渲染成
+            #    「[#None 系统]」✓，看起来像一条编号坏掉的真消息 ✓。
+            #    没有编号就不写方括号编号，只留昵称 ✓。
+            head = f"#{m['id']} {name}" if m.get("id") else name
+            lines.append(f"[{head}] {text}")
     return "\n".join(lines)
 
 
@@ -949,7 +953,8 @@ def _turn_instruction(must_speak: bool, *, stale: bool = False,
             "只就上面**真实聊过**的事随口接一句（最多两句），"
             "像群里的人插一句话那样。\n"
             "不要开新话题；不要提记录里没有的人、事、数字；"
-            "不要假装有人刚问过你什么、让你记账或等你确认。\n"
+            "不要假装有人刚问过你什么、让你记账或等你确认；"
+            "也不用引用旧消息。\n"
             "没什么想说的就回 [SILENT]。"
         )
     if must_speak:
@@ -1566,6 +1571,21 @@ async def _recent_chat_for_idle(group_id: int, agent_name: str) -> str:
     rows.reverse()                      # 查的时候倒序取最近，给它的时候正序 ✓
     # 「（已回复）」这类状态词不算聊天内容 ✓ —— 留在素材里只会让它学样 ✗
     rows = [r for r in rows if not _is_meta_only(r.get("content") or "")]
+    # ★ **掐掉最后一条用户消息之后那些"很久之后才冒出来的 agent 发言"** ✓
+    #   它们大多是主动冒泡/提醒 ✓（实测：用户 12:30 说完，它 18:54 凭空问
+    #   「记什么？没看到金额和类别」✓）。把这种句子当素材喂回去，
+    #   等于**把它自己编的提问再确认一遍** ✗ —— 下一轮更可能接着编 ✓。
+    #   判据只对**末尾**的 agent 发言生效：正常回复不会隔 15 分钟以上 ✓
+    #   （模型一轮几秒到几十秒 ✓；后台重启/断流的补发也远到不了这个量级 ✓）。
+    last_user = max((i for i, r in enumerate(rows)
+                     if r.get("sender_type") == "user"), default=None)
+    if last_user is not None:
+        anchor = int(rows[last_user].get("created_at") or 0)
+        rows = [
+            r for i, r in enumerate(rows)
+            if i <= last_user
+            or int(r.get("created_at") or 0) - anchor <= 15 * 60
+        ]
     return _render_transcript(rows, agent_name)
 
 
