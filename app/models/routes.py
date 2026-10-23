@@ -20,8 +20,8 @@ import time
 import zlib
 
 import httpx
-from fastapi import (APIRouter, Depends, File, Form, HTTPException, UploadFile,
-                     status)
+from fastapi import (APIRouter, Depends, File, Form, HTTPException, Response,
+                     UploadFile, status)
 from pydantic import BaseModel, Field
 
 from ..auth import current_user
@@ -285,19 +285,122 @@ def _builtin_png() -> bytes:
             + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
 
+def _test_img_path():
+    """**常驻测试图**存这儿 —— 用户换过就在，删掉就回到内置红蓝图 ✓。
+
+    ★ 2026-10-23（用户：「可以选择常驻的测试图并且显示出来，然后可以随时替换，
+      默认红蓝图」✓）—— 一张图存服务端 ✓，换了就是覆盖 ✓，不堆历史 ✓。
+    ⚠️ 放 `var/` 下、**不挂静态** ✓：只能走管理员接口取 ✓（和 `var/` 里别的一样 ✓）。
+    """
+    return settings.var_dir / "vision" / "test.img"
+
+
+def _resident_img() -> tuple[bytes, str] | None:
+    """读常驻图；没有 / 读不出来 / 认不出格式 → None（调用方退回红蓝图 ✓）。"""
+    p = _test_img_path()
+    try:
+        b = p.read_bytes()
+    except FileNotFoundError:
+        return None
+    except OSError as e:  # noqa: BLE001
+        log.warning("常驻测试图读不出来（%s）：%s —— 先用内置红蓝图", p, e)
+        return None
+    mime = _mime_of(b)
+    if not b or not mime:
+        log.warning("常驻测试图认不出来（%s）—— 先用内置红蓝图", p)
+        return None
+    return b, mime
+
+
 #: 上传封顶 8 MB ✓ —— 手机拍的原图常常五六兆 ✓，再大上游也未必收 ✓；
 #: 界面那边已经缩过一道 ✓，这儿是后端自己的底线 ✓。
 _VISION_MAX = 8 * 1024 * 1024
 
 
+# ── 常驻测试图 ────────────────────────────────────────────────────────
+#
+# ★ 2026-10-23：用户要「可以选择常驻的测试图并且显示出来，然后可以随时替换，
+#   默认红蓝图」✓。三件事拆成三个动作 ✓：
+#     GET    读现在这张（没有就是内置红蓝图 ✓，靠 `X-Image-Kind` 说清是哪种 ✓）
+#     POST   换一张（覆盖 ✓，不堆历史 ✓）
+#     DELETE 恢复默认（就是删掉这个文件 ✓）
+# ⚠️ 这张图**只管"看一眼模型怎么答"** ✗ —— 「能不能读图」的资格依旧只拿
+#    内置红蓝图判 ✓（下面 `/vision/test` 里的 `use=builtin` ✓）。
+
+@router.get("/vision/image", dependencies=[Depends(require_admin)])
+async def get_vision_image() -> Response:
+    """界面里显示的那张常驻图 ✓ —— 从来没换过就吐内置红蓝图 ✓。"""
+    r = _resident_img()
+    if r:
+        b, mime = r
+        kind = "custom"
+    else:
+        b, mime, kind = _builtin_png(), "image/png", "builtin"
+    return Response(b, media_type=mime,
+                    headers={"X-Image-Kind": kind, "Cache-Control": "no-store"})
+
+
+@router.post("/vision/image", dependencies=[Depends(require_admin)])
+async def set_vision_image(file: UploadFile = File(...)) -> dict:
+    """换常驻图 ✓ —— 验格式、验大小，**原子替换**（写一半断电不会留半张 ✓）。"""
+    b = await file.read()
+    if not b:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "这张图是空的")
+    if len(b) > _VISION_MAX:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            "图太大了（最多 8 MB）")
+    mime = _mime_of(b)
+    if not mime:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "这张图认不出来 —— 要 PNG / JPEG / GIF / WebP")
+    p = _test_img_path()
+    tmp = p.with_name("test.tmp")
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp.write_bytes(b)
+        os.replace(tmp, p)
+    except OSError as e:  # noqa: BLE001
+        log.error("常驻测试图存不下（%s）：%s", p, e)
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            "存不下这张图") from e
+    log.info("常驻测试图换了：%s，%s 字节", mime, len(b))
+    return {"ok": True, "kind": "custom", "mime": mime, "bytes": len(b)}
+
+
+@router.delete("/vision/image", dependencies=[Depends(require_admin)])
+async def reset_vision_image() -> dict:
+    """恢复默认红蓝图 ✓（删掉常驻图；本来就没有也算成功 ✓）。"""
+    p = _test_img_path()
+    try:
+        p.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError as e:  # noqa: BLE001
+        log.error("常驻测试图删不掉（%s）：%s", p, e)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            "恢复不了") from e
+    log.info("常驻测试图恢复成内置红蓝图")
+    return {"ok": True, "kind": "builtin"}
+
+
 @router.post("/vision/test", dependencies=[Depends(require_admin)])
 async def vision_test(cid: str = Form(""), model: str = Form(""),
-                      prompt: str = Form(""), file: UploadFile | None = File(None)) -> dict:
+                      prompt: str = Form(""), file: UploadFile | None = File(None),
+                      use: str = Form("resident")) -> dict:
     """**拿真图问一次** —— 这张图它到底看没看见 ✓。
 
-    图可选 ✓：不传就用内置那张红蓝图 ✓（答案固定、一眼能判对错 ✓）。
-    提示词可选 ✓：不传就按"有没有传图"给一句默认的 ✓。
-    结果**不落盘** ✓ —— 这只是测试，不改任何配置 ✓。
+    图从哪来（优先级从高到低 ✓）：
+      ① 这次临时传的 `file` ✓
+      ② `use=builtin` → **强制内置红蓝图** ✓（验资格只走这条 ✓，
+         不然用户换了常驻图，新模型就永远盖不上「能读图」的章 ✗）
+      ③ 常驻测试图（`var/vision/test.img` ✓，用户换过才有）
+      ④ 内置红蓝图 ✓（默认，答案固定、一眼能判对错 ✓）
+    提示词可选 ✓：不传就按"用没用红蓝图"给一句默认的 ✓。
+    结果**不落盘** ✓ —— 这只是测试，不改任何配置 ✓（`img` 资格除外 ✓）。
     """
     d = store.load()
     c = next((x for x in d["configs"] if x["id"] == (cid or "").strip()), None)
@@ -325,8 +428,15 @@ async def vision_test(cid: str = Form(""), model: str = Form(""),
         if not mime:
             raise HTTPException(status.HTTP_400_BAD_REQUEST,
                                 "这张图认不出来 —— 要 PNG / JPEG / GIF / WebP")
-    else:
+    elif (use or "").strip() == "builtin":
         image, mime = _builtin_png(), "image/png"
+    else:
+        r = _resident_img()
+        if r:
+            image, mime = r
+            builtin = False
+        else:
+            image, mime = _builtin_png(), "image/png"
 
     up = (prompt or "").strip()[:500]
     p = up or ("这张图从上到下分别是什么颜色？只答颜色。" if builtin else "描述这张图片。")

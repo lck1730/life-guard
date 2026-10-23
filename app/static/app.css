@@ -1133,9 +1133,19 @@
 
   /* 测试区：一条分隔线 + 一行小标题 ✓，别再堆三块一样重的控件 ✓ */
   #vSheet .vtest { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
-  #vSheet .vlab { color:var(--muted); font-size:11.5px; font-family:var(--mono);
+  #vSheet .vlab { display:flex; align-items:center; gap:8px;
+                  color:var(--muted); font-size:11.5px; font-family:var(--mono);
                   margin-bottom:8px; }
-  #vSheet .vtline { display:flex; gap:8px; }
+  /* 常驻图是谁 ✓（默认 / 自己换的）—— 小小一枚，别抢图的视线 ✓ */
+  #vSheet .vkind { margin-left:auto; flex:none; font-size:10.5px;
+                   border:1px solid var(--line); border-radius:999px;
+                   padding:1px 7px; }
+  /* 常驻图预览 ✓ —— 整宽、限高、**不裁切**（看得见整张才叫"显示出来"✓） */
+  #vSheet .vimg { display:block; width:100%; max-height:170px; object-fit:contain;
+                  border:1px solid var(--line); border-radius:11px;
+                  background:var(--panel2); }
+  #vSheet .vimg + .mhint, #vSheet .vlab + .mhint { margin-top:0; }
+  #vSheet .vtline { display:flex; gap:8px; margin-top:8px; }
   #vSheet .vtline .mbtn { flex:1; padding:10px 12px; }
   #vSheet .vprompt { margin:8px 0 0; }
   #vSheet .vtest > .mbtn { width:100%; padding:12px; margin-top:10px; font-weight:600; }

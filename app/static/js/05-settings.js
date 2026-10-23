@@ -546,10 +546,17 @@
   //
   // ⚠️ 测试结果**不跨图保留** ✓ —— 换了图就清掉 ✓，免得把上一张的结论当成
   //    "它现在也行" ✗。
-  let vFile = null;        // 选中的那张图（File / Blob）
-  let vFileUrl = '';       // 预览用的 object URL
+  // ★ 2026-10-23：**常驻测试图** ✓（用户：「可以选择常驻的测试图并且显示出来，
+  //   然后可以随时替换，默认红蓝图」✓）——
+  //   存在服务端 `var/vision/test.img` ✓，换一次存一次 ✓、大家看到同一张 ✓；
+  //   没有这个文件时服务端吐内置红蓝图 ✓ →「恢复默认」就是把它删掉 ✓。
+  //   ⚠️ 和以前那个"临时选一张测完就不管"不一样 ✗：现在是**长期留着**的 ✓。
+  let vImgUrl = '';        // 常驻图的预览（object URL ✓）
+  let vImgKind = '';       // 'builtin' | 'custom' | ''（还没读到）
+  let vImgErr = '';        // 读图失败的原因（显示在预览的位置 ✓）
+  let vImgSeq = 0;         // 拉图序号 —— 慢请求回来时别把新图盖掉 ✓
   let vPrompt = '';        // 输入框里的字（重画时得留着）
-  let vBusy = false;       // 正在测一张图
+  let vBusy = false;       // 正在测 / 正在换图
   let vVerifying = '';     // 正在验的「cid|model」
   let vRes = null;         // 上一次测试的结果
   // 厂家手风琴：**一次只展开一个** ✓（用户：「展开一个自动折叠其他」✓）。
@@ -606,12 +613,72 @@
     } catch (e) { return f; }
   };
 
-  const setVisionFile = (f) => {
-    if (vFileUrl) { try { URL.revokeObjectURL(vFileUrl); } catch (e) {} }
-    vFile = f || null;
-    vFileUrl = f ? URL.createObjectURL(f) : '';
-    vRes = null;                     // 换了图，上一次的结论不作数 ✓
+  /** 把常驻图拉回来显示 ✓ —— 每次开板子拉一次（可能别的设备换过 ✓）。
+   *  ⚠️ 带序号 ✗→✓：连点两下"换一张"时，先发的那趟可能后回来 ✓，
+   *     不认序号就会拿**旧图**盖掉新的 ✓（预览和实际测试对不上 ✗）。 */
+  const loadVisionImage = async () => {
+    const seq = ++vImgSeq;
+    try {
+      const r = await fetch('/api/models/vision/image',
+        { credentials: 'same-origin', cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const blob = await r.blob();
+      const kind = (r.headers.get('X-Image-Kind') || '').trim();
+      if (seq !== vImgSeq) return;   // 这中间又换过 → 这份作废 ✓
+      if (vImgUrl) { try { URL.revokeObjectURL(vImgUrl); } catch (e) {} }
+      vImgUrl = URL.createObjectURL(blob);
+      vImgKind = kind === 'custom' ? 'custom' : 'builtin';
+      vImgErr = '';
+    } catch (e) {
+      if (seq !== vImgSeq) return;
+      vImgErr = '测试图读不出来：' + ((e && e.message) || e);
+    }
     if ($('#vSheet')) renderVisionSheet(MODELS);
+  };
+
+  /** 换常驻图 ✓ —— 先缩一道（手机原图五六兆 ✓，走 WireGuard 慢 ✓）。 */
+  const replaceVisionImage = async (f) => {
+    if (!f || vBusy) return;
+    vBusy = true; vRes = null;
+    renderVisionSheet(MODELS);
+    try {
+      const small = await vShrink(f);
+      if (small.size > 8 * 1024 * 1024) throw new Error('图太大了（最多 8 MB）');
+      const fd = new FormData();
+      fd.append('file', small, small.name || 'test.jpg');
+      const r = await fetch('/api/models/vision/image',
+        { method: 'POST', body: fd, credentials: 'same-origin' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || ('换不了 ' + r.status));
+      vRes = null;                    // 换了图，上一次的结论不作数 ✓
+      await loadVisionImage();
+      toast('测试图换好了');
+    } catch (e) {
+      toast('换不了：' + ((e && e.message) || e));
+    } finally {
+      vBusy = false;
+      if ($('#vSheet')) renderVisionSheet(MODELS);
+    }
+  };
+
+  /** 恢复默认红蓝图 ✓（删掉服务端那张常驻图 ✓）。 */
+  const resetVisionImage = async () => {
+    if (vBusy) return;
+    vBusy = true; vRes = null;
+    renderVisionSheet(MODELS);
+    try {
+      const r = await fetch('/api/models/vision/image',
+        { method: 'DELETE', credentials: 'same-origin' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || ('恢复不了 ' + r.status));
+      await loadVisionImage();
+      toast('已恢复红蓝图');
+    } catch (e) {
+      toast('恢复不了：' + ((e && e.message) || e));
+    } finally {
+      vBusy = false;
+      if ($('#vSheet')) renderVisionSheet(MODELS);
+    }
   };
 
   /** 只刷新池子（资格标记在服务端 ✓），模型屏和板子都跟着重画 ✓。 */
@@ -649,6 +716,7 @@
       panel.appendChild(mHint('正在读…'));
     }
     openSheet();
+    loadVisionImage();   // 常驻图每次开都拉一张 ✓（别的设备可能刚换过 ✓）
     let d;
     try { d = await api('/models/configs'); }
     catch (e) {
@@ -672,6 +740,10 @@
         const fd = new FormData();
         fd.append('cid', c.id);
         fd.append('model', m.id);
+        // ⚠️ **验资格必须用内置红蓝图** ✗→✓（2026-10-23）—— 用户换了常驻图之后，
+        //    默认会拿那张去测 ✓，可照片里有什么我们不知道 ✓ → 判不了对错 ✓ →
+        //    新模型永远盖不上「能读图」的章 ✗，也就永远进不了这一屏 ✗。
+        fd.append('use', 'builtin');
         const r = await fetch('/api/models/vision/test',
           { method: 'POST', body: fd, credentials: 'same-origin' });
         const d = await r.json().catch(() => ({}));
@@ -711,11 +783,8 @@
       fd.append('model', t.model);
       const p = (vPrompt || '').trim();
       if (p) fd.append('prompt', p);
-      if (vFile) {
-        const small = await vShrink(vFile);
-        if (small.size > 8 * 1024 * 1024) throw new Error('图太大了（最多 8 MB）');
-        fd.append('file', small, small.name || 'test.jpg');
-      }
+      // 图不在这儿传 ✓ —— 服务端直接用常驻那张 ✓（没换过就是内置红蓝图 ✓）。
+      // 换图是另一件事（`POST /vision/image` ✓），**存下来**，不是一次性的 ✓。
       const r = await fetch('/api/models/vision/test',
         { method: 'POST', body: fd, credentials: 'same-origin' });
       const d = await r.json().catch(() => ({}));
@@ -798,18 +867,31 @@
       wrap.appendChild(box);
     });
 
-    // ── 测一张图（用现在这一档 ✓；不选图就用内置红蓝图 ✓）──
+    // ── 常驻测试图（默认红蓝图 ✓；换一张就**存下来** ✓，不是一次性的 ✓）──
     if (!t.id) { wrap.appendChild(mHint('先选一个能读图的模型。')); return; }
     const testBox = mkel('div', 'vtest');
-    testBox.appendChild(mkel('div', 'vlab', '测一张图'));
+    const lab = mkel('div', 'vlab');
+    lab.appendChild(mkel('span', null, '常驻测试图'));
+    lab.appendChild(mkel('span', 'vkind',
+      vImgKind === 'custom' ? '自己换的'
+        : (vImgKind === 'builtin' ? '默认红蓝图' : '读图中…')));
+    testBox.appendChild(lab);
+
+    if (vImgUrl) {
+      const img = mkel('img', 'vimg');
+      img.src = vImgUrl;
+      img.alt = '常驻测试图';
+      testBox.appendChild(img);
+    } else {
+      testBox.appendChild(mHint(vImgErr || '正在读测试图…', !!vImgErr));
+    }
+
     const line = mkel('div', 'vtline');
-    const pick = mBtn(vFile ? '换一张图' : '选一张图', '', () => {
-      if (!vBusy) $('#fileVision').click();
-    });
+    const pick = mBtn('换一张', '', () => { if (!vBusy) $('#fileVision').click(); });
     pick.disabled = vBusy;
     line.appendChild(pick);
-    if (vFile) {
-      const clr = mBtn('去掉', '', () => setVisionFile(null));
+    if (vImgKind === 'custom') {
+      const clr = mBtn('恢复红蓝图', '', () => resetVisionImage());
       clr.disabled = vBusy;
       line.appendChild(clr);
     }
@@ -819,7 +901,7 @@
     inp.type = 'text';
     inp.value = vPrompt;
     inp.maxLength = 500;
-    inp.placeholder = vFile ? '想让它做什么（可留空）' : '不选图就用内置红蓝图';
+    inp.placeholder = '想让它做什么（可留空）';
     inp.oninput = () => { vPrompt = inp.value; };
     testBox.appendChild(inp);
 
@@ -846,10 +928,11 @@
   };
 
   // 选完清空 input ✓ —— 同一张图再选一次才会再触发 `change` ✓（和背景那张一个坑 ✓）。
+  // 选了就**传给服务端存下来** ✓（常驻 ✓），测试时不用再带图 ✓。
   $('#fileVision').onchange = (e) => {
     const f = e.target.files && e.target.files[0];
     e.target.value = '';
-    if (f) setVisionFile(f);
+    if (f) replaceVisionImage(f);
   };
 
   const renderSettings = () => {
