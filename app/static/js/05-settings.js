@@ -552,6 +552,10 @@
   let vBusy = false;       // 正在测一张图
   let vVerifying = '';     // 正在验的「cid|model」
   let vRes = null;         // 上一次测试的结果
+  // 厂家手风琴：**一次只展开一个** ✓（用户：「展开一个自动折叠其他」✓）。
+  // `undefined` = 还没定过 → 进来自动展开“现在用的那家” ✓；
+  // `null` = 用户自己全收起来了 ✓ → 别在下次重画时又给他展开 ✗。
+  let vOpen;
 
   /** 读图现在指着谁 ✓（没单独配时服务端回"跟着聊天模型"的那个 ✓）。 */
   const vTarget = (d) => {
@@ -560,8 +564,12 @@
              label: v.label || '', set: !!v.set };
   };
 
-  /** 一套配置下能选的模型名 ✓ —— 顶层那个 + 清单里的 ✓，去重 ✓。
-   *  ★ 带上 `img` 资格 ✓：true = 验过能读图；false = 验过读不了；null = 没验过。 */
+  /** 一套配置下能选的模型名 ✓ —— 清单里的 + 顶层那个（不在清单里才补 ✓），去重 ✓。
+   *  ★ 带上 `img` 资格 ✓：true = 验过能读图；false = 验过读不了；null = 没验过。
+   *  ⚠️ **清单先走** ✗→✓（2026-10-23）—— 原来顶层 `c.model` 先加、`img` 记 `null` ✗，
+   *     于是「当前在用的那个」只要正好是顶层模型 ✓，清单里那行 `img:true` 就被
+   *     去重挡掉 ✗ → 按响当当的"只留能读图的"一筛，它自己反而不见了 ✓
+   *     （Agnes 的 `agnes-2.5-flash` 就是这么丢的 ✓）。 */
   const vModelsOf = (c) => {
     const seen = new Set(), out = [];
     const add = (id, ctx, img) => {
@@ -571,11 +579,11 @@
       out.push({ id: k, ctx: parseInt(ctx || 0, 10) || 0,
                  img: typeof img === 'boolean' ? img : null });
     };
-    if (c.model) add(c.model, c.context, null);
     (Array.isArray(c.models) ? c.models : []).forEach(m => add(
       typeof m === 'string' ? m : (m && m.id),
       (m && typeof m === 'object') ? m.ctx : 0,
       (m && typeof m === 'object') ? m.img : null));
+    if (c.model) add(c.model, c.context, null);
     return out;
   };
 
@@ -732,36 +740,68 @@
     panel.appendChild(wrap);
     wrap.appendChild(mkel('h3', null, '读图模型'));
     if (!d || !Array.isArray(d.configs)) { wrap.appendChild(mHint('正在读…')); return; }
-    if (!d.configs.length) { wrap.appendChild(mHint('还没有模型。')); return; }
     const t = vTarget(d);
     wrap.appendChild(mkel('div', 'vnow',
-      t.id ? (t.name + ' · ' + t.model) : '还没配'));
+      '现在用 ' + (t.id ? (t.name + ' · ' + t.model) : '还没配')));
 
-    // ── 候选：验过的直接点 ✓；没验过的点一下先验 ✓ ──
-    d.configs.forEach(c => {
-      const ms = vModelsOf(c);
-      if (!ms.length) return;
-      wrap.appendChild(mkel('div', 'vgh', c.name || '(没名字)'));
-      ms.forEach(m => {
-        const on = t.set && t.id === c.id && t.model === m.id;
-        const key = c.id + '|' + m.id;
-        const row = mkel('button', 'vr' + (on ? ' on' : ''));
-        row.type = 'button';
-        row.appendChild(mkel('span', 'vdot', on ? '●' : '○'));
-        row.appendChild(mkel('span', 'vname', m.id));
-        if (on) row.appendChild(mkel('span', 'vok', '使用中'));
-        else if (vVerifying === key) row.appendChild(mkel('span', 'vverify', '…'));
-        else if (m.img === true) row.appendChild(mkel('span', 'vtick', '✓'));
-        else row.appendChild(mkel('span', 'vverify', '验'));
-        row.disabled = vBusy || !!vVerifying;
-        row.onclick = () => pickVision(c, m, key);
-        wrap.appendChild(row);
-      });
+    // ★ 2026-10-23：**这一屏只留验过能读图的** ✓（用户：「里面只留有识图能力的
+    //   模型」✓，「去掉不支持的而不影响外面」✓）—— 过滤只发生在板子里 ✓，
+    //   模型页外面那份名单一个不少 ✓。没验过的（`img:null`）也不进来 ✓：
+    //   「验」那一堆正是他说的那点丑 ✓。
+    const groups = d.configs
+      .map(c => ({ c, ms: vModelsOf(c).filter(m => m.img === true) }))
+      .filter(g => g.ms.length);
+
+    // 展开哪一家：优先“现在用的那家” ✓；没有就第一家 ✓；用户全收着（null）就保持 ✓
+    const fallback = () => (groups.some(g => g.c.id === t.id) ? t.id
+                          : (groups[0] ? groups[0].c.id : null));
+    if (vOpen === undefined) vOpen = fallback();
+    else if (vOpen !== null && !groups.some(g => g.c.id === vOpen)) vOpen = fallback();
+
+    if (!groups.length) wrap.appendChild(mHint('还没有验过能读图的模型。'));
+
+    // ── 厂家手风琴：点标题展开 / 收起 ✓，开一家自动折其他 ✓ ──
+    groups.forEach(({ c, ms }) => {
+      const open = vOpen === c.id;
+      const cur = ms.find(m => t.set && t.id === c.id && t.model === m.id);
+      const box = mkel('div', 'vacc' + (open ? ' on' : ''));
+
+      const head = mkel('button', 'vacc-h');
+      head.type = 'button';
+      head.appendChild(mkel('span', 'vacc-n', c.name || '(没名字)'));
+      if (cur) head.appendChild(mkel('span', 'vacc-tag', '使用中'));
+      else head.appendChild(mkel('span', 'vacc-c', ms.length + ' 个'));
+      head.appendChild(mkel('span', 'vacc-chev', '›'));
+      head.onclick = () => {
+        if (vBusy || vVerifying) return;
+        vOpen = open ? null : c.id;
+        renderVisionSheet(MODELS);
+      };
+      box.appendChild(head);
+
+      if (open) {
+        const bd = mkel('div', 'vacc-b');
+        ms.forEach(m => {
+          const on = t.set && t.id === c.id && t.model === m.id;
+          const key = c.id + '|' + m.id;
+          const row = mkel('button', 'vr' + (on ? ' on' : ''));
+          row.type = 'button';
+          row.appendChild(mkel('span', 'vdot', on ? '●' : '○'));
+          row.appendChild(mkel('span', 'vname', m.id));
+          if (on) row.appendChild(mkel('span', 'vok', '使用中'));
+          row.disabled = vBusy || !!vVerifying;
+          row.onclick = () => pickVision(c, m, key);
+          bd.appendChild(row);
+        });
+        box.appendChild(bd);
+      }
+      wrap.appendChild(box);
     });
 
     // ── 测一张图（用现在这一档 ✓；不选图就用内置红蓝图 ✓）──
-    wrap.appendChild(mkel('div', 'vhr'));
     if (!t.id) { wrap.appendChild(mHint('先选一个能读图的模型。')); return; }
+    const testBox = mkel('div', 'vtest');
+    testBox.appendChild(mkel('div', 'vlab', '测一张图'));
     const line = mkel('div', 'vtline');
     const pick = mBtn(vFile ? '换一张图' : '选一张图', '', () => {
       if (!vBusy) $('#fileVision').click();
@@ -773,7 +813,7 @@
       clr.disabled = vBusy;
       line.appendChild(clr);
     }
-    wrap.appendChild(line);
+    testBox.appendChild(line);
 
     const inp = mkel('input', 'field vprompt');
     inp.type = 'text';
@@ -781,13 +821,13 @@
     inp.maxLength = 500;
     inp.placeholder = vFile ? '想让它做什么（可留空）' : '不选图就用内置红蓝图';
     inp.oninput = () => { vPrompt = inp.value; };
-    wrap.appendChild(inp);
+    testBox.appendChild(inp);
 
     const go = mBtn(vBusy ? '正在问…' : '测一下', 'pri', () => {
       if (!vBusy) runVisionTest();
     });
     go.disabled = vBusy || !t.id;
-    wrap.appendChild(go);
+    testBox.appendChild(go);
 
     if (vRes) {
       const r = vRes, res = r.result || {};
@@ -795,13 +835,14 @@
       box.textContent = r.ok
         ? ((res.text) || '(它回了个空)')
         : ('没测成：' + (r.error || res.error || '不知道'));
-      wrap.appendChild(box);
+      testBox.appendChild(box);
       // `image_tokens === 0` 是**图没送进去**的硬证据 ✓（上游不报时是 null ✓，不冤枉它 ✓）
       const it = res.usage ? res.usage.image_tokens : null;
       if (r.ok && it === 0) {
-        wrap.appendChild(mkel('div', 'vbad', '图 token 是 0 —— 图很可能没送进去。'));
+        testBox.appendChild(mkel('div', 'vbad', '图 token 是 0 —— 图很可能没送进去。'));
       }
     }
+    wrap.appendChild(testBox);
   };
 
   // 选完清空 input ✓ —— 同一张图再选一次才会再触发 `change` ✓（和背景那张一个坑 ✓）。

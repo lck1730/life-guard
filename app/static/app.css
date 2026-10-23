@@ -1088,36 +1088,57 @@
     margin-top:12px; line-height:1.5; }
 
   /* ── 读图（2026-10-23）── 并进「模型」屏 ✓
-     模型屏最上面一行（读图现在用谁）✓ + 点开的半屏板子 ✓。
-     用户要求简洁 ✓：只有「现在用谁 / 候选 / 测一下」三块，不写说明 ✓。 */
+     模型屏名单下面那一行（读图现在用谁）✓ + 点开的半屏板子 ✓。
+     用户要求简洁 ✓：只有「现在用谁 / 候选 / 测一下」三块，不写说明 ✓。
+     ★ 2026-10-23 按用户三条重做：厂家手风琴（一次只开一家 ✓）、
+        只列验过能读图的模型 ✓、样式收干净（不再每行一个小方框 ✓）。 */
   .mrow .vchev { flex:none; width:34px; text-align:center; color:var(--muted);
                  font-size:20px; line-height:1; }
   .mrow.vrow .mk { color:var(--agent); }
 
-  #vSheet h3 { margin:0 0 6px; font-size:16px; }
-  #vSheet .vnow { color:var(--muted); font-size:12.5px; font-family:var(--mono);
-                  margin-bottom:10px; word-break:break-all; }
-  #vSheet .vgh { color:var(--muted); font-size:11.5px; font-family:var(--mono);
-                 margin:12px 0 4px; }
+  #vSheet h3 { margin:0 0 5px; font-size:16.5px; }
+  #vSheet .vnow { color:var(--muted); font-size:12px; font-family:var(--mono);
+                  margin:0 0 14px; word-break:break-all; }
+
+  /* 厂家：一行标题 = 手风琴头 ✓；展开才画模型 ✓ */
+  #vSheet .vacc { margin-top:8px; border:1px solid var(--line); border-radius:13px;
+                  background:var(--panel2); overflow:hidden; }
+  #vSheet .vacc-h { display:flex; align-items:center; gap:9px; width:100%;
+                    padding:13px 14px; background:transparent; color:var(--text);
+                    text-align:left; font:inherit; }
+  #vSheet .vacc-h:active { background:var(--line); }
+  #vSheet .vacc-n { flex:1; min-width:0; font-size:14.5px; font-weight:600;
+                    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #vSheet .vacc-c { flex:none; color:var(--muted); font-size:11.5px;
+                    font-family:var(--mono); }
+  #vSheet .vacc-tag { flex:none; color:var(--accent); font-size:11px;
+                      font-family:var(--mono); border:1px solid var(--accent);
+                      border-radius:999px; padding:1px 8px; }
+  #vSheet .vacc-chev { flex:none; color:var(--muted); font-size:18px; line-height:1;
+                       transition:transform .16s ease; }
+  #vSheet .vacc.on .vacc-chev { transform:rotate(90deg); color:var(--text); }
+  #vSheet .vacc-b { border-top:1px solid var(--line); padding:5px 6px 6px; }
+
+  /* 模型行：没有外框 ✓，选中整行铺底色 ✓ —— 比一堆小方框干净 ✓ */
   #vSheet .vr { display:flex; align-items:center; gap:9px; width:100%;
-    text-align:left; background:var(--panel2); border:1px solid transparent;
-    border-radius:10px; padding:10px 12px; margin-top:5px;
-    color:var(--text); font-family:var(--mono); }
-  #vSheet .vr:active { border-color:var(--line); }
-  #vSheet .vr.on { border-color:var(--accent); background:var(--accent-bg); }
+                text-align:left; background:transparent; border-radius:9px;
+                padding:11px 9px; color:var(--text); font-family:var(--mono); }
+  #vSheet .vr:active { background:var(--line); }
+  #vSheet .vr.on { background:var(--accent-bg); }
   #vSheet .vr:disabled { opacity:.5; }
   #vSheet .vdot { flex:none; color:var(--muted); font-size:12px; }
   #vSheet .vr.on .vdot { color:var(--accent); }
-  #vSheet .vname { flex:1; min-width:0; font-size:14px; word-break:break-all; }
+  #vSheet .vname { flex:1; min-width:0; font-size:13.5px; word-break:break-all; }
   #vSheet .vok { flex:none; color:var(--accent); font-size:11.5px; }
-  #vSheet .vtick { flex:none; color:var(--accent); font-size:13px; }
-  #vSheet .vverify { flex:none; color:var(--muted); font-size:12px;
-    border:1px solid var(--line); border-radius:999px; padding:2px 9px; }
-  #vSheet .vhr { height:1px; background:var(--line); margin:16px 0 12px; }
+
+  /* 测试区：一条分隔线 + 一行小标题 ✓，别再堆三块一样重的控件 ✓ */
+  #vSheet .vtest { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+  #vSheet .vlab { color:var(--muted); font-size:11.5px; font-family:var(--mono);
+                  margin-bottom:8px; }
   #vSheet .vtline { display:flex; gap:8px; }
   #vSheet .vtline .mbtn { flex:1; padding:10px 12px; }
   #vSheet .vprompt { margin:8px 0 0; }
-  #vSheet > .mbtn { width:100%; padding:12px; margin-top:8px; font-weight:600; }
+  #vSheet .vtest > .mbtn { width:100%; padding:12px; margin-top:10px; font-weight:600; }
   #vSheet .mbtn.pri { background:var(--accent); color:var(--on-accent);
                       border-color:transparent; }
   #vSheet .mbtn:disabled { opacity:.45; }
