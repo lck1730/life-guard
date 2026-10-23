@@ -755,42 +755,42 @@
   /** 手机壳只留同 host ✓ —— modelscope.cn 是外链 ✓，交给系统浏览器打开 ✓。 */
   const magicOpen = () => { location.href = MS_HOME; };
 
-  const magicMeta = () => {
-    if (!MAGIC) return [MAGIC_LOADING ? '[..]' : '[--]', false];
-    if (!MAGIC.ok) return ['[--]', false];
-    return [MAGIC.signed ? '[已签]' : '[未签]', !!MAGIC.signed];
+  // ★ 2026-10-23 用户：「界面再简洁一些，跳转、刷新用 svg，不显示签到的详细
+  //   魔粒值，只需要显示当前账户魔粒值以及是否签到，刷新图标和跳转图标即可，
+  //   并且已签不能在 03 显示，因为后续可能有别的平台，03 只显示平台数就行」✓。
+  //   ⇒ 块头只报**平台数** ✓；条目里只剩 名字 / 魔粒值 / 是否签到 / 两颗图标 ✓。
+  const MG_GO_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>';
+  const MG_RF_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>';
+  const MG_PLATFORMS = 1;   // 现在只有魔塔 ✓；以后加平台，这里跟着加 ✓
+
+  const magicIcon = (svg, label, fn, spin) => {
+    const b = mBtn('', 'mgic', fn);
+    b.title = label;
+    b.innerHTML = svg;
+    if (spin && b.classList) b.classList.add('spin');
+    return b;
   };
 
   const magicBlock = () => {
     const box = mkel('div', 'mgwrap');
     box.id = 'mgWrap';
-    const m = magicMeta();
-    box.appendChild(mHead('03', '用量与签到', m[0], m[1]));
+    box.appendChild(mHead('03', '用量与签到', '[' + MG_PLATFORMS + ']'));
 
-    // ★ 2026-10-23：用户要「先弄一个条目，魔塔」✓ —— 就把三行收成**一条** ✓：
-    //   名字 ✓、魔粒值 ✓、是否签到 ✓，跳转/刷新两个按钮也在条目里 ✓。
     const row = mkel('div', 'mrow');
     row.appendChild(mkel('span', 'mk', '◉'));
     const mid = mkel('div', 'mid');
     mid.appendChild(mkel('div', 'nm', '魔塔'));
 
-    let sub;
+    let sub, signed = false;
     if (MAGIC && MAGIC.ok) {
-      sub = MAGIC.signed
-        ? ('今日已签（登录 ' + MAGIC.login_earned + ' · 阿里云 ' + MAGIC.aliyun_earned + '）')
-        : '今日未签 · 点「跳转」登录一次';
-      sub += ' · 今日消耗 ' + MAGIC.today_spent;
+      signed = !!MAGIC.signed;
+      sub = signed ? '已签到' : '未签到';
     } else if (MAGIC && !MAGIC.ok) {
       sub = MAGIC.why || '查不到';
     } else {
       sub = MAGIC_LOADING ? '正在问魔搭…' : '还没查';
     }
-    mid.appendChild(mkel('div', 'sub', sub));
-
-    const acts = mkel('div', 'macts');
-    acts.appendChild(mBtn('跳转', '', () => magicOpen()));
-    acts.appendChild(mBtn('刷新', '', () => loadMagicube(true)));
-    mid.appendChild(acts);
+    mid.appendChild(mkel('div', 'sub' + (signed ? ' mgon' : ''), sub));
     row.appendChild(mid);
 
     const num = mkel('div', 'mgnum');
@@ -798,6 +798,11 @@
       (MAGIC && MAGIC.ok) ? String(MAGIC.available) : '--'));
     num.appendChild(mkel('div', 'mglab', '魔粒'));
     row.appendChild(num);
+
+    const acts = mkel('div', 'macts');
+    acts.appendChild(magicIcon(MG_GO_SVG, '跳转魔搭', () => magicOpen()));
+    acts.appendChild(magicIcon(MG_RF_SVG, '刷新', () => loadMagicube(true), MAGIC_LOADING));
+    row.appendChild(acts);
 
     box.appendChild(row);
     if (MAGIC_ERR) box.appendChild(mHint(MAGIC_ERR, true));

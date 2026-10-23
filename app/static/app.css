@@ -1404,15 +1404,21 @@
   .mrow .nm { font-weight:600; font-size:15px; line-height:1.35; font-family:var(--mono); }
   .mrow .sub { margin-top:4px; color:var(--muted); font-size:12px; line-height:1.4;
                font-family:var(--mono); overflow-wrap:anywhere; }
-  /* ★ 2026-10-23 03 用量与签到 ✓ —— 用户要「先弄一个条目，魔塔」✓：
-     一条里放魔粒值 ✓ / 是否签到 ✓ / 跳转 + 刷新 ✓。 */
+  /* ★ 2026-10-23 03 用量与签到 ✓ —— 一条「魔塔」：
+     魔粒值 ✓ / 是否签到 ✓ / 跳转 + 刷新两颗 svg 图标 ✓（用户要求简洁 ✓）。 */
   .mrow .mgnum { flex:none; text-align:right; }
   .mrow .mgval { color:var(--agent); font-family:var(--mono);
                  font-size:18px; line-height:1.1; letter-spacing:.02em; }
   .mrow .mglab { margin-top:3px; color:var(--muted); font-family:var(--mono);
                  font-size:10px; letter-spacing:.12em; opacity:.8; }
-  .mrow .macts { display:flex; gap:8px; margin-top:9px; }
-  .mrow .macts .mbtn { padding:5px 12px; font-size:12px; border-radius:8px; }
+  .mrow .sub.mgon { color:var(--agent); }
+  .mrow .macts { flex:none; display:flex; align-items:center; gap:6px; margin-left:2px; }
+  .mrow .mgic { width:32px; height:32px; padding:0; border-radius:9px;
+                display:grid; place-items:center; color:var(--muted); }
+  .mrow .mgic:active { background:var(--panel2); color:var(--accent); }
+  .mrow .mgic svg { display:block; }
+  .mrow .mgic.spin svg { animation:mgspin .9s linear infinite; }
+  @keyframes mgspin { to { transform:rotate(360deg); } }
   .mrow .edit { flex:none; width:34px; height:34px; padding:0; border-radius:9px;
                 display:grid; place-items:center;
                 background:var(--panel2); border:1px solid var(--line); color:var(--muted); }
