@@ -138,7 +138,8 @@
     row.appendChild(mkel('span', 'mk', on ? '●' : '○'));
     const mid = mkel('div', 'mid');
     mid.appendChild(mkel('div', 'nm', c.name || '(没名字)'));
-    const sub = [c.model, fmtCtx(c.context)].filter(Boolean).join(' · ');
+    // ★ 2026-10-23：**没数就写 —**，不拿别套的数充数 ✓。
+    const sub = [c.model, fmtCtx(c.context) || '—'].filter(Boolean).join(' · ');
     mid.appendChild(mkel('div', 'sub', sub || '（没填模型）'));
     row.appendChild(mid);
     const ed = mkel('button', 'edit');

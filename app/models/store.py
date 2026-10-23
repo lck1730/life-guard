@@ -206,17 +206,15 @@ def public_view(data: dict) -> dict:
     """
     # ★ 2026-10-22：每套多回 `context`（窗口多大）和 `models`（模型名清单）——
     #   界面学「远程CC」：一行一套，模型名后面显示 `模型 · 256K`。
-    #   ⚠️ 老池子里没存过 context（它原来只住在 profile 里）→ 回 profile 那边
-    #     **当前生效**的数（是事实，不是猜的；见 `context_state`）。
+    #   ⚠️ 以前没存 context 时借用 profile 当前生效的数 → 四套全显示 1M ✗。
+    #   ★ 2026-10-23：**各套只报自己的** ✓ —— 没存就回空串，界面显示 `—` ✓。
     ctx = context_state()
-    chat_now = (ctx.get("groups") or {}).get("chat") or {}
-    eff = next(iter(chat_now.values()), 0)
     out = []
     for c in data["configs"]:
         k = c.get("api_key") or ""
         out.append({**c, "api_key": "", "has_key": bool(k),
                     "key_tail": k[-4:] if len(k) > 8 else "",
-                    "context": str(c.get("context") or eff or ""),
+                    "context": str(c.get("context") or ""),
                     "models": c.get("models") if isinstance(c.get("models"), list) else []})
     return {"configs": out, "roles": role_names(data), "context": ctx,
             # ★ 2026-10-23：读图那一档 —— 界面靠它画"现在用的" + 打勾 ✓。
