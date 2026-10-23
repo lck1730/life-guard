@@ -188,7 +188,25 @@ async def v1_proxy(path: str, request: Request):
                      len(names), tool_key or "（一个都没有）")
 
     data = store.load()
-    chosen, role = store.pick(data, want)
+    # ★★ 2026-10-23：**读图那一档不再靠"点名某个模型"** ✗→✓
+    #
+    #   原来 `auxiliary.vision.model` 写的是一个真模型名（`sensenova-6.8-flash-lite` ✓），
+    #   网关得先按 chat 挑一套配置、再看这个名字在不在那套的清单里 ✓ ——
+    #   **它成立的前提是 chat 正好选着同一家** ✗。chat 一换到 Agnes 看图就悄悄
+    #   跟着换了（或者换成收不下图的模型 ✓），界面上却还写着"商汤" ✓。
+    #
+    #   现在 models.json 里存「哪一套 + 哪个模型名」✓，Hermes 送下来的
+    #   只是用途名 `vision` ✓ → 这儿现查 ✓。换模型只改 models.json ✓。
+    vision = None
+    if want == store.VISION:
+        vision = store.vision_state(data, fallback=False)
+        chosen = next((x for x in data["configs"] if x.get("id") == vision["id"]),
+                      None) if vision["id"] else None
+        role = store.VISION
+        if not chosen:
+            log.warning("读图那一档没配 / 指着的那套已经不在了 —— 先跟着 chat 走")
+    if not (want == store.VISION and chosen):
+        chosen, role = store.pick(data, want)
     if not chosen:
         # 2026-10-22 起只有一个模型 ✓ —— 不再是"哪一档缺" ✗
         return JSONResponse(
@@ -196,7 +214,7 @@ async def v1_proxy(path: str, request: Request):
                        "type": "lifeguard_models"}},
             status_code=503)
 
-    if want in store.ROLES:
+    if want in store.ROLES or role == store.VISION:
         log.info("用途 %s → %s", role, chosen.get("name"))
 
     if isinstance(body, dict):
@@ -210,17 +228,23 @@ async def v1_proxy(path: str, request: Request):
         #   为什么敢这么改 ✗：点名的名字**必须是这套配置自己的 `models` 里列着的** ✓，
         #   不认识的一律照旧走顶层 `model` ✓ —— 不会因为谁写错一个名字就把请求
         #   发到没测过的模型上去 ✓。key 仍然只在这一个文件里 ✓，Hermes 拿不到 ✓。
-        chosen_model = chosen.get("model") or body.get("model")
-        listed = {str(m.get("id") or "").strip().lower(): m.get("id")
-                  for m in (chosen.get("models") or []) if isinstance(m, dict)}
-        if want in listed:
-            chosen_model = listed[want]
-            log.info("按名字点名 %s → %s（%s）", want, chosen_model, chosen.get("name"))
-        elif want and want not in store.ROLES:
-            # ⚠️ 点名了、但这套配置里没测过 ── **说一声再照旧** ✓：
-            #    静默换成顶层模型，下次"看图又变哑了"就只能靠猜 ✓。
-            log.warning("点名要 %r，但这套配置（%s）里没测过它 → 照旧用 %s",
-                        want, chosen.get("name"), chosen_model)
+        if vision and role == store.VISION and vision.get("id"):
+            # 读图：**就发存下来的那个模型名** ✓ —— 不要求它在 `models` 清单里 ✓
+            # （清单是"测过的名字"，不是白名单 ✓；界面上也是从清单里挑的 ✓）。
+            chosen_model = vision.get("model") or chosen.get("model") or body.get("model")
+            log.info("读图 → %s · %s", chosen.get("name"), chosen_model)
+        else:
+            chosen_model = chosen.get("model") or body.get("model")
+            listed = {str(m.get("id") or "").strip().lower(): m.get("id")
+                      for m in (chosen.get("models") or []) if isinstance(m, dict)}
+            if want in listed:
+                chosen_model = listed[want]
+                log.info("按名字点名 %s → %s（%s）", want, chosen_model, chosen.get("name"))
+            elif want and want not in store.ROLES:
+                # ⚠️ 点名了、但这套配置里没测过 ── **说一声再照旧** ✓：
+                #    静默换成顶层模型，下次"看图又变哑了"就只能靠猜 ✓。
+                log.warning("点名要 %r，但这套配置（%s）里没测过它 → 照旧用 %s",
+                            want, chosen.get("name"), chosen_model)
         body["model"] = chosen_model
         raw = json.dumps(body).encode()
 

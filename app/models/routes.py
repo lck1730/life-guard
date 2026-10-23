@@ -15,10 +15,13 @@ import asyncio
 import hashlib
 import logging
 import os
+import struct
 import time
+import zlib
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import (APIRouter, Depends, File, Form, HTTPException, UploadFile,
+                     status)
 from pydantic import BaseModel, Field
 
 from ..auth import current_user
@@ -158,6 +161,136 @@ async def ping(body: PingIn) -> dict:
     return {"ok": bool(res.get("ok")), "message": res.get("message") or ""}
 
 
+# ── 读图那一档 ─────────────────────────────────────────────────────────
+#
+# ★ 2026-10-23：**读图单独配** ✓（用户：「单独开个入口可以配置生活管家的读图模型…
+#   还可以自定义一张测试图片描述」✓）。
+#
+#   为什么单独一档 ✗：聊天用的模型和收图的模型常常不是同一个 ✓
+#   （实测：商汤的 glm-5.2 是纯文本 ✓、flash-lite 才收图 ✓）——
+#   以前只能让 profile 直接点名一个模型名 ✓，而那个名字能不能用
+#   **取决于 chat 当时选着哪一家** ✗（chat 换到 Agnes 之后，
+#   商汤那个名字就悄悄失效了 ✓，界面上却看不出来 ✗）。
+#
+#   现在 models.json 里存「哪一套 + 哪个模型名」✓，profile 里只写用途名 `vision` ✓
+#   → 换模型只改这个文件 ✓，不用 root 再去写 `/root/.hermes` ✓。
+
+class VisionIn(BaseModel):
+    cid: str = ""
+    model: str = ""
+
+
+@router.post("/vision", dependencies=[Depends(require_admin)])
+async def set_vision(body: VisionIn) -> dict:
+    """把读图指到「某一套的某个模型」✓；两个都空 = 取消单独配（跟着聊天模型走）✓。"""
+    cid = (body.cid or "").strip()
+    model = (body.model or "").strip()
+    d = store.load()
+    if not cid and not model:
+        d.pop(store.VISION, None)
+        store.save(d)
+        log.info("读图 → 取消单独配（跟着聊天模型走）")
+        return {"ok": True, "vision": store.vision_state(d)}
+    c = next((x for x in d["configs"] if x["id"] == cid), None)
+    if not c:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "池子里没有这一套")
+    if not model:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "得选一个模型名")
+    d[store.VISION] = {"cid": cid, "model": model[:200], "at": int(time.time())}
+    store.save(d)
+    log.info("读图 → %s · %s", c.get("name"), model)
+    return {"ok": True, "vision": store.vision_state(d)}
+
+
+def _mime_of(b: bytes) -> str:
+    """只看**文件头**认格式 ✓ —— 不信任浏览器报的 content-type ✗
+    （实测：改个扩展名就能让它报错 ✓，而上游拿到错的 mime 会直接 400 ✓）。"""
+    if b.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if b.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if b.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        return "image/webp"
+    return ""
+
+
+def _builtin_png() -> bytes:
+    """一张 96×64、**上红下蓝**的图 ✓ —— 不带任何人的照片 ✓。
+
+    为什么要有它 ✗：不给图的时候也得能测 ✓ —— 用户可能只是想确认
+    "这个模型到底收不收图" ✓，不想拿自己的照片去试 ✓。
+    答案也是**一眼能判对错**的 ✓（红 / 蓝），不像"描述这张图"怎么说都行 ✓。
+    """
+    w, h = 96, 64
+    rows = []
+    for y in range(h):
+        color = b"\xdc\x28\x28" if y < h // 2 else b"\x28\x3c\xdc"
+        rows.append(b"\x00" + color * w)      # 每行开头那个 0 = filter type ✓
+    raw = b"".join(rows)
+
+    def chunk(tag: bytes, payload: bytes) -> bytes:
+        return (struct.pack(">I", len(payload)) + tag + payload
+                + struct.pack(">I", zlib.crc32(tag + payload) & 0xFFFFFFFF))
+
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
+            + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
+
+
+#: 上传封顶 8 MB ✓ —— 手机拍的原图常常五六兆 ✓，再大上游也未必收 ✓；
+#: 界面那边已经缩过一道 ✓，这儿是后端自己的底线 ✓。
+_VISION_MAX = 8 * 1024 * 1024
+
+
+@router.post("/vision/test", dependencies=[Depends(require_admin)])
+async def vision_test(cid: str = Form(""), model: str = Form(""),
+                      prompt: str = Form(""), file: UploadFile | None = File(None)) -> dict:
+    """**拿真图问一次** —— 这张图它到底看没看见 ✓。
+
+    图可选 ✓：不传就用内置那张红蓝图 ✓（答案固定、一眼能判对错 ✓）。
+    提示词可选 ✓：不传就按"有没有传图"给一句默认的 ✓。
+    结果**不落盘** ✓ —— 这只是测试，不改任何配置 ✓。
+    """
+    d = store.load()
+    c = next((x for x in d["configs"] if x["id"] == (cid or "").strip()), None)
+    if not c:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "池子里没有这一套")
+
+    m = (model or "").strip()
+    if not m:
+        # 没点名 → 用读图那一档现在指着的那个 ✓（测试"现在这套"最自然 ✓）。
+        v = store.vision_state(d, fallback=False)
+        m = v.get("model") if v.get("id") == c["id"] else ""
+    if not m:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "得选一个模型名")
+
+    builtin = True
+    image = b""
+    if file is not None:
+        image = await file.read()
+        if len(image) > _VISION_MAX:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                                "图太大了（最多 8 MB）")
+    if image:
+        builtin = False
+        mime = _mime_of(image)
+        if not mime:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                                "这张图认不出来 —— 要 PNG / JPEG / GIF / WebP")
+    else:
+        image, mime = _builtin_png(), "image/png"
+
+    p = (prompt or "").strip()[:500] or (
+        "这张图从上到下分别是什么颜色？" if builtin else "描述这张图片。")
+
+    res = await asyncio.to_thread(probe.vision_test, c, m, image, mime, p)
+    return {"ok": bool(res.get("ok")), "result": res,
+            "name": c.get("name") or "", "model": m,
+            "prompt": p, "builtin": builtin}
+
+
 # ── 写 ────────────────────────────────────────────────────────────────
 
 class ConfigIn(BaseModel):
@@ -276,6 +409,11 @@ async def delete_config(cid: str) -> dict:
     for r in store.ROLES:
         if (d.get("roles") or {}).get(r) == cid:
             d["roles"].pop(r, None)
+    # ★ 2026-10-23：读图那一档也一起清 ✓ —— 和上面同一个道理 ✓
+    #   （`vision_state` 认不出 id 会退回 chat ✓，不会出事 ✓，但留着是垃圾 ✓）。
+    if (d.get(store.VISION) or {}).get("cid") == cid:
+        d.pop(store.VISION, None)
+        freed.append("读图")
     store.save(d)
     if freed:
         log.warning("删掉的是正在用的模型 —— 现在没有模型可用了")

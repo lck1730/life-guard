@@ -21,6 +21,15 @@ log = logging.getLogger("lifeguard.models")
 #: **改名字要三处一起改** ✗（`tools/set-profile-role.sh`、`set-context-length.sh` 各有一份 ✓）。
 ROLES = ("chat", "aux")
 
+#: ★ 2026-10-23：**读图单独一档** ✓ —— 和上面两个槽不一样：
+#: 它们只存"哪一套配置"（模型名用配置顶层的 `model` ✓），
+#: 而读图存的是「**哪一套 + 哪个模型名**」✓ —— 一套配置里往往有好几个模型 ✓，
+#: 读图和聊天多半不是同一个 ✓（实测：商汤的 glm-5.2 纯文本 / flash-lite 能收图 ✓）。
+#:
+#: ⚠️ profile 的 `auxiliary.vision.model` 写的是**用途名 `vision`** ✓ ——
+#: 所以换读图模型**只改这个文件** ✓，不用 root 再去写 `/root/.hermes` ✓。
+VISION = "vision"
+
 #: 给人看的名字 —— 报错、日志用它 ✓。
 #: ⚠️ 界面上不显示这两个名字了 ✓（只有一个「模型」）—— 这里留着只为日志能分得清 ✓。
 ROLE_LABEL = {"chat": "生活管家·chat", "aux": "辅助·压缩"}
@@ -143,6 +152,31 @@ def role_names(data: dict) -> dict:
     return out
 
 
+def vision_state(data: dict, *, fallback: bool = True) -> dict:
+    """读图那一档现在指着谁（哪一套 + 哪个模型名）。
+
+    `fallback=True`（界面用）→ 没配就回"**跟着聊天模型**"的那个真实名字 ✓
+      （界面上显示成"还没单独配，跟着聊天模型走" ✓，但不至于空着 ✓）；
+    `fallback=False`（网关用）→ 没配就回空的 ✓ —— 网关自己退回去挑 `chat` ✓，
+      但这儿**不能装作已经配了** ✓（否则日志里看不出"是退回去的" ✓）。
+    """
+    v = data.get(VISION) if isinstance(data.get(VISION), dict) else {}
+    cid = str(v.get("cid") or "")
+    c = next((x for x in (data.get("configs") or []) if x.get("id") == cid), None)
+    if c:
+        m = str(v.get("model") or "").strip() or str(c.get("model") or "")
+        return {"id": cid, "name": c.get("name") or "", "model": m,
+                "label": f"{c.get('name') or ''} · {m}".strip(" ·"), "set": True}
+    if not fallback:
+        return {"id": None, "name": "", "model": "", "label": "", "set": False}
+    c, _ = pick(data, "chat")
+    if c:
+        m = str(c.get("model") or "")
+        return {"id": c["id"], "name": c.get("name") or "", "model": m,
+                "label": f"{c.get('name') or ''} · {m}".strip(" ·"), "set": False}
+    return {"id": None, "name": "", "model": "", "label": "", "set": False}
+
+
 def context_state() -> dict:
     """界面要显示的"上下文长度现在是多少" —— **从 root 写出来的那份状态文件读** ✓。
 
@@ -184,4 +218,6 @@ def public_view(data: dict) -> dict:
                     "key_tail": k[-4:] if len(k) > 8 else "",
                     "context": str(c.get("context") or eff or ""),
                     "models": c.get("models") if isinstance(c.get("models"), list) else []})
-    return {"configs": out, "roles": role_names(data), "context": ctx}
+    return {"configs": out, "roles": role_names(data), "context": ctx,
+            # ★ 2026-10-23：读图那一档 —— 界面靠它画"现在用的" + 打勾 ✓。
+            "vision": vision_state(data)}

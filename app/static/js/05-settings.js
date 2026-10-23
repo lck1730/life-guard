@@ -530,6 +530,279 @@
 
   $('#themeBack').onclick = () => popScreen('themeSet');
 
+  // ── 读图模型（2026-10-23）────────────────────────────────────────────
+  //
+  // 用户：「单独开个入口可以配置生活管家的读图模型，目前配的应该是商汤的，
+  //        可以将 agnes 的也配进去，然后可以支持我自定义一张测试图片描述」✓。
+  //
+  // ★ 为什么读图要单独一档 ✗ —— 聊天和收图常常不是同一个模型 ✓
+  //   （商汤：glm-5.2 纯文本 / flash-lite 才收图 ✓）。`models.json` 里存的
+  //   `vision = {cid, model}` 就是「哪一套的哪个模型」✓；Hermes 那边
+  //   只写用途名 `vision` ✓ → **换它只改这一个文件** ✓，不重启、不碰 `/root` ✓。
+  //
+  // ⚠️ 测试结果**不跨模型保留** ✓ —— 换了图 / 换了模型就清掉 ✓，
+  //    免得把上一张的结果当成"它现在也行" ✗。
+  let vFile = null;        // 选中的那张图（File / Blob）
+  let vFileUrl = '';       // 预览用的 object URL
+  let vPrompt = '';        // 输入框里的字（重画时得留着）
+  let vBusy = false;       // 正在测
+  let vRes = null;         // 上一次测试的结果
+  let vRowLoading = false;
+
+  const paintVisionRow = () => {
+    const el = $('#vVision'); if (!el) return;
+    const v = MODELS && MODELS.vision;
+    el.textContent = v ? (v.set ? (v.model || '') : '跟聊天模型') : '';
+  };
+
+  /** 进设置页时顺手把名单读一次 ✓（这一行要显示"现在用哪个" ✓）。
+   *  ⚠️ 只读一次 ✓ —— `renderSettings` 调得很勤 ✓，每次都发一趟纯属白烧流量 ✓。 */
+  const loadVisionRow = () => {
+    paintVisionRow();
+    if (MODELS || vRowLoading) return;
+    vRowLoading = true;
+    api('/models/configs').then(d => { MODELS = d; })
+      .catch(() => {})
+      .finally(() => { vRowLoading = false; paintVisionRow(); });
+  };
+
+  /** 测试发给谁：读图指着的那一套/那个模型 ✓
+   *  （没单独配时服务端回的也是"跟着聊天走的那个" ✓，`set` 为 false ✓）。 */
+  const vTarget = (d) => {
+    const v = (d && d.vision) || {};
+    return { id: v.id || '', model: v.model || '', name: v.name || '', set: !!v.set };
+  };
+
+  /** 一套配置下能选的模型名 ✓ —— 顶层那个 + 清单里的 ✓，去重 ✓。
+   *  ⚠️ 清单里是对象（`{id, ctx, ok…}` ✓），老数据可能是字符串 ✓，两种都认 ✓。 */
+  const vModelsOf = (c) => {
+    const seen = new Set(), out = [];
+    const add = (id, ctx) => {
+      const k = String(id || '').trim();
+      if (!k || seen.has(k)) return;
+      seen.add(k); out.push({ id: k, ctx: parseInt(ctx || 0, 10) || 0 });
+    };
+    if (c.model) add(c.model, c.context);
+    (Array.isArray(c.models) ? c.models : []).forEach(m => add(
+      typeof m === 'string' ? m : (m && m.id),
+      (m && typeof m === 'object') ? m.ctx : 0));
+    return out;
+  };
+
+  /** 测试用的图先缩一道 ✓ —— 手机原图五六兆 ✓，走 WireGuard 慢 ✓、
+   *  上游也未必收 ✓。失败就**原样发** ✓（宁可慢，别把测试弄没 ✓）。 */
+  const vShrink = async (f) => {
+    try {
+      if (!f || f.size < 900 * 1024 || typeof createImageBitmap !== 'function') return f;
+      if (f.type === 'image/gif') return f;          // 动图不碰 ✓
+      const bmp = await createImageBitmap(f);
+      const k = Math.min(1, 1200 / Math.max(bmp.width, bmp.height));
+      const w = Math.max(1, Math.round(bmp.width * k));
+      const h = Math.max(1, Math.round(bmp.height * k));
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
+      try { bmp.close(); } catch (e) {}
+      const out = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.85));
+      return (out && out.size && out.size < f.size) ? out : f;
+    } catch (e) { return f; }
+  };
+
+  const setVisionFile = (f) => {
+    if (vFileUrl) { try { URL.revokeObjectURL(vFileUrl); } catch (e) {} }
+    vFile = f || null;
+    vFileUrl = f ? URL.createObjectURL(f) : '';
+    vRes = null;                     // 换了图，上一次的结论不作数 ✓
+    paintVision(MODELS);
+  };
+
+  const openVisionSet = () => { pushScreen('visionSet', 'settings'); renderVision(); };
+
+  const renderVision = async () => {
+    const body = $('#visionBody'); if (!body) return;
+    // 和模型那一屏一样：**先用手里这份铺上** ✓，别让慢网络变成一屏黑底 ✓。
+    paintVision(MODELS);
+    let d;
+    try { d = await api('/models/configs'); }
+    catch (e) {
+      if (MODELS) { toast('读不到最新的读图设置：' + ((e && e.message) || e)); return; }
+      body.textContent = '';
+      body.appendChild(mHint('读不到模型池：' + ((e && e.message) || e), true));
+      return;
+    }
+    MODELS = d; paintVision(d); paintVisionRow();
+  };
+
+  const setVision = async (cid, model) => {
+    let r;
+    try {
+      r = await api('/models/vision', { method: 'POST', body: JSON.stringify({ cid, model }) });
+    } catch (e) { toast((e && e.message) || '换不了'); return; }
+    if (MODELS) MODELS.vision = (r && r.vision) || MODELS.vision;
+    vRes = null;
+    toast(cid
+      ? '读图换成「' + ((r && r.vision && r.vision.model) || model) + '」，下一张图生效'
+      : '读图改成跟着聊天模型走，下一张图生效');
+    paintVision(MODELS); paintVisionRow();
+  };
+
+  const runVisionTest = async () => {
+    const t = vTarget(MODELS);
+    if (!t.id || !t.model) { toast('先配一个模型'); return; }
+    vBusy = true; vRes = null; paintVision(MODELS);
+    try {
+      const fd = new FormData();
+      fd.append('cid', t.id);
+      fd.append('model', t.model);
+      const p = (vPrompt || '').trim();
+      if (p) fd.append('prompt', p);
+      if (vFile) {
+        const small = await vShrink(vFile);
+        if (small.size > 8 * 1024 * 1024) throw new Error('图太大了（最多 8 MB）');
+        fd.append('file', small, small.name || 'test.jpg');
+      }
+      const r = await fetch('/api/models/vision/test',
+        { method: 'POST', body: fd, credentials: 'same-origin' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || ('测试失败 ' + r.status));
+      vRes = d;
+    } catch (e) {
+      vRes = { ok: false, error: (e && e.message) || '没测成' };
+    } finally {
+      vBusy = false; paintVision(MODELS);
+    }
+  };
+
+  const paintVision = (d) => {
+    const body = $('#visionBody'); if (!body) return;
+    body.textContent = '';
+    if (!d || !Array.isArray(d.configs)) { body.appendChild(mHint('正在读…')); return; }
+    if (!d.configs.length) {
+      body.appendChild(mHint('还没有模型。先去「设置 → 模型」加一套。'));
+      return;
+    }
+    const t = vTarget(d);
+
+    // ── 现在用的 ──
+    body.appendChild(mkel('div', 'vsec', '现在用的'));
+    const now = mkel('div', 'vcard vnow');
+    now.appendChild(mkel('div', 'vnm',
+      t.id ? (t.name + ' · ' + t.model) : '还没有可用的模型'));
+    if (t.id && !t.set) {
+      now.appendChild(mkel('div', 'vtip', '没单独配 —— 现在跟着聊天模型走。'));
+    }
+    if (t.set) {
+      const back = mBtn('改成跟着聊天模型走', '', () => setVision('', ''));
+      back.disabled = vBusy;
+      now.appendChild(back);
+    }
+    body.appendChild(now);
+
+    // ── 换成哪一个 ──（每一套一个卡片 ✓，模型名一行一个 ✓）
+    body.appendChild(mkel('div', 'vsec', '换成哪一个'));
+    d.configs.forEach(c => {
+      const card = mkel('div', 'vcard');
+      const hd = mkel('div', 'vhd');
+      hd.appendChild(mkel('span', 'vnm', c.name || '(没名字)'));
+      if (activeId(d) === c.id) hd.appendChild(mkel('span', 'vtag', '聊天在用'));
+      card.appendChild(hd);
+      const ms = vModelsOf(c);
+      if (!ms.length) card.appendChild(mkel('div', 'vtip', '这一套还没填模型名。'));
+      ms.forEach(m => {
+        const on = t.set && t.id === c.id && t.model === m.id;
+        const row = mkel('button', 'vm' + (on ? ' on' : ''));
+        row.type = 'button';
+        row.appendChild(mkel('span', 'vdot', on ? '●' : '○'));
+        const mid = mkel('div', 'vmid');
+        mid.appendChild(mkel('div', 'vname', m.id));
+        const sub = fmtCtx(m.ctx);
+        if (sub) mid.appendChild(mkel('div', 'vsub', sub));
+        row.appendChild(mid);
+        if (on) row.appendChild(mkel('span', 'vok', '使用中'));
+        row.onclick = on ? null : () => setVision(c.id, m.id);
+        card.appendChild(row);
+      });
+      body.appendChild(card);
+    });
+
+    // ── 测一张图 ──
+    body.appendChild(mkel('div', 'vsec', '测一张图'));
+    const tc = mkel('div', 'vcard');
+    tc.appendChild(mkel('div', 'vnm',
+      t.id ? ('用 ' + t.name + ' · ' + t.model) : '还没有可用的模型'));
+
+    const prev = mkel('div', 'vprev');
+    if (vFileUrl) {
+      const img = document.createElement('img');
+      img.src = vFileUrl; img.alt = '测试图';
+      prev.appendChild(img);
+    } else {
+      prev.appendChild(mkel('div', 'vswatch'));
+      prev.appendChild(mkel('div', 'vptip', '内置测试图（上红下蓝）'));
+    }
+    tc.appendChild(prev);
+
+    const acts = mkel('div', 'vacts');
+    const pick = mBtn(vFile ? '换一张图' : '选一张图', '', () => {
+      if (!vBusy) $('#fileVision').click();
+    });
+    pick.disabled = vBusy;
+    acts.appendChild(pick);
+    if (vFile) {
+      const clr = mBtn('去掉这张', '', () => setVisionFile(null));
+      clr.disabled = vBusy;
+      acts.appendChild(clr);
+    }
+    tc.appendChild(acts);
+
+    tc.appendChild(mkel('div', 'vlab', '让它描述什么（留空用默认）'));
+    const inp = mkel('input', 'field vprompt');
+    inp.type = 'text';
+    inp.value = vPrompt;
+    inp.maxLength = 500;
+    inp.placeholder = vFile ? '描述这张图片。' : '这张图从上到下分别是什么颜色？';
+    inp.oninput = () => { vPrompt = inp.value; };
+    tc.appendChild(inp);
+
+    const go = mBtn(vBusy ? '正在问…' : '测一下', 'pri', () => {
+      if (!vBusy) runVisionTest();
+    });
+    go.disabled = vBusy || !t.id;
+    tc.appendChild(go);
+
+    if (vBusy) {
+      tc.appendChild(mkel('div', 'vtip', '正在发给上游 —— 会思考的模型可能要想十几秒。'));
+    } else if (vRes) {
+      const r = vRes, res = r.result || {};
+      const box = mkel('div', 'vres' + (r.ok ? '' : ' bad'));
+      box.textContent = r.ok
+        ? ((res.text) || '(它回了个空)')
+        : ('没测成：' + (r.error || res.error || '不知道'));
+      tc.appendChild(box);
+      // ⚠️ `image_tokens` 是**唯一能证明图真进去了**的数 ✓ ——
+      //    有的上游会把 `image_url` 悄悄丢掉、照样回一句"看到了" ✓。
+      const meta = ['「' + (r.name || '') + ' · ' + (r.model || '') + '」'];
+      if (res.ms) meta.push((res.ms / 1000).toFixed(1) + 's');
+      const it = res.usage ? res.usage.image_tokens : null;
+      meta.push(it == null ? '上游没报图 token' : ('图 token ' + it));
+      if (r.builtin) meta.push('内置图');
+      if (res.finish) meta.push('finish=' + res.finish);
+      tc.appendChild(mkel('div', 'vmeta', meta.join(' · ')));
+      if (r.ok && it === 0) {
+        tc.appendChild(mkel('div', 'vwarn', '图 token 是 0 —— 上游很可能把图丢了，它没真的看见。'));
+      }
+    }
+    body.appendChild(tc);
+  };
+
+  $('#visionBack').onclick = () => popScreen('visionSet');
+  // 选完清空 input ✓ —— 同一张图再选一次才会再触发 `change` ✓（和背景那张一个坑 ✓）。
+  $('#fileVision').onchange = (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (f) setVisionFile(f);
+  };
+
   const renderSettings = () => {
     const eGname = $('#vGname'); if (eGname) eGname.textContent = group?.name || '';
     // 「聊天背景」右边：只说有没有 ✓ —— 缩略图不塞进这一行 ✓（行太窄 ✓）。
@@ -565,6 +838,10 @@
     //   藏入口只是体验 ✓，闸门在服务端（`/api/models/*` 的 `require_admin` ✓）。
     const rm = $('#rowModels');
     if (rm) rm.style.display = (me && me.is_admin) ? '' : 'none';
+    // ★ 2026-10-23：「读图模型」—— 和「模型」一样只给管理员 ✓（闸门在服务端 ✓）。
+    const rv = $('#rowVision');
+    if (rv) rv.style.display = (me && me.is_admin) ? '' : 'none';
+    if (me && me.is_admin) loadVisionRow();
   };
   const promptText = (title, value, hint, onOk) => {
     const p = $('#sheetPanel');
@@ -757,6 +1034,8 @@
       else if (act === 'shell') openMe();
       // ★ 2026-10-11：「模型」—— 只对管理员显示 ✓（那一行在 renderSettings 里控制 ✓）
       else if (act === 'models') openModels();
+      // ★ 2026-10-23：「读图模型」—— 同上，只对管理员显示 ✓
+      else if (act === 'vision') openVisionSet();
       // ⚠️ 原来这里有一条 `act === 'plugins' → openComponents()` ✗→✓ ——
       //    它是条**死路**：设置里那一行 DOM 早就被拿掉了 ✓（用户"后续我自有安排"✓），
       //    所以那个分支永远不会被触发 ✓，只会让人以为"有个组件入口在设置里" ✗。
@@ -1198,8 +1477,8 @@
   //:    上左滑也会把收纳页推上来 ✗✓（用户看到的就是"到处都能滑出来" ✓）。
   //:    判据改成"**最上面那一屏**是不是这三屏之一" ✓。
   const _OTHER_SCREENS = [
-    '#settings', '#bgSet', '#themeSet', '#me', '#meAccount', '#space', '#peer', '#selfIntro',
-    '#agent', '#agentEdit', '#login', '#init',
+    '#settings', '#bgSet', '#themeSet', '#visionSet', '#me', '#meAccount', '#space',
+    '#peer', '#selfIntro', '#agent', '#agentEdit', '#login', '#init',
   ];
 
   const _whichScreen = () => {

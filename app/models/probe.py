@@ -13,6 +13,7 @@
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import time
@@ -110,6 +111,77 @@ def ping(cfg: dict, model: str) -> dict:
     if r.get("tools"):
         return {"ok": True, "message": "通 ✓ 调工具"}
     return {"ok": False, "message": "通，但**没调工具**（回了文字）—— 干活会哑"}
+
+
+#: 读图测试的超时 —— 比连通测试长得多 ✓：一张大图 + 会思考的模型（Agnes 那类）
+#: 要好几秒到几十秒 ✓，给 45 秒会把"慢"报成"不通" ✗。
+_VISION_TIMEOUT = 90.0
+
+#: 读图测试的 `max_tokens` —— **不能给小** ✗→✓（实测：给 40 时 Agnes 把额度
+#: 全花在 reasoning 上 ✓，`content` 是空的 ✓，看起来像"收不下图" ✗；
+#: 给 200 就正常答"红色" ✓）。空回复的下场和"模型不收图"一模一样 ✓，
+#: 所以宁可多给一点 ✓。
+_VISION_MAX_TOKENS = 500
+
+
+def vision_test(cfg: dict, model: str, image: bytes, mime: str, prompt: str) -> dict:
+    """拿**一张真图**去问这个模型 —— 看它到底收不收图、认不认得出来 ✓。
+
+    为什么非要发图、不能只发一句话 ✗ —— "能不能看图"和"能不能聊天"是两回事 ✓：
+    有的模型/代理**把 `image_url` 悄悄丢掉** ✓，照样回一句"我看到了" ✓，
+    只有 `prompt_tokens` 从几百掉到二十几 ✓ —— 从回复文字上永远看不出来 ✗。
+    所以这儿把 `usage` 里的 `image_tokens` **原样带回去** ✓：它大于 0 才说明图
+    真的进去了 ✓（上游不给这个字段时回 None ✓，不假装是 0 ✗）。
+
+    用的是**存下来的那把 key** ✓（key 不出服务端 ✓，界面只拿得到结果 ✓）。
+    """
+    b64 = base64.b64encode(image).decode("ascii")
+    body = {
+        "model": model,
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url",
+             "image_url": {"url": f"data:{mime};base64,{b64}"}},
+        ]}],
+        "max_tokens": _VISION_MAX_TOKENS,
+        "stream": False,
+    }
+    url = (cfg.get("base_url") or "").rstrip("/") + "/chat/completions"
+    _say(f"正在用「{cfg.get('name') or ''}」· {model} 看图…")
+    t0 = time.time()
+    try:
+        r = httpx.post(url, json=body, timeout=_VISION_TIMEOUT,
+                       headers={"Authorization": f"Bearer {cfg.get('api_key') or ''}"})
+        ms = int((time.time() - t0) * 1000)
+        if r.status_code >= 400:
+            _say(f"看图失败：HTTP {r.status_code}")
+            return {"ok": False, "ms": ms,
+                    "error": f"HTTP {r.status_code}: {r.text[:400]}"}
+        d = r.json()
+        ch = (d.get("choices") or [{}])[0] or {}
+        msg = ch.get("message") or {}
+        text = str(msg.get("content") or "").strip()
+        usage = d.get("usage") or {}
+        img_tok = ((usage.get("prompt_tokens_details") or {}).get("image_tokens"))
+        out = {"ok": True, "ms": ms, "text": text,
+               "finish": ch.get("finish_reason"),
+               "usage": {"prompt": usage.get("prompt_tokens"),
+                         "completion": usage.get("completion_tokens"),
+                         "image_tokens": img_tok},
+               "reasoning": str(msg.get("reasoning_content") or "")[:200]}
+        if not text:
+            # 空回复**不算成功** ✓ —— 和"模型不收图"长得一样，含糊过去等于没测 ✓。
+            why = ("额度花在思考上了（finish=%s）" % ch.get("finish_reason")
+                   if msg.get("reasoning_content") else
+                   "模型一个字都没回（finish=%s）" % ch.get("finish_reason"))
+            _say(f"看图没答上来：{why}")
+            return {**out, "ok": False, "error": why}
+        _say(f"看图通了（{ms} ms，图 token {img_tok}）")
+        return out
+    except Exception as e:  # noqa: BLE001
+        _say(f"看图请求挂了：{type(e).__name__}")
+        return {"ok": False, "ms": int((time.time() - t0) * 1000),
+                "error": f"{type(e).__name__}: {e}"}
 
 
 def test_config(cfg: dict) -> dict:
