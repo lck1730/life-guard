@@ -200,7 +200,28 @@ async def v1_proxy(path: str, request: Request):
         log.info("用途 %s → %s", role, chosen.get("name"))
 
     if isinstance(body, dict):
-        body["model"] = chosen.get("model") or body.get("model")
+        # ★ **允许按名字点名这个池子里测过的模型** ✗→✓（2026-10-23 看图那次）
+        #
+        #   ⚠️ 原来一律换成配置顶层的 `model` ✓ —— 于是**看图这条路没法单独换模型** ✗：
+        #      Hermes 的 `auxiliary.vision.model` 写什么都会被抹成 chat 用的那个 ✓，
+        #      而 chat 用的 glm-5.2 **收不下图** ✗（上游直接把 image_url 丢了 ✓，
+        #      prompt_tokens 从 800 多掉到 21 ✓）→ 它说"图我看到了但没看清" ✓。
+        #
+        #   为什么敢这么改 ✗：点名的名字**必须是这套配置自己的 `models` 里列着的** ✓，
+        #   不认识的一律照旧走顶层 `model` ✓ —— 不会因为谁写错一个名字就把请求
+        #   发到没测过的模型上去 ✓。key 仍然只在这一个文件里 ✓，Hermes 拿不到 ✓。
+        chosen_model = chosen.get("model") or body.get("model")
+        listed = {str(m.get("id") or "").strip().lower(): m.get("id")
+                  for m in (chosen.get("models") or []) if isinstance(m, dict)}
+        if want in listed:
+            chosen_model = listed[want]
+            log.info("按名字点名 %s → %s（%s）", want, chosen_model, chosen.get("name"))
+        elif want and want not in store.ROLES:
+            # ⚠️ 点名了、但这套配置里没测过 ── **说一声再照旧** ✓：
+            #    静默换成顶层模型，下次"看图又变哑了"就只能靠猜 ✓。
+            log.warning("点名要 %r，但这套配置（%s）里没测过它 → 照旧用 %s",
+                        want, chosen.get("name"), chosen_model)
+        body["model"] = chosen_model
         raw = json.dumps(body).encode()
 
     url = (chosen.get("base_url") or "").rstrip("/") + "/" + path.lstrip("/")
