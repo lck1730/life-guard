@@ -54,13 +54,15 @@
     } catch (e) { toast('模型换了，但上下文没排上队'); }
   };
 
-  /** 极客风分块标题 ✓ —— `01 // 文本 · 模型池 ────── [4]`。
+  /** 极客风分块标题 ✓ —— `01 // 文本 ────── [4]`。
    *  用户 2026-10-23：「模型界面两块，一个文本，一个图像。用极客//风格分块」✓。
+   *  ⚠️ 用户 2026-10-23 补：「就行了，不要后面的模型池、读图模型字样」✗→✓ ——
+   *    块头只留「文本」「图像」两个字 ✓，别再加上用途后缀 ✓。
    *  `idx` = 序号 ✓，`meta` = 右边那枚状态/计数牌 ✓（`[4]` / `[ON]` ✓）。 */
-  const mHead = (idx, title, sub, meta, on) => {
+  const mHead = (idx, title, meta, on) => {
     const h = mkel('div', 'mhead');
     h.appendChild(mkel('span', 'mh-i', idx));
-    h.appendChild(mkel('span', 'mh-t', '// ' + title + ' · ' + sub));
+    h.appendChild(mkel('span', 'mh-t', '// ' + title));
     h.appendChild(mkel('span', 'mh-rule'));
     h.appendChild(mkel('span', 'mh-m' + (on ? ' on' : ''), meta));
     return h;
@@ -78,17 +80,17 @@
     const list = (d && Array.isArray(d.configs)) ? d.configs : [];
     const v = vTarget(d);
 
-    // ── 01 文本 · 模型池 ──
-    body.appendChild(mHead('01', '文本', '模型池', '[' + list.length + ']'));
+    // ── 01 文本 ──
+    body.appendChild(mHead('01', '文本', '[' + list.length + ']'));
     if (!list.length) {
       body.appendChild(mHint('还没有模型。点右上角「＋」加一套。'));
     } else {
       list.forEach(c => body.appendChild(mRow(c, c.id === on)));
     }
 
-    // ── 02 图像 · 读图模型 ──
+    // ── 02 图像 ──
     // ★ 2026-10-23：读图并进这一屏 ✓ —— 原先放在名单下面 ✓，现在自成一块 ✓。
-    body.appendChild(mHead('02', '图像', '读图模型',
+    body.appendChild(mHead('02', '图像',
       v.id ? '[ON]' : '[--]', !!v.id));
     body.appendChild(visionRow(d));
   };
@@ -714,7 +716,7 @@
   };
 
   /** 「图像」那一块里的一行：读图现在用谁 ✓，点开换 / 测 ✓。
-   *  ★ 2026-10-23：标题已经写在块头上（`// 图像 · 读图模型` ✓），这一行就不再
+   *  ★ 2026-10-23：标题已经写在块头上（`// 图像` ✓），这一行就不再
    *    重复「读图」两个字 ✓ —— 直接报“现在用谁” ✓。没单独配时点一句
    *    「跟着聊天」✓，不然他会以为这块没生效 ✓。 */
   const visionRow = (d) => {
