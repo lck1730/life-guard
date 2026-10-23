@@ -54,26 +54,49 @@
     } catch (e) { toast('模型换了，但上下文没排上队'); }
   };
 
-  const renderModels = async () => {
+  /** 把一份名单画出来 ✓（`renderModels` 的两条路——先画缓存 / 刷新后重画——共用）。 */
+  const paintModels = (d) => {
     const body = $('#modelsBody');
     if (!body) return;
     body.textContent = '';
-    body.appendChild(mHint('正在读…'));
+    const on = activeId(d);
+    const list = (d && Array.isArray(d.configs)) ? d.configs : [];
+    if (!list.length) {
+      body.appendChild(mHint('还没有模型。点右上角「＋」加一套。'));
+      return;
+    }
+    list.forEach(c => body.appendChild(mRow(c, c.id === on)));
+  };
+
+  const renderModels = async () => {
+    const body = $('#modelsBody');
+    if (!body) return;
+    // ★★ **再进来时先用上一份名单铺上** ✗→✓（2026-10-23）——
+    //   用户报「从模型界面切出后，再进入偶尔会黑屏」✓。
+    //   原来每次都先 `textContent=''` 只留一句「正在读…」✗：
+    //   请求快的时候看不见 ✓，可 WireGuard 一慢 / 偶尔卡一下 ✓，
+    //   那一屏就只剩深色空底 ✓ —— 看着就是"黑了" ✓。
+    //   名单本来就在内存里（`MODELS` ✓），先同步画上 ✓，后台再刷新 ✓
+    //   （和工坊外观 `preloadWallCss` 那条同一个道理 ✓）。
+    const cached = (MODELS && Array.isArray(MODELS.configs)) ? MODELS : null;
+    if (cached) {
+      paintModels(cached);
+    } else {
+      body.textContent = '';
+      body.appendChild(mHint('正在读…'));
+    }
+    let d;
     try {
-      MODELS = await api('/models/configs');
+      d = await api('/models/configs');
     } catch (e) {
+      // 手里有旧名单就留着 ✓ —— 这一趟没刷新上，不该把看得见的东西抹掉 ✗
+      if (cached) { toast('模型名单没刷新：' + ((e && e.message) || e)); return; }
       body.textContent = '';
       body.appendChild(mHint('读不到模型池：' + ((e && e.message) || e), true));
       return;
     }
-    const d = MODELS;
-    body.textContent = '';
-    const on = activeId(d);
-    if (!d.configs.length) {
-      body.appendChild(mHint('还没有模型。点右上角「＋」加一套。'));
-      return;
-    }
-    d.configs.forEach(c => body.appendChild(mRow(c, c.id === on)));
+    MODELS = d;
+    paintModels(d);
   };
 
   /** 一套方案 = 一行；整行可点，右边一颗铅笔 */
@@ -152,6 +175,11 @@
         try {
           const r = await api('/models/configs/' + c.id, { method: 'DELETE' });
           if (r && r.freed && r.freed.length) toast('删了 —— 现在没有模型可用了');
+          // 缓存里也摘掉 ✓ —— 否则 `renderModels` 会先把**已经删掉的那一行**
+          // 同步画一下 ✓，等刷新回来才消失（网慢时看着像没删掉 ✓）。
+          if (MODELS && Array.isArray(MODELS.configs)) {
+            MODELS.configs = MODELS.configs.filter(x => x.id !== c.id);
+          }
           renderModels();
         } catch (e) { toast((e && e.message) || '没删掉'); }
       }));

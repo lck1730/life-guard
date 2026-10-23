@@ -300,6 +300,34 @@
     return _bootOff;
   };
 
+  // ── 从后台切回来时，逼 WebView 重画一帧（2026-10-23）───────────────────
+  //
+  // 用户报「从生活管家的模型界面切出后，再进入偶尔会黑屏」✓ ——
+  // **"切出 / 再进入"按"切到别的 App / 切回来"理解** ✓
+  // （同一族症状这个项目见过：`d6bee6f`「缩短长时间挂后台回来时的黑屏间隙」✓）。
+  //
+  // ⚠️ **这不是 DOM 的问题** ✗ —— 网页这边状态都好好的 ✓；是 Android WebView
+  //    切后台时**合成层的纹理被回收了** ✓，回来那一帧整块画布还是空的 ✓。
+  //    而壳给的底色就是 `#0F1115`（深色 ✓）→ 看着就是"黑屏" ✓。
+  //    常见兜法：让它**重新合成一次** ✓ —— 抖一下最上面那一屏的 opacity ✓，
+  //    0.999 肉眼看不出来 ✓，两帧之后复原 ✓。
+  //
+  // ⚠️ 诚实说一句：**这台机器没有安卓，我没法复现那个黑面** ✗ ——
+  //    这是按症状加的兜底 ✓，不是"验证过有效" ✓。要是还黑，就得动壳：
+  //    `MainActivity.onResume` 里给 `web` 补一次 `invalidate()`（或重建合成层）。
+  const _kickRepaint = () => {
+    const on = Array.prototype.slice.call(document.querySelectorAll('.screen.on'));
+    if (!on.length) return;
+    on.forEach(el => { el.style.opacity = '0.999'; });
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      on.forEach(el => { el.style.opacity = ''; });
+    }));
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') _kickRepaint();
+  });
+  window.addEventListener('pageshow', (ev) => { if (ev.persisted) _kickRepaint(); });
+
   const toast = (m) => {
     const t = $('#toast'); t.textContent = m; t.classList.add('on');
     clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 1800);
@@ -340,6 +368,7 @@
   const show = (id, anim) => {
     // ⚠️ 这里**不碰加载页** ✗ —— 由 `_bootReady()` 统一收 ✓（见上面那段说明 ✓）。
     $$('.screen').forEach(s => {
+      s._popToken = (s._popToken || 0) + 1;   // 平级切换 → 之前没跑完的退场收尾一律作废 ✓
       s.classList.remove(...ANIM_CLASSES);
       s.classList.toggle('on', s.id === id);
     });
@@ -374,8 +403,12 @@
    */
   const afterAnim = (el, done) => {
     let fired = false;
-    const finish = () => {
+    const finish = (ev) => {
       if (fired) return;
+      // ⚠️ **子元素的动画冒泡上来不算数** ✗→✓（2026-10-23）——
+      //   这个监听挂在整屏上 ✓，屏里任何一个元素（脉冲、加载条…）动画结束
+      //   都会冒到这儿 ✓；不认 target 的话，那一屏会被**提前**收掉 ✓。
+      if (ev && ev.target !== el) return;
       fired = true;
       clearTimeout(timer);
       el.removeEventListener('animationend', finish);
@@ -491,6 +524,15 @@
 
   const pushScreen = (id, from) => {
     const s = $('#' + id);
+    // ★★ **推回来 = 作废上一次退场的收尾** ✗→✓（2026-10-23）——
+    //   2026-10-23 用户报「从模型界面切出后，再进入偶尔会黑屏」✓，顺手查出来的：
+    //   退场动画还没走完（180ms ✓）就又把它推回来了 ✗ →
+    //   `pushScreen` 把动画类全清掉 ✓ → 那条退场动画**被取消** ✓ →
+    //   **`animationend` 永远不会来** ✗；可 `afterAnim` 那个 400ms 兜底还在 ✓ →
+    //   它在**新的这一屏**上补跑收尾 ✓ → 把刚推上来的屏 `on` 摘掉 ✗
+    //   （人看到的是"刚进去又自己弹回去了 / 露底" ✓，深色主题下很容易被说成黑屏 ✓）。
+    //   取号：谁最后推/退的，谁说了算 ✓；旧号码的回调一律作废 ✓。
+    s._popToken = (s._popToken || 0) + 1;
     s.classList.remove(...ANIM_CLASSES);          // ★ 先全清，见上面那段 ✓
     const cls = from === 'top'    ? 'anim-drop'
               : from === 'corner' ? 'anim-corner'
@@ -504,13 +546,17 @@
     const s = $('#' + id);
     const how = _enterAnim.get(id);
     _enterAnim.delete(id);
+    const token = (s._popToken = (s._popToken || 0) + 1);   // 见 `pushScreen` 那段 ✓
     s.classList.remove(...ANIM_CLASSES);          // ★ 先全清 ✓
     const cls = how === 'top'    ? 'anim-lift'
               : how === 'corner' ? 'anim-corner-out'
               : 'anim-out';                       // 默认：从右边退回去 ✓
     s.classList.add(cls);
     void s.offsetWidth;                           // 同理，连点两次也要重放 ✓
-    afterAnim(s, () => s.classList.remove(cls, 'on'));
+    afterAnim(s, () => {
+      if (s._popToken !== token) return;          // 中间又被推回来 / 又退了一次 → 作废 ✓
+      s.classList.remove(cls, 'on');
+    });
     // ★ **按"它已经没了"来报** ✓（不能等动画收尾再报 ✗ —— 那中间有 200ms
     //   原生还以为是别的屏 ✓，返回键在这 200ms 里按下去就会走错 ✓）。
     tellTop(id);

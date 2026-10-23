@@ -1266,6 +1266,10 @@
   #models { z-index:12; }
   #models.anim-in  { animation:pushIn  .24s cubic-bezier(.22,1,.36,1); }
   #models.anim-out { animation:pushOut .18s cubic-bezier(.4,0,1,1) forwards; }
+  /* ★ 2026-10-23：**推进来那 240ms 走合成器** ✗→✓ —— 和 `#settings` / `.ascreen`
+     同一条道理（见上面那段 ✓）。主线程一忙，这一屏就会掉帧 ✓；它底下是深色底 ✓，
+     掉帧看着就是"黑一下" ✓。只在动画类挂着时给 ✓（退出时类一摘，图层就释放 ✓）。 */
+  #models.anim-in, #models.anim-out { will-change: transform; }
 
   /* ★ 2026-10-11 模型池那一屏（`#models`）—— 自己几个类 ✓，不动既有样式 ✓
      ★ 2026-10-12 极客风 —— 等宽字体 + 状态牌 [OK]/[ERR] + 像素状态点 +
