@@ -946,11 +946,11 @@
     const wrap = mkel('div');
     wrap.id = 'vSheet';
     panel.appendChild(wrap);
-    wrap.appendChild(mkel('h3', null, '读图模型'));
+    // ★ 2026-10-23 用户：「读图模型点击后，顶部的：读图模型，现在用**** 去掉」✓
+    //   ⇒ 板子顶上**不再写标题、也不写「现在用 xxx」** ✓
+    //   （当前用的是哪个，列表里本来就有「使用中」✓，够看了 ✓）。
     if (!d || !Array.isArray(d.configs)) { wrap.appendChild(mHint('正在读…')); return; }
     const t = vTarget(d);
-    wrap.appendChild(mkel('div', 'vnow',
-      '现在用 ' + (t.id ? (t.name + ' · ' + t.model) : '还没配')));
 
     // ★ 2026-10-23：**这一屏只留验过能读图的** ✓（用户：「里面只留有识图能力的
     //   模型」✓，「去掉不支持的而不影响外面」✓）—— 过滤只发生在板子里 ✓，

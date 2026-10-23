@@ -1096,10 +1096,6 @@
                  font-size:20px; line-height:1; }
   .mrow.vrow .mk { color:var(--agent); }
 
-  #vSheet h3 { margin:0 0 5px; font-size:16.5px; }
-  #vSheet .vnow { color:var(--muted); font-size:12px; font-family:var(--mono);
-                  margin:0 0 14px; word-break:break-all; }
-
   /* 厂家：一行标题 = 手风琴头 ✓；展开才画模型 ✓ */
   #vSheet .vacc { margin-top:8px; border:1px solid var(--line); border-radius:13px;
                   background:var(--panel2); overflow:hidden; }
