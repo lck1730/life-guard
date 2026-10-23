@@ -65,9 +65,9 @@
       body.appendChild(mHint('还没有模型。点右上角「＋」加一套。'));
       return;
     }
-    // ★ 2026-10-23：读图并进这一屏 ✓ —— 最上面一行，点开半屏板子 ✓
-    body.appendChild(visionRow(d));
     list.forEach(c => body.appendChild(mRow(c, c.id === on)));
+    // ★ 2026-10-23：读图并进这一屏 ✓ —— **放在名单下面**（用户：「入口放在模型页的下方」✓）
+    body.appendChild(visionRow(d));
   };
 
   const renderModels = async () => {
@@ -615,7 +615,7 @@
     if ($('#vSheet')) renderVisionSheet(d);
   };
 
-  /** 「模型」屏最上面那一行：读图现在用谁 ✓，点开换 / 测 ✓。 */
+  /** 「模型」屏最下面那一行：读图现在用谁 ✓，点开换 / 测 ✓。 */
   const visionRow = (d) => {
     const v = vTarget(d);
     const row = mkel('div', 'mrow vrow');
@@ -630,13 +630,17 @@
   };
 
   const openVisionSheet = async () => {
+    // ⚠️ **`openSheet()` 一定要在两条路都走到的地方** ✗→✓（2026-10-23）——
+    //    原来它只写在 `else`（`MODELS` 还没读到时 ✓）里 ✗：
+    //    正常进这一屏时 `MODELS` 早就有值了 ✓ → 只往**关着的**板子里填了内容 ✓，
+    //    `#sheet` 从来没拿到 `.on` ✗ → 点那一行**什么都不发生** ✓（用户报的"点不开"✓）。
     if (MODELS) renderVisionSheet(MODELS);
     else {
       const panel = $('#sheetPanel');
       panel.textContent = '';
       panel.appendChild(mHint('正在读…'));
-      openSheet();
     }
+    openSheet();
     let d;
     try { d = await api('/models/configs'); }
     catch (e) {
