@@ -7,6 +7,8 @@
   //
   // ⚠️ 这一屏只由「设置 → 模型」进入；闸门在服务端 require_admin。
   let MODELS = null;
+  // 03 用量与签到（魔搭）✓ —— 上一次查到的余额/签到、没查到的原因、正在查 ✓
+  let MAGIC = null, MAGIC_ERR = '', MAGIC_LOADING = false;
 
   const openModels = () => { pushScreen('models', 'settings'); renderModels(); };
 
@@ -93,11 +95,15 @@
     body.appendChild(mHead('02', '图像',
       v.id ? '[ON]' : '[--]', !!v.id));
     body.appendChild(visionRow(d));
+
+    // ── 03 用量与签到（魔搭）──
+    body.appendChild(magicBlock());
   };
 
   const renderModels = async () => {
     const body = $('#modelsBody');
     if (!body) return;
+    loadMagicube(false);   // 后台查 ✓（和模型名单那趟并行 ✓；失败不影响上半屏 ✓）
     // ★★ **再进来时先用上一份名单铺上** ✗→✓（2026-10-23）——
     //   用户报「从模型界面切出后，再进入偶尔会黑屏」✓。
     //   原来每次都先 `textContent=''` 只留一句「正在读…」✗：
@@ -732,6 +738,117 @@
     row.appendChild(mkel('span', 'vchev', '›'));
     row.onclick = () => openVisionSheet();
     return row;
+  };
+
+  // ── 03 用量与签到（魔搭） ★ 2026-10-23 ──────────────────────────────
+  //
+  // 用户：「魔塔需要每天登录获取魔粒值，为魔塔专门开辟魔粒值显示和每日快速
+  //       登录的入口。具体就放在 03，用量与签到」✓。
+  //
+  // ⚠️ **「领」不在这一屏里做** ✗ —— 魔搭每日 200 是**网页登录**发的 ✓，
+  //    阿里 passport 那一步带验证码 ✗，服务器拿用户名密码登不进去 ✓。
+  //    这里只做两件事：**把余额 / 今日状态显示出来** ✓、**一键打开魔搭** ✓
+  //    （手机系统浏览器里登录着的会话，打开首页就会到账 ✓）。
+  //    回来点「刷新」看结果 ✓ —— 数字来自后端 `/models/magicube` ✓（只读 ✓）。
+  const MS_HOME = 'https://modelscope.cn/home';
+
+  /** 手机壳只留同 host ✓ —— modelscope.cn 是外链 ✓，交给系统浏览器打开 ✓。 */
+  const magicOpen = () => { location.href = MS_HOME; };
+
+  const magicMeta = () => {
+    if (!MAGIC) return [MAGIC_LOADING ? '[..]' : '[--]', false];
+    if (!MAGIC.ok) return ['[--]', false];
+    return [MAGIC.signed ? '[已签]' : '[未签]', !!MAGIC.signed];
+  };
+
+  const magicBlock = () => {
+    const box = mkel('div', 'mgwrap');
+    box.id = 'mgWrap';
+    const m = magicMeta();
+    box.appendChild(mHead('03', '用量与签到', m[0], m[1]));
+
+    // 魔粒余额 + 今日消耗
+    const r1 = mkel('div', 'mrow');
+    r1.appendChild(mkel('span', 'mk', '◉'));
+    const mid1 = mkel('div', 'mid');
+    mid1.appendChild(mkel('div', 'nm', '魔粒余额'));
+    let sub1;
+    if (MAGIC && MAGIC.ok) {
+      sub1 = '今日消耗 ' + MAGIC.today_spent + ' 魔粒';
+      if (MAGIC.frozen) sub1 += ' · 冻结 ' + MAGIC.frozen;
+    } else if (MAGIC && !MAGIC.ok) {
+      sub1 = MAGIC.why || '查不到';
+    } else {
+      sub1 = MAGIC_LOADING ? '正在问魔搭…' : '还没查';
+    }
+    mid1.appendChild(mkel('div', 'sub', sub1));
+    r1.appendChild(mid1);
+    r1.appendChild(mkel('span', 'mgval',
+      (MAGIC && MAGIC.ok) ? String(MAGIC.available) : '--'));
+    box.appendChild(r1);
+
+    // 今日签到：登录 +200 / 绑阿里云 +50 ✓
+    const r2 = mkel('div', 'mrow');
+    r2.appendChild(mkel('span', 'mk',
+      (MAGIC && MAGIC.ok && MAGIC.signed) ? '●' : '○'));
+    const mid2 = mkel('div', 'mid');
+    mid2.appendChild(mkel('div', 'nm', '今日签到'));
+    let sub2;
+    if (MAGIC && MAGIC.ok) {
+      sub2 = MAGIC.signed
+        ? ('已到账 ' + (MAGIC.login_earned + MAGIC.aliyun_earned) +
+           '（登录 ' + MAGIC.login_earned + ' · 阿里云 ' + MAGIC.aliyun_earned + '）')
+        : '还没到账 · 打开魔搭登录一次';
+    } else {
+      sub2 = '每天登录 +200 · 绑阿里云再 +50';
+    }
+    mid2.appendChild(mkel('div', 'sub', sub2));
+    r2.appendChild(mid2);
+    box.appendChild(r2);
+
+    // 每日快速登录的入口 ✓ —— 就是打开魔搭首页 ✓
+    const r3 = mkel('div', 'mrow mggo');
+    r3.appendChild(mkel('span', 'mk', '↗'));
+    const mid3 = mkel('div', 'mid');
+    mid3.appendChild(mkel('div', 'nm', '打开魔搭'));
+    mid3.appendChild(mkel('div', 'sub', '登录着的会话打开首页就到账 · 回来刷新'));
+    r3.appendChild(mid3);
+    r3.appendChild(mkel('span', 'vchev', '›'));
+    r3.onclick = magicOpen;
+    box.appendChild(r3);
+
+    // 刷新 + 数据来源/时间 ✓
+    const foot = mkel('div', 'mhint', '数据来自魔搭 · ');
+    const rf = mkel('span', 'mlink', '刷新');
+    rf.onclick = () => loadMagicube(true);
+    foot.appendChild(rf);
+    if (MAGIC && MAGIC.ok && MAGIC.at)
+      foot.appendChild(mkel('span', 'mgat', ' · ' + MAGIC.at + ' 查的'));
+    box.appendChild(foot);
+    if (MAGIC_ERR) box.appendChild(mHint(MAGIC_ERR, true));
+    return box;
+  };
+
+  /** 只换 03 那一块 ✓ —— 不重画上面两块（免得闪 / 丢滚动位置 ✓）。 */
+  const paintMagic = () => {
+    const old = $('#mgWrap');
+    if (!old || !old.parentNode) return;
+    old.parentNode.replaceChild(magicBlock(), old);
+  };
+
+  const loadMagicube = async (force) => {
+    if (MAGIC_LOADING) return;
+    MAGIC_LOADING = true;
+    paintMagic();
+    try {
+      MAGIC = await api('/models/magicube' + (force ? '?refresh=1' : ''));
+      MAGIC_ERR = '';
+    } catch (e) {
+      MAGIC_ERR = '没查到：' + ((e && e.message) || '网络没通');
+    } finally {
+      MAGIC_LOADING = false;
+      paintMagic();
+    }
   };
 
   const openVisionSheet = async () => {

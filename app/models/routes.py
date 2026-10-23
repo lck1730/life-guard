@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 from ..auth import current_user
 from ..config import settings
 from ..db import fetch_one
-from . import probe, store
+from . import magicube, probe, store
 
 log = logging.getLogger("lifeguard.models")
 
@@ -50,6 +50,12 @@ async def list_configs() -> dict:
     ★ **key 一个字都不回** ✗ —— 见 `store.public_view` 那段（掩码被当新 key 提交过 ✓）。
     """
     return store.public_view(store.load())
+
+
+@router.get("/magicube", dependencies=[Depends(require_admin)])
+async def get_magicube(refresh: bool = False) -> dict:
+    """魔塔的魔粒余额 / 今日签到 / 今日消耗 ✓ —— **只读** ✓（见 magicube 模块说明 ✓）。"""
+    return await magicube.summary(force=refresh)
 
 
 @router.get("/progress", dependencies=[Depends(require_admin)])
