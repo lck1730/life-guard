@@ -244,22 +244,51 @@
     return JSON.stringify(d);
   };
 
+  /**
+   * `opts.timeout`（毫秒，可选）—— **只有开屏这种"卡住就很显眼"的请求才传** ✓。
+   *
+   * ★ 2026-10-23 加 ✓：用户报"点刷新卡在加载页，只能划掉重进" ✓。
+   *   `fetch` 在 WebView 里**没有自带的超时** ✗ —— 连接被网络栈攥住时，
+   *   这个 Promise 可以永远不返回 ✓ → `enterApp()` 永远走不到 `_bootReady()` ✓
+   *   → 加载页一直转 ✓。默认不设超时（发消息这些慢操作不能误杀 ✓），
+   *   只在开屏那几趟点名传 ✓。
+   */
   const api = async (path, opts = {}) => {
-    const r = await fetch('/api' + path, {
-      ...opts,
-      credentials: 'same-origin',   // 带上 Cookie。同源本来就默认带，写明是为了别被将来改错
-      headers: { 'Content-Type': 'application/json',
-                 ...(opts.headers || {}) }
-    });
-    const text = await r.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-    if (!r.ok) {
-      const err = new Error(explain(data, r.status));
-      err.status = r.status;   // 启动时要靠它分辨"没登录(401)"和"网络坏了"
-      throw err;
+    const { timeout, ...rest } = opts;
+    let ctl = null, tid = 0;
+    if (timeout && typeof AbortController !== 'undefined') {
+      ctl = new AbortController();
+      tid = setTimeout(() => { try { ctl.abort(); } catch (e) {} }, timeout);
     }
-    return data;
+    try {
+      const r = await fetch('/api' + path, {
+        ...rest,
+        credentials: 'same-origin',   // 带上 Cookie。同源本来就默认带，写明是为了别被将来改错
+        signal: ctl ? ctl.signal : rest.signal,
+        headers: { 'Content-Type': 'application/json',
+                   ...(rest.headers || {}) }
+      });
+      const text = await r.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+      if (!r.ok) {
+        const err = new Error(explain(data, r.status));
+        err.status = r.status;   // 启动时要靠它分辨"没登录(401)"和"网络坏了"
+        throw err;
+      }
+      return data;
+    } catch (e) {
+      // abort 之后 `fetch` / `r.text()` 抛的是 AbortError，不是我们那种带 status 的错 ✓
+      if (ctl && ctl.signal.aborted && !(e && e.status)) {
+        const err = new Error('服务器一直没回应（超时了）');
+        err.status = 0;
+        err.timeout = true;
+        throw err;
+      }
+      throw e;
+    } finally {
+      if (tid) clearTimeout(tid);
+    }
   };
 
   // ── 开局加载页的退场（2026-10-20）────────────────────────────────────
@@ -281,8 +310,19 @@
   let _bootOff = null;
 
   const _afterPaint = () => new Promise(res => {
-    requestAnimationFrame(() => requestAnimationFrame(res));
+    // ⚠️ **两帧 rAF 不一定来** ✗ —— 页面切到后台 / 这次导航没有合成帧时，
+    //    rAF 会被按住 ✓ → `_bootReady()` 就永远停在第一行 ✓。补一个兜底 ✓。
+    let done = false;
+    const fin = () => { if (!done) { done = true; res(); } };
+    requestAnimationFrame(() => requestAnimationFrame(fin));
+    setTimeout(fin, 400);
   });
+
+  /** 让一个 Promise **最多等 ms 毫秒**（超时就算了，活儿在后台照跑 ✓）。 */
+  const _within = (p, ms) => Promise.race([
+    Promise.resolve(p).catch(() => {}),
+    new Promise(r => setTimeout(r, ms)),
+  ]);
 
   /** 底下那一屏已经准备好了 → 加载页等满 0.5s 后淡出 ✓（重复调只认第一次 ✓）。 */
   const _bootReady = () => {
@@ -299,6 +339,35 @@
     })();
     return _bootOff;
   };
+
+  // ★★ 2026-10-23：**加载页绝不能无限期挂着** —— 用户报的那条 bug ✓。
+  //
+  //   正常出口每个都调 `_bootReady()` ✓，但"每个出口都调了"不等于"一定会调到" ✗：
+  //   只要有一处 await 永远不返回（`fetch` / IndexedDB / 字体 ✓），
+  //   人就只能看着转圈 ✓，唯一出路是划掉 App 重进 ✓（= 重建 WebView ✓）。
+  //
+  //   这里是**最后一道兜底** ✓：到点不管卡在哪一步，都把加载页收掉 ✓。
+  //   · 底下已经有屏（最典型：本机缓存那一份群聊 ✓）→ 直接露出来 ✓
+  //   · 底下什么都没有 → 摆登录页 + 一句实话 ✓（别让人对着空屏猜 ✓）
+  //
+  //   ⚠️ 放在这里（01-core）而不是 06 的派发后面 ✗ —— 万一后面某个文件
+  //      顶层就抛了 ✓，06 根本执行不到 ✓，这道兜底也就没人挂 ✓。
+  const BOOT_HANG_MS = 10000;
+  setTimeout(() => {
+    const b = $('#boot');
+    if (!b || b.hidden) return;
+    try {
+      if (!$('.screen.on')) {
+        show('login');
+        tellNative('chat');
+        const el = $('#loginErr');
+        if (el) el.textContent = '加载太久没反应 —— 网络可能断了，点重新加载再试';
+      }
+      _bootReady();
+    } catch (e) {
+      try { b.hidden = true; } catch (e2) {}   // 连兜底都出错 → 至少把这块布摘掉
+    }
+  }, BOOT_HANG_MS);
 
   // ── 从后台切回来时，逼 WebView 重画一帧（2026-10-23）───────────────────
   //
@@ -386,6 +455,39 @@
   // 网页里的界面切换不会进 WebView 历史，原生光靠 canGoBack 判断不出来。
   const tellNative = (name) => {
     try { window.LifeGuardNative?.setScreen?.(name); } catch {}
+  };
+
+  // ── 「重新加载」这颗按钮该干什么（2026-10-23 改）──────────────────────
+  //
+  // ★ 用户报的 bug：**在 App 里点刷新 → 卡在加载页 → 只能划掉 App 重进** ✓。
+  //
+  //   服务端日志里那一次是这样的 ✓：`GET /` 来了两趟 ✓ 都 200 ✓，
+  //   但**之后 `app.js` / `bootstrap` 一趟都没有** ✗，**旧的 WebSocket 也没断** ✗
+  //   —— 说明 `location.reload()` 这次导航**根本没落地** ✓，
+  //   WebView 卡在"旧的还没卸干净、新的还没跑起来"的中间态 ✓。
+  //   划掉重进之所以好使 ✓，是因为那等于**把整个 WebView 销毁重建** ✓。
+  //
+  //   → **在 App 里就别再 `location.reload()` 了** ✗：走原生现成的
+  //     `setServer(serverUrl())` ✓ —— `MainActivity.openUi()` 会
+  //     `web.destroy()` 再新建一个 ✓，和手动划掉重进**是同一条路** ✓
+  //     （0.7.0 的壳里就有这个口子 ✓，不用等新版 App ✓）。
+  //     ⚠️ 它是"换服务器地址"用的接口 ✓，这里传的是**地址本身** ✓
+  //     —— 地址不变、效果是重建 ✓；不去改壳，也就不引入新版才有的方法 ✓。
+  //
+  //   ⚠️ 浏览器里（没有原生桥）照旧 `location.reload()` ✓。
+  //
+  //   另外：**先主动关掉 WebSocket** ✓ —— 旧页面被重建时，它那条 WS
+  //   在日志里是"没断"的 ✓；关一下，服务端那边立刻干净 ✓（不依赖导航去收拾 ✓）。
+  const _appReload = () => {
+    try { if (ws) { try { ws.onclose = null; ws.close(); } catch (e) {} } } catch (e) {}
+    try {
+      const N = window.LifeGuardNative;
+      if (N && typeof N.serverUrl === 'function' && typeof N.setServer === 'function') {
+        const u = String(N.serverUrl() || '');
+        if (/^https?:\/\//i.test(u)) { N.setServer(u); return; }
+      }
+    } catch (e) {}
+    location.reload();
   };
 
   /**

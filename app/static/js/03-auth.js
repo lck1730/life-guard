@@ -261,7 +261,10 @@
     // 前缀是 /api/groups —— 所以是 /api/groups/bootstrap，不是 /api/bootstrap ✗
     let b;
     try {
-      b = await api('/groups/bootstrap?limit=50');
+      // ★ 2026-10-23：**这趟必须有超时** ✓ —— 它是开屏唯一的必经之路 ✓，
+      //   网络栈卡住时它不返回 = 加载页永远转 ✓（用户报的那条 ✓）。
+      //   7 秒远大于正常耗时（本机/隧道都是几十毫秒 ✓）✓。
+      b = await api('/groups/bootstrap?limit=50', { timeout: 7000 });
     } catch (e) {
       // 票已经没了 → 本机那份也不该再露 ✓（下一次开页别再顶出来 ✓）
       if (e && e.status === 401) _clearBoot();
@@ -340,8 +343,14 @@
     //   ⚠️ **消息图片不在这里等** ✗：历史里可能有一堆图 ✓，逐张等会把开屏拖到
     //      不可控 ✓；它们本来就是滚到才加载的（`loading=lazy` ✓），不属于
     //      "第一眼就该完整"的那部分 ✓。
-    try { await ensureChatBackground(); } catch (e) {}
-    try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
+    //   ★ 2026-10-23：这两样原来都是**无上限地等** ✗ —— 背景图那趟走
+    //     IndexedDB + 网络 + 解码 ✓，任何一环卡住都能把开屏永远按住 ✓。
+    //     现在给它们上盖：**等不到就先开 ✓**，背景图回来后再铺上 ✓
+    //     （晚铺一下，好过对着加载页 ✓）。
+    try { await _within(ensureChatBackground(), 3000); } catch (e) {}
+    try {
+      if (document.fonts && document.fonts.ready) await _within(document.fonts.ready, 1500);
+    } catch (e) {}
     _bootReady();
     // ★ 2026-10-08：这里原来有一段 `sessionStorage['lg_back_to']` 的还原 ✓ ——
     //   **删掉了** ✗→✓。它当初是为了修"从「我的」回来落到群聊首页" ✓，

@@ -1644,8 +1644,19 @@
   // ★ DIY 助手整套已经撤掉 ✓ —— 工坊只剩组件展示 / 管理 ✓，
   //   组件和界面外观的修改现在由管理员在服务端做 ✓。
 
-  /** 改账号（用户名 / 密码）✓ —— 和「我的」同构的一屏 ✓。 */
+  // ★ 群聊右上角那颗「重新加载」（2026-10-20 从设置页挪过来的 ✓）。
+  //
+  //   ⚠️ 2026-10-23 换掉了原来的 `location.reload()` ✗ ——
+  //      用户报"点刷新卡在加载页、只能划掉重进" ✓。走 `_appReload`：
+  //      在 App 里重建 WebView（= 划掉重进那条路 ✓），浏览器里才 reload ✓。
+  //      连点两下别开两次 ✓（重建那一两百毫秒里按钮还挂在那儿 ✓）。
   const _rb = $('#reloadBtn');
-  if (_rb) _rb.onclick = () => location.reload();
+  let _rbBusy = false;
+  if (_rb) _rb.onclick = () => {
+    if (_rbBusy) return;
+    _rbBusy = true;
+    try { _rb.disabled = true; } catch (e) {}
+    _appReload();
+  };
 
   // ── 创意工坊（2026-10-07，右上角那个入口）────────────────────────────

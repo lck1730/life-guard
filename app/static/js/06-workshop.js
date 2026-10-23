@@ -1274,7 +1274,7 @@
   // 那就得先问一句"我是谁" ✓（这一屏要画昵称和头像 ✓）。
   const bootAtMe = async () => {
     try {
-      me = await api('/me');
+      me = await api('/me', { timeout: 7000 });   // 开屏必经之路，卡住也要有头 ✓（2026-10-23）
     } catch (e) {
       if (e && e.status === 401) { location.href = '/login'; return; }
       show('login');
@@ -1332,7 +1332,9 @@
   window.LifeGuard = {
     // —— 原生壳用 ——
     logout,
-    reload: () => location.reload(),
+    // ★ 2026-10-23：**别再用 `location.reload()`** ✗（在 App 里会卡死 ✓，见 01-core 的
+    //   `_appReload` 说明 ✓）。壳里调用它也走"重建 WebView"那条路 ✓。
+    reload: () => _appReload(),
 
     // —— agent 用：钩子（它在本文件之后加载，注册的回调稍后会被调用）——
     onReady: _hook('ready'),              // 进了聊天页、历史消息都渲染完之后
