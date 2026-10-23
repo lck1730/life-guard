@@ -767,64 +767,39 @@
     const m = magicMeta();
     box.appendChild(mHead('03', '用量与签到', m[0], m[1]));
 
-    // 魔粒余额 + 今日消耗
-    const r1 = mkel('div', 'mrow');
-    r1.appendChild(mkel('span', 'mk', '◉'));
-    const mid1 = mkel('div', 'mid');
-    mid1.appendChild(mkel('div', 'nm', '魔粒余额'));
-    let sub1;
+    // ★ 2026-10-23：用户要「先弄一个条目，魔塔」✓ —— 就把三行收成**一条** ✓：
+    //   名字 ✓、魔粒值 ✓、是否签到 ✓，跳转/刷新两个按钮也在条目里 ✓。
+    const row = mkel('div', 'mrow');
+    row.appendChild(mkel('span', 'mk', '◉'));
+    const mid = mkel('div', 'mid');
+    mid.appendChild(mkel('div', 'nm', '魔塔'));
+
+    let sub;
     if (MAGIC && MAGIC.ok) {
-      sub1 = '今日消耗 ' + MAGIC.today_spent + ' 魔粒';
-      if (MAGIC.frozen) sub1 += ' · 冻结 ' + MAGIC.frozen;
+      sub = MAGIC.signed
+        ? ('今日已签（登录 ' + MAGIC.login_earned + ' · 阿里云 ' + MAGIC.aliyun_earned + '）')
+        : '今日未签 · 点「跳转」登录一次';
+      sub += ' · 今日消耗 ' + MAGIC.today_spent;
     } else if (MAGIC && !MAGIC.ok) {
-      sub1 = MAGIC.why || '查不到';
+      sub = MAGIC.why || '查不到';
     } else {
-      sub1 = MAGIC_LOADING ? '正在问魔搭…' : '还没查';
+      sub = MAGIC_LOADING ? '正在问魔搭…' : '还没查';
     }
-    mid1.appendChild(mkel('div', 'sub', sub1));
-    r1.appendChild(mid1);
-    r1.appendChild(mkel('span', 'mgval',
+    mid.appendChild(mkel('div', 'sub', sub));
+
+    const acts = mkel('div', 'macts');
+    acts.appendChild(mBtn('跳转', '', () => magicOpen()));
+    acts.appendChild(mBtn('刷新', '', () => loadMagicube(true)));
+    mid.appendChild(acts);
+    row.appendChild(mid);
+
+    const num = mkel('div', 'mgnum');
+    num.appendChild(mkel('div', 'mgval',
       (MAGIC && MAGIC.ok) ? String(MAGIC.available) : '--'));
-    box.appendChild(r1);
+    num.appendChild(mkel('div', 'mglab', '魔粒'));
+    row.appendChild(num);
 
-    // 今日签到：登录 +200 / 绑阿里云 +50 ✓
-    const r2 = mkel('div', 'mrow');
-    r2.appendChild(mkel('span', 'mk',
-      (MAGIC && MAGIC.ok && MAGIC.signed) ? '●' : '○'));
-    const mid2 = mkel('div', 'mid');
-    mid2.appendChild(mkel('div', 'nm', '今日签到'));
-    let sub2;
-    if (MAGIC && MAGIC.ok) {
-      sub2 = MAGIC.signed
-        ? ('已到账 ' + (MAGIC.login_earned + MAGIC.aliyun_earned) +
-           '（登录 ' + MAGIC.login_earned + ' · 阿里云 ' + MAGIC.aliyun_earned + '）')
-        : '还没到账 · 打开魔搭登录一次';
-    } else {
-      sub2 = '每天登录 +200 · 绑阿里云再 +50';
-    }
-    mid2.appendChild(mkel('div', 'sub', sub2));
-    r2.appendChild(mid2);
-    box.appendChild(r2);
-
-    // 每日快速登录的入口 ✓ —— 就是打开魔搭首页 ✓
-    const r3 = mkel('div', 'mrow mggo');
-    r3.appendChild(mkel('span', 'mk', '↗'));
-    const mid3 = mkel('div', 'mid');
-    mid3.appendChild(mkel('div', 'nm', '打开魔搭'));
-    mid3.appendChild(mkel('div', 'sub', '登录着的会话打开首页就到账 · 回来刷新'));
-    r3.appendChild(mid3);
-    r3.appendChild(mkel('span', 'vchev', '›'));
-    r3.onclick = magicOpen;
-    box.appendChild(r3);
-
-    // 刷新 + 数据来源/时间 ✓
-    const foot = mkel('div', 'mhint', '数据来自魔搭 · ');
-    const rf = mkel('span', 'mlink', '刷新');
-    rf.onclick = () => loadMagicube(true);
-    foot.appendChild(rf);
-    if (MAGIC && MAGIC.ok && MAGIC.at)
-      foot.appendChild(mkel('span', 'mgat', ' · ' + MAGIC.at + ' 查的'));
-    box.appendChild(foot);
+    box.appendChild(row);
     if (MAGIC_ERR) box.appendChild(mHint(MAGIC_ERR, true));
     return box;
   };
