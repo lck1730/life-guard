@@ -65,6 +65,8 @@
       body.appendChild(mHint('还没有模型。点右上角「＋」加一套。'));
       return;
     }
+    // ★ 2026-10-23：读图并进这一屏 ✓ —— 最上面一行，点开半屏板子 ✓
+    body.appendChild(visionRow(d));
     list.forEach(c => body.appendChild(mRow(c, c.id === on)));
   };
 
@@ -530,62 +532,50 @@
 
   $('#themeBack').onclick = () => popScreen('themeSet');
 
-  // ── 读图模型（2026-10-23）────────────────────────────────────────────
+  // ── 读图（2026-10-23）—— **并进「模型」这一屏** ✓
   //
-  // 用户：「单独开个入口可以配置生活管家的读图模型，目前配的应该是商汤的，
-  //        可以将 agnes 的也配进去，然后可以支持我自定义一张测试图片描述」✓。
+  // 用户：「读图模型放在模型里面 ✓，并且要真的能读图的才能进 ✓，
+  //        你负责把关并配置好 ✓，界面简洁别介绍那么多废话 ✓」✓。
   //
-  // ★ 为什么读图要单独一档 ✗ —— 聊天和收图常常不是同一个模型 ✓
-  //   （商汤：glm-5.2 纯文本 / flash-lite 才收图 ✓）。`models.json` 里存的
-  //   `vision = {cid, model}` 就是「哪一套的哪个模型」✓；Hermes 那边
-  //   只写用途名 `vision` ✓ → **换它只改这一个文件** ✓，不重启、不碰 `/root` ✓。
+  // ★ 谁够格 ✗→✓：`models.json` 每个模型行上的 `img` ✓ —— 只有拿内置那张
+  //   （上红下蓝、答案固定 ✓）当场问出来、两块颜色都答对 ✓ 才是 `true` ✓。
+  //   后端 `POST /api/models/vision` **只收 `img===true` 的** ✓
+  //   （闸门在服务端 ✓，不是靠界面上把按钮藏起来 ✓）。
+  // ★ 存的是「哪一套 + 哪个模型」✓（`vision = {cid, model}` ✓），
+  //   Hermes 那边只写用途名 `vision` ✓ → 换它不改 `/root/.hermes` ✓、不重启 ✓。
   //
-  // ⚠️ 测试结果**不跨模型保留** ✓ —— 换了图 / 换了模型就清掉 ✓，
-  //    免得把上一张的结果当成"它现在也行" ✗。
+  // ⚠️ 测试结果**不跨图保留** ✓ —— 换了图就清掉 ✓，免得把上一张的结论当成
+  //    "它现在也行" ✗。
   let vFile = null;        // 选中的那张图（File / Blob）
   let vFileUrl = '';       // 预览用的 object URL
   let vPrompt = '';        // 输入框里的字（重画时得留着）
-  let vBusy = false;       // 正在测
+  let vBusy = false;       // 正在测一张图
+  let vVerifying = '';     // 正在验的「cid|model」
   let vRes = null;         // 上一次测试的结果
-  let vRowLoading = false;
 
-  const paintVisionRow = () => {
-    const el = $('#vVision'); if (!el) return;
-    const v = MODELS && MODELS.vision;
-    el.textContent = v ? (v.set ? (v.model || '') : '跟聊天模型') : '';
-  };
-
-  /** 进设置页时顺手把名单读一次 ✓（这一行要显示"现在用哪个" ✓）。
-   *  ⚠️ 只读一次 ✓ —— `renderSettings` 调得很勤 ✓，每次都发一趟纯属白烧流量 ✓。 */
-  const loadVisionRow = () => {
-    paintVisionRow();
-    if (MODELS || vRowLoading) return;
-    vRowLoading = true;
-    api('/models/configs').then(d => { MODELS = d; })
-      .catch(() => {})
-      .finally(() => { vRowLoading = false; paintVisionRow(); });
-  };
-
-  /** 测试发给谁：读图指着的那一套/那个模型 ✓
-   *  （没单独配时服务端回的也是"跟着聊天走的那个" ✓，`set` 为 false ✓）。 */
+  /** 读图现在指着谁 ✓（没单独配时服务端回"跟着聊天模型"的那个 ✓）。 */
   const vTarget = (d) => {
     const v = (d && d.vision) || {};
-    return { id: v.id || '', model: v.model || '', name: v.name || '', set: !!v.set };
+    return { id: v.id || '', model: v.model || '', name: v.name || '',
+             label: v.label || '', set: !!v.set };
   };
 
   /** 一套配置下能选的模型名 ✓ —— 顶层那个 + 清单里的 ✓，去重 ✓。
-   *  ⚠️ 清单里是对象（`{id, ctx, ok…}` ✓），老数据可能是字符串 ✓，两种都认 ✓。 */
+   *  ★ 带上 `img` 资格 ✓：true = 验过能读图；false = 验过读不了；null = 没验过。 */
   const vModelsOf = (c) => {
     const seen = new Set(), out = [];
-    const add = (id, ctx) => {
+    const add = (id, ctx, img) => {
       const k = String(id || '').trim();
       if (!k || seen.has(k)) return;
-      seen.add(k); out.push({ id: k, ctx: parseInt(ctx || 0, 10) || 0 });
+      seen.add(k);
+      out.push({ id: k, ctx: parseInt(ctx || 0, 10) || 0,
+                 img: typeof img === 'boolean' ? img : null });
     };
-    if (c.model) add(c.model, c.context);
+    if (c.model) add(c.model, c.context, null);
     (Array.isArray(c.models) ? c.models : []).forEach(m => add(
       typeof m === 'string' ? m : (m && m.id),
-      (m && typeof m === 'object') ? m.ctx : 0));
+      (m && typeof m === 'object') ? m.ctx : 0,
+      (m && typeof m === 'object') ? m.img : null));
     return out;
   };
 
@@ -613,43 +603,96 @@
     vFile = f || null;
     vFileUrl = f ? URL.createObjectURL(f) : '';
     vRes = null;                     // 换了图，上一次的结论不作数 ✓
-    paintVision(MODELS);
+    if ($('#vSheet')) renderVisionSheet(MODELS);
   };
 
-  const openVisionSet = () => { pushScreen('visionSet', 'settings'); renderVision(); };
+  /** 只刷新池子（资格标记在服务端 ✓），模型屏和板子都跟着重画 ✓。 */
+  const refreshModelPool = async () => {
+    let d;
+    try { d = await api('/models/configs'); } catch (e) { return; }
+    MODELS = d;
+    paintModels(d);
+    if ($('#vSheet')) renderVisionSheet(d);
+  };
 
-  const renderVision = async () => {
-    const body = $('#visionBody'); if (!body) return;
-    // 和模型那一屏一样：**先用手里这份铺上** ✓，别让慢网络变成一屏黑底 ✓。
-    paintVision(MODELS);
+  /** 「模型」屏最上面那一行：读图现在用谁 ✓，点开换 / 测 ✓。 */
+  const visionRow = (d) => {
+    const v = vTarget(d);
+    const row = mkel('div', 'mrow vrow');
+    row.appendChild(mkel('span', 'mk', '◉'));
+    const mid = mkel('div', 'mid');
+    mid.appendChild(mkel('div', 'nm', '读图'));
+    mid.appendChild(mkel('div', 'sub', v.id ? (v.name + ' · ' + v.model) : '还没配'));
+    row.appendChild(mid);
+    row.appendChild(mkel('span', 'vchev', '›'));
+    row.onclick = () => openVisionSheet();
+    return row;
+  };
+
+  const openVisionSheet = async () => {
+    if (MODELS) renderVisionSheet(MODELS);
+    else {
+      const panel = $('#sheetPanel');
+      panel.textContent = '';
+      panel.appendChild(mHint('正在读…'));
+      openSheet();
+    }
     let d;
     try { d = await api('/models/configs'); }
     catch (e) {
-      if (MODELS) { toast('读不到最新的读图设置：' + ((e && e.message) || e)); return; }
-      body.textContent = '';
-      body.appendChild(mHint('读不到模型池：' + ((e && e.message) || e), true));
+      if (!MODELS) toast('读不到模型池：' + ((e && e.message) || e));
       return;
     }
-    MODELS = d; paintVision(d); paintVisionRow();
+    MODELS = d;
+    paintModels(d);
+    if ($('#vSheet')) renderVisionSheet(d);
   };
 
-  const setVision = async (cid, model) => {
-    let r;
+  /** 点一个模型：**没验过的先当场验** ✓（内置红蓝图 ✓）；过了才让它当读图 ✓。
+   *  ⚠️ 验不过就**停在这儿** ✓ —— 不写 `vision` ✓（后端也不收 ✓）。 */
+  const pickVision = async (c, m, key) => {
+    if (vBusy || vVerifying) return;
+    if (m.img !== true) {
+      vVerifying = key; vRes = null;
+      renderVisionSheet(MODELS);
+      let pass = false, why = '', verdict = null;
+      try {
+        const fd = new FormData();
+        fd.append('cid', c.id);
+        fd.append('model', m.id);
+        const r = await fetch('/api/models/vision/test',
+          { method: 'POST', body: fd, credentials: 'same-origin' });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || ('验不了 ' + r.status));
+        verdict = d.verified;
+        pass = verdict === true;
+        why = (d.result && (d.result.error || d.result.text)) || '';
+      } catch (e) { why = (e && e.message) || '没验成'; }
+      vVerifying = '';
+      if (!pass) {
+        // ⚠️ **判不了 ≠ 读不了** ✗→✓：429 / 超时 / 连不上这一趟说明不了什么 ✓，
+        //    别拿它给模型下结论 ✓（后端的 `img` 也没动 ✓）。
+        const brief = why ? '（' + String(why).split('\n')[0].slice(0, 40) + '）' : '';
+        toast(verdict === false ? ('「' + m.id + '」读不了图' + brief)
+                                : ('「' + m.id + '」没验成' + brief));
+        await refreshModelPool();
+        return;
+      }
+    }
     try {
-      r = await api('/models/vision', { method: 'POST', body: JSON.stringify({ cid, model }) });
-    } catch (e) { toast((e && e.message) || '换不了'); return; }
-    if (MODELS) MODELS.vision = (r && r.vision) || MODELS.vision;
-    vRes = null;
-    toast(cid
-      ? '读图换成「' + ((r && r.vision && r.vision.model) || model) + '」，下一张图生效'
-      : '读图改成跟着聊天模型走，下一张图生效');
-    paintVision(MODELS); paintVisionRow();
+      const r = await api('/models/vision',
+        { method: 'POST', body: JSON.stringify({ cid: c.id, model: m.id }) });
+      if (MODELS) MODELS.vision = (r && r.vision) || MODELS.vision;
+      toast('读图 → ' + m.id);
+    } catch (e) { toast((e && e.message) || '换不了'); }
+    await refreshModelPool();
   };
 
   const runVisionTest = async () => {
     const t = vTarget(MODELS);
     if (!t.id || !t.model) { toast('先配一个模型'); return; }
-    vBusy = true; vRes = null; paintVision(MODELS);
+    vBusy = true; vRes = null;
+    renderVisionSheet(MODELS);
     try {
       const fd = new FormData();
       fd.append('cid', t.id);
@@ -666,136 +709,97 @@
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.detail || ('测试失败 ' + r.status));
       vRes = d;
+      // 内置图那一发会顺手验一次资格 ✓ —— 刷一下池子里的标记 ✓
+      if (d.verified !== null && d.verified !== undefined) await refreshModelPool();
     } catch (e) {
       vRes = { ok: false, error: (e && e.message) || '没测成' };
     } finally {
-      vBusy = false; paintVision(MODELS);
+      vBusy = false;
+      if ($('#vSheet')) renderVisionSheet(MODELS);
     }
   };
 
-  const paintVision = (d) => {
-    const body = $('#visionBody'); if (!body) return;
-    body.textContent = '';
-    if (!d || !Array.isArray(d.configs)) { body.appendChild(mHint('正在读…')); return; }
-    if (!d.configs.length) {
-      body.appendChild(mHint('还没有模型。先去「设置 → 模型」加一套。'));
-      return;
-    }
+  const renderVisionSheet = (d) => {
+    const panel = $('#sheetPanel');
+    if (!panel) return;
+    panel.textContent = '';
+    const wrap = mkel('div');
+    wrap.id = 'vSheet';
+    panel.appendChild(wrap);
+    wrap.appendChild(mkel('h3', null, '读图模型'));
+    if (!d || !Array.isArray(d.configs)) { wrap.appendChild(mHint('正在读…')); return; }
+    if (!d.configs.length) { wrap.appendChild(mHint('还没有模型。')); return; }
     const t = vTarget(d);
+    wrap.appendChild(mkel('div', 'vnow',
+      t.id ? (t.name + ' · ' + t.model) : '还没配'));
 
-    // ── 现在用的 ──
-    body.appendChild(mkel('div', 'vsec', '现在用的'));
-    const now = mkel('div', 'vcard vnow');
-    now.appendChild(mkel('div', 'vnm',
-      t.id ? (t.name + ' · ' + t.model) : '还没有可用的模型'));
-    if (t.id && !t.set) {
-      now.appendChild(mkel('div', 'vtip', '没单独配 —— 现在跟着聊天模型走。'));
-    }
-    if (t.set) {
-      const back = mBtn('改成跟着聊天模型走', '', () => setVision('', ''));
-      back.disabled = vBusy;
-      now.appendChild(back);
-    }
-    body.appendChild(now);
-
-    // ── 换成哪一个 ──（每一套一个卡片 ✓，模型名一行一个 ✓）
-    body.appendChild(mkel('div', 'vsec', '换成哪一个'));
+    // ── 候选：验过的直接点 ✓；没验过的点一下先验 ✓ ──
     d.configs.forEach(c => {
-      const card = mkel('div', 'vcard');
-      const hd = mkel('div', 'vhd');
-      hd.appendChild(mkel('span', 'vnm', c.name || '(没名字)'));
-      if (activeId(d) === c.id) hd.appendChild(mkel('span', 'vtag', '聊天在用'));
-      card.appendChild(hd);
       const ms = vModelsOf(c);
-      if (!ms.length) card.appendChild(mkel('div', 'vtip', '这一套还没填模型名。'));
+      if (!ms.length) return;
+      wrap.appendChild(mkel('div', 'vgh', c.name || '(没名字)'));
       ms.forEach(m => {
         const on = t.set && t.id === c.id && t.model === m.id;
-        const row = mkel('button', 'vm' + (on ? ' on' : ''));
+        const key = c.id + '|' + m.id;
+        const row = mkel('button', 'vr' + (on ? ' on' : ''));
         row.type = 'button';
         row.appendChild(mkel('span', 'vdot', on ? '●' : '○'));
-        const mid = mkel('div', 'vmid');
-        mid.appendChild(mkel('div', 'vname', m.id));
-        const sub = fmtCtx(m.ctx);
-        if (sub) mid.appendChild(mkel('div', 'vsub', sub));
-        row.appendChild(mid);
+        row.appendChild(mkel('span', 'vname', m.id));
         if (on) row.appendChild(mkel('span', 'vok', '使用中'));
-        row.onclick = on ? null : () => setVision(c.id, m.id);
-        card.appendChild(row);
+        else if (vVerifying === key) row.appendChild(mkel('span', 'vverify', '…'));
+        else if (m.img === true) row.appendChild(mkel('span', 'vtick', '✓'));
+        else row.appendChild(mkel('span', 'vverify', '验'));
+        row.disabled = vBusy || !!vVerifying;
+        row.onclick = () => pickVision(c, m, key);
+        wrap.appendChild(row);
       });
-      body.appendChild(card);
     });
 
-    // ── 测一张图 ──
-    body.appendChild(mkel('div', 'vsec', '测一张图'));
-    const tc = mkel('div', 'vcard');
-    tc.appendChild(mkel('div', 'vnm',
-      t.id ? ('用 ' + t.name + ' · ' + t.model) : '还没有可用的模型'));
-
-    const prev = mkel('div', 'vprev');
-    if (vFileUrl) {
-      const img = document.createElement('img');
-      img.src = vFileUrl; img.alt = '测试图';
-      prev.appendChild(img);
-    } else {
-      prev.appendChild(mkel('div', 'vswatch'));
-      prev.appendChild(mkel('div', 'vptip', '内置测试图（上红下蓝）'));
-    }
-    tc.appendChild(prev);
-
-    const acts = mkel('div', 'vacts');
+    // ── 测一张图（用现在这一档 ✓；不选图就用内置红蓝图 ✓）──
+    wrap.appendChild(mkel('div', 'vhr'));
+    if (!t.id) { wrap.appendChild(mHint('先选一个能读图的模型。')); return; }
+    const line = mkel('div', 'vtline');
     const pick = mBtn(vFile ? '换一张图' : '选一张图', '', () => {
       if (!vBusy) $('#fileVision').click();
     });
     pick.disabled = vBusy;
-    acts.appendChild(pick);
+    line.appendChild(pick);
     if (vFile) {
-      const clr = mBtn('去掉这张', '', () => setVisionFile(null));
+      const clr = mBtn('去掉', '', () => setVisionFile(null));
       clr.disabled = vBusy;
-      acts.appendChild(clr);
+      line.appendChild(clr);
     }
-    tc.appendChild(acts);
+    wrap.appendChild(line);
 
-    tc.appendChild(mkel('div', 'vlab', '让它描述什么（留空用默认）'));
     const inp = mkel('input', 'field vprompt');
     inp.type = 'text';
     inp.value = vPrompt;
     inp.maxLength = 500;
-    inp.placeholder = vFile ? '描述这张图片。' : '这张图从上到下分别是什么颜色？';
+    inp.placeholder = vFile ? '想让它做什么（可留空）' : '不选图就用内置红蓝图';
     inp.oninput = () => { vPrompt = inp.value; };
-    tc.appendChild(inp);
+    wrap.appendChild(inp);
 
     const go = mBtn(vBusy ? '正在问…' : '测一下', 'pri', () => {
       if (!vBusy) runVisionTest();
     });
     go.disabled = vBusy || !t.id;
-    tc.appendChild(go);
+    wrap.appendChild(go);
 
-    if (vBusy) {
-      tc.appendChild(mkel('div', 'vtip', '正在发给上游 —— 会思考的模型可能要想十几秒。'));
-    } else if (vRes) {
+    if (vRes) {
       const r = vRes, res = r.result || {};
       const box = mkel('div', 'vres' + (r.ok ? '' : ' bad'));
       box.textContent = r.ok
         ? ((res.text) || '(它回了个空)')
         : ('没测成：' + (r.error || res.error || '不知道'));
-      tc.appendChild(box);
-      // ⚠️ `image_tokens` 是**唯一能证明图真进去了**的数 ✓ ——
-      //    有的上游会把 `image_url` 悄悄丢掉、照样回一句"看到了" ✓。
-      const meta = ['「' + (r.name || '') + ' · ' + (r.model || '') + '」'];
-      if (res.ms) meta.push((res.ms / 1000).toFixed(1) + 's');
+      wrap.appendChild(box);
+      // `image_tokens === 0` 是**图没送进去**的硬证据 ✓（上游不报时是 null ✓，不冤枉它 ✓）
       const it = res.usage ? res.usage.image_tokens : null;
-      meta.push(it == null ? '上游没报图 token' : ('图 token ' + it));
-      if (r.builtin) meta.push('内置图');
-      if (res.finish) meta.push('finish=' + res.finish);
-      tc.appendChild(mkel('div', 'vmeta', meta.join(' · ')));
       if (r.ok && it === 0) {
-        tc.appendChild(mkel('div', 'vwarn', '图 token 是 0 —— 上游很可能把图丢了，它没真的看见。'));
+        wrap.appendChild(mkel('div', 'vbad', '图 token 是 0 —— 图很可能没送进去。'));
       }
     }
-    body.appendChild(tc);
   };
 
-  $('#visionBack').onclick = () => popScreen('visionSet');
   // 选完清空 input ✓ —— 同一张图再选一次才会再触发 `change` ✓（和背景那张一个坑 ✓）。
   $('#fileVision').onchange = (e) => {
     const f = e.target.files && e.target.files[0];
@@ -838,10 +842,6 @@
     //   藏入口只是体验 ✓，闸门在服务端（`/api/models/*` 的 `require_admin` ✓）。
     const rm = $('#rowModels');
     if (rm) rm.style.display = (me && me.is_admin) ? '' : 'none';
-    // ★ 2026-10-23：「读图模型」—— 和「模型」一样只给管理员 ✓（闸门在服务端 ✓）。
-    const rv = $('#rowVision');
-    if (rv) rv.style.display = (me && me.is_admin) ? '' : 'none';
-    if (me && me.is_admin) loadVisionRow();
   };
   const promptText = (title, value, hint, onOk) => {
     const p = $('#sheetPanel');
@@ -1034,8 +1034,6 @@
       else if (act === 'shell') openMe();
       // ★ 2026-10-11：「模型」—— 只对管理员显示 ✓（那一行在 renderSettings 里控制 ✓）
       else if (act === 'models') openModels();
-      // ★ 2026-10-23：「读图模型」—— 同上，只对管理员显示 ✓
-      else if (act === 'vision') openVisionSet();
       // ⚠️ 原来这里有一条 `act === 'plugins' → openComponents()` ✗→✓ ——
       //    它是条**死路**：设置里那一行 DOM 早就被拿掉了 ✓（用户"后续我自有安排"✓），
       //    所以那个分支永远不会被触发 ✓，只会让人以为"有个组件入口在设置里" ✗。
@@ -1477,7 +1475,7 @@
   //:    上左滑也会把收纳页推上来 ✗✓（用户看到的就是"到处都能滑出来" ✓）。
   //:    判据改成"**最上面那一屏**是不是这三屏之一" ✓。
   const _OTHER_SCREENS = [
-    '#settings', '#bgSet', '#themeSet', '#visionSet', '#me', '#meAccount', '#space',
+    '#settings', '#bgSet', '#themeSet', '#me', '#meAccount', '#space',
     '#peer', '#selfIntro', '#agent', '#agentEdit', '#login', '#init',
   ];
 

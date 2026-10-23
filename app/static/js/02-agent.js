@@ -504,10 +504,8 @@
     //   ⚠️ 没这一支的话，在主题页按返回会**隔着它把设置关掉** ✓
     //      （屏幕不动、人退到了群聊 ✓ —— 见 `android-back-key-only-knows-settings` ✓）。
     if ($('#themeSet').classList.contains('on')) { popScreen('themeSet'); return; }
-    // ★ **读图模型**（2026-10-23）—— 同样从设置页推出来 ✓，排在设置之前 ✓。
-    //   ⚠️ 没这一支的话，在这一屏按返回会隔着它把设置关掉 ✓（见
-    //      `android-back-key-only-knows-settings` ✓）。
-    if ($('#visionSet').classList.contains('on')) { popScreen('visionSet'); return; }
+    // ★ 2026-10-23：读图不再是整屏子页 ✓ —— 它现在在 `#models` 里开半屏板子 ✓，
+    //   返回键走上面那支 `#sheet` ✓（`closeSheet` ✓）。
     if ($('#models').classList.contains('on')) { popScreen('models'); return; }
     if ($('#settings').classList.contains('on')) { closeSettings(); return; }
     // ⚠️ `#login` / `#init` **刻意不列在这儿** ✗ —— 它们是**根屏** ✓：

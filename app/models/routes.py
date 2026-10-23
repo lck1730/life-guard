@@ -180,9 +180,51 @@ class VisionIn(BaseModel):
     model: str = ""
 
 
+def _row_of(c: dict, model: str) -> dict | None:
+    """这一套里那个模型名的清单行 ✓（老数据可能是字符串 ✓，也认 ✓）。"""
+    for r in c.get("models") or []:
+        if isinstance(r, dict) and r.get("id") == model:
+            return r
+    return None
+
+
+def _mark_img(d: dict, cid: str, model: str, ok: bool) -> None:
+    """把「这个模型真能读图」的结论记在**清单那一行**上 ✓。
+
+    ⚠️ 记在模型行、不记在 `vision` 槽上 ✗ —— `vision` 是"现在用谁" ✓，
+       这个标记是"它够不够格进候选" ✓，换一个用不该把别的模型的结论抹掉 ✓。
+    """
+    c = next((x for x in d.get("configs") or [] if x.get("id") == cid), None)
+    if not c:
+        return
+    rows = c.setdefault("models", [])
+    row = _row_of(c, model)
+    if row is None:
+        row = {"id": model[:200], "ctx": int(c.get("context") or 0),
+               "ok": None, "at": 0, "msg": ""}
+        rows.insert(0, row)
+    row["img"] = bool(ok)
+    row["img_at"] = int(time.time())
+
+
+def _colors_ok(text: str) -> bool:
+    """内置那张**上红下蓝**的图，答对了两块颜色才算真的看见 ✓。
+
+    ⚠️ 只看 `ok` 不够 ✗ —— 有的模型把图丢掉、照样回一句"我看到了" ✓；
+       `image_tokens` 也不是每家都报 ✓（商汤就不报 ✓）。
+       红/蓝是**固定答案** ✓，蒙对两块的概率很低 ✓。
+    """
+    t = (text or "").lower()
+    return (("红" in t) or ("red" in t)) and (("蓝" in t) or ("blue" in t))
+
+
 @router.post("/vision", dependencies=[Depends(require_admin)])
 async def set_vision(body: VisionIn) -> dict:
-    """把读图指到「某一套的某个模型」✓；两个都空 = 取消单独配（跟着聊天模型走）✓。"""
+    """把读图指到「某一套的某个模型」✓；两个都空 = 取消单独配（跟着聊天模型走）✓。
+
+    ★ **只收验过的** ✓（用户 2026-10-23：「要真的能读图的才能进」✓）——
+      `img` 是之前拿内置红蓝图当场问出来的结论 ✓，不是按名字猜的 ✓。
+    """
     cid = (body.cid or "").strip()
     model = (body.model or "").strip()
     d = store.load()
@@ -196,6 +238,10 @@ async def set_vision(body: VisionIn) -> dict:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "池子里没有这一套")
     if not model:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "得选一个模型名")
+    row = _row_of(c, model)
+    if not (row and row.get("img") is True):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            f"「{model}」还没验过能读图 —— 先让它看一次内置那张")
     d[store.VISION] = {"cid": cid, "model": model[:200], "at": int(time.time())}
     store.save(d)
     log.info("读图 → %s · %s", c.get("name"), model)
@@ -282,13 +328,38 @@ async def vision_test(cid: str = Form(""), model: str = Form(""),
     else:
         image, mime = _builtin_png(), "image/png"
 
-    p = (prompt or "").strip()[:500] or (
-        "这张图从上到下分别是什么颜色？" if builtin else "描述这张图片。")
+    up = (prompt or "").strip()[:500]
+    p = up or ("这张图从上到下分别是什么颜色？只答颜色。" if builtin else "描述这张图片。")
+
+    # ★ 只有「内置图 + 没改问题」这一种才当场判合格 ✓ —— 换了问题 / 换成
+    #   用户的照片就判不了对错 ✓（照片里有什么我们不知道 ✓），那种只回结果、
+    #   不写 `img` 标记 ✓（别拿一次说明不了什么的测试给模型盖章 ✗）。
+    verify = builtin and not up
 
     res = await asyncio.to_thread(probe.vision_test, c, m, image, mime, p)
+    verified = None
+    if verify:
+        # ⚠️ **只有上游真的回了话才判** ✓（哪怕回的是空话）——
+        #    429 / 403 / 超时 / 连不上只说明"这一趟没测成" ✓，
+        #    拿它盖章"读不了图"是**假阴性** ✗（实测撞过：429 把
+        #    deepseek-v4-flash 盖成了"读不了" ✓，之前它还回过话 ✓）。
+        #    判不了就**保持原样** ✓（`img` 不清、不写 ✓），下次再验 ✓。
+        if "finish" in res:
+            verified = bool(res.get("ok")) and _colors_ok(res.get("text") or "")
+            try:
+                d2 = store.load()      # 测的这几秒里池子可能被改过 ✓，重读再写 ✓
+                _mark_img(d2, c["id"], m, verified)
+                store.save(d2)
+            except Exception as e:  # noqa: BLE001
+                log.warning("读图结论没记上（%s）：%s", m, e)
+            log.info("读图验「%s · %s」→ %s", c.get("name"), m,
+                     "能读" if verified else "读不了")
+        else:
+            log.info("读图验「%s · %s」没测成（这趟说明不了会不会看图）：%s",
+                     c.get("name"), m, str(res.get("error") or "")[:120])
     return {"ok": bool(res.get("ok")), "result": res,
             "name": c.get("name") or "", "model": m,
-            "prompt": p, "builtin": builtin}
+            "prompt": p, "builtin": builtin, "verified": verified}
 
 
 # ── 写 ────────────────────────────────────────────────────────────────
@@ -334,10 +405,15 @@ def _rows(inp: list[dict] | None) -> list[dict]:
         except (TypeError, ValueError):
             ctx = 0
         ok = r.get("ok")
+        img = r.get("img")
         out.append({"id": mid[:200], "ctx": ctx,
                     "ok": ok if isinstance(ok, bool) else None,
                     "at": float(r.get("at") or 0),
-                    "msg": str(r.get("msg") or "")[:300]})
+                    "msg": str(r.get("msg") or "")[:300],
+                    # ★ 读图资格一起留着 ✓ —— 编辑表单把整份清单交回来 ✓，
+                    #   这里不认它的话，改个名字就把"验过能读图"抹了 ✗。
+                    "img": img if isinstance(img, bool) else None,
+                    "img_at": float(r.get("img_at") or 0)})
         if len(out) >= 50:
             break
     return out
@@ -348,7 +424,7 @@ def _with_current(cfg: dict) -> list[dict]:
     rows = cfg.get("models") or []
     if cfg.get("model") and not any(r.get("id") == cfg["model"] for r in rows):
         rows = [{"id": cfg["model"], "ctx": int(cfg.get("context") or 0),
-                 "ok": None, "at": 0, "msg": ""}] + rows
+                 "ok": None, "at": 0, "msg": "", "img": None, "img_at": 0}] + rows
     return rows
 
 
@@ -382,6 +458,7 @@ async def edit_config(cid: str, body: ConfigIn) -> dict:
     c = next((x for x in d["configs"] if x["id"] == cid), None)
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "没有这一套")
+    old_base = str(c.get("base_url") or "")
     for k in ("name", "base_url", "model", "api_key"):
         v = getattr(body, k)
         if v:
@@ -391,6 +468,11 @@ async def edit_config(cid: str, body: ConfigIn) -> dict:
         c["context"] = ctx
     if body.models is not None:
         c["models"] = _rows(body.models)
+    # 换了端点 = 换了个上游 ✓ —— 上一家的"能读图"结论不作数 ✓（模型名可能一样）
+    if str(c.get("base_url") or "") != old_base:
+        for r in c.get("models") or []:
+            if isinstance(r, dict):
+                r["img"] = None
     c["models"] = _with_current(c)
     c["test"] = None          # 改过就得重测 ✓（旧结论不作数 ✓）
     store.save(d)

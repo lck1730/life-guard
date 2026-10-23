@@ -121,7 +121,10 @@ _VISION_TIMEOUT = 90.0
 #: 全花在 reasoning 上 ✓，`content` 是空的 ✓，看起来像"收不下图" ✗；
 #: 给 200 就正常答"红色" ✓）。空回复的下场和"模型不收图"一模一样 ✓，
 #: 所以宁可多给一点 ✓。
-_VISION_MAX_TOKENS = 500
+#: ★ 2026-10-23 再抬到 1500：商汤 flash-lite 是**会思考的** ✓，500 偶尔被
+#:   reasoning 吃光（同一道题一会儿"红色，蓝色"、一会儿空 ✓）。
+#:   **空回复 = 判成读不了图** ✗ —— 假阴性会把好模型挡在门外 ✗。
+_VISION_MAX_TOKENS = 1500
 
 
 def vision_test(cfg: dict, model: str, image: bytes, mime: str, prompt: str) -> dict:
@@ -143,16 +146,22 @@ def vision_test(cfg: dict, model: str, image: bytes, mime: str, prompt: str) -> 
             {"type": "image_url",
              "image_url": {"url": f"data:{mime};base64,{b64}"}},
         ]}],
-        "max_tokens": _VISION_MAX_TOKENS,
         "stream": False,
     }
     url = (cfg.get("base_url") or "").rstrip("/") + "/chat/completions"
+    headers = {"Authorization": f"Bearer {cfg.get('api_key') or ''}"}
     _say(f"正在用「{cfg.get('name') or ''}」· {model} 看图…")
+
+    def ask(limit: int) -> tuple[dict, int]:
+        b = {**body, "max_tokens": limit}
+        t0 = time.time()
+        r = httpx.post(url, json=b, timeout=_VISION_TIMEOUT, headers=headers)
+        return r, int((time.time() - t0) * 1000)
+
     t0 = time.time()
     try:
-        r = httpx.post(url, json=body, timeout=_VISION_TIMEOUT,
-                       headers={"Authorization": f"Bearer {cfg.get('api_key') or ''}"})
-        ms = int((time.time() - t0) * 1000)
+        limit = _VISION_MAX_TOKENS
+        r, ms = ask(limit)
         if r.status_code >= 400:
             _say(f"看图失败：HTTP {r.status_code}")
             return {"ok": False, "ms": ms,
@@ -161,6 +170,20 @@ def vision_test(cfg: dict, model: str, image: bytes, mime: str, prompt: str) -> 
         ch = (d.get("choices") or [{}])[0] or {}
         msg = ch.get("message") or {}
         text = str(msg.get("content") or "").strip()
+        # ★ 额度被思考吃光（finish=length、一个字没回）→ **再给一次更大的额度** ✓。
+        #   不重试的话，一个会思考、真能读图的模型会被判成"读不了" ✗（假阴性 ✗）。
+        if not text and ch.get("finish_reason") == "length":
+            _say(f"额度花在思考上了，放大了再问一次…（{ms} ms）")
+            limit = min(limit * 2, 4000)
+            r, ms = ask(limit)
+            if r.status_code >= 400:
+                _say(f"看图失败：HTTP {r.status_code}")
+                return {"ok": False, "ms": ms,
+                        "error": f"HTTP {r.status_code}: {r.text[:400]}"}
+            d = r.json()
+            ch = (d.get("choices") or [{}])[0] or {}
+            msg = ch.get("message") or {}
+            text = str(msg.get("content") or "").strip()
         usage = d.get("usage") or {}
         img_tok = ((usage.get("prompt_tokens_details") or {}).get("image_tokens"))
         out = {"ok": True, "ms": ms, "text": text,
@@ -168,6 +191,7 @@ def vision_test(cfg: dict, model: str, image: bytes, mime: str, prompt: str) -> 
                "usage": {"prompt": usage.get("prompt_tokens"),
                          "completion": usage.get("completion_tokens"),
                          "image_tokens": img_tok},
+               "tokens": limit,
                "reasoning": str(msg.get("reasoning_content") or "")[:200]}
         if not text:
             # 空回复**不算成功** ✓ —— 和"模型不收图"长得一样，含糊过去等于没测 ✓。
