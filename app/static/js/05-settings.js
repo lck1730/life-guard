@@ -54,19 +54,42 @@
     } catch (e) { toast('模型换了，但上下文没排上队'); }
   };
 
-  /** 把一份名单画出来 ✓（`renderModels` 的两条路——先画缓存 / 刷新后重画——共用）。 */
+  /** 极客风分块标题 ✓ —— `01 // 文本 · 模型池 ────── [4]`。
+   *  用户 2026-10-23：「模型界面两块，一个文本，一个图像。用极客//风格分块」✓。
+   *  `idx` = 序号 ✓，`meta` = 右边那枚状态/计数牌 ✓（`[4]` / `[ON]` ✓）。 */
+  const mHead = (idx, title, sub, meta, on) => {
+    const h = mkel('div', 'mhead');
+    h.appendChild(mkel('span', 'mh-i', idx));
+    h.appendChild(mkel('span', 'mh-t', '// ' + title + ' · ' + sub));
+    h.appendChild(mkel('span', 'mh-rule'));
+    h.appendChild(mkel('span', 'mh-m' + (on ? ' on' : ''), meta));
+    return h;
+  };
+
+  /** 把一份名单画出来 ✓（`renderModels` 的两条路——先画缓存 / 刷新后重画——共用）。
+   *  ★ 2026-10-23：**分成两块** ✓ —— 文本 = 模型池 ✓，图像 = 读图模型 ✓。
+   *    两块**永远都在** ✓：池子空着也一样 ✓（否则读图那一块会跟着"消失" ✗，
+   *    用户看着像坏了 ✓）。 */
   const paintModels = (d) => {
     const body = $('#modelsBody');
     if (!body) return;
     body.textContent = '';
     const on = activeId(d);
     const list = (d && Array.isArray(d.configs)) ? d.configs : [];
+    const v = vTarget(d);
+
+    // ── 01 文本 · 模型池 ──
+    body.appendChild(mHead('01', '文本', '模型池', '[' + list.length + ']'));
     if (!list.length) {
       body.appendChild(mHint('还没有模型。点右上角「＋」加一套。'));
-      return;
+    } else {
+      list.forEach(c => body.appendChild(mRow(c, c.id === on)));
     }
-    list.forEach(c => body.appendChild(mRow(c, c.id === on)));
-    // ★ 2026-10-23：读图并进这一屏 ✓ —— **放在名单下面**（用户：「入口放在模型页的下方」✓）
+
+    // ── 02 图像 · 读图模型 ──
+    // ★ 2026-10-23：读图并进这一屏 ✓ —— 原先放在名单下面 ✓，现在自成一块 ✓。
+    body.appendChild(mHead('02', '图像', '读图模型',
+      v.id ? '[ON]' : '[--]', !!v.id));
     body.appendChild(visionRow(d));
   };
 
@@ -690,14 +713,19 @@
     if ($('#vSheet')) renderVisionSheet(d);
   };
 
-  /** 「模型」屏最下面那一行：读图现在用谁 ✓，点开换 / 测 ✓。 */
+  /** 「图像」那一块里的一行：读图现在用谁 ✓，点开换 / 测 ✓。
+   *  ★ 2026-10-23：标题已经写在块头上（`// 图像 · 读图模型` ✓），这一行就不再
+   *    重复「读图」两个字 ✓ —— 直接报“现在用谁” ✓。没单独配时点一句
+   *    「跟着聊天」✓，不然他会以为这块没生效 ✓。 */
   const visionRow = (d) => {
     const v = vTarget(d);
     const row = mkel('div', 'mrow vrow');
     row.appendChild(mkel('span', 'mk', '◉'));
     const mid = mkel('div', 'mid');
-    mid.appendChild(mkel('div', 'nm', '读图'));
-    mid.appendChild(mkel('div', 'sub', v.id ? (v.name + ' · ' + v.model) : '还没配'));
+    mid.appendChild(mkel('div', 'nm', v.id ? v.name : '还没配'));
+    mid.appendChild(mkel('div', 'sub', v.id
+      ? (v.model + (v.set ? '' : ' · 跟着聊天'))
+      : '点进去选一个能读图的'));
     row.appendChild(mid);
     row.appendChild(mkel('span', 'vchev', '›'));
     row.onclick = () => openVisionSheet();

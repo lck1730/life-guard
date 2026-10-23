@@ -1358,6 +1358,23 @@
   .msec { padding:18px 18px 8px; color:var(--agent); font-size:13px; letter-spacing:.08em;
           font-family:var(--mono); }
   .msec::before { content:"// "; color:var(--muted); }
+  /* ★ 2026-10-23 主屏分两块 ✓ —— 用户：「一个文本，一个图像。用极客//风格分块」✓。
+     块头长这样 ✓：`01  // 文本 · 模型池 ────────── [4]`
+     序号小一号压暗 ✓、标题用 agent 色 ✓、中间一根细线把标题和右边那枚牌子
+     撑开 ✓（就是终端里注释分栏那个味道 ✓）。 */
+  #models .mhead { display:flex; align-items:center; gap:9px;
+                   padding:20px 18px 9px; font-family:var(--mono); }
+  #models .mhead .mh-i { flex:none; color:var(--muted); font-size:10px;
+                         letter-spacing:.08em; opacity:.7; }
+  #models .mhead .mh-t { flex:none; color:var(--agent); font-size:13px;
+                         font-weight:600; letter-spacing:.03em; }
+  #models .mhead .mh-rule { flex:1; min-width:10px; height:1px;
+                            background:var(--line); }
+  #models .mhead .mh-m { flex:none; color:var(--muted); font-size:10.5px;
+                         letter-spacing:.06em; }
+  #models .mhead .mh-m.on { color:var(--accent); }
+  /* 第一块紧着页头 ✓ —— 别在「模型」标题下面空出一大截 */
+  #models .mhead:first-child { padding-top:14px; }
   .mhint { padding:10px 18px; color:var(--muted); font-size:13px; line-height:1.75;
            font-family:var(--mono); }
   .mhint::before { content:"# "; opacity:.6; }
