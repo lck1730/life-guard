@@ -8,7 +8,7 @@
   // ⚠️ 这一屏只由「设置 → 模型」进入；闸门在服务端 require_admin。
   let MODELS = null;
   // 03 用量与签到（魔搭）✓ —— 上一次查到的余额/签到、没查到的原因、正在查 ✓
-  let MAGIC = null, MAGIC_ERR = '', MAGIC_LOADING = false;
+  let MAGIC = null, MAGIC_ERR = '', MAGIC_LOADING = false, MAGIC_TS = 0;
 
   const openModels = () => { pushScreen('models', 'settings'); renderModels(); };
 
@@ -827,9 +827,21 @@
       MAGIC_ERR = '没查到：' + ((e && e.message) || '网络没通');
     } finally {
       MAGIC_LOADING = false;
+      MAGIC_TS = Date.now();
       paintMagic();
     }
   };
+
+  // ★ 2026-10-23：点「跳转」去系统浏览器，回来时页面重新可见 ✓ ——
+  //   这里自动补查一次 ✓（用户就真的只要点「跳转」✓）；15 秒内不重复查 ✓。
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!MAGIC_TS || Date.now() - MAGIC_TS < 15000) return;
+      if (!$('#mgWrap')) return;          // 不在模型这一屏就别查 ✓
+      loadMagicube(true);
+    });
+  }
 
   const openVisionSheet = async () => {
     // ⚠️ **`openSheet()` 一定要在两条路都走到的地方** ✗→✓（2026-10-23）——
