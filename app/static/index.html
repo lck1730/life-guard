@@ -375,6 +375,26 @@
   </div>
 </div>
 
+<!-- ★ 2026-10-19：**聊天背景设置** —— 设置页「聊天背景」那一行进这里 ✓。
+     ⚠️ 它是一屏整屏子页 ✓ → **报给原生的屏名必须是 `'settings'`** ✗——
+        靠的是 `_OTHER_SCREENS` 里列上 `#bgSet` ✓（`tellTop` 会现算 ✓），
+        并在 `__goBack` 里加一支 ✓。漏一处，第一次返回什么都不发生、
+        第二次直接退 App ✗（见 `android-back-key-only-knows-settings` ✓）。 -->
+<div class="screen ascreen" id="bgSet">
+  <header class="sub">
+    <button class="icon-btn back" id="bgBack" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 4.5 8.5 12 15 19.5" />
+      </svg>
+    </button>
+    <h2>聊天背景</h2>
+    <div class="spacer"></div>
+  </header>
+  <div class="abody" id="bgBody"></div>
+</div>
+
 <!-- ★ 2026-10-19：**主题设置** —— 设置页「主题」那一行进这里 ✓。
      ⚠️ 和 `#bgSet` 一样是一屏整屏子页 ✓ → 必须列进 `_OTHER_SCREENS` ✓、
         并在 `__goBack` 里加一支 ✓，否则安卓返回键第一下没反应 ✗
