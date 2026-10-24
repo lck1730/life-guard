@@ -39,9 +39,9 @@
       b.onclick = () => openStateScreen(k);
       rows1.push(b);
     });
-    m.appendChild(secG('状态显示', rows1));
+    m.appendChild(secG(null, rows1));
 
-    m.appendChild(secG('性格', [promptBlock()]));
+    m.appendChild(secG(null, [promptBlock()]));
   };
 
   // ── 性格：**直奔一个文本框** ✓（用户："不要给管家的话，直接一个文本框" ✓）──

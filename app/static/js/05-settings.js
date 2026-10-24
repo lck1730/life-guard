@@ -395,13 +395,9 @@
     //    又要把 5.6MB 原图从 WireGuard 上拉一遍 ✓（预览只要看得见就行 ✓）。
     const prev = document.createElement('div');
     prev.className = 'bgprev';
-    if (url) {
-      prev.style.backgroundImage =
-        `url("${(bgKey === url && bgObjUrl) ? bgObjUrl : url}")`;
-      // ★ 2026-10-24：左下角一枚小胶囊「当前背景」✓ —— 预览框自己是空的画面 ✓，
-      //   不写一句就看不出"这就是现在用的那张"✓（`.bgtag` ✓，见 app.css）。
-      prev.appendChild(mkel('span', 'bgtag', '当前背景'));
-    } else {
+    if (url) prev.style.backgroundImage =
+      `url("${(bgKey === url && bgObjUrl) ? bgObjUrl : url}")`;
+    else {
       const none = document.createElement('span');
       none.className = 'bgempty';
       none.textContent = bgBusy ? '正在上传…' : '还没有设置背景';
@@ -409,29 +405,22 @@
     }
     body.appendChild(prev);
 
-    // ★ 2026-10-24：两颗按钮**并排** ✓（原来上下各一颗、一样宽 ✓,
-    //   「移除」和「换一张」一样重，看着像同等重要的两个动作 ✗）——
-    //   「换一张」是主 ✓（实心 ✓）、「移除」是次 ✓（描边红字 ✓）。
-    //   ⚠️ 只有**一张图**时，「换一张」才收成一半宽 ✓；没有背景时它通栏 ✓。
-    const acts = mkel('div', 'bgacts');
     const pick = document.createElement('button');
     pick.className = 'bgbtn';
+    pick.textContent = url ? '换一张图片' : '选择图片';
     pick.disabled = bgBusy;
-    pick.appendChild(ico('image'));
-    pick.appendChild(document.createTextNode(url ? '换一张图片' : '选择图片'));
     pick.onclick = () => { if (!bgBusy) $('#fileBg').click(); };
-    acts.appendChild(pick);
+    body.appendChild(pick);
 
     // 「移除」只在有背景时出现 ✓ —— 没背景时摆一颗红按钮只是吓人 ✓
     if (url) {
       const del = document.createElement('button');
       del.className = 'bgbtn danger';
-      del.textContent = '移除';
+      del.textContent = '移除背景';
       del.disabled = bgBusy;
       del.onclick = removeBg;
-      acts.appendChild(del);
+      body.appendChild(del);
     }
-    body.appendChild(acts);
 
     const hint = document.createElement('div');
     hint.className = 'bghint';
@@ -1427,7 +1416,7 @@
     body.appendChild(prof);
 
     // ② 账号：三行 ✓（右边那一格就是**现值** ✓ —— 一眼看全，不用点进去才知道 ✓）
-    body.appendChild(secG('账号', [
+    body.appendChild(secG(null, [
       meRow('user', '昵称', me.nickname || '', () => openMeEdit('nickname')),
       meRow('user', '用户名', me.username || '', () => openMeEdit('username')),
       // 密码那一行**右边不写值** ✓（壳那版就是空着 ✓）——
@@ -1437,25 +1426,29 @@
 
     // ③ 自我介绍 ✓（2026-10-09 用户定的 ✓）—— 和管家的「性格」**同一个形状** ✓
     //    （可收可展、三行封顶、居中的朝下箭头 ✓，见 `collapsibleText` ✓）
-    body.appendChild(secG('自我介绍', [selfIntroBlock()]));
+    body.appendChild(secG(null, [selfIntroBlock()]));
   };
 
   /** 右边那个尖 ✓（真描边 svg ✓，见 01-core.js 的 `ico` ✓）。 */
   const arrow = () => { const g = mkel('span', 'go'); g.appendChild(ico('chev')); return g; };
 
   /**
-   * ★ 2026-10-24：**一组行 = 一张卡 + 组头** ✓（原来是光秃秃的 `.grp` + 一行灰字 ✓）。
+   * ★ 2026-10-24：**一组行 = 一张卡** ✓（原来是光秃秃的 `.grp` + 一行灰字 ✓）。
    * `rows` 可以是一组 `.row` 按钮 ✓，也可以是别的东西（比如自我介绍那块 ✓）。
-   * ⚠️ 组头 `.sec-h` 是**这里加的** ✓ —— 原来 `mkel('div','sec','账号')` 那几处
-   *    全换成了它 ✓（「我的」和「管家」两屏 ✓，两屏本来就是同构的 ✓）。
+   * ⚠️ 组头（`.sec-h` + 一枚小点）**当天就被用户否了** ✗（「不要分组标题」✓）——
+   *    现在三处调用全部传 `null` ✓；`title` 参数留着 ✓，哪天真要再说 ✓。
    */
   const secG = (title, rows) => {
     const g = mkel('div', 'sec-g');
-    const h = mkel('div', 'sec-h');
-    h.append(mkel('i'), document.createTextNode(title));
+    // ⚠️ 2026-10-24 用户：「不要分组标题」✓ —— title 给 null 就只出卡片 ✓。
+    if (title) {
+      const h = mkel('div', 'sec-h');
+      h.append(mkel('i'), document.createTextNode(title));
+      g.appendChild(h);
+    }
     const card = mkel('div', 'grp gcard');
     rows.forEach(r => card.appendChild(r));
-    g.append(h, card);
+    g.appendChild(card);
     return g;
   };
 

@@ -1090,8 +1090,7 @@
     border-radius:12px; background:var(--accent); color:var(--on-accent);
     font-size:16px; font-weight:600; }
   #bgSet .bgbtn:disabled { opacity:.45; }
-  #bgSet .bgbtn.danger { flex:0 0 auto; padding-left:20px; padding-right:20px;
-    background:transparent; color:var(--danger);
+  #bgSet .bgbtn.danger { background:transparent; color:var(--danger);
     border:1px solid var(--line); }
   #bgSet .bghint { color:var(--muted); font-size:12.5px; text-align:center;
     margin-top:12px; line-height:1.5; }
@@ -1737,19 +1736,11 @@
   [data-theme="cream"], [data-theme="light"] { --glow:0 6px 18px rgba(74,58,38,.07); }
   [data-theme="forest"]                       { --glow:0 6px 18px rgba(0,0,0,.20); }
 
-  /* ── 组：组头（一枚小点 + 名字）+ 一张卡 ✓ ──────────────────────── */
+  /* ── 组 = 一张卡 ✓（2026-10-24 用户：「不要分组标题」✓ —— 组头 `.sec-h` 已全线拿掉 ✓，
+     只剩卡片和卡片之间的距离 ✓）── */
   .ascreen .sec-g { margin:0 0 18px; }
   /* 最后一个组（「退出」那张卡）底下不留 18 —— 还有 `.abody` 自己的底部留白 ✓ */
   .ascreen .sec-g:last-child { margin-bottom:0; }
-  /* ⚠️ 组头左右**跟着卡片的边**走 ✓ —— 但两种屏的"卡片边"不在同一个地方：
-       · 「我的」「管家」：`.abody` 自带 14px ✓ → 组头**不用再缩** ✓
-       · 设置页：`.abody` 是 0 ✓、卡片由 `.sec-g` 的 14px 让开 ✓ → 组头也交给它 ✓
-     所以这里**不写左右内边距** ✗（原来写了 14 ✓，在「我的」上会缩进去多一截 ✗）。 */
-  .ascreen .sec-h { display:flex; align-items:center; gap:8px;
-                    padding:2px 6px 8px; color:var(--muted);
-                    font-size:12.5px; letter-spacing:.06em; }
-  .ascreen .sec-h i { width:5px; height:5px; border-radius:50%; flex:none;
-                      background:var(--accent); opacity:.75; }
   .ascreen .grp.gcard { border-radius:var(--card-r); border:1px solid var(--line);
                         box-shadow:var(--glow); margin-bottom:0; }
   /* 退出那两行单独一张卡 ✓、中间不画分隔线 ✓ —— 它们是两个动作，不是一组数据 ✓ */
@@ -1783,7 +1774,6 @@
                        font-size:13px; font-weight:500; }
 
   /* ── 设置页（硬件勾选式：通栏卡 + 行）── */
-  #settings .body { padding-top:calc(var(--inset-top) + 28px); }
   #settings .sec-g { padding:0 14px; }
   #settings .item { min-height:56px; padding:0 14px 0 12px; gap:12px;
                     background:transparent; border-bottom:1px solid var(--line); }
@@ -1858,29 +1848,10 @@
                                       background:var(--accent-a); font-weight:600; }
   .ascreen .pfoot button:last-child:active { filter:brightness(.92); }
 
-  /* ── 聊天背景那一屏 ✓ ────────────────────────────────────────────── */
-  #bgSet .abody { padding-top:calc(var(--inset-top) + 10px); }
-  #bgSet .bgprev { border-radius:20px; box-shadow:var(--shadow-lg); position:relative; }
-  /* 预览底角一行小字：「当前背景」✓ —— 空的时候不出 ✓（`.bgempty` 自己说话 ✓） */
-  #bgSet .bgprev .bgtag { position:absolute; left:12px; bottom:12px;
-    padding:4px 10px; border-radius:999px; font-size:11.5px;
-    color:#fff; background:rgba(0,0,0,.42); backdrop-filter:blur(6px); }
-  #bgSet .bgacts { display:flex; gap:10px; margin-top:14px; }
-  #bgSet .bgbtn { display:flex; align-items:center; justify-content:center; gap:8px;
-    flex:1; min-width:0; padding:15px 10px; margin-top:0; border-radius:14px; font-size:15.5px;
-    background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 86%, #fff),
-                                        var(--accent));
-    box-shadow:0 6px 16px var(--accent-a), 0 1px 0 rgba(255,255,255,.14) inset;
-    transition:transform .12s ease, filter .12s ease; }
-  #bgSet .bgbtn:active { transform:translateY(1px); filter:brightness(.94); }
-  #bgSet .bgbtn svg { width:18px; height:18px; display:block; }
-  #bgSet .bgbtn.danger { flex:0 0 auto; padding-left:20px; padding-right:20px;
-    background:transparent; color:var(--danger);
-    border:1px solid var(--danger-soft); box-shadow:none; }
-  #bgSet .bgbtn.danger:active { background:var(--accent-a); transform:none; }
-  #bgSet .bghint { margin-top:14px; }
+  /* ⚠️ 聊天背景那一屏**不参与这次换皮** ✓（2026-10-24 用户：「聊天背景进入后的界面乱了，还原」✓）——
+     它的样式留在上面 2026-10-19 那一块 ✓，这里一条都不写 ✓。 */
 
   /* 注视点：手机上"点了没反应"是真的没反应 ✓ —— 动画只给手感 ✓ */
   @media (prefers-reduced-motion: reduce) {
-    .ascreen .btn-save:active, #bgSet .bgbtn:active { transform:none; }
+    .ascreen .btn-save:active { transform:none; }
   }
