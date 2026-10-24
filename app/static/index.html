@@ -334,90 +334,29 @@
     <div class="spacer"></div>
   </header>
   <div class="body">
-    <!-- ★ **2026-10-24 分组** ✗→✓（只动结构 · 行序一个字没改 ✓）——
-         用户：「按钮不要朴素」。原来是一整列**完全一样**的平条 ✓、
-         一条细线接一条细线 ✓ → 看着像一张表 ✓。
-         现在分成四组：账户（我的 · 空间 · 邀请码）· 外观（主题 · 聊天背景）
-         · 管家（管家 · 模型 · 检查更新）· 退出（退出当前空间 · 退出登录，两行紧挨 ✓）——
-         组是一张圆角卡 ✓、组与组之间拉开 ✓（2026-10-24 用户：不要分组标题 ✓），
-         "这一块管的是什么事"不用读字就分得出来 ✓。
-         ⚠️ 退出那两行**仍在一张卡里 ✓**（用户 2026-10-09 定的「红色字体居中在
-           退出登录上面」✓ —— 那说的是**紧挨着**✓）。
-         ⚠️ 下面那些老注释写的"行序"仍然成立 ✓ —— 组换了，组内顺序没换 ✓。 -->
+    <!-- ★★ **行序 2026-10-24 用户定的**（原话：「顺序：我的，管家，空间，主题，背景，
+         模型，邀请码，检查更新」✓）—— 八行**一张卡** ✓，退出两行仍单独一张卡 ✓。
+         ⚠️ 这条注释取代之前所有"行序"老注释 ✓（2026-10-06 / 10-08 / 10-09 那几条 ✓）——
+            顺序以**这里**为准 ✓，再改就改这里 ✓。 -->
 
     <div class="sec-g">
       <div class="grp gcard">
-    <!-- ★ **行序**（2026-10-06 用户定的）：
-           我的 · 群名称 · 群昵称 · 管家 · 邀请码 · 检查更新 · 退出登录 ✓
-         「组件」和「外观」**整个拿掉了** ✓ —— 用户说"后续我自有安排" ✓。
-         ★ 2026-10-19：「主题」**回来了** ✓ —— 用户要三套可切换的主题 ✓。
-            它推开 `#themeSet`（夜阑 / 奶霜 / 林深 ✓），选完立即生效 ✓。
-            ⚠️ 主题**只存这台设备** ✓、按用户 id 分开 ✓ ——
-               不进服务端、不进空间 ✓，群里其他人看不到也改不了 ✓。 -->
-    <!-- ★ 行序是用户 2026-10-08 定的 ✓：我的 · 生活空间 · 管家 · 检查更新 · 退出登录 ✓ -->
     <div class="item" data-act="shell"><span class="ico" data-ico="user"></span><span class="k">我的</span><span class="v" id="vMe"></span><span class="chev" data-chev></span></div>
-    <!-- ★ 「群名称」→「**生活空间**」✗→✓（2026-10-08）—— 叫法跟着 App 里的说法走 ✓
-         （用户："第二行是原先是群名称，现在改为[生活空间]，右边展示还是群名称，
-           只不过换了个叫法"✓）。
-         ⚠️ 它**点进去要去新的一屏**（`#space`：改名 / 邀请码 / 退出该空间 ✓）——
-            那一屏在 P5 做 ✓，这一版先保持"点了改个名"✓（不是死按钮 ✓）。 -->
-    <!-- ★ 「生活空间」→「**空间**」✗→✓（2026-10-09 用户定的 ✓："生活空间改名，空间" ✓）。
-         ★ **点它只改名** ✗→✓（2026-10-09 稍后用户又定的 ✓：
-           「空间的话，拆到设置里吧，**不单独进入了**，点击空间依旧**只修改空间名**」✓）——
-           原来它推开一整屏 `#space` ✓（改名 + 邀请码 + 退出 ✓），现在那三样
-           全在**这一页里** ✓（见下面两行 ✓）。`#space` 那一屏**没有入口了** ✓。 -->
-    <div class="item" data-act="gname"><span class="ico" data-ico="space"></span><span class="k">空间</span><span class="v" id="vGname"></span><span class="chev" data-chev></span></div>
-    <!-- ✅ 2026-10-09 用户定的：**邀请码排在「检查更新」上面** ✓
-         （他看的是这一版：我的 · 空间 · 邀请码 · 管家 · 检查更新 ✓ →
-           这个顺序下"邀请码在检查更新上面"本来就是真的 ✗，
-           所以他说的只能是"**挨着**检查更新、就在它上面" ✓ → 挪到管家后面 ✓）。
-         最终顺序：我的 · 空间 · 管家 · **邀请码** · 检查更新 · 退出当前空间 · 退出登录 ✓ -->
-    <div class="item" data-act="invite"><span class="ico" data-ico="link"></span><span class="k">邀请码</span><span class="v" id="vInvite"></span><span class="chev" data-chev></span></div>
-
-      </div>
-    </div>
-
-    <div class="sec-g">
-      <div class="grp gcard">
-    <!-- ★ 2026-10-19：**主题** ✓ —— 三套可选：夜阑 / 奶霜 / 林深 ✓。
-         点它推开 `#themeSet` ✓（大预览卡片，选完立即生效 ✓）。
-         ⚠️ 它是**个人的** ✓：存在本机 localStorage、按用户 id 分开 ✓，
-            **不共享给空间里的其他人** ✓（和下面那个"聊天背景"不是一回事 ✗ ——
-            背景图是整个空间共享的 ✓）。 -->
-    <div class="item" data-act="theme"><span class="ico" data-ico="palette"></span><span class="k">主题</span><span class="v" id="vTheme"></span><span class="chev" data-chev></span></div>
-    <!-- ★ 2026-10-19：**聊天背景** ✓ —— 用户定的「上传图片作为主群聊背景，
-         在设置页新开一个背景设置」✓。
-         点它推开 `#bgSet` ✓（预览 / 选图 / 移除 ✓）。
-         ⚠️ 背景是**每个空间一份** ✓（存 `var/background/g<群号>/` ✓），
-            和空间名、管家一样跟着这个群走 ✓。 -->
-    <div class="item" data-act="bg"><span class="ico" data-ico="image"></span><span class="k">聊天背景</span><span class="v" id="vBg"></span><span class="chev" data-chev></span></div>
-
-      </div>
-    </div>
-
-    <div class="sec-g">
-      <div class="grp gcard">
-    <!-- ★ **邀请码回来了** ✗→✓（2026-10-09 今天第二次改这个 ✓）：
-         上午刚定的"设置页不留、只在空间里留" ✓，晚上他把空间拆了 ✓ →
-         那就得有一条地方放它 ✓（点了照样是复制 ✓，满员时说的话也一样 ✓）。
-         ⚠️ 右边那一格是**异步填的** ✓（`refreshSpaceInfo` 里 ✓）——
-            因为"满员了没有"要问服务端算过的那个值 ✓（`full` ✓），
-            而 `bootstrap` 里那个 `group` 没有这一项 ✗。 -->
-    <!-- ⚠️ 「群昵称」这一行**整个删了** ✗→✓（2026-10-08 用户定的）：
-         「群昵称的地位被[我的]昵称替换，因为一个人只有一个群，
-           已经不必区分昵称和群昵称」✓ —— 所以名字只有一个来源：
-         账号昵称 ✓（改在「我的」里 ✓）。 -->
     <div class="item" data-act="agentprofile"><span class="ico" data-ico="bot"></span><span class="k">管家</span><span class="v" id="vAname"></span><span class="chev" data-chev></span></div>
-    <!-- ★ 2026-10-11：「模型」—— **只有管理员看得见** ✓（`renderSettings` 按 `me.is_admin` 显示 ✓）。
-         它推开 `#models` 那一屏 ✓（模型池 / 上下文长度 ✓），那一屏**只由这一行进** ✓。
-         ★ 2026-10-23：「读图」也并进这一屏 ✓（用户：「读图模型放在模型里面」✓）——
-           名单下面那一行推开半屏板子 ✓；**只有验过能看图的模型才进候选** ✓
-           （用户：「要真的能读图的才能进」✓，闸门在 `POST /api/models/vision` ✓）。
-         ⚠️ 藏起来只是**体验** ✓，**不是闸门** ✗ —— 闸门在 `/api/models/*`
-            的 `require_admin` 里 ✓（服务端过滤、不靠前端藏 ✓，这个项目的老规矩 ✓）。 -->
+    <div class="item" data-act="gname"><span class="ico" data-ico="space"></span><span class="k">空间</span><span class="v" id="vGname"></span><span class="chev" data-chev></span></div>
+    <!-- ★ 主题（2026-10-19）：三套可选（夜阑 / 奶霜 / 林深 ✓），选完立即生效 ✓。
+         ⚠️ 只存这台设备、按用户 id 分开 ✓，不进服务端、不给空间里的别人 ✓。 -->
+    <div class="item" data-act="theme"><span class="ico" data-ico="palette"></span><span class="k">主题</span><span class="v" id="vTheme"></span><span class="chev" data-chev></span></div>
+    <!-- ★ 聊天背景（2026-10-19）：**每个空间一份** ✓（存 `var/background/g<群号>/` ✓）——
+         和上面那个"主题"不是一回事 ✗（主题是**这台设备**的 ✓）。 -->
+    <div class="item" data-act="bg"><span class="ico" data-ico="image"></span><span class="k">聊天背景</span><span class="v" id="vBg"></span><span class="chev" data-chev></span></div>
+    <!-- ★ 「模型」**只有管理员看得见** ✓（`renderSettings` 按 `me.is_admin` 显示 ✓）——
+         藏起来只是**体验** ✓，闸门在 `/api/models/*` 的 `require_admin` ✓。 -->
     <div class="item" data-act="models" id="rowModels" style="display:none"><span class="ico" data-ico="layers"></span><span class="k">模型</span><span class="v" id="vModels"></span><span class="chev" data-chev></span></div>
-    <!-- 手动查更新。自动检查是"开 App 时问一次"，但那个时机不由你定——
-         这一条让你随时能问，不用等。右边显示当前壳的版本号。 -->
+    <!-- ★ 邀请码：点了是**复制** ✓（满员时说的话也一样 ✓）；右边那一格
+         **异步填** ✓（`refreshSpaceInfo` ✓）—— "满员没有"要问服务端 ✓。 -->
+    <div class="item" data-act="invite"><span class="ico" data-ico="link"></span><span class="k">邀请码</span><span class="v" id="vInvite"></span><span class="chev" data-chev></span></div>
+    <!-- 手动查更新。自动检查是"开 App 时问一次"；这一条随时能问。右边是当前壳的版本号。 -->
     <div class="item" data-act="update"><span class="ico" data-ico="refresh"></span><span class="k">检查更新</span><span class="v" id="vAppVer"></span><span class="chev" data-chev></span></div>
 
       </div>
@@ -425,11 +364,8 @@
 
     <div class="sec-g">
       <div class="grp gcard quit">
-    <!-- ★ **退出当前空间** ✗→✓（2026-10-09 用户定的 ✓，原话：
-         「邀请码和退出当前空间（**红色字体居中在退出登录上面**）回到设置页」✓）。
-         ⚠️ 它和「退出登录」**同一个长相** ✓（`[data-act="logout"]` 那条 CSS 是
-            "整行居中 + 红字" ✓）—— 所以这里**也挂同一套** ✓：`.k.danger` 红字 ✓，
-            居中靠下面那一条 CSS 里一并算上它 ✓（见 `#settings` 那一块 ✓）。 -->
+    <!-- ★ **退出当前空间**（2026-10-09 用户定的 ✓，原话：
+         「邀请码和退出当前空间（**红色字体居中在退出登录上面**）回到设置页」✓）。 -->
     <div class="item" data-act="leave"><span class="k danger">退出当前空间</span></div>
     <div class="item" data-act="logout"><span class="k danger">退出登录</span></div>
 
@@ -437,26 +373,6 @@
     </div>
 
   </div>
-</div>
-
-<!-- ★ 2026-10-19：**聊天背景设置** —— 设置页「聊天背景」那一行进这里 ✓。
-     ⚠️ 它是一屏整屏子页 ✓ → **报给原生的屏名必须是 `'settings'`** ✗——
-        靠的是 `_OTHER_SCREENS` 里列上 `#bgSet` ✓（`tellTop` 会现算 ✓），
-        并在 `__goBack` 里加一支 ✓。漏一处，第一次返回什么都不发生、
-        第二次直接退 App ✗（见 `android-back-key-only-knows-settings` ✓）。 -->
-<div class="screen ascreen" id="bgSet">
-  <header class="sub">
-    <button class="icon-btn back" id="bgBack" aria-label="返回">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-           stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 4.5 8.5 12 15 19.5" />
-      </svg>
-    </button>
-    <h2>聊天背景</h2>
-    <div class="spacer"></div>
-  </header>
-  <div class="abody" id="bgBody"></div>
 </div>
 
 <!-- ★ 2026-10-19：**主题设置** —— 设置页「主题」那一行进这里 ✓。
