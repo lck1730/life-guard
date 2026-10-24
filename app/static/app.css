@@ -994,9 +994,9 @@
      只有**没有顶栏**的那几屏（我的 / 改资料 / 空间 / 别人 … ✓）才需要自己让 ✓。 */
   .ascreen > header.sub ~ .abody { padding-top:14px; }
 
-  /* ⚠️ `.ascreen .sec`（一行灰字当组头 ✓）**2026-10-24 不用了** ✗→✓ ——
-     「我的」「管家」两屏改用 `secG()` 画的组头（`.sec-h` + 一枚小点 ✓，见文件末尾 ✓），
-     这一条**只在别处没人用的时候**还留着当兜底 ✓；真没人用就删 ✓（别留死样式 ✓）。 */
+  /* ⚠️ `.ascreen .sec`（一行灰字当组头 ✓）**2026-10-24 起没人用了** ✗ ——
+     「我的」「管家」两屏改走 `secG()` 的卡片 ✓，组头又于当天被用户否掉 ✓。
+     这一条留着当兜底 ✓；确认没人用就删 ✓（别留死样式 ✓）。 */
   .ascreen .sec { color:var(--muted); font-size:13px; padding:16px 4px 6px; }
   .ascreen .grp { background:var(--panel); border-radius:14px; overflow:hidden;
                   margin-bottom:8px; }
