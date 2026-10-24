@@ -1413,10 +1413,12 @@
     paintAvatar(av, shellURL(me.avatar), me.nickname || me.username || '我');
     const who = mkel('div', 'who');
     who.appendChild(mkel('div', 'n', me.nickname || me.username || ''));
-    // ★ 2026-10-24：名字下面加一枚**用户名胶囊** ✓（`@a` 单独一行、灰字，看着像漏填了一半 ✓）。
-    //   ⚠️ 它**不再是 `.u` 那个 `div`** ✗ —— 而是个带底色的 `span` ✓（`.uname` ✓）。
-    //   内容还是 `@用户名` ✓，一个字没改 ✓。
-    who.appendChild(mkel('div', 'uname', '@' + (me.username || '')));
+    // ★ 2026-10-24：用户名换成**一枚小胶囊** ✓ —— 外框同一个 `div.u` ✓（尺寸/行高照旧 ✓），
+    //   里面套一个 `.uname` 画成带底色的胶囊 ✓。内容还是 `@用户名` ✓，一个字没改 ✓。
+    //   （原来就是一行灰字 ✓，和下面的"账号"组比，看着像漏填了一半 ✓。）
+    const un = mkel('div', 'u');
+    un.appendChild(mkel('span', 'uname', '@' + (me.username || '')));
+    who.appendChild(un);
     // ★ 右侧那个 `›` ✓（2026-10-09 用户：「我的，头像栏右侧加上 >，和管家那里对齐」✓）——
     //   管家那一屏的资料卡（`renderAgent`）本来就有 ✓，
     //   两屏是**同构**的 ✓（同一套 `.prof` 样式 ✓，`.go` 自带 `margin-left:auto` ✓）。

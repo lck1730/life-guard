@@ -1812,10 +1812,13 @@
                        font-size:21px; font-weight:600; }
   .ascreen .prof .who .n { font-size:19.5px; letter-spacing:.01em; }
   /* 用户名：一小枚**胶囊** ✓（原来是一行灰字 ✓，看着像漏填 ✓） */
-  .ascreen .prof .who .uname { display:inline-block; margin-top:6px; padding:2px 9px;
+  .ascreen .prof .who .u { white-space:nowrap; }
+  .ascreen .prof .who .uname { display:inline-block; padding:2px 9px;
     border-radius:999px; background:var(--accent-a); color:var(--accent);
     font-size:12px; line-height:1.5; max-width:100%; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; vertical-align:top; }
+  /* ⚠️ 老 `.u` 的形状（`.prof .who .u` ✓，2026-10-09 那条 ✓）**一字没动** ✗ ——
+     它就是这一行的"盒"，胶囊只是塞在里面 ✓（行高、省略号都还归它管 ✓）。 */
   .ascreen .prof .go svg { width:18px; height:18px; display:block; }
 
   /* ── 卡片 / 输入框 / 保存 ────────────────────────────────────────── */
