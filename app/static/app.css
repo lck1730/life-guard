@@ -1775,7 +1775,7 @@
 
   /* ── 设置页（硬件勾选式：通栏卡 + 行）── */
   #settings .sec-g { padding:0 14px; }
-  #settings .item { min-height:56px; padding:0 14px 0 12px; gap:12px;
+  #settings .item { min-height:56px; padding:0 14px 0 8px; gap:12px;
                     background:transparent; border-bottom:1px solid var(--line); }
   #settings .grp .item:last-child { border-bottom:0; }
   #settings .item:active { background:var(--hover); }
