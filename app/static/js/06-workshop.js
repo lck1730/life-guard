@@ -95,13 +95,73 @@
     try { window.LifeGuardNative?.setLightStatusBar?.(onScene ? true : light); } catch (e) {}
   };
 
-  const openWorkshop = () => {
-    pushScreen('workshop');
-    applyWallCss();
-    _syncStatusBar();
-    // ⚠️ **先推屏、再画** ✗→✓ —— 画要发请求（几十毫秒 ✓）；
-    //    反过来的话那几十毫秒里这一屏是空的 ✓，看着像"点了没反应" ✓。
-    renderWorkshop();
+  // ── 进空间：**跟着手指拉** ✗→✓（2026-10-24 用户定的）────────────────────
+  //
+  // 用户原话：「滑多少空间界面展示多少，依旧超过阈值松开后弹进来，
+  //   不超过时缩回去，但没有提示了，全靠手感」✓。
+  //
+  // 所以进门这条路**不再有"提示条 + 过阈值才动"** ✗：
+  //   · 拖的时候这一屏**按手指走了多远**实时跟 ✓（`peekWorkshop` ✓）
+  //   · 松手过阈值 → 收进来 ✓；没过 → 缩回右边 ✓（`endWorkshopPeek` ✓）
+  //
+  // ⚠️ **不能借 `pushScreen`** ✗ —— 它一上来就放 `anim-in` ✓，
+  //    和跟手那条 `transform` 会**打架** ✓（两条动画抢同一个属性 ✓）。
+  //    所以这里自己挂 `.on` + 清掉动画类 + `transition:none` ✓，
+  //    收尾也自己来 ✓（计号防串台，和 `pushScreen` 的 `_popToken` 一个道理 ✓）。
+  //
+  // ⚠️ **拖到一半不算"进来了"** ✗ —— `tellTop` / 状态栏只在**松手过阈值**
+  //    那一刻改 ✓；缩回去那一路原生那边始终以为在群聊 ✓（返回键不会被带偏 ✓）。
+  let wsPeekTok = 0;
+  //: 这一手是不是正拉着 ✓ —— 缩回去的那 200ms 里又拉一下时，旧收尾必须作废 ✓。
+  let wsPeekOn = false;
+
+  /** 手指往左走了 `travel` px → 这一屏就露多少 ✓。 */
+  const peekWorkshop = (travel) => {
+    const scr = $('#workshop');
+    const W = window.innerWidth || 1;
+    if (!wsPeekOn) {
+      wsPeekOn = true;
+      wsPeekTok++;
+      scr.classList.remove(...ANIM_CLASSES);
+      scr.classList.add('on');
+      scr.style.transition = 'none';
+      scr.style.willChange = 'transform';
+      // ⚠️ **内容和外观先备好** ✗→✓ —— 松手就是成品 ✓，不用等那几十毫秒的请求 ✓。
+      applyWallCss();
+      renderWorkshop();
+    }
+    const d = Math.max(0, Math.min(W, travel));
+    scr.style.transform = 'translateX(' + (W - d) + 'px)';
+  };
+
+  /** 松手：`open`（过了阈值）→ 弹进来 ✓；否则缩回右边 ✓。 */
+  const endWorkshopPeek = (open) => {
+    const scr = $('#workshop');
+    if (!wsPeekOn) return;                 // 没在跟手 → 这一手根本没发生 ✓
+    wsPeekOn = false;
+    const tok = ++wsPeekTok;
+    const W = window.innerWidth || 1;
+    void scr.offsetWidth;                  // 让上面那条 `transition:none` 先落地 ✓
+    scr.style.transition = open
+      ? 'transform .26s cubic-bezier(.16,1,.3,1)'
+      : 'transform .2s cubic-bezier(.4,0,1,1)';
+    scr.style.transform = open ? 'translateX(0)' : 'translateX(' + W + 'px)';
+    if (open) {
+      tellTop();                           // ★ 松手才算进来 ✓（见上面那段 ✓）
+      _syncStatusBar();
+    }
+    setTimeout(() => {
+      if (tok !== wsPeekTok) return;       // 中间又拉了一下 → 这次收尾作废 ✓
+      scr.style.transition = '';
+      scr.style.transform = '';
+      scr.style.willChange = '';
+      if (open) return;
+      scr.classList.remove('on');
+      // ⚠️ 那段外观**跟着这一屏走** ✓ —— 缩回去了就得摘掉 ✓，
+      //    不然它会继续挂在头上影响别的屏 ✓（同 `closeWorkshop` ✓）。
+      const st = $('#wall-custom');
+      if (st) st.remove();
+    }, 300);
   };
 
   const closeWorkshop = () => {

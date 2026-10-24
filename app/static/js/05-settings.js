@@ -1750,23 +1750,23 @@
   // ③ **只在这三屏开着的时候认** ✓（弹层/确认框/小卡片开着时不认 ✓，
   //    设置页那些屏也不认 ✓ —— 那是另一类导航 ✓，有它们自己的返回 ✓）。
   //
-  // ⚠️ 这一版是**过阈值才触发** ✓（不看手指跟手 ✓）——
-  //    更花的做法是整屏跟着手指走 ✓，那要 `transform` 实时跟手 + 松手判定 ✓，
-  //    这一版先把"能进能出"做扎实 ✓（用户要的是这两条 ✓）。
+  // ★ 2026-10-24：左滑进空间改成**整屏跟着手指走** ✗→✓（用户：「滑多少空间界面
+  //   展示多少……没有提示了，全靠手感」✓）—— 过阈值 / 缩回去仍按 `SW_TRIG` ✓，
+  //   只是中途**没有提示条了** ✓，反馈全由那一屏自己的位置给 ✓（见
+  //   `06-workshop.js` 的 `peekWorkshop` / `endWorkshopPeek` ✓）。
   const SW_EDGE = 24;      // 边缘留给系统 ✓
   const SW_MIN2 = 10;      // 超过它才判方向 ✓
-  //: 横滑（主群聊左滑进收纳页 ✓）：拉过这么多才算数 ✓。
-  //: ★ **70 → 96**（2026-10-09 用户定的 ✓）—— 和下拉那条**同一个道理** ✓：
-  //:   它现在也要**跟手出一条提示**（「继续左滑进入创意工坊」✓）✓，
-  //:   所以这个数同时是"阈值"和"那根条走满格的行程" ✓。
+  //: 横滑（主群聊左滑进空间 ✓）：松手时拉过这么多才算数 ✓。
+  //: ★ **70 → 96**（2026-10-09 用户定的 ✓）—— 2026-10-24 跟手之后它只剩
+  //:   "阈值"这一个身份 ✓（原来还兼着提示条走满格的行程 ✓，提示条已删 ✓）。
   const SW_TRIG = 96;
   //: ★ **右滑引用**的阈值 ✓（2026-10-11 用户：「将引用变为右滑消息」）——
   //:   ⚠️ 比左滑那个(96) **小得多** ✗ —— 它们不是一类动作 ✓：
-  //:      左滑是**换一整个界面** ✓（要拉得够、要那条跟手提示走满格 ✓）；
+  //:      左滑是**换一整个界面** ✓（要拉得够 ✓，整屏跟手、松手才定 ✓）；
   //:      右滑是**给这条消息挂个引用** ✓（一次干脆的短划 ✓，要拉 96px 手很累 ✓）。
   //:   ⚠️ 它同时是"行跟手时能走多远"的**上限** ✓（拖到这儿就顶住 ✓）——
-  //:      和左滑那个数一个道理 ✓：改它**同时改两件事**（阈值 + 行程 ✓），
-  //:      别只按"阈值"去调 ✓。
+  //:      改它**同时改两件事**（阈值 + 行程 ✓），别只按"阈值"去调 ✓
+  //:      （左滑那个数 2026-10-24 起已经不兼行程了 ✓ —— 那一屏自己跟手 ✓）。
   const QUOTE_TRIG = 56;
   let pgSw = null;
   //: 跟手那一下正在挪的是哪一行 ✓ —— 松手 / 取消 / 被别的手势接管，
@@ -1811,46 +1811,14 @@
     return '';
   };
 
-  //: 左滑提示的后半句 ✓。
-  const _pullHintText = () => '进入创意工坊';
-
-  /** 顶部那条提示 —— **跟着手指浮现** ✓（`p` 0→1 就是"拉了多少" ✓）。
-   *
-   *  ⚠️ `trig` 就是本方向的阈值 ✓ —— 条子走到满格的行程要和它一致 ✓
-   *    （"该松手了"正是靠变色告诉他的 ✓）。
-   */
-  const showPullHint = (tail, dist, trig, side) => {
-    const el = $('#pullHint');
-    if (!el) return;
-    const p = Math.max(0, Math.min(1, (dist || 0) / (trig || 1)));
-    if (!p) { hidePullHint(); return; }
-    // ★ **两段文案** ✓（用户 2026-10-10 定的 ✓）：
-    //   还差一点 → 「继续左滑 / 继续下滑 …」✓（在催他接着拉 ✓）
-    //   拉够了   → 「松开 …」✓（在催他松手 ✓）
-    //   ⚠️ 分界就是 `p >= 1` ✓ —— 而那根条**同一个点变蓝** ✓（见 `.ready` ✓）：
-    //      "变色"和"换字"是**同一件事的两个说法** ✓，别只改一个 ✗。
-    el.textContent = (p >= 1 ? '松开' : '继续左滑') + tail;
-    el.classList.toggle('side', !!side);      // ★ 竖排贴右边（横滑那条 ✓）
-    el.style.opacity = String(p);
-    if (side) {
-      // 从**右边**滑进来 ✓ —— 它和手势是同一个方向 ✓（往左滑，条子从右往里走 ✓）
-      el.style.transform = 'translate(' + ((1 - p) * 130) + '%, -50%)';
-    } else {
-      // 从上面"掉"下来 ✓ —— 往上收着的那一截随 `p` 归零 ✓
-      el.style.transform = 'translate(-50%, ' + (-140 + p * 140) + '%)';
-    }
-    el.classList.toggle('ready', p >= 1);
-  };
-  const hidePullHint = () => {
-    const el = $('#pullHint');
-    if (!el) return;
-    el.classList.remove('ready', 'side');
-    el.style.opacity = '';
-    el.style.transform = '';
-  };
-
   document.addEventListener('touchstart', (ev) => {
-    if (ev.touches.length !== 1) { pgSw = null; return; }
+    // ⚠️ **半路多出一根手指** ✓（语音 / 系统手势…）→ 这一手就不算了 ✓，
+    //    跟手拉开的那一屏得缩回去 ✓ —— 不能把它晾在半路上 ✗。
+    if (ev.touches.length !== 1) {
+      const s = pgSw; pgSw = null;
+      if (s && s.space) endWorkshopPeek(false);
+      return;
+    }
     if (_overlayOn()) { pgSw = null; return; }
     const x = ev.touches[0].clientX, y = ev.touches[0].clientY;
     // ① 贴边的滑动归系统 ✓
@@ -1878,14 +1846,14 @@
     //      选区是**长按之后**才冒出来的 ✓，那会儿这个手势早就开始了 ✓。
     if (!pgSw.dir) {
       const sel = window.getSelection();
-      if (sel && !sel.isCollapsed) { pgSw = null; hidePullHint(); return; }
+      if (sel && !sel.isCollapsed) { pgSw = null; return; }
     }
     if (!pgSw.dir) {
       if (Math.abs(dx) < SW_MIN2 && Math.abs(dy) < SW_MIN2) return;
       // ② 方向要**明确**才认 ✓（斜着划不算 ✓）
       if (Math.abs(dx) > Math.abs(dy) * 1.2) pgSw.dir = dx < 0 ? 'L' : 'R';
       else if (Math.abs(dy) > Math.abs(dx) * 1.2) pgSw.dir = dy > 0 ? 'D' : 'U';
-      else { pgSw = null; hidePullHint(); return; }
+      else { pgSw = null; return; }
       // ③ 这一屏上这个方向有没有意义？没有就把手势丢掉 ✓（免得吃掉正常滚动 ✓）
       const s = _whichScreen();
       const ok = (pgSw.dir === 'L' && s === 'chat')
@@ -1904,28 +1872,30 @@
               || (pgSw.dir === 'R' && !!pgSw.row && s === 'chat');
       // ★ 2026-10-13：**下拉那一条撤了** ✗→✓ —— 只留群聊右上角一个入口进统一聊天 ✓
       //   （用户：「只留右上角入口」✓）。'D' 不再算手势 ✓ —— 下拉回到正常滚动 ✓。
-      if (!ok) { pgSw = null; hidePullHint(); return; }
+      if (!ok) { pgSw = null; return; }
       ev.preventDefault();      // ★ 认了之后**才**拦 ✓（早了会把滚动卡死 ✗）
     } else {
       ev.preventDefault();
     }
     pgSw.dx = dx;
     pgSw.dy = dy;
-    // ★ 顶部那条提示**跟着手指出** ✓（见 `showPullHint` ✓）
-    // ★ **左滑那条也要** ✗→✓（用户 2026-10-09：「从群聊主界面左滑进入组件界面时，
-    //    也要有提示"继续左滑进入创意工坊"和滑入阈值」✓）。
-    // ⚠️ `'R'`（右滑退出那两条）**不给** ✓ —— 用户没要 ✓，
-    //    而且"退出"是往回走 ✓ 不需要一句"继续滑"来鼓励 ✓。
-    if (pgSw.dir === 'L') showPullHint(_pullHintText(), -dx, SW_TRIG, true);
+    // ★ **左滑进空间 = 整屏跟着手指露** ✗→✓（2026-10-24 用户定的）——
+    //   滑多少露多少 ✓，松手再按阈值收进来 / 缩回去 ✓（见 `_endSwipe` ✓）。
+    //   ⚠️ 中途**不报原生、不换状态栏** ✗ —— 那都是"已经进来了"才该发生的事 ✓，
+    //      拖到一半又缩回去的话，报了还得再报回来 ✓（同一件事多一处真相 ✓）。
+    if (pgSw.dir === 'L') {
+      pgSw.space = true;
+      peekWorkshop(-dx);
+    }
     // ★ **右滑那一条：行跟着手走一点** ✗→✓（2026-10-11）——
     //   ⚠️ **不跟手是不行的** ✗：右滑是个"短划" ✓，划完手指就抬了 ✓，
     //      中间没有任何反馈的话，用户根本分不清"我是划了还是滚了一下"✓
     //      （这个项目最烦的"做了像没做"✓）。
     //   ⚠️ 跟**一半不到**、而且**封顶** ✓ —— 走到 `QUOTE_TRIG` 就顶住不再走 ✓：
     //      再走就会把行推出屏幕 ✓（而那时候他其实已经可以松手了 ✓）。
-    //   ⚠️ 那条跟手提示（`#pullHint`）**不给它** ✗ —— 那是给"换一个界面"用的 ✓
-    //      （要拉得够、要那句话催他接着拉 ✓）；引用是**一次短划** ✓，
-    //      在屏幕边上再浮出一行字，重得不相称 ✓。反馈由**行自己**给 ✓。
+    //   ⚠️ **不给它任何提示条** ✗ —— 右滑是**一次短划** ✓，
+    //      反馈由**行自己跟手**给 ✓（左滑那边 2026-10-24 起也没提示条了 ✓，
+    //      改成整屏跟手 ✓）。
     else if (pgSw.dir === 'R' && pgSw.row) {
       if (qDragRow !== pgSw.row) { _endQuoteDrag(); pgSw.row.style.transition = 'none'; qDragRow = pgSw.row; }
       const d = Math.max(0, Math.min(QUOTE_TRIG, dx));
@@ -1938,13 +1908,17 @@
   const _endSwipe = () => {
     const s = pgSw;
     pgSw = null;
-    // ⚠️ **一进门就收掉那根条** ✗→✓ —— 它是"手上正在做的那件事"的一部分 ✓，
-    //    松手那一刻就该没 ✓（留着会变成"我刚才是不是滑过头了"这个疑问 ✓）。
-    //    原来只在 `'D'` 那条分支里收 ✓ → 左滑也加提示之后就会**留在屏幕上** ✗。
-    hidePullHint();
     // ⚠️ **跟手那行无论成不成都要收回原位** ✓ —— 见 `_endQuoteDrag` 那段 ✓。
     _endQuoteDrag();
-    if (!s || !s.dir) return;
+    if (!s) return;
+    // ★ **跟手拉开的那一屏要在 `_whichScreen()` 之前处置** ✗→✓ ——
+    //   它现在正 `.on` 着 ✓，按"最上面是谁"现算得到的是 `'wall'` ✓，
+    //   于是下面那条 `s.dir === 'L' && scr === 'chat'` 就永远不成立 ✗。
+    //   所以看**手势自己记下的** `s.space` ✓（不看屏幕 ✓）。
+    // ⚠️ 用**有方向的** `-dx` 判 ✓（不用 `Math.abs` ✗）—— 手指往左拉出去又
+    //    拉回来时 `dx` 会变正 ✓，`abs` 会把"其实已经收回来了"判成过阈值 ✗。
+    if (s.space) { endWorkshopPeek(-(s.dx || 0) >= SW_TRIG); return; }
+    if (!s.dir) return;
     // ★ **右滑 = 引用手里那条** ✗→✓（2026-10-11 用户：「将引用变为右滑消息」）——
     //   排在最前面 ✓：它和下面几条**按屏幕互斥** ✓（有 `row` 就一定是消息列表 ✓），
     //   写在最前头最不容易看错 ✓。
@@ -1956,14 +1930,17 @@
     }
     const far = Math.abs(s.dx || 0) >= SW_TRIG;
     if (!far) return;
-    const scr = _whichScreen();
-    if (s.dir === 'L' && scr === 'chat') { openWorkshop(); return; }
-    if (s.dir === 'R' && scr === 'comp') { closeComp(); return; }
+    if (s.dir === 'R' && _whichScreen() === 'comp') { closeComp(); return; }
   };
   document.addEventListener('touchend', _endSwipe);
   // ⚠️ 取消（来电、系统抢手势…）也要**把那行收回原位** ✓ —— 不然它会**永远歪着** ✓
   //    （`touchend` 不一定会来 ✓，这种"少一个事件"的坑这个项目栽过 ✓）。
-  document.addEventListener('touchcancel', () => { pgSw = null; hidePullHint(); _endQuoteDrag(); });
+  document.addEventListener('touchcancel', () => {
+    const s = pgSw; pgSw = null;
+    _endQuoteDrag();
+    // 跟手拉开的那一屏也要缩回去 ✓（来电 / 系统抢手势的时候 ✓）
+    if (s && s.space) endWorkshopPeek(false);
+  });
 
   // ★ DIY 助手整套已经撤掉 ✓ —— 工坊只剩组件展示 / 管理 ✓，
   //   组件和界面外观的修改现在由管理员在服务端做 ✓。

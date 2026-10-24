@@ -802,9 +802,10 @@
   .ascreen.anim-corner     { animation:cornerIn  .26s cubic-bezier(.22,1,.36,1); }
   .ascreen.anim-corner-out { animation:cornerOut .2s  cubic-bezier(.4,0,1,1) forwards; }
 
-  /* ── 创意工坊（右上角那个入口）────────────────────────────────────────
-     两屏：工坊（#workshop，**只罗列组件**）+ 组件页（#compView，压在上面）。
-     工坊右上角那个 ⋯ 进组件管理（改名/导入/导出/删除 ✓）。
+  /* ── 空间（群聊左滑进去的那一屏）───────────────────────────────
+     两屏：空间（#workshop，**只罗列组件**）+ 组件页（#compView，压在上面）。
+     ★ 2026-10-22：组件管理（改名/导入/导出/删除 ✓）也撤了 ✓ —— 这一屏纯展示 ✓。
+     ★ 2026-10-24：用户改口叫它「空间」✓；进来靠左滑、整屏跟手 ✓。
      ⚠️ z-index 要**比 .ascreen 的 20 高** ✗ —— 工坊是从群聊进的独立去处 ✓，
         和"管家"那三屏不是一层 ✓（但它进来的时候那三屏都是关着的 ✓，
         高了只是保险 ✓）。
@@ -845,28 +846,6 @@
                       margin:-2px 2px 4px; }
   #init     { z-index:2; }
   #compView { z-index:26; }
-  /* ⚠️ 下拉的提示条（见 JS 里 `showPullHint`）——
-     只在**工坊/组件页**上浮现 ✓，所以它要压过这两屏（22 / 26 ✓）。
-     它 `pointer-events:none` ✓ —— 绝不抢手势 ✓。 */
-  #pullHint { position:fixed; left:50%; top:calc(var(--inset-top) + 10px);
-              transform:translate(-50%,-140%); opacity:0; z-index:27;
-              background:var(--panel2); border:1px solid var(--line);
-              color:var(--muted); font-size:13px; padding:8px 16px;
-              border-radius:999px; pointer-events:none; white-space:nowrap;
-              transition:color .15s, border-color .15s; }
-  /* ★ **横滑那一条竖着贴在右边** ✗→✓（2026-10-09 用户定的原话：
-     「主群聊左滑进创意工坊的时候，提示不能在最顶部啊，很违和，因为是左滑进去的，
-       **应该在最右侧，竖着**」✓）。
-     ⚠️ 他的理儿是对的 ✓：提示该**跟着手势的方向**站 ✓ ——
-        下拉是"从上往下"✓ 提示在最上面 ✓；左滑是"往左去"✓ 提示就该在**去的那个方向**上
-        （右边 ✓）✓。挂在顶上跟手势一点关系都没有 ✓。
-     `writing-mode:vertical-rl` = 竖排 ✓（中文竖排就从右往左读 ✓，正好贴右边 ✓）。 */
-  #pullHint.side { left:auto; right:10px; top:50%;
-                   writing-mode:vertical-rl; text-orientation:mixed;
-                   padding:16px 8px; letter-spacing:.06em; }
-  /* 拉满了：变色 ✓ —— "现在松手就进去" ✓（不给这个反馈的话，
-     用户不知道要拉多远 ✓，只会觉得"拉了没反应" ✓）。 */
-  #pullHint.ready { color:var(--accent); border-color:var(--accent-line); }
   /* ★ 「组件容纳界面」= 一块**画布**（2026-10-07 晚上用户定的 ✓）——
      用户的原话：「整个组件容纳界面就像一张纸」✓，
      默认每个组件「上面是图标，下面是组件名称」✓（跟手机桌面上的应用一样 ✓），
