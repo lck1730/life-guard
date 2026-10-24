@@ -1,3 +1,7 @@
+  // 三种状态各一枚小图标 ✓（2026-10-24）—— 待机=钟 ✓ / 思考=对话泡里的点 ✓ /
+  // 沉默=静音 ✓。只为了"扫一眼分得开"✓，不解释含义 ✓。
+  const STATE_ICO = { idle: 'clock', thinking: 'talk', silent: 'mute' };
+
   const renderAgent = () => {
     const m = $('#agentBody');
     if (!m) return;
@@ -13,29 +17,31 @@
     const who = mkel('div', 'who');
     who.appendChild(mkel('div', 'n', agentName()));
     prof.appendChild(who);
-    prof.appendChild(mkel('div', 'go', '›'));
+    // ★ 2026-10-24：右边那个尖换成**真描边 svg** ✓（原来是 `›` 文字字符 ✓ ——
+    //   粗细和头像那边对不上 ✓，见 01-core.js 的 `arrow` ✓）。
+    const go = mkel('span', 'go'); go.appendChild(ico('chev'));
+    prof.appendChild(go);
     prof.onclick = openAgentEdit;
     m.appendChild(prof);
 
-    m.appendChild(mkel('div', 'sec', '状态显示'));
-    const g1 = mkel('div', 'grp');
+    // ★ 2026-10-24：一组行 = 一张卡 + 组头 ✓（`secG` / `icoBox` 在 05-settings.js ✓）。
+    const rows1 = [];
     ['idle', 'thinking', 'silent'].forEach((k) => {
       const b = mkel('button', 'row');
+      b.appendChild(icoBox(STATE_ICO[k]));
       b.appendChild(mkel('span', 'rl', KIND_LABEL[k]));
       // ⚠️ 右边原来写的是**四个字**「点击编辑」✗→✓（2026-10-09 用户定的：
       //   「管家那里的三个状态的点击编辑替换为 `>` 吧」✓）——
       //   换成那个 `›` ✓，和这一页的资料卡、我的那三行、设置页那几行**同一个记号** ✓
       //   （`›` 在整个 App 里就是"点得进去"✓；写成四个字反而是这里独有的形状 ✓）。
-      b.appendChild(mkel('span', 'go', '›'));
+      const go = mkel('span', 'go'); go.appendChild(ico('chev'));
+      b.appendChild(go);
       b.onclick = () => openStateScreen(k);
-      g1.appendChild(b);
+      rows1.push(b);
     });
-    m.appendChild(g1);
+    m.appendChild(secG('状态显示', rows1));
 
-    m.appendChild(mkel('div', 'sec', '性格'));
-    const g2 = mkel('div', 'grp');
-    g2.appendChild(promptBlock());
-    m.appendChild(g2);
+    m.appendChild(secG('性格', [promptBlock()]));
   };
 
   // ── 性格：**直奔一个文本框** ✓（用户："不要给管家的话，直接一个文本框" ✓）──

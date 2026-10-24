@@ -395,9 +395,13 @@
     //    又要把 5.6MB 原图从 WireGuard 上拉一遍 ✓（预览只要看得见就行 ✓）。
     const prev = document.createElement('div');
     prev.className = 'bgprev';
-    if (url) prev.style.backgroundImage =
-      `url("${(bgKey === url && bgObjUrl) ? bgObjUrl : url}")`;
-    else {
+    if (url) {
+      prev.style.backgroundImage =
+        `url("${(bgKey === url && bgObjUrl) ? bgObjUrl : url}")`;
+      // ★ 2026-10-24：左下角一枚小胶囊「当前背景」✓ —— 预览框自己是空的画面 ✓，
+      //   不写一句就看不出"这就是现在用的那张"✓（`.bgtag` ✓，见 app.css）。
+      prev.appendChild(mkel('span', 'bgtag', '当前背景'));
+    } else {
       const none = document.createElement('span');
       none.className = 'bgempty';
       none.textContent = bgBusy ? '正在上传…' : '还没有设置背景';
@@ -405,22 +409,29 @@
     }
     body.appendChild(prev);
 
+    // ★ 2026-10-24：两颗按钮**并排** ✓（原来上下各一颗、一样宽 ✓,
+    //   「移除」和「换一张」一样重，看着像同等重要的两个动作 ✗）——
+    //   「换一张」是主 ✓（实心 ✓）、「移除」是次 ✓（描边红字 ✓）。
+    //   ⚠️ 只有**一张图**时，「换一张」才收成一半宽 ✓；没有背景时它通栏 ✓。
+    const acts = mkel('div', 'bgacts');
     const pick = document.createElement('button');
     pick.className = 'bgbtn';
-    pick.textContent = url ? '换一张图片' : '选择图片';
     pick.disabled = bgBusy;
+    pick.appendChild(ico('image'));
+    pick.appendChild(document.createTextNode(url ? '换一张图片' : '选择图片'));
     pick.onclick = () => { if (!bgBusy) $('#fileBg').click(); };
-    body.appendChild(pick);
+    acts.appendChild(pick);
 
     // 「移除」只在有背景时出现 ✓ —— 没背景时摆一颗红按钮只是吓人 ✓
     if (url) {
       const del = document.createElement('button');
       del.className = 'bgbtn danger';
-      del.textContent = '移除背景';
+      del.textContent = '移除';
       del.disabled = bgBusy;
       del.onclick = removeBg;
-      body.appendChild(del);
+      acts.appendChild(del);
     }
+    body.appendChild(acts);
 
     const hint = document.createElement('div');
     hint.className = 'bghint';
@@ -1075,7 +1086,27 @@
     if (f) replaceVisionImage(f);
   };
 
+  // ★ 2026-10-24：设置页那几行的**图标框和箭头**由这里一次画上 ✓ ——
+  //   HTML 里只留了空位（`span.ico[data-ico]` / `span.chev[data-chev]` ✓），
+  //   形状住在 01-core.js 的 `ICO` 里 ✓（和「我的」「管家」两屏同一套 ✓）。
+  //   ⚠️ 写进 HTML 里也行 ✗，但那样图标就得在**两个地方**（html 和 JS）各写一份 ✓，
+  //      加一行时必漏 ✓ —— 这个项目栽过这种"两处写"的坑 ✓。
+  //   ⚠️ 只在**还没有画过**的时候塞 ✓（`firstChild` 判断 ✓）——
+  //      `renderSettings` 调得很勤（每来一条消息就可能调一次 ✓），
+  //      不管的话每调一次就叠一个 svg ✓。
+  const paintSettingsIcons = () => {
+    $$('#settings [data-ico]').forEach(box => {
+      if (box.firstChild) return;
+      box.appendChild(ico(box.dataset.ico));
+    });
+    $$('#settings [data-chev]').forEach(box => {
+      if (box.firstChild) return;
+      box.appendChild(ico('chev'));
+    });
+  };
+
   const renderSettings = () => {
+    paintSettingsIcons();
     const eGname = $('#vGname'); if (eGname) eGname.textContent = group?.name || '';
     // 「聊天背景」右边：只说有没有 ✓ —— 缩略图不塞进这一行 ✓（行太窄 ✓）。
     const eBg = $('#vBg');
@@ -1382,34 +1413,54 @@
     paintAvatar(av, shellURL(me.avatar), me.nickname || me.username || '我');
     const who = mkel('div', 'who');
     who.appendChild(mkel('div', 'n', me.nickname || me.username || ''));
-    who.appendChild(mkel('div', 'u', '@' + (me.username || '')));
+    // ★ 2026-10-24：名字下面加一枚**用户名胶囊** ✓（`@a` 单独一行、灰字，看着像漏填了一半 ✓）。
+    //   ⚠️ 它**不再是 `.u` 那个 `div`** ✗ —— 而是个带底色的 `span` ✓（`.uname` ✓）。
+    //   内容还是 `@用户名` ✓，一个字没改 ✓。
+    who.appendChild(mkel('div', 'uname', '@' + (me.username || '')));
     // ★ 右侧那个 `›` ✓（2026-10-09 用户：「我的，头像栏右侧加上 >，和管家那里对齐」✓）——
     //   管家那一屏的资料卡（`renderAgent`）本来就有 ✓，
     //   两屏是**同构**的 ✓（同一套 `.prof` 样式 ✓，`.go` 自带 `margin-left:auto` ✓）。
-    prof.append(av, who, mkel('span', 'go', '›'));
+    prof.append(av, who, arrow());
     prof.onclick = () => openMeEdit('avatar');
     body.appendChild(prof);
 
     // ② 账号：三行 ✓（右边那一格就是**现值** ✓ —— 一眼看全，不用点进去才知道 ✓）
-    body.appendChild(mkel('div', 'sec', '账号'));
-    const grp = mkel('div', 'grp');
-    grp.appendChild(meRow('昵称', me.nickname || '', () => openMeEdit('nickname')));
-    grp.appendChild(meRow('用户名', me.username || '', () => openMeEdit('username')));
-    grp.appendChild(meRow('密码', '', () => openMeEdit('password')));
-    body.appendChild(grp);
+    body.appendChild(secG('账号', [
+      meRow('user', '昵称', me.nickname || '', () => openMeEdit('nickname')),
+      meRow('user', '用户名', me.username || '', () => openMeEdit('username')),
+      // 密码那一行**右边不写值** ✓（壳那版就是空着 ✓）——
+      // 换成一句灰话 ✓，省得右边空一格、看着像没加载出来 ✓。
+      meRow('lock', '密码', '••••••', () => openMeEdit('password')),
+    ]));
 
     // ③ 自我介绍 ✓（2026-10-09 用户定的 ✓）—— 和管家的「性格」**同一个形状** ✓
     //    （可收可展、三行封顶、居中的朝下箭头 ✓，见 `collapsibleText` ✓）
-    body.appendChild(mkel('div', 'sec', '自我介绍'));
-    const g3 = mkel('div', 'grp');
-    g3.appendChild(selfIntroBlock());
-    body.appendChild(g3);
+    body.appendChild(secG('自我介绍', [selfIntroBlock()]));
   };
 
-  /** 「我的」里的**一行** ✓（左标题、右现值、最右 `›` ✓）。 */
-  const meRow = (label, value, fn) => {
+  /** 右边那个尖 ✓（真描边 svg ✓，见 01-core.js 的 `ico` ✓）。 */
+  const arrow = () => { const g = mkel('span', 'go'); g.appendChild(ico('chev')); return g; };
+
+  /**
+   * ★ 2026-10-24：**一组行 = 一张卡 + 组头** ✓（原来是光秃秃的 `.grp` + 一行灰字 ✓）。
+   * `rows` 可以是一组 `.row` 按钮 ✓，也可以是别的东西（比如自我介绍那块 ✓）。
+   * ⚠️ 组头 `.sec-h` 是**这里加的** ✓ —— 原来 `mkel('div','sec','账号')` 那几处
+   *    全换成了它 ✓（「我的」和「管家」两屏 ✓，两屏本来就是同构的 ✓）。
+   */
+  const secG = (title, rows) => {
+    const g = mkel('div', 'sec-g');
+    const h = mkel('div', 'sec-h');
+    h.append(mkel('i'), document.createTextNode(title));
+    const card = mkel('div', 'grp gcard');
+    rows.forEach(r => card.appendChild(r));
+    g.append(h, card);
+    return g;
+  };
+
+  /** 「我的」里的**一行** ✓（左图标、标题、右现值、最右 `›` ✓）。 */
+  const meRow = (icon, label, value, fn) => {
     const b = mkel('button', 'row');
-    b.append(mkel('span', 'rl', label), mkel('span', 'rv', value), mkel('span', 'go', '›'));
+    b.append(icoBox(icon), mkel('span', 'rl', label), mkel('span', 'rv', value), arrow());
     b.onclick = fn;
     return b;
   };
@@ -1475,9 +1526,20 @@
     const body = $('#meEditBody');
     body.textContent = '';
     const kind = meEditKind;
+    // ★ 2026-10-24：标题下面补一句**说明** ✓（这一页原来只有一行大标题 ✓，
+    //   下面直接一张空卡 ✓ —— 用户：「子界面 ui 优化」✓）。
+    //   ⚠️ 措辞只说"会发生什么"✓，不写"建议/最好"那种客套 ✓。
     const T = { nickname: '修改昵称', username: '修改用户名',
                 password: '修改密码', avatar: '修改头像' };
+    const D = {
+      nickname: '空间里的成员都会看到新名字。',
+      username: '登录用的账号名也会跟着改，下次用新的登录。',
+      password: '改完之后，其它设备上的登录会失效。',
+      avatar: '一张方图最好；群聊里显示成圆形。',
+    };
     body.appendChild(mkel('div', 'mh', T[kind] || '修改'));
+    // 说明那一行只在**改密码**时真有用 ✓ —— 别的几条也说一句 ✓，短、一行 ✓。
+    body.appendChild(mkel('div', 'msub', D[kind] || ''));
 
     const card = mkel('div', 'card');
     const err = mkel('div', 'err', '');

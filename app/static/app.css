@@ -9,6 +9,9 @@
     --bg:#0f1115; --panel:#171a21; --panel2:#1e222b;
     --text:#e6e8ee; --muted:#8b93a7; --line:#262b36;
     --accent:#6ea8ff; --accent-bg:#1e3a5f; --on-accent:#07131f;
+    /* ★ 2026-10-24 描边强调色 ✓ —— 和 `--accent` **同色、只带透明度** ✓。
+       用在图标框 / 胶囊 / 选中态上 ✓：底不压字 ✓，主题一换它跟着换 ✓。 */
+    --accent-a:rgba(110,168,255,.13);
     --agent:#9dd0aa; --danger:#ff6b6b;
     /* 辅助色（规则里不再写死） */
     --accent-line:#35507a;  --accent-soft:rgba(90,140,255,.10);
@@ -40,6 +43,7 @@
     --bg:#f6f0e4; --panel:#fffcf5; --panel2:#efe7d8;
     --text:#2d2822; --muted:#706658; --line:#e4d8c5;
     --accent:#9a5b2e; --accent-bg:#f2e1cb; --on-accent:#fffdf8;
+    --accent-a:rgba(154,91,46,.11);
     --agent:#5e7d4a; --danger:#b94735;
     --accent-line:#d8be9e;  --accent-soft:rgba(154,91,46,.10);
     --hover:#f3eadb;        --avatar-bg:#e9dfcf;
@@ -61,6 +65,7 @@
     --bg:#12231a; --panel:#1a2f22; --panel2:#233a2b;
     --text:#e6efe3; --muted:#90a794; --line:#2e4836;
     --accent:#8be4a0; --accent-bg:#2f5739; --on-accent:#07150d;
+    --accent-a:rgba(139,228,160,.13);
     --agent:#e3cd82; --danger:#e37e6d;
     --accent-line:#477552;  --accent-soft:rgba(139,228,160,.14);
     --hover:#294334;        --avatar-bg:#294334;
@@ -989,6 +994,9 @@
      只有**没有顶栏**的那几屏（我的 / 改资料 / 空间 / 别人 … ✓）才需要自己让 ✓。 */
   .ascreen > header.sub ~ .abody { padding-top:14px; }
 
+  /* ⚠️ `.ascreen .sec`（一行灰字当组头 ✓）**2026-10-24 不用了** ✗→✓ ——
+     「我的」「管家」两屏改用 `secG()` 画的组头（`.sec-h` + 一枚小点 ✓，见文件末尾 ✓），
+     这一条**只在别处没人用的时候**还留着当兜底 ✓；真没人用就删 ✓（别留死样式 ✓）。 */
   .ascreen .sec { color:var(--muted); font-size:13px; padding:16px 4px 6px; }
   .ascreen .grp { background:var(--panel); border-radius:14px; overflow:hidden;
                   margin-bottom:8px; }
@@ -1082,7 +1090,8 @@
     border-radius:12px; background:var(--accent); color:var(--on-accent);
     font-size:16px; font-weight:600; }
   #bgSet .bgbtn:disabled { opacity:.45; }
-  #bgSet .bgbtn.danger { background:transparent; color:var(--danger);
+  #bgSet .bgbtn.danger { flex:0 0 auto; padding-left:20px; padding-right:20px;
+    background:transparent; color:var(--danger);
     border:1px solid var(--line); }
   #bgSet .bghint { color:var(--muted); font-size:12.5px; text-align:center;
     margin-top:12px; line-height:1.5; }
@@ -1569,7 +1578,12 @@
   /* ★ 编辑页顶上那个标题（「修改昵称」…）✓ —— 壳那版是卡片**上面**一个 hero 标题 ✓，
      居中、比正文大一档 ✓。 */
   .ascreen .mh { font-size:22px; font-weight:600; text-align:center;
-                 color:var(--text); margin:10px 0 20px; }
+                 color:var(--text); margin:10px 0 6px; }
+  /* ★ 2026-10-24：标题下面那句说明 ✓（原来标题下面直接是卡片 ✓，20px 的间距
+     现在分给这句说明 ✓ —— 标题和卡片之间**还是差不多那一段距离** ✓，只是中间有话说 ✓）。 */
+  .ascreen .msub { color:var(--muted); font-size:13px; line-height:1.6;
+                   text-align:center; margin:0 12px 20px; }
+  .ascreen .msub:empty { display:none; }
 
   /* ── 开局加载页（2026-10-20）──────────────────────────────────────────
      **为什么要它**：以前开局只有一个延迟 200ms 才亮的转圈 ✓ ——
@@ -1695,4 +1709,175 @@
       animation:none !important;
     }
     #boot { transition-duration:.12s; }
+  }
+  /* ══════════════════════════════════════════════════════════════════
+     ★★ 2026-10-24 **「我的 / 空间 / 管家 / 聊天背景」这几屏的皮** ✗→✓
+     用户：「这些页面以及子界面的 ui 是否可以优化，按钮不要朴素」。
+
+     ⚠️ 这次**不发明新版式** ✗ —— 上面那一整套 `.prof` / `.row` / `.grp` /
+       `.card` / `.btn-save` 都是用户 2026-10-06 到 10-09 一条条量着截图
+       定下来的 ✓（头像 150、`.tip` 的 30、`.avcard` 的上下 30、别处也都有注释
+       "别再自己发明"✓）。所以**一个尺寸都不动** ✓，只换"表面"：
+         · 每行左边一枚**图标框** ✓（底色走 `--accent-a` ✓，三套主题各自换色 ✓）
+         · 组 = 一张**圆角卡** ✓（原来是一条细线接一条细线 ✓，看着像表格 ✓）
+         · 按钮 = 有高度、有投影、按下去会沉 ✓（不再是"一块平涂" ✓）
+         · 头像是**等比图 + 强调色圆环**而不是"盖满的方图" ✓
+           （2026-10-15 用户：「我的界面的头像形状是方的，其他都是圆的」✓ ——
+            当时只改了两处 id 选择器 ✓，`.prof .av` 这一条还在 ✓，这里一并收掉 ✓）
+     ⚠️ 全部挂在 `.ascreen` 下面 ✓（和上面那条规矩一样：群聊页也有 `.row` / `.av` ✓，
+       不套作用域就会串味 ✗）。
+     ⚠️ 底色取 `--panel` ✓、卡内分隔线取 `--line` ✓ —— 浅色主题下
+        `--panel2` 只比白深一点点 ✓，拿它垫整组会"看不出是张卡" ✓。
+     ══════════════════════════════════════════════════════════════════ */
+  :root {
+    --ico-size:34px;
+    --card-r:18px;
+    --glow:0 6px 18px rgba(0,0,0,.16);
+  }
+  [data-theme="cream"], [data-theme="light"] { --glow:0 6px 18px rgba(74,58,38,.07); }
+  [data-theme="forest"]                       { --glow:0 6px 18px rgba(0,0,0,.20); }
+
+  /* ── 组：组头（一枚小点 + 名字）+ 一张卡 ✓ ──────────────────────── */
+  .ascreen .sec-g { margin:0 0 18px; }
+  /* 最后一个组（「退出」那张卡）底下不留 18 —— 还有 `.abody` 自己的底部留白 ✓ */
+  .ascreen .sec-g:last-child { margin-bottom:0; }
+  /* ⚠️ 组头左右**跟着卡片的边**走 ✓ —— 但两种屏的"卡片边"不在同一个地方：
+       · 「我的」「管家」：`.abody` 自带 14px ✓ → 组头**不用再缩** ✓
+       · 设置页：`.abody` 是 0 ✓、卡片由 `.sec-g` 的 14px 让开 ✓ → 组头也交给它 ✓
+     所以这里**不写左右内边距** ✗（原来写了 14 ✓，在「我的」上会缩进去多一截 ✗）。 */
+  .ascreen .sec-h { display:flex; align-items:center; gap:8px;
+                    padding:2px 6px 8px; color:var(--muted);
+                    font-size:12.5px; letter-spacing:.06em; }
+  .ascreen .sec-h i { width:5px; height:5px; border-radius:50%; flex:none;
+                      background:var(--accent); opacity:.75; }
+  .ascreen .grp.gcard { border-radius:var(--card-r); border:1px solid var(--line);
+                        box-shadow:var(--glow); margin-bottom:0; }
+  /* 退出那两行单独一张卡 ✓、中间不画分隔线 ✓ —— 它们是两个动作，不是一组数据 ✓ */
+  .ascreen .grp.gcard.quit .item + .item { border-top:0; }
+
+  /* ── 行（`.row` = 我的/管家里的按钮行 ✓；`.item` = 设置页 ✓）────────
+     两套长得一样 ✓：左边图标框、中间字、右边值 + `›` ✓。
+     ⚠️ 圆角只在**首行 / 末行**上 ✓ —— 卡片自己 `overflow:hidden` 不会裁掉
+        `:active` 的底色圆角 ✓（`.grp` 原来就带着 ✓）。 */
+  .ascreen .row { padding:0 14px 0 12px; min-height:56px; }
+  .ascreen .grp .row { border-radius:0; }
+  .ascreen .grp .row:first-child { border-radius:var(--card-r) var(--card-r) 0 0; }
+  .ascreen .grp .row:last-child  { border-radius:0 0 var(--card-r) var(--card-r); }
+  .ascreen .grp .row:only-child  { border-radius:var(--card-r); }
+  /* 图标框 ✓ —— 里面是 svg（描边、`currentColor` ✓）。没有图标的老行不受影响 ✓ */
+  .ascreen .row > .ico, .item > .ico {
+    flex:none; width:var(--ico-size); height:var(--ico-size); border-radius:11px;
+    display:grid; place-items:center; background:var(--accent-a);
+    color:var(--accent); }
+  .ascreen .row > .ico svg, .item > .ico svg { width:19px; height:19px; display:block; }
+  /* ⚠️ 没有图标的行（老的行 ✓）左边多让一点 ✓ —— 让文字和"有图标那几行"的文字对齐 ✓。
+     ⚠️ 这里**不用 `:has()`** ✗：它是较新的选择器 ✓，壳里那版 WebView 认不认没验过 ✗
+     （不认的话整条规则被丢 ✓，左边就少 6px ✓ —— 小事，但别拿它当结构 ✗）。
+     现在说的只有「退出」那两行（它们居中 ✓，左边框不影响 ✓），先留着兜底 ✓。 */
+  .ascreen .row .rl, .item .k { font-weight:500; }
+  /* `›` 换成**真描边**的尖 ✓（原来是一个 `›` 文字字符 ✓ ——
+     粗细和旁边的 svg 对不上 ✓，而且字形的墨迹算不准 ✓，和顶栏那几颗同一套做法 ✓）。 */
+  .ascreen .row > .go svg, .item > .chev svg { width:17px; height:17px; display:block; }
+  .ascreen .row > .go, .item > .chev { display:grid; place-items:center; }
+  .ascreen .row .act { padding:5px 11px; border-radius:999px; background:var(--accent-a);
+                       font-size:13px; font-weight:500; }
+
+  /* ── 设置页（硬件勾选式：通栏卡 + 行）── */
+  #settings .body { padding-top:calc(var(--inset-top) + 28px); }
+  #settings .sec-g { padding:0 14px; }
+  #settings .item { min-height:56px; padding:0 14px 0 12px; gap:12px;
+                    background:transparent; border-bottom:1px solid var(--line); }
+  #settings .grp .item:last-child { border-bottom:0; }
+  #settings .item:active { background:var(--hover); }
+  #settings .item .k { font-size:15.5px; }
+  #settings .item .v { font-size:13px; }
+  #settings .item.danger-row:active .k { opacity:.6; }
+  /* 退出那两行：红字居中 ✓ —— 用户 2026-10-09 定的 ✓，只是把它挪进卡片里 ✓ */
+  #settings .item[data-act="logout"], #settings .item[data-act="leave"] {
+    justify-content:center; min-height:50px; }
+  #settings .item[data-act="logout"] .k, #settings .item[data-act="leave"] .k {
+    flex:0 0 auto; font-size:15px; font-weight:500; }
+
+  /* ── 资料卡（我的 / 管家）── */
+  .ascreen .prof { border:1px solid var(--line); border-radius:var(--card-r);
+                   box-shadow:var(--glow); padding:16px; gap:15px; }
+  .ascreen .prof:active { background:var(--panel2); }
+  /* ★ 头像：**等比图 + 圆环** ✓（不再把方图盖满一个圆角方块 ✗）——
+     `contain` + 内边距：方图不会被裁 ✗，圆图也装得下 ✓；
+     底色仍是 `--avatar-bg` ✓（没图时首字照样清楚 ✓）。 */
+  .ascreen .prof .av { width:58px; height:58px; border-radius:50%;
+                       background-color:var(--avatar-bg); background-size:contain !important;
+                       background-position:center; background-repeat:no-repeat;
+                       box-shadow:0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent-a);
+                       font-size:21px; font-weight:600; }
+  .ascreen .prof .who .n { font-size:19.5px; letter-spacing:.01em; }
+  /* 用户名：一小枚**胶囊** ✓（原来是一行灰字 ✓，看着像漏填 ✓） */
+  .ascreen .prof .who .uname { display:inline-block; margin-top:6px; padding:2px 9px;
+    border-radius:999px; background:var(--accent-a); color:var(--accent);
+    font-size:12px; line-height:1.5; max-width:100%; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; vertical-align:top; }
+  .ascreen .prof .go svg { width:18px; height:18px; display:block; }
+
+  /* ── 卡片 / 输入框 / 保存 ────────────────────────────────────────── */
+  .ascreen .card { border-radius:var(--card-r); box-shadow:var(--glow);
+                   padding:18px 18px 16px; }
+  .ascreen .field { border-radius:12px; transition:border-color .15s, box-shadow .15s; }
+  .ascreen .field:focus { border-color:var(--accent);
+                          box-shadow:0 0 0 3px var(--accent-a); }
+  /* 保存：**主按钮** ✓ —— 渐变只是"它是最重要的一颗"的提示 ✓，不换色 ✓ */
+  .ascreen .btn-save { padding:15px; border-radius:14px; letter-spacing:.04em;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 86%, #fff),
+                                        var(--accent));
+    box-shadow:0 6px 16px var(--accent-a), 0 1px 0 rgba(255,255,255,.14) inset;
+    transition:transform .12s ease, box-shadow .12s ease, filter .12s ease; }
+  .ascreen .btn-save:active { transform:translateY(1px) scale(.995);
+    filter:brightness(.94);
+    box-shadow:0 2px 6px var(--accent-a), 0 1px 0 rgba(255,255,255,.10) inset; }
+  .ascreen .btn-save:disabled { box-shadow:none; }
+  /* 大头像（改头像 / 别人）：也走 `contain` + 圆环 ✓（见上面 `.prof .av` 那段注释 ✓） */
+  .ascreen .bigav .av { border-radius:50%; background-size:contain !important;
+                        background-position:center; background-repeat:no-repeat;
+                        box-shadow:0 0 0 4px var(--panel), 0 0 0 6px var(--accent-a); }
+  .ascreen .pname { margin-top:16px; }
+  .ascreen .tip { margin-top:30px; }   /* 不动 ✓（那是量出来的 ✓，见上面 ✓） */
+
+  /* ── 性格 / 自我介绍：收着是一块"可点的文本" ✓，点开才露出输入框 ✓ ── */
+  /* ⚠️ `.pbox` 本身**不加 `position:relative` + 整块 `::after`** ✗ ——
+     那块是 `.grp` 里的一整片 ✓，比文字宽得多 ✓ → 按下时会亮出一整条 ✗。
+     按下反馈就交给浏览器（`-webkit-tap-highlight` 已经关了 ✓）→ **不加** ✓：
+     它本来就是"点一下展开编辑"✓，展开就是反馈 ✓。 */
+  .ascreen .pbox .pmore .chev { display:inline-block; }
+  .ascreen .ptext { border:1px solid var(--line); }
+  .ascreen .ptext:focus { border-color:var(--accent);
+                          box-shadow:0 0 0 3px var(--accent-a); }
+  /* 编辑时底部那颗「保存」：胶囊蓝 ✓（「取消」仍是灰字 ✓，不动 ✓） */
+  .ascreen .pfoot button:last-child { padding:7px 18px; border-radius:999px;
+                                      background:var(--accent-a); font-weight:600; }
+  .ascreen .pfoot button:last-child:active { filter:brightness(.92); }
+
+  /* ── 聊天背景那一屏 ✓ ────────────────────────────────────────────── */
+  #bgSet .abody { padding-top:calc(var(--inset-top) + 10px); }
+  #bgSet .bgprev { border-radius:20px; box-shadow:var(--shadow-lg); position:relative; }
+  /* 预览底角一行小字：「当前背景」✓ —— 空的时候不出 ✓（`.bgempty` 自己说话 ✓） */
+  #bgSet .bgprev .bgtag { position:absolute; left:12px; bottom:12px;
+    padding:4px 10px; border-radius:999px; font-size:11.5px;
+    color:#fff; background:rgba(0,0,0,.42); backdrop-filter:blur(6px); }
+  #bgSet .bgacts { display:flex; gap:10px; margin-top:14px; }
+  #bgSet .bgbtn { display:flex; align-items:center; justify-content:center; gap:8px;
+    flex:1; min-width:0; padding:15px 10px; margin-top:0; border-radius:14px; font-size:15.5px;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 86%, #fff),
+                                        var(--accent));
+    box-shadow:0 6px 16px var(--accent-a), 0 1px 0 rgba(255,255,255,.14) inset;
+    transition:transform .12s ease, filter .12s ease; }
+  #bgSet .bgbtn:active { transform:translateY(1px); filter:brightness(.94); }
+  #bgSet .bgbtn svg { width:18px; height:18px; display:block; }
+  #bgSet .bgbtn.danger { flex:0 0 auto; padding-left:20px; padding-right:20px;
+    background:transparent; color:var(--danger);
+    border:1px solid var(--danger-soft); box-shadow:none; }
+  #bgSet .bgbtn.danger:active { background:var(--accent-a); transform:none; }
+  #bgSet .bghint { margin-top:14px; }
+
+  /* 注视点：手机上"点了没反应"是真的没反应 ✓ —— 动画只给手感 ✓ */
+  @media (prefers-reduced-motion: reduce) {
+    .ascreen .btn-save:active, #bgSet .bgbtn:active { transform:none; }
   }

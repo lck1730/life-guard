@@ -556,6 +556,47 @@
   };
   const KIND_LABEL = { idle: '待机显示', thinking: '思考中', silent: '保持沉默' };
 
+  // ★ 2026-10-24：**一行一枚小图标** ✓ —— 「我的 / 管家 / 设置」这几屏的行前面
+  //   原来一个字都不带 ✓（用户：「按钮不要朴素」✓）。画的还是 App 里那一套：
+  //   细描边、圆端点、`currentColor` ✓（和顶栏 ☰ / 刷新、`go` 那个尖同一个画法 ✓）。
+  //   ⚠️ **只画形、不写颜色** ✗ —— 颜色由 `.row .ico` / `.item .ico` 给 ✓（主题一换就跟着换 ✓）。
+  const ICO = {
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/>',
+    space: '<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2l1.8 2h7A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-12A2.5 2.5 0 0 1 3 16.5z"/>',
+    link: '<path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1.5 1.5"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1.5-1.5"/>',
+    palette: '<path d="M12 3a9 9 0 0 0 0 18c1.5 0 2-1 1.4-1.9-.7-1 .1-2.1 1.4-2.1H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>',
+    image: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5l-4.5-4-6 7"/>',
+    bot: '<rect x="4.5" y="8" width="15" height="11" rx="3"/><path d="M12 4.5V8"/><circle cx="9.5" cy="13.2" r="1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="13.2" r="1" fill="currentColor" stroke="none"/><path d="M9.8 16.2h4.4"/>',
+    layers: '<path d="M12 3.5l8.5 4.5-8.5 4.5L3.5 8z"/><path d="M4.5 12.6l7.5 4 7.5-4"/><path d="M4.5 16.6l7.5 4 7.5-4"/>',
+    refresh: '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><polyline points="20 4.5 20 9 15.5 9"/>',
+    chev: '<polyline points="9.5 5.5 16 12 9.5 18.5"/>',
+    exit: '<path d="M14.5 4.5h3A1.5 1.5 0 0 1 19 6v12a1.5 1.5 0 0 1-1.5 1.5h-3"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h9"/>',
+    lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    talk: '<path d="M20.5 12a8.5 8.5 0 0 1-8.5 8.5H4.5V12a8.5 8.5 0 1 1 16 0z"/><circle cx="9" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r=".9" fill="currentColor" stroke="none"/>',
+    mute: '<path d="M4 5.5l16 13"/><path d="M11 5.5 6.5 9H4v6h2.5L11 18.5z"/><path d="M15 9a4 4 0 0 1 1.6 3"/>',
+  };
+
+  /** 一枚行内图标 ✓（`cls` 给 SVG 自己用 —— 只有「性格」那个朝下箭头要它 ✓）。 */
+  const ico = (name, cls) => {
+    const n = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    if (cls) n.setAttribute('class', cls);
+    n.setAttribute('viewBox', '0 0 24 24');
+    n.setAttribute('fill', 'none');
+    n.setAttribute('stroke', 'currentColor');
+    n.setAttribute('stroke-width', '1.75');
+    n.setAttribute('stroke-linecap', 'round');
+    n.setAttribute('stroke-linejoin', 'round');
+    n.innerHTML = ICO[name] || '';
+    return n;
+  };
+  /** 行首那个**图标框** ✓（`.ico` ✓）—— 没有名字时给个空框里的点 ✓，别留个破洞 ✗。 */
+  const icoBox = (name) => {
+    const b = mkel('span', 'ico');
+    b.appendChild(ico(name || 'chev'));
+    return b;
+  };
+
   // 服务端那份配置（`group.agent_status` 是个 JSON **字符串** ✓）。
   const agentCfg = () => statusCfg || {
     idle: { on: true, lines: ['正在窥屏…'], every: 600 },
