@@ -1027,7 +1027,9 @@
 
   const stickerImg = (s, thumb) => {
     if (!s) return '';
-    return '/' + (thumb && s.thumb ? s.thumb : s.file) + '?v=' + (stickerCatalog.version || 1);
+    // ⚠️ 清单里的路径是**相对 `/static`** 的 ✓（和 `core/stickers.py` 的 `media_path()` 一致 ✓）；
+    //    少这一截就是 404 —— 2026-10-27 表情面板整片"碎图"就是这么来的 ✗。
+    return '/static/' + (thumb && s.thumb ? s.thumb : s.file) + '?v=' + (stickerCatalog.version || 1);
   };
   const stickerById = (id) => {
     id = String(id || '');
@@ -1035,7 +1037,7 @@
   };
   /** 已落库的消息：用发送那一刻的路径 ✓；实在没有才按编号回查清单 ✓。 */
   const stickerUrl = (m) => {
-    if (m && m.media_path) return '/' + m.media_path;
+    if (m && m.media_path) return '/static/' + m.media_path;
     return stickerImg(stickerById(m && m.content));
   };
   const stickerName = (m) => {
@@ -1079,14 +1081,15 @@
     const cats = (stickerCatalog.categories || []).slice().sort((a, b) =>
       a.key === 'butler' ? -1 : b.key === 'butler' ? 1 : 0);
     let html = '<h3>表情</h3><div class="st-scroll">';
-    cats.forEach(c => {
+    cats.forEach((c, i) => {
       const items = all.filter(s => s.category === c.key);
       if (!items.length) return;
-      html += `<div class="st-cat">${_esc(c.name)}${c.desc ? `<i>${_esc(c.desc)}</i>` : ''}</div>`;
-      html += '<div class="st-grid">' + items.map(s =>
+      // ★ 分组**只靠底色和圆角** ✓，一个字都不写 ✓（2026-10-27 用户：不要那么多字、
+      //   不要文字分组 ✓）。颜色按清单顺序轮换 ✓，以后加组也不会挤在一起 ✓。
+      html += `<div class="st-group st-g${i % 3}"><div class="st-grid">` + items.map(s =>
         `<button class="st-item" data-sid="${_esc(s.id)}" aria-label="${_esc(s.name)}">
-           <img loading="lazy" src="${stickerImg(s, true)}" alt="${_esc(s.name)}">
-         </button>`).join('') + '</div>';
+           <img loading="lazy" src="${stickerImg(s, true)}" alt="">
+         </button>`).join('') + '</div></div>';
     });
     html += '</div>';
     p.innerHTML = html;

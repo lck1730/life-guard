@@ -675,15 +675,18 @@
     margin-top:0; padding:4px; border-radius:14px !important; box-shadow:none;
     background:transparent !important; border:0 !important;
   }
-  /* 表情面板：分类 + 网格；弹层里自己滚，别把输入区顶出去 */
+  /* 表情面板（2026-10-27 第二版）：**不写分类名** ✓ —— 每组一块淡色圆角底，
+     靠底色和间距分组 ✓；弹层里自己滚，别把输入区顶出去 ✓ */
   .st-scroll { max-height:52vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
-  .st-cat { display:flex; align-items:baseline; gap:8px; margin:10px 0 8px;
-            font-size:13px; color:var(--muted); }
-  .st-cat i { font-style:normal; font-size:11px; opacity:.75; }
-  .st-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; }
+  .st-group { border-radius:16px; padding:8px; margin:0 0 10px; }
+  .st-g0 { background:rgba(150,215,165,.11); }
+  .st-g1 { background:rgba(255,150,190,.11); }
+  .st-g2 { background:rgba(122,190,255,.10); }
+  .st-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
   .st-item { padding:0; border:0; background:transparent; border-radius:12px;
              overflow:hidden; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .st-item img { display:block; width:100%; aspect-ratio:1/1; object-fit:cover; }
+  .st-item img { display:block; width:100%; aspect-ratio:1/1; object-fit:cover;
+                 border-radius:12px; }
   .st-item:active { transform:scale(.94); }
   .st-empty { color:var(--muted); font-size:14px; line-height:1.7; padding:12px 0; }
   .vmsg { display:flex; align-items:center; gap:8px; min-width:90px; cursor:pointer; }
