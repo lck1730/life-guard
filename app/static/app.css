@@ -419,8 +419,13 @@
         font-size:13px;font-weight:600; }
   .row.agent .av { background:var(--accent-bg); color:var(--agent); }
   .wrap2 { min-width:0; }
-  .who { font-size:12px; color:var(--muted); margin-bottom:3px; padding-left:4px; }
-  .row.agent .who { color:var(--agent); }
+  /* ★ 2026-10-27：聊天里**所有名字统一用主题色 + 加粗** ✓（用户：「管家昵称和用户昵称
+     颜色不一致，应该一致，并且按照主题色变化，然后字体粗一些」✓）。
+     ⚠️ 原来管家是 `--agent`（绿）✓、别人和自己却是 `--muted`（灰）✗ → 一个群里三种颜色 ✓；
+        现在删掉管家那条 ✓，聊天里的名字**只剩这一条规则** ✓。
+     ⚠️ 只管 `.row`（聊天行）✓ —— 「我的」「管家」「别人」那几屏的 `.who` 不动 ✓。 */
+  .row .who { font-size:12px; color:var(--accent); font-weight:600;
+              margin-bottom:3px; padding-left:4px; }
   .row.mine .who { text-align:right; padding-right:4px; }
   .bubble { padding:9px 13px; border-radius:14px; background:var(--bubble-bg);
             word-break:break-word; white-space:pre-wrap; }
