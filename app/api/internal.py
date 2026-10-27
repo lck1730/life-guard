@@ -506,6 +506,38 @@ async def send_image(body: SendImageIn) -> dict:
     return {"ok": True, "message_id": msg["id"], "path": rel.as_posix()}
 
 
+# ── 发表情（2026-10-27）───────────────────────────────────────────────
+#
+# ★ **管家只能发 3xx 猫猫管家** ✓ —— 这一条必须卡在**后端** ✗，不能只写在
+#   工具描述 / SOUL 里：1xx / 2xx 是群友的表情 ✓，让管家发等于它在替人说话 ✓。
+#   （和"能力边界用有没有这个工具来划"是同一个思路：规则贴着执行点最硬 ✓。）
+class SendStickerIn(BaseModel):
+    group_id: int
+    sticker_id: str = Field(min_length=3, max_length=3)
+
+
+@router.post("/send-sticker", dependencies=[Depends(require_internal_token)])
+async def send_sticker(body: SendStickerIn) -> dict:
+    await _assert_group(body.group_id)
+    from ..core import stickers as sticker_core
+
+    s = sticker_core.get(body.sticker_id)
+    if not s:
+        return {"ok": False, "error": f"没有编号 {body.sticker_id} 这个表情"}
+    if s.get("owner") != "butler":
+        return {"ok": False,
+                "error": (f"{sticker_core.label(body.sticker_id)} 是群友的表情，"
+                          f"不是你的。你只能发猫猫管家那一套（301-306）。")}
+    msg = await create_message(
+        group_id=body.group_id, sender_id=None, sender_type="agent",
+        msg_type="sticker", content=str(s["id"]),
+        media_path=sticker_core.media_path(s),
+        media_meta=sticker_core.sticker_meta(s),
+    )
+    log.info("群 %s：管家发了一张表情 %s ✓", body.group_id, body.sticker_id)
+    return {"ok": True, "message_id": msg["id"]}
+
+
 # ── 组件仓库的公共校验 ─────────────────────────────────────────────────
 #
 # 创意工坊/DIY 助手已经下线，但组件本身还在：列表、渲染、导入、删版本

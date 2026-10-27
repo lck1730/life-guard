@@ -663,6 +663,29 @@
   .bubble.media img { display:block; max-width:210px; max-height:280px;
                       border-radius:12px; object-fit:cover; }
   .row.agent .bubble.media { border-left:0 !important; }
+  /* ★ 表情（2026-10-27）：**图就是气泡** —— 不要底板、不要补白、不要那条竖线 */
+  .bubble.sticker { padding:4px; background:transparent !important; border:0 !important; }
+  .bubble.sticker img { display:block; width:126px; height:126px; border-radius:14px;
+                        object-fit:cover; cursor:pointer; }
+  .row.agent .bubble.sticker { border-left:0 !important; }
+  /* ⚠️ 贴纸主题那条通用规则会给所有非 media 气泡挂一颗"脑袋" ✓ ——
+     表情必须一起挡掉 ✗→✓（`media` 类已经挡了一层，这里是第二道：
+     主题的 padding/圆角/白圈都别沾到表情上 ✓）。 */
+  .row[data-bubble]:not([data-bubble="plain"]) .bubble.sticker {
+    margin-top:0; padding:4px; border-radius:14px !important; box-shadow:none;
+    background:transparent !important; border:0 !important;
+  }
+  /* 表情面板：分类 + 网格；弹层里自己滚，别把输入区顶出去 */
+  .st-scroll { max-height:52vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .st-cat { display:flex; align-items:baseline; gap:8px; margin:10px 0 8px;
+            font-size:13px; color:var(--muted); }
+  .st-cat i { font-style:normal; font-size:11px; opacity:.75; }
+  .st-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; }
+  .st-item { padding:0; border:0; background:transparent; border-radius:12px;
+             overflow:hidden; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .st-item img { display:block; width:100%; aspect-ratio:1/1; object-fit:cover; }
+  .st-item:active { transform:scale(.94); }
+  .st-empty { color:var(--muted); font-size:14px; line-height:1.7; padding:12px 0; }
   .vmsg { display:flex; align-items:center; gap:8px; min-width:90px; cursor:pointer; }
   .vmsg .bars { color:var(--accent); font-size:16px; }
   .vmsg .dur { font-size:12px; color:var(--muted); }

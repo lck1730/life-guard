@@ -208,6 +208,7 @@
   const quoteWho = m => m.sender_type === 'agent' ? agentName() : (dispName(m) || '某人');
   const quoteText = m => {
     if (m.msg_type === 'image') return '[图片]';
+    if (m.msg_type === 'sticker') return '[表情] ' + (stickerName(m) || '');
     if (m.msg_type === 'voice') return '[语音] ' + (m.content || '');
     if (m.msg_type === 'audio') return '[音频] ' + (m.content || '');
     if (m.msg_type === 'file') {
@@ -358,6 +359,22 @@
       img.onload = () => scrollDown();
       img.onclick = () => openLightbox(img.src);
       b.appendChild(img);
+    } else if (m.msg_type === 'sticker') {
+      // ★ 表情（2026-10-27）：**图就是气泡** ✓ —— 没有底板、没有补白 ✓。
+      //   路径取消息里存的那一份（带发送时的版本号 ✓），老消息不会被新图换掉 ✓。
+      b.classList.add('media', 'sticker');
+      const src = stickerUrl(m);
+      if (src) {
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = stickerName(m);
+        img.loading = 'lazy';
+        img.onload = () => scrollDown();
+        img.onclick = () => openLightbox(src);
+        b.appendChild(img);
+      } else {
+        b.textContent = '[表情]';
+      }
     } else if (m.msg_type === 'file' && m.media_path) {
       b.classList.add('media');
       b.appendChild(fileCard(m));
@@ -991,44 +1008,128 @@
     openSheet();
   };
 
-  // ── 表情包（占位）──────────────────────────────────────────────────
+  // ── 表情包（2026-10-27）────────────────────────────────────────────
   //
-  // 位置先留着。后面内置表情包时，只要往 STICKERS 里塞条目、
-  // 点选后走 **addPending** ✓（`sendImage` 已经没了 ✗ —— 2026-10-06 改成
-  // "选了先停在待发区、点发送才走" ✓）。表情包本质就是张图片 ✓，一样停在待发区 ✓。
-  const STICKERS = [];   // 例如 { name:'抱抱', path:'emoji/hug.webp' }
+  // ★ **编号 ⇄ 图**只认服务端那份清单 ✓：`static/stickers/stickers.json` ✓。
+  //   前端**不抄编号表** ✗ —— 以后加表情只改清单 + 图 ✓。
+  //   这里只做两件事：把清单缓一份到 localStorage（下次开页秒开 ✓），
+  //   以及按清单预载缩略图（点开入口时不一格一格地跳 ✓）。
+  //
+  // ⚠️ 图片 URL 一定带 `?v=<清单版本>` ✓ —— 静态层见到它就回 immutable 长缓存 ✓；
+  //    换版时只改清单的 `version` 和目录名 ✓，旧消息里存的旧 `?v=` 照旧能取到 ✓。
+  const STICKER_CACHE = 'lg_stickers_v1';
+  let stickerCatalog = { version: 0, categories: [], stickers: [] };
+  try {
+    const cached = JSON.parse(localStorage.getItem(STICKER_CACHE) || 'null');
+    if (cached && Array.isArray(cached.stickers)) stickerCatalog = cached;
+  } catch (e) {}
+  let _stickerLoaded = false;
 
-  $('#pickSticker').onclick = () => {
+  const stickerImg = (s, thumb) => {
+    if (!s) return '';
+    return '/' + (thumb && s.thumb ? s.thumb : s.file) + '?v=' + (stickerCatalog.version || 1);
+  };
+  const stickerById = (id) => {
+    id = String(id || '');
+    return (stickerCatalog.stickers || []).find(s => String(s.id) === id) || null;
+  };
+  /** 已落库的消息：用发送那一刻的路径 ✓；实在没有才按编号回查清单 ✓。 */
+  const stickerUrl = (m) => {
+    if (m && m.media_path) return '/' + m.media_path;
+    return stickerImg(stickerById(m && m.content));
+  };
+  const stickerName = (m) => {
+    const meta = (m && m.media_meta) || {};
+    const s = stickerById(m && m.content);
+    return meta.name || (s && s.name) || '';
+  };
+  const _esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  const loadStickers = async () => {
+    if (_stickerLoaded) return;
+    _stickerLoaded = true;
+    try {
+      // 这份清单很小（几 KB），`/static` 没带 `?v=` 时是 no-store ✓，不会吃到旧版。
+      const r = await fetch('/static/stickers/stickers.json', { credentials: 'same-origin' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      if (!data || !Array.isArray(data.stickers) || !data.stickers.length) return;
+      stickerCatalog = data;
+      try { localStorage.setItem(STICKER_CACHE, JSON.stringify(data)); } catch (e) {}
+      data.stickers.forEach(s => { const im = new Image(); im.src = stickerImg(s, true); });
+      if ($('#stLoading')) renderStickerSheet();   // 第一次进来时补画 ✓
+    } catch (e) {
+      _stickerLoaded = false;                       // 下次点开再试一次 ✓
+      const box = $('#stLoading');
+      if (box) box.textContent = '表情没拉到，检查一下网络再点开这个入口。';
+    }
+  };
+
+  const renderStickerSheet = () => {
     const p = $('#sheetPanel');
-    if (!STICKERS.length) {
+    const all = stickerCatalog.stickers || [];
+    if (!all.length) {
       p.innerHTML = `<h3>表情</h3>
-        <div style="color:var(--muted);font-size:14px;line-height:1.7;padding:12px 0">
-          这里以后会放内置表情包。<br>入口先留着。</div>
+        <div class="st-empty" id="stLoading">表情正在加载…<br>稍等一下；一直这样的话，退出去再进来一次。</div>
         <div class="actions"><button class="btn-solid" id="stOk">知道了</button></div>`;
       p.querySelector('#stOk').onclick = closeSheet;
-      openSheet();
       return;
     }
-    // 有表情包之后的渲染（现在走不到）
-    p.innerHTML = '<h3>表情</h3><div id="stGrid" style="display:flex;flex-wrap:wrap;gap:10px"></div>';
-    STICKERS.forEach(s => {
-      const img = document.createElement('img');
-      img.src = '/media/' + s.path;
-      img.style.cssText = 'width:64px;height:64px;border-radius:10px;object-fit:cover;cursor:pointer';
-      img.onclick = async () => {
-        closeSheet();
-        try {
-          await api(`/groups/${group.id}/messages`, {
-            method: 'POST',
-            body: JSON.stringify({ msg_type: 'image', media_path: s.path,
-                                   media_meta: { sticker: true } }),
-          });
-        } catch (e) { toast(e.message); }
-      };
-      p.querySelector('#stGrid').appendChild(img);
+    const cats = (stickerCatalog.categories || []).slice().sort((a, b) =>
+      a.key === 'butler' ? -1 : b.key === 'butler' ? 1 : 0);
+    let html = '<h3>表情</h3><div class="st-scroll">';
+    cats.forEach(c => {
+      const items = all.filter(s => s.category === c.key);
+      if (!items.length) return;
+      html += `<div class="st-cat">${_esc(c.name)}${c.desc ? `<i>${_esc(c.desc)}</i>` : ''}</div>`;
+      html += '<div class="st-grid">' + items.map(s =>
+        `<button class="st-item" data-sid="${_esc(s.id)}" aria-label="${_esc(s.name)}">
+           <img loading="lazy" src="${stickerImg(s, true)}" alt="${_esc(s.name)}">
+         </button>`).join('') + '</div>';
     });
-    openSheet();
+    html += '</div>';
+    p.innerHTML = html;
+    p.querySelectorAll('.st-item').forEach(btn => {
+      btn.onclick = () => {
+        const s = stickerById(btn.dataset.sid);
+        closeSheet();
+        if (s) sendSticker(s);
+      };
+    });
   };
+
+  $('#pickSticker').onclick = () => {
+    renderStickerSheet();
+    openSheet();
+    loadStickers();
+  };
+
+  /** 发一张表情：**先上屏、再落库** ✓；客户端只报编号，路径由服务端补 ✓。 */
+  const sendSticker = async (s) => {
+    if (!s || !group) return;
+    const tempId = 'st' + Date.now() + Math.random().toString(36).slice(2, 6);
+    addTempBubble(tempId, 'sticker', stickerImg(s, false));
+    scrollDown();
+    try {
+      const msg = await api(`/groups/${group.id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify(Object.assign({
+          msg_type: 'sticker',
+          content: String(s.id),
+        }, quoteField())),
+      });
+      clearQuote();
+      // 正式消息可能已经从 WebSocket 先到了 ✓（和图片那条一样 ✓）
+      if (!$('#msgs').querySelector(`[data-id="${msg.id}"]`)) addMsg(msg);
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      removeTempBubble(tempId);
+    }
+  };
+
+  loadStickers();   // 开页就预热：清单 + 缩略图 ✓（有缓存时零等待 ✓）
 
   const openLightbox = (src) => {
     $('#lightboxTxt').hidden = true;
@@ -1142,6 +1243,13 @@
       img.src = url;                       // 本地 blob，零延迟
       img.onclick = () => openLightbox(url);
       b.appendChild(img);
+    } else if (kind === 'sticker') {
+      // 表情也是"先上屏、后落库" ✓ —— 本地缓存命中时和已发出的一模一样 ✓
+      b.classList.add('media', 'sticker');
+      const img = document.createElement('img');
+      img.src = url;
+      img.onclick = () => openLightbox(url);
+      b.appendChild(img);
     } else if (kind === 'file' || kind === 'audio') {
       // 上传中：先画一个"正在传"的壳 ✓（文件名立刻看得见 ✓，别让人以为没选上 ✗）
       b.classList.add('media');
@@ -1157,9 +1265,11 @@
       v.appendChild(d);
       b.appendChild(v);
     }
-    const st = document.createElement('div'); st.className = 'vsub';
-    st.textContent = '发送中…';
-    b.appendChild(st);
+    if (kind !== 'sticker') {
+      const st = document.createElement('div'); st.className = 'vsub';
+      st.textContent = '发送中…';
+      b.appendChild(st);
+    }
     w.appendChild(b); row.appendChild(av); row.appendChild(w);
     $('#msgs').appendChild(row);
     _temps.set(id, row);

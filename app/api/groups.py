@@ -34,7 +34,9 @@ router = APIRouter(prefix="/api/groups", tags=["groups"])
 
 class SendMessageIn(BaseModel):
     # ★ 2026-10-08 加了 `file`（文档）和 `audio`（**上传的音频**，和"按住说的 voice"分开 ✓）
-    msg_type: str = Field(default="text", pattern="^(text|image|voice|file|audio)$")
+    # ★ 2026-10-27 加 `sticker` —— 表情包只存编号（`content="301"`），
+    #   图路径和名字由服务端按清单补 ✓（见 `core/stickers.py`）。
+    msg_type: str = Field(default="text", pattern="^(text|image|voice|file|audio|sticker)$")
     content: str | None = None
     media_path: str | None = None
     media_meta: dict | None = None
@@ -643,6 +645,22 @@ async def send_message(
     # 只是管家读不到内容而已。为了转写失败让人发不出话，本末倒置。
     content = body.content
     media_meta = dict(body.media_meta or {})
+    media_path = body.media_path
+
+    # ★ 表情包（2026-10-27）：**客户端只说编号** ✓，路径和名字一律由服务端补 ✗→✓。
+    #   ⚠️ 不能信客户端给的 `media_path` ✗ —— 那等于让它可以拿任意静态文件
+    #      冒充一条表情消息 ✓；编号也不认清单里没有的 ✓。
+    if body.msg_type == "sticker":
+        from ..core import stickers as sticker_core
+
+        s = sticker_core.get(body.content)
+        if not s:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                "没有这个表情编号")
+        content = str(s["id"])
+        media_path = sticker_core.media_path(s)
+        media_meta = sticker_core.sticker_meta(s)
+
     # ★ `audio`（用户**上传的音频文件** ✓）和 `voice`（按住说的 ✓）**走同一条路** ✓ ——
     #   对管家来说都是"一段话"，它不需要知道是录的还是传的 ✓。
     if body.msg_type in ("voice", "audio") and body.media_path and not (content or "").strip():
@@ -724,7 +742,7 @@ async def send_message(
         sender_type="user",
         msg_type=body.msg_type,
         content=content,
-        media_path=body.media_path,
+        media_path=media_path,
         media_meta=media_meta or None,
         mentions=body.mentions,
         reply_to=body.reply_to,

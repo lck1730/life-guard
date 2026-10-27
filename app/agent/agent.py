@@ -705,6 +705,9 @@ async def _group_persona(group_id: int) -> str:
         "· **记录** —— 要记的东西（记钱、待办、体重…）存下来 ✓，以后能查能算 ✓\n"
         "· **提醒** —— 到点我来跟你说 ✓\n"
         "· **聊天** —— 陪他们说话、接话、出主意 ✓\n"
+        "· **发表情** —— 你自己有一套「猫猫管家」表情（301-306）✓；"
+        "群友发的表情有编号和初始含义 ✓，你能读懂再决定接不接 ✓"
+        "（⚠️ 1xx 医生猪猪 / 2xx 程序猪猪 是群友的，**你不能发** ✗）\n"
         "· **看图** —— 他们发的图你看得见 ✓（看到 `[图片]` 就 `look_at_image(编号)` 取路径，"
         "再交给 `vision_analyze` 看**整张**；⚠️ 看整图**别传 `region`** —— "
         "那是按像素裁一块，只裁一角会把满盘菜看成空盘）\n"
@@ -826,6 +829,15 @@ def _render_transcript(messages: list[dict[str, Any]], agent_name: str) -> str:
             #   区别只在**人**那边看得见（一个是语音条、一个是播放器 ✓）。
             transcript = (m.get("content") or "").strip()
             text = f"[音频] {transcript}" if transcript else "[音频，没转出文字]"
+        elif kind == "sticker":
+            # ★ 表情（2026-10-27）：**把编号、名字、初始含义一起给它** ✓ ——
+            #   用户定的就是这个：编号是索引，含义要结合语境和相处习惯再判断 ✓。
+            #   所有权也在这一行里（"群友发了管家的猫猫表情"）✓，
+            #   它才知道自己能不能接、能不能调侃 ✓。
+            from ..core import stickers as sticker_core
+
+            text = sticker_core.describe_for_agent(
+                m.get("content") or "", sender_type=str(kind_of_sender or ""))
         elif kind == "file":
             # ★ 文件三态（2026-10-08）：
             #   · **读进来了**（txt/md/csv/json ✓）→ 直接把正文给它 ✓

@@ -38,6 +38,7 @@ SELECT m.id, m.group_id, m.sender_id, m.sender_type, m.msg_type,
        q.sender_type AS quote_sender_type,
        q.msg_type   AS quote_msg_type,
        q.content    AS quote_content,
+       q.media_meta AS quote_media_meta,
        COALESCE(qgm.nickname, qu.nickname) AS quote_sender_nickname
 FROM messages m
 LEFT JOIN users u ON u.id = m.sender_id
@@ -74,6 +75,12 @@ def _quote(row: dict[str, Any]) -> dict[str, Any] | None:
         body = "[图片]"
     elif kind == "voice":
         body = f"[语音] {body}" if body else "[语音]"
+    elif kind == "sticker":
+        # ★ 2026-10-27：`content` 是编号 ✓，引用条上要写名字而不是 "301" ✓
+        #   （名字在发送那一刻的快照里 ✓，见 `core/stickers.py`）。
+        meta = _load_json(row.get("quote_media_meta")) or {}
+        nm = meta.get("name") if isinstance(meta, dict) else None
+        body = f"[表情] {nm}" if nm else "[表情]"
     elif not body:
         body = f"[{kind}]"
     return {

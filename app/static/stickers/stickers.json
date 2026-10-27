@@ -1,0 +1,233 @@
+{
+  "version": 1,
+  "title": "生活管家表情包",
+  "asset_dir": "stickers/v1",
+  "categories": [
+    {
+      "key": "butler",
+      "name": "猫猫管家",
+      "desc": "管家自己的表情；只有这一套归管家发"
+    },
+    {
+      "key": "doctor",
+      "name": "医生猪猪",
+      "desc": "群友的一套；管家不能发"
+    },
+    {
+      "key": "coder",
+      "name": "程序猪猪",
+      "desc": "群友的一套；管家不能发"
+    }
+  ],
+  "stickers": [
+    {
+      "id": "101",
+      "category": "doctor",
+      "name": "睡觉中",
+      "meaning": "困了、想睡、晚安；也可以表示不想动",
+      "slug": "sleep",
+      "owner": "user",
+      "file": "stickers/v1/101.webp",
+      "thumb": "stickers/v1/101-t.webp",
+      "source": "edbec247096ecf5a621a4258.jpg"
+    },
+    {
+      "id": "102",
+      "category": "doctor",
+      "name": "拱饭中",
+      "meaning": "干饭、吃饭、到饭点了",
+      "slug": "eat",
+      "owner": "user",
+      "file": "stickers/v1/102.webp",
+      "thumb": "stickers/v1/102-t.webp",
+      "source": "c25679c25670068d06700869.jpg"
+    },
+    {
+      "id": "103",
+      "category": "doctor",
+      "name": "生气气",
+      "meaning": "有点生气、不满、撒娇式抗议",
+      "slug": "angry",
+      "owner": "user",
+      "file": "stickers/v1/103.webp",
+      "thumb": "stickers/v1/103-t.webp",
+      "source": "f3bbc8cc197d178f7fff4092.jpg"
+    },
+    {
+      "id": "104",
+      "category": "doctor",
+      "name": "开心心",
+      "meaning": "开心、庆祝、好消息",
+      "slug": "happy",
+      "owner": "user",
+      "file": "stickers/v1/104.webp",
+      "thumb": "stickers/v1/104-t.webp",
+      "source": "9920ef613932f01ffe7389f0.jpg"
+    },
+    {
+      "id": "105",
+      "category": "doctor",
+      "name": "委屈屈",
+      "meaning": "委屈、求安慰、被欺负了",
+      "slug": "sad",
+      "owner": "user",
+      "file": "stickers/v1/105.webp",
+      "thumb": "stickers/v1/105-t.webp",
+      "source": "cc11b210c4d3b14e2f7793a3.jpg"
+    },
+    {
+      "id": "106",
+      "category": "doctor",
+      "name": "摸鱼中",
+      "meaning": "偷懒、摸鱼、不想干活",
+      "slug": "slack",
+      "owner": "user",
+      "file": "stickers/v1/106.webp",
+      "thumb": "stickers/v1/106-t.webp",
+      "source": "e44a7b410f14b0ddc348cd62.jpg"
+    },
+    {
+      "id": "201",
+      "category": "coder",
+      "name": "摸鱼中",
+      "meaning": "偷懒、摸鱼、不想上班",
+      "slug": "slack",
+      "owner": "user",
+      "file": "stickers/v1/201.webp",
+      "thumb": "stickers/v1/201-t.webp",
+      "source": "5f961b2515feaec1b60a3b68.jpg"
+    },
+    {
+      "id": "202",
+      "category": "coder",
+      "name": "敲代码",
+      "meaning": "写代码、干活、忙起来了",
+      "slug": "coding",
+      "owner": "user",
+      "file": "stickers/v1/202.webp",
+      "thumb": "stickers/v1/202-t.webp",
+      "source": "10b6789d82341259bd0c1276.jpg"
+    },
+    {
+      "id": "203",
+      "category": "coder",
+      "name": "又有bug?!",
+      "meaning": "崩溃、又出 bug 了、离谱",
+      "slug": "bug",
+      "owner": "user",
+      "file": "stickers/v1/203.webp",
+      "thumb": "stickers/v1/203-t.webp",
+      "source": "b980ac17176e8c947b994a28.jpg"
+    },
+    {
+      "id": "204",
+      "category": "coder",
+      "name": "开心心",
+      "meaning": "开心、搞定、庆祝",
+      "slug": "happy",
+      "owner": "user",
+      "file": "stickers/v1/204.webp",
+      "thumb": "stickers/v1/204-t.webp",
+      "source": "ae4c7f74da8bfd3ee58a83b0.jpg"
+    },
+    {
+      "id": "205",
+      "category": "coder",
+      "name": "委屈屈",
+      "meaning": "委屈、求安慰、不想改需求",
+      "slug": "sad",
+      "owner": "user",
+      "file": "stickers/v1/205.webp",
+      "thumb": "stickers/v1/205-t.webp",
+      "source": "4d8d88d035a812425b649115.jpg"
+    },
+    {
+      "id": "206",
+      "category": "coder",
+      "name": "睡觉中",
+      "meaning": "困了、熬夜、晚安",
+      "slug": "sleep",
+      "owner": "user",
+      "file": "stickers/v1/206.webp",
+      "thumb": "stickers/v1/206-t.webp",
+      "source": "0bb79b07bf5daa9b7742ea6d.jpg"
+    },
+    {
+      "id": "207",
+      "category": "coder",
+      "name": "吃饭中",
+      "meaning": "干饭、吃饭、补充能量",
+      "slug": "eat",
+      "owner": "user",
+      "file": "stickers/v1/207.webp",
+      "thumb": "stickers/v1/207-t.webp",
+      "source": "94f92b47beafa30e24d09fbe.jpg"
+    },
+    {
+      "id": "301",
+      "category": "butler",
+      "name": "早安",
+      "meaning": "早上打招呼、元气满满地叫人起床",
+      "slug": "morning",
+      "owner": "butler",
+      "file": "stickers/v1/301.webp",
+      "thumb": "stickers/v1/301-t.webp",
+      "source": "bb62343551baa7f3fd701341.jpg"
+    },
+    {
+      "id": "302",
+      "category": "butler",
+      "name": "记账啦！",
+      "meaning": "提醒记账、账记好了、该对账了",
+      "slug": "bookkeeping",
+      "owner": "butler",
+      "file": "stickers/v1/302.webp",
+      "thumb": "stickers/v1/302-t.webp",
+      "source": "9917fe08ede5d572f8d3ea46.jpg"
+    },
+    {
+      "id": "303",
+      "category": "butler",
+      "name": "真棒",
+      "meaning": "夸奖、庆祝、为你骄傲",
+      "slug": "praise",
+      "owner": "butler",
+      "file": "stickers/v1/303.webp",
+      "thumb": "stickers/v1/303-t.webp",
+      "source": "7fa53bb507d2efdbd00f2fca.jpg"
+    },
+    {
+      "id": "304",
+      "category": "butler",
+      "name": "辛苦啦",
+      "meaning": "安慰、感谢辛苦、递杯水",
+      "slug": "thanks",
+      "owner": "butler",
+      "file": "stickers/v1/304.webp",
+      "thumb": "stickers/v1/304-t.webp",
+      "source": "4d4ce15056108e673dc37360.jpg"
+    },
+    {
+      "id": "305",
+      "category": "butler",
+      "name": "早点休息",
+      "meaning": "关心、催睡、别熬夜",
+      "slug": "rest",
+      "owner": "butler",
+      "file": "stickers/v1/305.webp",
+      "thumb": "stickers/v1/305-t.webp",
+      "source": "33906fac0796416cabb2b28a.jpg"
+    },
+    {
+      "id": "306",
+      "category": "butler",
+      "name": "摸摸头",
+      "meaning": "安慰、亲昵、顺毛",
+      "slug": "comfort",
+      "owner": "butler",
+      "file": "stickers/v1/306.webp",
+      "thumb": "stickers/v1/306-t.webp",
+      "source": "3bdfc51c9472b605285596f2.jpg"
+    }
+  ]
+}
