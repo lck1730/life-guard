@@ -203,20 +203,33 @@
   //     · 身上的暖光晕跟着呼吸明暗 ✓ · 背脊一线窗光 ✓
   //     · **点一下：整只猫蹦起来 + 爱心 + 瞪大眼 → 0.52 秒后回主群聊** ✓
   const flatCatSvg = function () {
-    const T = 'translate(682,1444)';
+    const T = 'translate(682,1444) scale(1.16)';
+    // 时间轴：24s 一轮（睡 → 醒/伸懒腰 → 舔爪 → 踩奶 → 看四周/摇尾 → 蝴蝶 → 洗脸 → 打哈欠 → 睡）
+    const _A = function (attr, pairs, dur, tail) {
+      return '<animate attributeName="' + attr + '" values="' +
+        pairs.map(function (p) { return p[1]; }).join(';') + '" keyTimes="' +
+        pairs.map(function (p) { return p[0]; }).join(';') + '" dur="' + dur +
+        's" repeatCount="indefinite"' + (tail ? ' ' + tail : '') + '/>';
+    };
+    const _T = function (type, pairs, dur, tail) {
+      return '<animateTransform attributeName="transform" type="' + type + '" values="' +
+        pairs.map(function (p) { return p[1]; }).join(';') + '" keyTimes="' +
+        pairs.map(function (p) { return p[0]; }).join(';') + '" dur="' + dur +
+        's" repeatCount="indefinite"' + (tail ? ' ' + tail : '') + '/>';
+    };
+
     let s = '<g class="ws-cat" transform="' + T + '" style="cursor:pointer">' +
-      // 点击热区 ✓ —— 猫在屏上本来就小 ✓，热区比它宽一圈 ✓
-      //   （pointer-events=all ✓：fill 是透明的不然不算命中 ✓）。
-      '<rect x="-100" y="-96" width="196" height="142" fill="transparent" pointer-events="all"/>' +
-      // 身上的暖光晕 ✓ —— 跟着呼吸一起明暗 ✓
-      '<ellipse cx="0" cy="-6" rx="116" ry="68" fill="url(#wsCatGlow)" opacity=".5">' +
+      // 点击热区 —— 猫小，热区比它宽一圈
+      '<rect x="-104" y="-98" width="204" height="148" fill="transparent" pointer-events="all"/>' +
+      // 暖光晕
+      '<ellipse cx="-6" cy="-8" rx="112" ry="64" fill="url(#wsCatGlow)" opacity=".5">' +
         '<animate attributeName="opacity" values=".38;.62;.38" keyTimes="0;.5;1" ' +
         'dur="4.2s" repeatCount="indefinite"/></ellipse>' +
-      // 地上的软影 ✓（猫窝留在 rsvg 里 ✓，这里只补影子 ✓）
-      '<ellipse cx="0" cy="27" rx="78" ry="17" fill="#6a4530" opacity=".22" ' +
+      // 地上的软影
+      '<ellipse cx="2" cy="26" rx="76" ry="15" fill="#6a4530" opacity=".22" ' +
         'filter="url(#wsSoft)"/>';
 
-    // 蹦起来（点击时 beginElement ✓）+ 跳起来时那一点点歪 ✓
+    // ── 点击：蹦一下 + 歪头 ───────────────────────────────────────────
     s += '<g class="cat-jump">' +
       '<animateTransform id="wsCatJump" attributeName="transform" type="translate" ' +
       'values="0 0;0 -22;0 -27;0 -5;0 0" keyTimes="0;.28;.5;.75;1" dur=".52s" ' +
@@ -226,284 +239,361 @@
       'values="0 -28 16;-4 -28 16;3 -28 16;0 -28 16" keyTimes="0;.3;.65;1" ' +
       'dur=".52s" begin="indefinite" fill="freeze"/>';
 
-    // 呼吸（整只轻轻起伏 ✓）
+    // ── 呼吸 + 身体轻晃（踩奶/被蝴蝶痒到）────────────────────────────
     s += '<g class="cat-breathe">' +
-      '<animateTransform attributeName="transform" type="translate" ' +
-      'values="0 0;0 -1.8;0 0" keyTimes="0;.5;1" dur="4.2s" repeatCount="indefinite"/>';
+      _T('translate', [[0, '0 0'], [0.5, '0 -1.5'], [1, '0 0']], 4.2) +
+      '<g class="cat-sway">' +
+      _T('rotate', [
+        [0, '0 0 24'], [0.39, '0 0 24'],
+        [0.405, '2.2 0 24'], [0.425, '0 0 24'], [0.445, '-2.2 0 24'],
+        [0.465, '0 0 24'], [0.485, '2 0 24'], [0.505, '0 0 24'],
+        [0.525, '-1.8 0 24'], [0.54, '0 0 24'],
+        [0.555, '1 0 24'], [0.60, '-.6 0 24'], [0.655, '0 0 24'],
+        [0.715, '0 0 24'], [0.725, '-1.6 0 24'], [0.74, '1.2 0 24'], [0.752, '0 0 24'],
+        [1, '0 0 24']
+      ], 24);
 
-    // 醒来时整只轻轻侧一下身 ✓；蝴蝶落到鼻尖时被痒得抖两下 ✓（同一个 12s 周期 ✓）
-    s += '<g class="cat-shift">' +
-      '<animateTransform attributeName="transform" type="rotate" ' +
-      'values="0 -20 18;0 -20 18;1.6 -20 18;-1 -20 18;0 -20 18;-1.8 -20 18;1.4 -20 18;0 -20 18" ' +
-      'keyTimes="0;.58;.66;.76;.86;.895;.915;1" dur="12s" repeatCount="indefinite"/>';
-
-    // 尾巴（在身体后面 ✓，从右侧卷上来 ✓）
+    // ── 尾巴（在身体后面）─────────────────────────────────────────────
     s += '<g class="cat-tail">' +
-      // 整条尾巴甩得比原来勤一点、大一点 ✓
-      '<animateTransform attributeName="transform" type="rotate" ' +
-      'values="0 44 10;-10 44 10;0 44 10;8 44 10;0 44 10" keyTimes="0;.20;.42;.68;1" ' +
-      'dur="3.2s" repeatCount="indefinite"/>' +
-      // 蝴蝶落到鼻尖时，尾巴也跟着「啪」地甩一下 ✓（和 12s 醒来的周期对齐 ✓）
-      '<g class="cat-tail-react">' +
-        '<animateTransform attributeName="transform" type="rotate" ' +
-        'values="0 44 10;0 44 10;-16 44 10;7 44 10;0 44 10" ' +
-        'keyTimes="0;.865;.89;.915;.945" dur="12s" repeatCount="indefinite"/>' +
-        // 尾巴尖再单独一抖 ✓（和整条尾巴错开 ✓，看着才不像一根硬棍 ✓）
-        '<g class="cat-tail-tip">' +
-          '<animateTransform attributeName="transform" type="rotate" ' +
-          'values="0 58 -18;0 58 -18;0 58 -18;-5 58 -18;3 58 -18;0 58 -18;0 58 -18" ' +
-          'keyTimes="0;.30;.33;.36;.40;.44;1" dur="2.9s" repeatCount="indefinite"/>' +
-          '<path d="M 42 10 Q 68 10 72 -6 Q 75 -22 59 -23 Q 48 -23 47 -13" fill="none" ' +
-          'stroke="#b3733f" stroke-width="16" stroke-linecap="round"/>' +
-          '<path d="M 42 10 Q 68 10 72 -6 Q 75 -22 59 -23 Q 48 -23 47 -13" fill="none" ' +
-          'stroke="#d9955f" stroke-width="12.5" stroke-linecap="round"/>' +
-          '<path d="M 42 8 Q 64 8 69 -5" fill="none" stroke="#f0c08d" stroke-width="3.5" ' +
-          'stroke-linecap="round" opacity=".55"/>' +
-          '<path d="M 59 -19 q 6 2 4 7" fill="none" stroke="#b3733f" stroke-width="3" ' +
-          'stroke-linecap="round" opacity=".5"/>' +
-        '</g></g></g>';
+      // 基础慢摆
+      _T('rotate', [[0, '0 48 12'], [0.25, '-4 48 12'], [0.5, '0 48 12'],
+        [0.75, '4 48 12'], [1, '0 48 12']], 3.6) +
+      '<g class="cat-tail-wag">' +
+      _T('rotate', [
+        [0, '0 48 12'],
+        [0.39, '0 48 12'], [0.415, '2 48 12'], [0.44, '-2 48 12'],
+        [0.465, '2 48 12'], [0.49, '-2 48 12'], [0.515, '1.5 48 12'], [0.54, '0 48 12'],
+        [0.55, '0 48 12'], [0.568, '8 48 12'], [0.586, '-9 48 12'], [0.604, '8 48 12'],
+        [0.622, '-9 48 12'], [0.64, '7 48 12'], [0.658, '-5 48 12'], [0.665, '0 48 12'],
+        [0.70, '0 48 12'], [0.715, '14 48 12'], [0.73, '-12 48 12'], [0.745, '8 48 12'],
+        [0.755, '0 48 12'], [1, '0 48 12']
+      ], 24) +
+      '<g class="cat-tail-tip">' +
+      _T('rotate', [[0, '0 66 -14'], [0.30, '0 66 -14'], [0.35, '-5 66 -14'],
+        [0.39, '3 66 -14'], [0.43, '0 66 -14'], [1, '0 66 -14']], 2.9) +
+      '<g class="cat-tail-reaction">' +
+      _T('rotate', [[0, '0 66 -14'], [0.705, '0 66 -14'], [0.72, '-9 66 -14'],
+        [0.735, '6 66 -14'], [0.75, '0 66 -14'], [1, '0 66 -14']], 24) +
+      '<path d="M 44 13 C 66 19 81 5 78 -9 C 76 -22 62 -26 56 -15" fill="none" ' +
+      'stroke="#a8845a" stroke-width="16" stroke-linecap="round"/>' +
+      '<path d="M 44 13 C 66 19 81 5 78 -9 C 76 -22 62 -26 56 -15" fill="none" ' +
+      'stroke="#fffaf0" stroke-width="13" stroke-linecap="round"/>' +
+      '<path d="M 48 12 C 66 17 78 5 75 -8" fill="none" stroke="#ffffff" ' +
+      'stroke-width="2.8" stroke-linecap="round" opacity=".5"/>' +
+      '<path d="M 74 -14 q 4 3 2 7" fill="none" stroke="#e7cba4" stroke-width="2.4" ' +
+      'stroke-linecap="round" opacity=".8"/>' +
+      '</g></g></g>';
 
-    // 身体（趴成一团 ✓）
-    s += '<path d="M -54 14 Q -57 -10 -36 -19 Q -10 -29 20 -20 Q 46 -12 50 6 ' +
-      'Q 52 18 36 22 L -38 22 Q -50 22 -54 14 Z" fill="url(#wsCatFur)" ' +
-      'stroke="#b3733f" stroke-width="1.8"/>' +
-      // 背脊上的一线暖光 ✓ —— 让毛边看起来被窗光照到 ✓
-      '<path d="M -48 8 Q -50 -8 -34 -15 Q -10 -24 18 -16 Q 40 -9 45 3" fill="none" ' +
-      'stroke="#f7d8a8" stroke-width="2.4" stroke-linecap="round" opacity=".42"/>' +
-      // 前胸的浅色毛 ✓
-      '<path d="M -52 18 Q -46 -6 -30 -8 Q -17 -6 -16 10 Q -18 20 -32 20 Z" ' +
-      'fill="#f4d6a8" opacity=".85"/>' +
-      // 后腿的弧线 + 背上的虎斑 ✓
-      '<path d="M 20 -16 Q 44 -4 38 18" fill="none" stroke="#b3733f" ' +
-      'stroke-width="2.2" opacity=".35"/>' +
-      '<g fill="none" stroke="#b3733f" stroke-width="4" stroke-linecap="round" opacity=".55">' +
-      '<path d="M 18 -17 q 7 8 2 16"/><path d="M 30 -14 q 6 8 2 15"/>' +
-      '<path d="M 40 -9 q 5 7 2 13"/></g>' +
-      // 两只前爪 ✓ —— 睡着时踩奶 ✓；醒来伸懒腰时往前探出去一点 ✓（和哈欠同一段 ✓）
-      '<g class="cat-stretch-paw">' +
-        '<animateTransform attributeName="transform" type="translate" ' +
-        'values="0 0;0 0;-10 2;-10 2;0 0;0 0" ' +
-        'keyTimes="0;.60;.64;.80;.86;1" dur="12s" repeatCount="indefinite"/>' +
-        '<g class="cat-paw">' +
-          '<animateTransform attributeName="transform" type="rotate" ' +
-          'values="0 16 22;0 16 22;-3 16 22;2 16 22;-2 16 22;0 16 22;0 16 22" ' +
-          'keyTimes="0;.38;.42;.46;.50;.54;1" dur="6.4s" repeatCount="indefinite"/>' +
-          '<ellipse cx="6" cy="21" rx="11" ry="6" fill="#f4d6a8" stroke="#c68a5c" ' +
-          'stroke-width="1.3"/>' +
-          '<ellipse cx="25" cy="22" rx="10" ry="5.5" fill="#f4d6a8" stroke="#c68a5c" ' +
-          'stroke-width="1.3"/>' +
-          '<path d="M 3 20 v 3 M 9 20 v 3 M 23 21 v 3 M 28 21 v 3" stroke="#c68a5c" ' +
-          'stroke-width="1" opacity=".6"/>' +
-        '</g></g>';
+    // 尾巴甩起来的动势线（只在摇尾那段出现）
+    s += '<g class="cat-tail-lines" pointer-events="none" opacity="0">' +
+      _A('opacity', [[0, 0], [0.552, 0], [0.56, 1], [0.655, 1], [0.666, 0], [1, 0]], 24) +
+      '<path d="M 85 -4 q 7 1 9 6" fill="none" stroke="#fff6de" stroke-width="2.2" ' +
+      'stroke-linecap="round" opacity=".7">' +
+        '<animate attributeName="opacity" values="0;.8;0" keyTimes="0;.5;1" ' +
+        'dur="1.1s" repeatCount="indefinite"/></path>' +
+      '<path d="M 82 -14 q 8 0 12 4" fill="none" stroke="#fff6de" stroke-width="1.8" ' +
+      'stroke-linecap="round" opacity=".6">' +
+        '<animate attributeName="opacity" values=".7;0;.7" keyTimes="0;.5;1" ' +
+        'dur="1.4s" repeatCount="indefinite"/></path></g>';
 
-    // 头（醒来的那套动作全挂在 `.cat-head` 上 ✓）
+    // ── 身体（趴成一团）──────────────────────────────────────────────
+    s += '<g class="cat-body-stretch">' +
+      _T('scale', [[0, '1 1'], [0.19, '1 1'], [0.222, '1.045 .962'], [0.248, '1.045 .962'],
+        [0.262, '1.01 1'], [0.276, '1 1'], [1, '1 1']], 24) +
+      '<g class="cat-body">' +
+      '<path d="M -36 20 C -39 4 -33 -14 -18 -21 C 0 -28 26 -27 42 -20 ' +
+      'C 54 -14 58 -2 55 10 C 52 21 42 24 30 24 L -22 24 C -30 24 -34 23 -36 20 Z" ' +
+      'fill="url(#wsCatFur)" stroke="#a8845a" stroke-width="2.4"/>' +
+      // 背脊上的一线暖光
+      '<path d="M -32 -10 C -26 -20 -8 -25 12 -24 C 30 -23 44 -18 50 -9" fill="none" ' +
+      'stroke="#fffdf6" stroke-width="2.6" stroke-linecap="round" opacity=".55"/>' +
+      // 胸口的浅色毛
+      '<path d="M -30 22 C -34 10 -30 0 -20 -4 C -12 -6 -8 0 -9 10 ' +
+      'C -10 18 -16 22 -22 23 Z" fill="#fffdf8" opacity=".92"/>' +
+      // 背上的虎斑（很浅，不破坏奶油色）
+      '<g fill="none" stroke="#e8cfa8" stroke-width="3" stroke-linecap="round" opacity=".65">' +
+        '<path d="M 24 -19 q 5 7 2 13"/><path d="M 35 -15 q 4 5 2 10"/></g>' +
+      // 后脚
+      '<ellipse cx="44" cy="23" rx="10" ry="5.5" fill="#fdf6e8" stroke="#b08c5f" ' +
+      'stroke-width="1.6"/>' +
+      '<path d="M 40 21 q 2.4 -2 4.6 0 M 46 21 q 2.4 -2 4.6 0" fill="none" ' +
+      'stroke="#c9a97e" stroke-width="1.2" stroke-linecap="round"/>' +
+      '</g></g>';
+
+    // ── 远侧前爪（伸懒腰 / 踩奶）────────────────────────────────────
+    s += '<g class="cat-paw-far">' +
+      _T('translate', [
+        [0, '0 0'], [0.155, '0 0'], [0.195, '-7 0'], [0.213, '-15 1'],
+        [0.248, '-15 1'], [0.26, '-6 0'], [0.274, '0 0'],
+        [0.405, '0 0'], [0.418, '3 0'], [0.432, '-4 0'], [0.446, '3 0'],
+        [0.460, '-4 0'], [0.474, '3 0'], [0.488, '-4 0'], [0.502, '3 0'],
+        [0.516, '-4 0'], [0.53, '0 0'],
+        [0.78, '0 0'], [0.84, '0 0'], [1, '0 0']
+      ], 24) +
+      '<ellipse cx="-32" cy="21" rx="8.5" ry="6" fill="#fbf3e3" stroke="#ab8557" ' +
+      'stroke-width="1.8"/>' +
+      '<path d="M -36 19 q 2.5 -2 5 0 M -31 19 q 2.5 -2 5 0" fill="none" ' +
+      'stroke="#c7a476" stroke-width="1.2" stroke-linecap="round"/>' +
+      '</g>';
+
+
+    // ── 头 + 脸（气泡猫那条「耳朵和脸一条轮廓」的曲线，缩到 0.9）────
     s += '<g class="cat-head">' +
-      '<animateTransform attributeName="transform" type="translate" ' +
-      // 抬头 → 打哈欠时再扬一点 → 蝴蝶落鼻尖时低一点 → 睡回去 ✓
-      'values="0 0;0 0;0 -7;0 -7;0 -9;0 -9;0 -6;0 0;0 0" ' +
-      'keyTimes="0;.58;.62;.68;.70;.79;.86;.94;1" ' +
-      'dur="12s" repeatCount="indefinite"/>' +
+      _T('translate', [
+        [0, '0 3'], [0.145, '0 3'],
+        [0.162, '0 -3'], [0.182, '-1 -7'], [0.208, '-1 -7'], [0.222, '-1 -2'],
+        [0.238, '-1 4'], [0.252, '0 5'], [0.262, '0 1'],
+        [0.285, '0 .8'], [0.33, '0 1.5'], [0.38, '0 1'],
+        [0.395, '0 -2'], [0.45, '0 -3.5'], [0.53, '0 -3.5'], [0.548, '0 -5'],
+        [0.60, '0 -6.5'], [0.655, '0 -6'], [0.67, '-1 -7.5'], [0.695, '-2 -9'],
+        [0.715, '-1 -8'], [0.73, '0 -8'], [0.748, '0 -4'],
+        [0.765, '0 .2'], [0.80, '0 1'], [0.845, '0 .2'],
+        [0.862, '0 -5'], [0.895, '0 -7'], [0.925, '0 -2.5'], [0.948, '0 1'], [0.965, '0 3'],
+        [1, '0 3']
+      ], 24) +
       '<g class="cat-head-tilt">' +
-      '<animateTransform attributeName="transform" type="rotate" ' +
-      // 左边看看 → 右边看看 → 正对着打哈欠 → 转头盯蝴蝶 → 被鼻尖痒得甩一下 → 睡回去 ✓
-      'values="0 -28 6;0 -28 6;-4 -28 6;3 -28 6;0 -28 6;4 -28 6;0 -28 6;-1 -28 6;0 -28 6;0 -28 6" ' +
-      'keyTimes="0;.58;.62;.67;.71;.80;.87;.90;.94;1" ' +
-      'dur="12s" repeatCount="indefinite"/>';
+      _T('rotate', [
+        [0, '-2 -18 2'], [0.145, '-2 -18 2'], [0.162, '0 -18 2'],
+        [0.19, '-3 -18 2'], [0.245, '-2 -18 2'], [0.258, '0 -18 2'],
+        [0.285, '4 -18 2'], [0.33, '8 -18 2'], [0.38, '8 -18 2'], [0.395, '0 -18 2'],
+        [0.415, '-1.5 -18 2'], [0.455, '1 -18 2'], [0.495, '-1 -18 2'],
+        [0.535, '0 -18 2'], [0.56, '-5 -18 2'], [0.60, '4 -18 2'], [0.64, '-3 -18 2'],
+        [0.663, '0 -18 2'], [0.688, '-2 -18 2'], [0.712, '-7 -18 2'],
+        [0.73, '6 -18 2'], [0.746, '-3 -18 2'], [0.758, '0 -18 2'],
+        [0.772, '5 -18 2'], [0.80, '10 -18 2'], [0.825, '6 -18 2'], [0.85, '9 -18 2'],
+        [0.862, '0 -18 2'], [0.885, '-5 -18 2'], [0.92, '-2 -18 2'],
+        [0.948, '0 -18 2'], [0.968, '-2 -18 2'], [1, '-2 -18 2']
+      ], 24) +
+      '<g transform="translate(-66.08,-76.48) scale(.96)">';
 
-    // 耳朵（各自抖一下 ✓）
-    s += '<g class="cat-ear">' +
-      '<animateTransform attributeName="transform" type="rotate" ' +
-      'values="0 -52 -26;0 -52 -26;-7 -52 -26;2 -52 -26;0 -52 -26;0 -52 -26" ' +
-      'keyTimes="0;.10;.13;.16;.20;1" dur="6.8s" repeatCount="indefinite"/>' +
-      '<path d="M -52 -24 Q -58 -48 -42 -42 Q -35 -37 -34 -28 Z" fill="#d9955f" ' +
-      'stroke="#b3733f" stroke-width="1.6" stroke-linejoin="round"/>' +
-      '<path d="M -49 -29 Q -52 -42 -43 -38 Q -39 -34 -39 -30 Z" fill="#f7b8c0" ' +
-      'opacity=".9"/></g>' +
-      // ★ 右耳 2026-10-20 重画 ✓ —— 原来那只耳朵向右多探出 8px ✓，
-      //   粉色的内耳又几乎盖满外耳 ✓ → 看着像贴了一瓣花 ✗（他说「右耳朵有点奇怪」✓）。
-      //   现在按左耳**镜像**回来 ✓：耳根落在头顶上 ✓、外耳留一圈毛边 ✓、
-      //   内耳只占中间一块 ✓；抖动支点也挪到耳根外侧 ✓（和左耳对称 ✓）。
-      '<g class="cat-ear">' +
-      '<animateTransform attributeName="transform" type="rotate" ' +
-      'values="0 -4 -26;0 -4 -26;0 -4 -26;7 -4 -26;-2 -4 -26;0 -4 -26" ' +
-      'keyTimes="0;.20;.23;.26;.29;1" dur="7.6s" repeatCount="indefinite"/>' +
-      '<path d="M -4 -24 Q 2 -48 -14 -42 Q -21 -37 -22 -28 Z" fill="#d9955f" ' +
-      'stroke="#b3733f" stroke-width="1.6" stroke-linejoin="round"/>' +
-      '<path d="M -7 -29 Q -4 -42 -13 -38 Q -17 -34 -17 -30 Z" fill="#f7b8c0" ' +
-      'opacity=".9"/></g>';
+    // 头（含耳朵）—— 与气泡猫同一块轮廓；内耳也同一对
+    s += '<path d="M21.5 49.3 L19.77 36.14 Q18.33 25.23 28.49 29.45 L42.8 35.4 ' +
+      'A30 27 0 0 1 53.2 35.4 L67.51 29.45 Q77.67 25.23 76.23 36.14 L75.5 49.3 ' +
+      'A30 27 0 1 1 21.5 49.3 Z" fill="url(#wsCatHead)" stroke="#a8845a" ' +
+      'stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<path d="M36.6 36.1 L27.5 32.7 Q22.8 31.0 23.3 36.0 L24.1 43.6 Z" fill="#f9c6c3"/>' +
+      '<path d="M59.4 36.1 L68.5 32.7 Q73.2 31.0 72.7 36.0 L71.9 43.6 Z" fill="#f9c6c3"/>' +
+      // 腮红
+      '<ellipse cx="26" cy="73" rx="5.5" ry="3.4" fill="#f8b8b4" opacity=".9"/>' +
+      '<ellipse cx="70" cy="73" rx="5.5" ry="3.4" fill="#f8b8b4" opacity=".9"/>';
 
-    // 脸
-    s += '<ellipse cx="-28" cy="-12" rx="27" ry="23" fill="url(#wsCatHead)" ' +
-      'stroke="#b3733f" stroke-width="1.8"/>' +
-      '<g fill="none" stroke="#b3733f" stroke-width="2.6" stroke-linecap="round" opacity=".55">' +
-      '<path d="M -40 -25 q 5 6 1 12"/><path d="M -30 -29 q 5 7 1 13"/>' +
-      '<path d="M -19 -25 q 4 6 0 11"/></g>';
+    // 胡须（会轻轻抖）
+    s += '<g class="cat-whisker">' +
+      _T('rotate', [
+        [0, '0 48 70'], [0.19, '0 48 70'], [0.22, '1.5 48 70'], [0.255, '0 48 70'],
+        [0.32, '0 48 70'], [0.35, '1.4 48 70'], [0.38, '0 48 70'],
+        [0.60, '0 48 70'], [0.63, '1.4 48 70'], [0.66, '0 48 70'],
+        [0.705, '0 48 70'], [0.725, '2.2 48 70'], [0.75, '0 48 70'],
+        [0.80, '0 48 70'], [0.83, '1.4 48 70'], [0.86, '0 48 70'], [1, '0 48 70']
+      ], 24) +
+      '<path d="M13 62 h8 M13 69 l8 -2.5 M83 62 h-8 M83 69 l-8 -2.5" fill="none" ' +
+      'stroke="#a8845a" stroke-width="1.5" stroke-linecap="round"/></g>';
 
-    // 睡着的眼睛（大部分时间 ✓）
-    s += '<g class="cat-eyes-closed">' +
-      '<animate attributeName="opacity" values="1;1;0;0;1;1" ' +
-      'keyTimes="0;.58;.62;.94;.96;1" dur="12s" repeatCount="indefinite"/>' +
-      '<path d="M -48 -12 q 7 6 14 0" fill="none" stroke="#7d4a2c" stroke-width="2.2" ' +
+    // 睡着的眼睛（向下弯）
+    s += '<g class="cat-eyes-sleep">' +
+      _A('opacity', [[0, 1], [0.146, 1], [0.156, 0], [0.928, 0], [0.945, 1], [1, 1]], 24) +
+      '<path d="M31 61 q6 5 12 0" fill="none" stroke="#4b3a2e" stroke-width="2.3" ' +
       'stroke-linecap="round"/>' +
-      '<path d="M -24 -13 q 7 6 14 0" fill="none" stroke="#7d4a2c" stroke-width="2.2" ' +
+      '<path d="M53 61 q6 5 12 0" fill="none" stroke="#4b3a2e" stroke-width="2.3" ' +
       'stroke-linecap="round"/></g>';
 
-    // 醒来的眼睛（和抬头同一个时间轴 ✓）—— 打哈欠那一段让位给下面的挤眼 ✓
+    // 睁着的眼睛（气泡猫的圆眼珠；会眨）
     s += '<g class="cat-eyes-open" opacity="0">' +
-      '<animate attributeName="opacity" values="0;0;1;1;0;0;1;1;0;0" ' +
-      'keyTimes="0;.62;.64;.71;.725;.79;.80;.93;.945;1" ' +
-      'dur="12s" repeatCount="indefinite"/>' +
-      '<ellipse cx="-41" cy="-12" rx="6.5" ry="7.5" fill="#fffef5" stroke="#3a2a1c" ' +
-      'stroke-width="1.1"/>' +
-      '<ellipse cx="-17" cy="-13" rx="6.5" ry="7.5" fill="#fffef5" stroke="#3a2a1c" ' +
-      'stroke-width="1.1"/>' +
-      // 眼珠会跟着蝴蝶转 ✓ —— 最后落到鼻尖时两只眼珠朝中间看 ✓ 变成斗鸡眼 ✓
-      '<g class="cat-pupil-l">' +
-        '<animateTransform attributeName="transform" type="translate" ' +
-        'values="0 0;0 0;-1.4 -1.2;1.2 -1;0.8 -1.6;1.6 -0.5;1 -0.8;0 0;0 0" ' +
-        'keyTimes="0;.62;.66;.70;.80;.86;.90;.93;1" dur="12s" repeatCount="indefinite"/>' +
-        '<circle cx="-41" cy="-11" r="4.2" fill="#4fae7d"/>' +
-        '<ellipse cx="-41" cy="-11" rx="1.7" ry="3.2" fill="#2a1b10"/>' +
-        '<circle cx="-42.6" cy="-14" r="1.5" fill="#fff"/></g>' +
-      '<g class="cat-pupil-r">' +
-        '<animateTransform attributeName="transform" type="translate" ' +
-        'values="0 0;0 0;-1.2 -1.2;1.4 -1;0.8 -1.6;-1.5 -0.6;-1 -0.9;0 0;0 0" ' +
-        'keyTimes="0;.62;.66;.70;.80;.86;.90;.93;1" dur="12s" repeatCount="indefinite"/>' +
-        '<circle cx="-17" cy="-12" r="4.2" fill="#4fae7d"/>' +
-        '<ellipse cx="-17" cy="-12" rx="1.7" ry="3.2" fill="#2a1b10"/>' +
-        '<circle cx="-18.6" cy="-15" r="1.5" fill="#fff"/></g>' +
-      // 睁眼时外眼角的一点细睫毛 ✓
-      '<path d="M -47 -18 q -4 -2 -6 -5 M -11 -19 q 4 -2 6 -5" fill="none" ' +
-      'stroke="#3a2a1c" stroke-width="1" opacity=".55" stroke-linecap="round"/></g>';
+      _A('opacity', [[0, 0], [0.155, 0], [0.162, 1], [0.168, 1], [0.176, 0],
+        [0.248, 0], [0.256, 1], [0.272, 1], [0.28, 0],
+        [0.54, 0], [0.548, 1], [0.746, 1], [0.755, 0],
+        [0.93, 0], [1, 0]], 24) +
+      '<g transform="translate(48 61)"><g>' +
+      _T('scale', [[0, '1 1'], [0.595, '1 1'], [0.600, '1 .1'], [0.607, '1 .1'],
+        [0.612, '1 1'], [0.695, '1 1'], [0.700, '1 .1'], [0.707, '1 .1'],
+        [0.712, '1 1'], [1, '1 1']], 24) +
+      '<g transform="translate(-48 -61)">' +
+        '<g class="cat-pupil-l">' +
+        _T('translate', [[0, '0 0'], [0.548, '0 0'], [0.565, '-1.4 -.6'],
+          [0.60, '1.5 -.8'], [0.64, '-1 -.4'], [0.675, '0 0'], [0.70, '1.8 0'],
+          [0.72, '0 0'], [0.746, '0 0'], [1, '0 0']], 24) +
+        '<circle cx="37" cy="61" r="4.6" fill="#4b3a2e"/>' +
+        '<circle cx="35.5" cy="59.3" r="1.5" fill="#fff"/></g>' +
+        '<g class="cat-pupil-r">' +
+        _T('translate', [[0, '0 0'], [0.548, '0 0'], [0.565, '1.4 -.6'],
+          [0.60, '-1.5 -.8'], [0.64, '1 -.4'], [0.675, '0 0'], [0.70, '-1.8 0'],
+          [0.72, '0 0'], [0.746, '0 0'], [1, '0 0']], 24) +
+        '<circle cx="59" cy="61" r="4.6" fill="#4b3a2e"/>' +
+        '<circle cx="57.5" cy="59.3" r="1.5" fill="#fff"/></g>' +
+      '</g></g></g></g>';
 
-    // 打哈欠时挤起来的眼睛 ✓ —— 睁着大眼打哈欠最怪 ✓（他说的就是这一下 ✓）
-    s += '<g class="cat-eyes-squint" opacity="0">' +
-      '<animate attributeName="opacity" values="0;0;1;1;0;0" ' +
-      'keyTimes="0;.715;.73;.785;.80;1" dur="12s" repeatCount="indefinite"/>' +
-      '<path d="M -48 -12 q 7 -6 14 0" fill="none" stroke="#7d4a2c" stroke-width="2.4" ' +
+    // 开心的眯眼（舔爪 / 踩奶 / 洗脸）
+    s += '<g class="cat-eyes-happy" opacity="0">' +
+      _A('opacity', [[0, 0], [0.28, 0], [0.288, 1], [0.535, 1], [0.545, 0],
+        [0.765, 0], [0.775, 1], [0.852, 1], [0.862, 0], [1, 0]], 24) +
+      '<path d="M31 62 q6 -5 12 0" fill="none" stroke="#4b3a2e" stroke-width="2.3" ' +
       'stroke-linecap="round"/>' +
-      '<path d="M -24 -13 q 7 -6 14 0" fill="none" stroke="#7d4a2c" stroke-width="2.4" ' +
+      '<path d="M53 62 q6 -5 12 0" fill="none" stroke="#4b3a2e" stroke-width="2.3" ' +
       'stroke-linecap="round"/></g>';
 
-    // 点下去瞪大的眼睛（只在蹦起那一下 ✓）
+    // 打哈欠时挤起来的眼睛
+    s += '<g class="cat-eyes-squint" opacity="0">' +
+      _A('opacity', [[0, 0], [0.176, 0], [0.184, 1], [0.246, 1], [0.256, 0],
+        [0.866, 0], [0.874, 1], [0.92, 1], [0.929, 0], [1, 0]], 24) +
+      '<path d="M31 61 q6 -5 12 0" fill="none" stroke="#4b3a2e" stroke-width="2.5" ' +
+      'stroke-linecap="round"/>' +
+      '<path d="M53 61 q6 -5 12 0" fill="none" stroke="#4b3a2e" stroke-width="2.5" ' +
+      'stroke-linecap="round"/>' +
+      '<path d="M29 57 l-2 -1.5 M67 57 l2 -1.5" fill="none" stroke="#4b3a2e" ' +
+      'stroke-width="1.2" opacity=".55" stroke-linecap="round"/></g>';
+
+    // 鼻子 + 平时的小嘴
+    s += '<path d="M44.5 67.5 L51.5 67.5 L48 71.5 Z" fill="#f2a3a0"/>' +
+      '<g class="cat-mouth-rest">' +
+      _A('opacity', [[0, 1], [0.17, 1], [0.178, 0], [0.241, 0], [0.249, 1],
+        [0.859, 1], [0.868, 0], [0.92, 0], [0.929, 1], [1, 1]], 24) +
+      '<path d="M48 71.5 v2.2 M48 73.7 q-3.6 3.4 -6.6 0 M48 73.7 q3.6 3.4 6.6 0" ' +
+      'fill="none" stroke="#4b3a2e" stroke-width="1.7" stroke-linecap="round"/></g>';
+
+    // 打哈欠的嘴（两段：伸懒腰时 + 睡前）
+    s += '<g class="cat-yawn" opacity="0">' +
+      _A('opacity', [[0, 0], [0.17, 0], [0.178, 1], [0.238, 1], [0.248, 0],
+        [0.86, 0], [0.87, 1], [0.918, 1], [0.929, 0], [1, 0]], 24) +
+      '<g transform="translate(48 74)"><g>' +
+      _T('scale', [[0, '.6 .35'], [0.178, '.6 .35'], [0.19, '.85 .75'], [0.20, '1 1'],
+        [0.23, '1 1.08'], [0.238, '.8 .6'], [0.248, '.6 .35'],
+        [0.87, '.6 .35'], [0.88, '.9 .8'], [0.89, '1 1'], [0.915, '1 1.05'],
+        [0.92, '.8 .6'], [0.929, '.6 .35'], [1, '.6 .35']], 24) +
+      '<path d="M-7 -1 Q0 -3.4 7 -1 Q8 2.6 0 5 Q-8 2.6 -7 -1 Z" fill="#7e4147" ' +
+      'stroke="#5f2f36" stroke-width=".9"/>' +
+      '<ellipse cx="0" cy="2.9" rx="4.4" ry="1.8" fill="#e79aa0"/>' +
+      '</g></g></g>';
+
+    // 舔爪时伸出来的小舌头（朝右下，碰到抬起的肉垫）
+    s += '<g class="cat-tongue" opacity="0" transform="translate(48 74) rotate(30)">' +
+      _A('opacity', [[0, 0], [0.306, 0], [0.313, 1], [0.373, 1], [0.381, 0], [1, 0]], 24) +
+      '<g><animateTransform attributeName="transform" type="scale" ' +
+      'values=".7 .55;.7 .55;1.05 1.15;.7 .55;1.05 1.15;.7 .55;1.05 1.15;.7 .55" ' +
+      'keyTimes="0;.315;.322;.33;.338;.346;.354;.362" dur="24s" repeatCount="indefinite"/>' +
+      '<path d="M-3.2 0 Q0 -1.8 3.2 0 Q4 7.4 0 9.2 Q-4 7.4 -3.2 0 Z" fill="#f4a7ad" ' +
+      'stroke="#d97f8a" stroke-width=".85" stroke-linejoin="round"/>' +
+      '<path d="M0 .8 v6.4" stroke="#dc8e95" stroke-width=".7" opacity=".7"/></g></g>';
+
+    // 点下去瞪大的眼睛（只在蹦起那一下）
     s += '<g class="cat-eyes-pop" opacity="0">' +
       '<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.2;.7;1" ' +
       'dur=".55s" begin="wsCatJump.begin" fill="freeze"/>' +
-      '<ellipse cx="-41" cy="-13" rx="7.5" ry="8.5" fill="#fffef5" stroke="#3a2a1c" ' +
+      '<ellipse cx="37" cy="60" rx="8" ry="9" fill="#fffef5" stroke="#3a2a1c" ' +
       'stroke-width="1.2"/>' +
-      '<ellipse cx="-17" cy="-14" rx="7.5" ry="8.5" fill="#fffef5" stroke="#3a2a1c" ' +
+      '<ellipse cx="59" cy="60" rx="8" ry="9" fill="#fffef5" stroke="#3a2a1c" ' +
       'stroke-width="1.2"/>' +
-      '<circle cx="-41" cy="-12" r="2.6" fill="#2a1b10"/>' +
-      '<circle cx="-17" cy="-13" r="2.6" fill="#2a1b10"/>' +
-      '<circle cx="-43" cy="-16" r="1.7" fill="#fff"/>' +
-      '<circle cx="-19" cy="-17" r="1.7" fill="#fff"/></g>';
+      '<circle cx="37" cy="61" r="3.6" fill="#4b3a2e"/>' +
+      '<circle cx="59" cy="61" r="3.6" fill="#4b3a2e"/>' +
+      '<circle cx="35" cy="58" r="1.7" fill="#fff"/>' +
+      '<circle cx="57" cy="58" r="1.7" fill="#fff"/></g>';
 
-    // 腮红 / 鼻子 / 嘴 / 胡须 ✓
-    s += '<ellipse cx="-50" cy="0" rx="6" ry="3.3" fill="#ff9aa8" opacity=".5"/>' +
-      '<ellipse cx="-8" cy="-1" rx="6" ry="3.3" fill="#ff9aa8" opacity=".5"/>' +
-      '<path d="M -31 0 l 6 0 l -3 4 Z" fill="#e07a8c" stroke="#b4526a" stroke-width=".8"/>' +
-      // 平时抿着的小嘴 ✓ —— 张嘴打哈欠时就把它藏起来 ✓（不然两张嘴叠在一起 ✓）
-      '<g class="cat-mouth-rest">' +
-        '<animate attributeName="opacity" values="1;1;0;0;1;1" ' +
-        'keyTimes="0;.715;.73;.79;.805;1" dur="12s" repeatCount="indefinite"/>' +
-        '<path d="M -28 4.5 q -5 5 -9 2 M -28 4.5 q 5 5 9 2" fill="none" stroke="#7a4a2a" ' +
-        'stroke-width="1.6" stroke-linecap="round"/></g>' +
-      // 打哈欠 ✓ —— 整张嘴从一条缝慢慢撑开 ✓ 露出舌头 ✓ 再合上 ✓
-      //   ★ 2026-10-20 重做 ✓：原来只有两团椭圆、又睁着眼 ✓ → 看着像脸上贴了块深色疤 ✗
-      //   现在嘴的**上沿贴着鼻子** ✓、下沿收在项圈上方 ✓，眼睛同步挤起来 ✓
-      '<g class="cat-yawn" opacity="0">' +
-        '<animate attributeName="opacity" values="0;0;1;1;0;0" ' +
-        'keyTimes="0;.705;.72;.79;.805;1" dur="12s" repeatCount="indefinite"/>' +
-        '<g transform="translate(-30,5.5)">' +
-          '<g>' +
-            '<animateTransform attributeName="transform" type="scale" ' +
-            'values=".6 .35;.6 .35;1 1;1 1.06;.75 .55;.6 .35" ' +
-            'keyTimes="0;.705;.735;.765;.79;.81" dur="12s" repeatCount="indefinite"/>' +
-            '<path d="M -7 -1 Q 0 -3.4 7 -1 Q 8 2.6 0 5 Q -8 2.6 -7 -1 Z" ' +
-            'fill="#7e4147" stroke="#5f2f36" stroke-width=".9"/>' +
-            '<ellipse cx="0" cy="2.9" rx="4.4" ry="1.8" fill="#e79aa0"/>' +
-          '</g>' +
-        '</g></g>' +
-      // 胡须偶尔轻轻抖一下 ✓
-      '<g class="cat-whisker">' +
-        '<animateTransform attributeName="transform" type="rotate" ' +
-        'values="0 -28 -2;0 -28 -2;1.8 -28 -2;-1.2 -28 -2;0 -28 -2;0 -28 -2" ' +
-        'keyTimes="0;.56;.60;.64;.68;1" dur="5.4s" repeatCount="indefinite"/>' +
-        '<path d="M -52 -2 q -10 -2 -15 -4 M -52 3 q -10 1 -15 3" fill="none" ' +
-        'stroke="#9a6a3a" stroke-width="1.2" stroke-linecap="round"/>' +
-        '<path d="M -4 -2 q 10 -2 15 -4 M -4 3 q 10 1 15 3" fill="none" ' +
-        'stroke="#9a6a3a" stroke-width="1.2" stroke-linecap="round"/>' +
-      '</g>' +
-      // 红项圈 + 铃铛 ✓（和 3D 那只二狗同一件 ✓）
-      '<path d="M -52 8 Q -30 18 -8 8" fill="none" stroke="#c8506a" stroke-width="5" ' +
-      'stroke-linecap="round"/>' +
-      '<path d="M -48 10 Q -30 17 -12 10" fill="none" stroke="#f08ba0" ' +
-      'stroke-width="1.4" stroke-linecap="round" opacity=".55"/>' +
-      '<circle cx="-30" cy="15" r="4.5" fill="#ffd34d" stroke="#c9931f" stroke-width="1.3"/>' +
-      '<circle cx="-30" cy="13.8" r="1" fill="#c9931f"/>' +
-      '<path d="M -30 16 v 2.4" stroke="#c9931f" stroke-width="1"/>';
+    s += '</g></g></g>';   // /face /head-tilt /head
 
-    s += '</g></g>';   // /cat-head-tilt /cat-head
+    // ── 近侧前腿（抬起来舔爪 / 洗脸）────────────────────────────────
+    s += '<g class="cat-arm-lift">' +
+      _T('rotate', [
+        [0, '0 -4 10'], [0.272, '0 -4 10'], [0.288, '12 -4 10'], [0.305, '76 -4 10'],
+        [0.375, '76 -4 10'], [0.388, '22 -4 10'], [0.398, '0 -4 10'],
+        [0.405, '0 -4 10'], [0.418, '-14 -4 10'], [0.432, '10 -4 10'],
+        [0.446, '-14 -4 10'], [0.460, '10 -4 10'], [0.474, '-14 -4 10'],
+        [0.488, '10 -4 10'], [0.502, '-14 -4 10'], [0.516, '10 -4 10'],
+        [0.53, '0 -4 10'],
+        [0.752, '0 -4 10'], [0.772, '92 -4 10'],
+        [0.788, '90 -4 10'], [0.803, '96 -4 10'], [0.818, '89 -4 10'],
+        [0.833, '95 -4 10'], [0.847, '92 -4 10'],
+        [0.86, '12 -4 10'], [0.872, '0 -4 10'], [1, '0 -4 10']
+      ], 24) +
+      '<g class="cat-arm-stretch">' +
+      _T('translate', [
+        [0, '0 0'], [0.155, '0 0'], [0.195, '-7 0'], [0.213, '-15 1'],
+        [0.248, '-15 1'], [0.26, '-6 0'], [0.274, '0 0'], [1, '0 0']
+      ], 24) +
+      '<path d="M -4 11 C -7 15 -9 18 -10 21" fill="none" stroke="#a8845a" ' +
+      'stroke-width="12" stroke-linecap="round"/>' +
+      '<path d="M -4 11 C -7 15 -9 18 -10 21" fill="none" stroke="#fffaf0" ' +
+      'stroke-width="9.6" stroke-linecap="round"/>' +
+      '<ellipse cx="-11" cy="22" rx="7.6" ry="5.6" fill="#fffaf0" stroke="#a8845a" ' +
+      'stroke-width="1.8"/>' +
+      '<path d="M -16 20 q 2.4 -2 4.8 0 M -11 19.6 q 2.4 -2 4.8 0" fill="none" ' +
+      'stroke="#c7a476" stroke-width="1.2" stroke-linecap="round"/>' +
+      // 抬起来才看得到的肉垫
+      '<g class="cat-paw-pad" opacity="0">' +
+        _A('opacity', [[0, 0], [0.30, 0], [0.312, 1], [0.38, 1], [0.392, 0],
+          [0.772, 0], [0.782, 1], [0.85, 1], [0.862, 0], [1, 0]], 24) +
+        '<ellipse cx="-10.5" cy="23.4" rx="3.4" ry="2.7" fill="#f3b4ad"/>' +
+        '<circle cx="-13.5" cy="20.6" r="1.35" fill="#f3b4ad"/>' +
+        '<circle cx="-9.4" cy="19.4" r="1.35" fill="#f3b4ad"/>' +
+        '<circle cx="-5.8" cy="21" r="1.35" fill="#f3b4ad"/>' +
+      '</g></g></g>';
 
-    s += '</g>';       // /cat-shift
-    s += '</g>';       // /cat-breathe
-    s += '</g></g>';   // /cat-tilt /cat-jump
+    // 踩奶时爪子边冒出的小星星
+    s += '<g class="cat-paw-spark" pointer-events="none" fill="#ffe7a8" opacity="0">' +
+      _A('opacity', [[0, 0], [0.398, 0], [0.406, 1], [0.528, 1], [0.538, 0], [1, 0]], 24) +
+      '<path d="M-24 12 l1.6 4 4 1.6 -4 1.6 -1.6 4 -1.6 -4 -4 -1.6 4 -1.6 Z">' +
+        '<animate attributeName="opacity" values=".9;.4;.9" keyTimes="0;.5;1" ' +
+        'dur="1.3s" repeatCount="indefinite"/></path>' +
+      '<path d="M-2 8 l1.3 3.2 3.2 1.3 -3.2 1.3 -1.3 3.2 -1.3 -3.2 -3.2 -1.3 ' +
+      '3.2 -1.3 Z">' +
+        '<animate attributeName="opacity" values=".35;.95;.35" keyTimes="0;.5;1" ' +
+        'dur="1.6s" repeatCount="indefinite"/></path>' +
+      '<path d="M-14 -6 l1.1 2.8 2.8 1.1 -2.8 1.1 -1.1 2.8 -1.1 -2.8 -2.8 -1.1 ' +
+      '2.8 -1.1 Z">' +
+        '<animate attributeName="opacity" values=".8;0;.8" keyTimes="0;.5;1" ' +
+        'dur="1.9s" repeatCount="indefinite"/></path></g>';
 
-    // Zzz ✓ —— 睡着的猫旁边才有；不写字 ✓（家里不放字 ✓）
-    s += '<g class="cat-zzz" pointer-events="none" fill="#fff7e2" font-family="serif" ' +
+    // Zzz（睡着时才有）
+    s += '<g class="cat-zzz" pointer-events="none" fill="#ffe9b8" font-family="serif" ' +
       'font-weight="bold">' +
-      // 醒着的那一下 Zzz 先退场 ✓（不然睁着眼还在冒睡泡 ✗）
-      '<animate attributeName="opacity" values="1;1;0;0;1;1" ' +
-        'keyTimes="0;.58;.61;.94;.96;1" dur="12s" repeatCount="indefinite"/>' +
-      '<text x="-66" y="-52" font-size="12" opacity="0">' +
-      '<animate attributeName="opacity" values="0;0;.75;0" keyTimes="0;.10;.45;.66" ' +
-      'dur="4.6s" begin="-1.5s" repeatCount="indefinite"/>' +
-      '<animateTransform attributeName="transform" type="translate" values="0 0;7 -11" ' +
-      'dur="4.6s" begin="-1.5s" repeatCount="indefinite"/></text>' +
-      '<text x="-57" y="-66" font-size="14" opacity="0">' +
-      '<animate attributeName="opacity" values="0;0;.8;0" keyTimes="0;.12;.48;.69" ' +
-      'dur="5.4s" begin="-3.1s" repeatCount="indefinite"/>' +
-      '<animateTransform attributeName="transform" type="translate" values="0 0;8 -12" ' +
-      'dur="5.4s" begin="-3.1s" repeatCount="indefinite"/></text>' +
-      '<text x="-47" y="-82" font-size="17" opacity="0">' +
-      '<animate attributeName="opacity" values="0;0;.85;0" keyTimes="0;.14;.50;.72" ' +
-      'dur="6.1s" begin="-4.6s" repeatCount="indefinite"/>' +
-      '<animateTransform attributeName="transform" type="translate" values="0 0;9 -14" ' +
-      'dur="6.1s" begin="-4.6s" repeatCount="indefinite"/></text></g>';
+      _A('opacity', [[0, 1], [0.142, 1], [0.158, 0], [0.933, 0], [0.952, 1], [1, 1]], 24) +
+      '<text x="-58" y="-62" font-size="12" text-anchor="middle">Z' +
+        '<animate attributeName="opacity" values="0;.85;.85;0" keyTimes="0;.18;.72;1" ' +
+        'dur="4.6s" begin="-1.5s" repeatCount="indefinite"/>' +
+        '<animateTransform attributeName="transform" type="translate" values="0 0;7 -11" ' +
+        'dur="4.6s" begin="-1.5s" repeatCount="indefinite"/></text>' +
+      '<text x="-50" y="-78" font-size="15" text-anchor="middle">Z' +
+        '<animate attributeName="opacity" values=".9;.9;0;.9" keyTimes="0;.2;.7;1" ' +
+        'dur="5.4s" begin="-3.1s" repeatCount="indefinite"/>' +
+        '<animateTransform attributeName="transform" type="translate" values="0 0;8 -12" ' +
+        'dur="5.4s" begin="-3.1s" repeatCount="indefinite"/></text>' +
+      '<text x="-42" y="-94" font-size="18" text-anchor="middle">Z' +
+        '<animate attributeName="opacity" values="0;.95;.95;0" keyTimes="0;.15;.7;1" ' +
+        'dur="6.1s" begin="-4.6s" repeatCount="indefinite"/>' +
+        '<animateTransform attributeName="transform" type="translate" values="0 0;9 -14" ' +
+        'dur="6.1s" begin="-4.6s" repeatCount="indefinite"/></text></g>';
 
-    // 身边偶尔闪的小星星 ✓ —— 不写「点我」✓，只是把眼睛引过去 ✓
+    // 身边偶尔闪的小星星
     s += '<g class="cat-spark" pointer-events="none" fill="#ffe7a8">' +
       '<path d="M 62 -46 l 2.2 5.6 5.6 2.2 -5.6 2.2 -2.2 5.6 -2.2 -5.6 -5.6 -2.2 ' +
       '5.6 -2.2 Z" opacity="0">' +
-      '<animate attributeName="opacity" values="0;0;.9;0;0" keyTimes="0;.45;.50;.57;1" ' +
-      'dur="6.2s" repeatCount="indefinite"/></path>' +
+        '<animate attributeName="opacity" values="0;0;.9;0;0" keyTimes="0;.45;.50;.57;1" ' +
+        'dur="6.2s" repeatCount="indefinite"/></path>' +
       '<path d="M -72 -40 l 1.7 4.4 4.4 1.7 -4.4 1.7 -1.7 4.4 -1.7 -4.4 -4.4 -1.7 ' +
       '4.4 -1.7 Z" opacity="0">' +
-      '<animate attributeName="opacity" values="0;0;.8;0;0" keyTimes="0;.24;.29;.36;1" ' +
-      'dur="7.4s" repeatCount="indefinite"/></path>' +
+        '<animate attributeName="opacity" values="0;0;.8;0;0" keyTimes="0;.24;.29;.36;1" ' +
+        'dur="7.4s" repeatCount="indefinite"/></path>' +
       '<path d="M 34 14 l 1.5 3.8 3.8 1.5 -3.8 1.5 -1.5 3.8 -1.5 -3.8 -3.8 -1.5 ' +
       '3.8 -1.5 Z" opacity="0">' +
-      '<animate attributeName="opacity" values="0;0;.75;0;0" keyTimes="0;.63;.68;.75;1" ' +
-      'dur="8.1s" repeatCount="indefinite"/></path></g>';
+        '<animate attributeName="opacity" values="0;0;.75;0;0" keyTimes="0;.63;.68;.75;1" ' +
+        'dur="8.1s" repeatCount="indefinite"/></path></g>';
 
-    // 点击时冒出来的两颗爱心 ✓
+    // 点击时冒出来的两颗爱心
     s += '<g class="cat-hearts" pointer-events="none">' +
       '<g transform="translate(-16,-56)"><path d="M 0 4 C -8 -4 -14 -10 -7 -14 ' +
       'C -3 -16 0 -12 0 -10 C 0 -12 3 -16 7 -14 C 14 -10 8 -4 0 4 Z" fill="#f18b9b" ' +
       'stroke="#d96f80" stroke-width="1" opacity="0">' +
-      '<animate attributeName="opacity" values="0;.95;.95;0" keyTimes="0;.2;.65;1" ' +
-      'dur=".65s" begin="wsCatJump.begin" fill="freeze"/>' +
-      '<animateTransform attributeName="transform" type="translate" values="0 0;-2 -24" ' +
-      'dur=".65s" begin="wsCatJump.begin" fill="freeze"/></path></g>' +
+        '<animate attributeName="opacity" values="0;.95;.95;0" keyTimes="0;.2;.65;1" ' +
+        'dur=".65s" begin="wsCatJump.begin" fill="freeze"/>' +
+        '<animateTransform attributeName="transform" type="translate" values="0 0;-2 -24" ' +
+        'dur=".65s" begin="wsCatJump.begin" fill="freeze"/></path></g>' +
       '<g transform="translate(14,-64)"><path d="M 0 3.4 C -6.8 -3.4 -12 -8.5 -6 -12 ' +
       'C -2.6 -13.6 0 -10.2 0 -8.5 C 0 -10.2 2.6 -13.6 6 -12 C 12 -8.5 6.8 -3.4 0 3.4 Z" ' +
       'fill="#f7a8b4" stroke="#d96f80" stroke-width=".9" opacity="0">' +
-      '<animate attributeName="opacity" values="0;.9;.9;0" keyTimes="0;.25;.7;1" ' +
-      'dur=".7s" begin="wsCatJump.begin" fill="freeze"/>' +
-      '<animateTransform attributeName="transform" type="translate" values="0 0;4 -20" ' +
-      'dur=".7s" begin="wsCatJump.begin" fill="freeze"/></path></g></g>';
+        '<animate attributeName="opacity" values="0;.9;.9;0" keyTimes="0;.25;.7;1" ' +
+        'dur=".7s" begin="wsCatJump.begin" fill="freeze"/>' +
+        '<animateTransform attributeName="transform" type="translate" values="0 0;4 -20" ' +
+        'dur=".7s" begin="wsCatJump.begin" fill="freeze"/></path></g></g>';
 
-    s += '</g>';       // /ws-cat
+    s += '</g></g></g></g></g></g>';   // /hearts /sway /breathe /tilt /jump /cat
     return s;
   };
 
@@ -607,8 +697,8 @@
       _fxFirefly(776, 1470, 2, 8.2, -4.6, -14, -8);
   };
 
-  // 一只来找二狗玩的小蝴蝶 ✓ —— 每 12 秒飞来一次 ✓，正好赶上猫醒来 ✓。
-  //   先绕着脑袋转 ✓，最后停在它鼻尖下面 ✓；猫被痒得甩一下头 ✓，它就飞走了 ✓。
+  // 一只来找二狗玩的小蝴蝶 ✓ —— 和猫同一条 **24 秒** 时间轴 ✓：
+  //   14 秒左右飞进来 → 绕脑袋一圈 → 17.5 秒停在鼻尖前 → 猫一甩头它就跑 ✓。
   //   用 SMIL ✓（WebView 里比 CSS transform 稳 ✓）；pointer-events:none ✓ 不挡点击。
   const flatButterflySvg = function () {
     const wing = function (dir) {
@@ -627,13 +717,15 @@
     };
     return '<g class="ws-butterfly" pointer-events="none">' +
       '<animateTransform attributeName="transform" type="translate" ' +
-      'values="560 1470;560 1470;585 1435;615 1405;638 1385;655 1378;640 1398;650 1412;' +
-      '648 1436;646 1443;646 1443;665 1405;705 1370;740 1340" ' +
-      'keyTimes="0;.58;.62;.66;.70;.74;.78;.82;.855;.875;.895;.91;.94;1" ' +
-      'dur="12s" repeatCount="indefinite"/>' +
-      '<g opacity="0" transform="scale(1.18)">' +
-        '<animate attributeName="opacity" values="0;0;1;1;1;0;0" ' +
-        'keyTimes="0;.59;.63;.90;.935;.955;1" dur="12s" repeatCount="indefinite"/>' +
+      'values="470 1560;470 1560;535 1512;572 1478;600 1445;610 1405;625 1372;' +
+      '668 1358;704 1374;708 1408;684 1432;662 1437;660 1438;663 1438;' +
+      '680 1415;724 1380;782 1332;838 1288;884 1256" ' +
+      'keyTimes="0;.575;.596;.612;.629;.646;.6625;.679;.696;.708;.717;.723;' +
+      '.729;.7375;.748;.758;.775;.792;1" ' +
+      'dur="24s" repeatCount="indefinite"/>' +
+      '<g opacity="0" transform="scale(1.3)">' +
+        '<animate attributeName="opacity" values="0;0;1;1;0;0" ' +
+        'keyTimes="0;.588;.602;.782;.798;1" dur="24s" repeatCount="indefinite"/>' +
         '<ellipse cx="0" cy="0" rx="11" ry="9" fill="url(#wsBokeh)" opacity=".45"/>' +
         wing(-1) + wing(1) +
         '<ellipse cx="0" cy="1.4" rx="1.5" ry="4.6" fill="#6f5138"/>' +
@@ -656,12 +748,12 @@
       '<defs>' +
         '<filter id="wsSoft" x="-30%" y="-60%" width="160%" height="220%">' +
           '<feGaussianBlur stdDeviation="5"/></filter>' +
-        '<radialGradient id="wsCatFur" cx="38%" cy="30%" r="75%">' +
-          '<stop offset="0" stop-color="#eeb07a"/><stop offset=".6" stop-color="#d9955f"/>' +
-          '<stop offset="1" stop-color="#c07f49"/></radialGradient>' +
-        '<radialGradient id="wsCatHead" cx="40%" cy="32%" r="75%">' +
-          '<stop offset="0" stop-color="#f2b87f"/><stop offset=".6" stop-color="#dc9a63"/>' +
-          '<stop offset="1" stop-color="#c98750"/></radialGradient>' +
+        '<radialGradient id="wsCatFur" cx="38%" cy="26%" r="78%">' +
+          '<stop offset="0" stop-color="#fffdf8"/><stop offset=".62" stop-color="#f7e9cf"/>' +
+          '<stop offset="1" stop-color="#ecd8b4"/></radialGradient>' +
+        '<radialGradient id="wsCatHead" cx="42%" cy="26%" r="80%">' +
+          '<stop offset="0" stop-color="#fffefb"/><stop offset=".62" stop-color="#fdf3df"/>' +
+          '<stop offset="1" stop-color="#f2dfbe"/></radialGradient>' +
         '<radialGradient id="wsWarm" cx="50%" cy="50%" r="50%">' +
           '<stop offset="0" stop-color="#ffe3a0" stop-opacity=".9"/>' +
           '<stop offset=".6" stop-color="#ffe3a0" stop-opacity=".35"/>' +
