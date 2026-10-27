@@ -472,145 +472,202 @@
   }
   .row.agent .bubble { background:var(--bubble-agent-bg); border:1px solid var(--line);
                        border-left:3px solid var(--agent); border-bottom-left-radius:4px; }
-  /* ── 气泡皮肤（2026-10-27）：鸭鸭 / 猪猪 / 猫猫 ───────────────────────
+  /* ── 气泡皮肤 第二版（2026-10-27 晚）：鸭鸭 / 猪猪 / 猫猫 ─────────────
      ★ 它是**盖在主题上的皮肤** ✓ —— 底色 / 正文 / 顶栏一行都不动 ✓，
        只换气泡本身的**形状和配色** ✓。
      ★★ `data-bubble` 挂在**每一行**上（`.row[data-bubble]` ✓，由 `setRowBubble` 写 ✓）：
         一个群里可能同时有三款 ✓（我鸭鸭 / 她猪猪 / 管家猫猫 ✓）——
         挂在容器上就只能全群一款 ✗（2026-10-27 用户纠正过 ✓）。
-     ★★ **不是换颜色** ✓（用户原话：「气泡不是换个颜色，而是要有对应的动物的图案，
-        比如气泡变成了别的形状，或者气泡边缘有了一个小动物图案形状」✓）。
-        三只动物各有一个**一眼认得出的器官** ✓：
-          鸭鸭 = 边上伸出一张**扁扁的橙色鸭嘴** ✓
-          猪猪 = 边上顶一个**粉色猪鼻**（两个鼻孔 ✓）
-          猫猫 = 顶上竖**两只尖耳朵** ✓
-        圆角也各不相同 ✓ —— 灰阶截图里也分得开 ✓。
+     ★★ 第一版是"侧面长一件器官"（一张嘴 / 一个鼻子 / 两只耳朵 ✓），
+        贴在气泡外面像挂件 ✓；用户看完说"还是不好看，思路打开" ✗（同一天下午 ✓）——
+        第二版换成**一枚小脑袋扒着气泡上沿往外看** ✓：
+        一张共用的小脸（两只眼睛 ✓）+ 一件一眼认出它的器官（鸭嘴 / 猪鼻+耳朵 / 猫耳 ✓）。
+        三只的脸是同一段 CSS ✓ —— 以后要加第四只，只写器官那两三行就够 ✓。
+     ⚠️ 尺寸**一律用 em** ✓ —— 标尺是气泡自己的 `font-size`（群聊 15px ✓、
+        选择页预览 12px ✓）→ 预览自动小一号 ✓，那边不用再抄一遍像素值 ✗
+        （抄一遍 = 两边迟早长得不一样 ✓；第一版就是靠一堆 `bottom:5px` 硬对 ✗）。
+     ⚠️ 脑袋压在**上沿里面** ✓，所以带皮肤的气泡要把 `padding-top` 抬到 1.02em ✓：
+        文字从脑袋下面开始 ✓，嘴/鼻/耳永远戳不到字 ✓（预览字小一号时尤其明显 ✓）。
      ⚠️ 颜色写死在这里、**按主题深浅各一套** ✓ —— 气泡底色不跟 `--bubble-*` 走 ✗：
         那三个变量是半透明的 ✓（要透背景图 ✓），动物色一透明就发灰 ✓。
      ⚠️ 器官用伪元素画 ✓（`::before` / `::after` ✓）—— 不引图片 ✓：
-        它得跟着气泡底色/主题走 ✓，两套主题各一张图就多两处会忘的地方 ✓。
+        它得跟着主题走 ✓，两套主题各一张图就多两处会忘的地方 ✓。
      ⚠️ **只有消息行**带 `data-bubble` ✓ —— 设置页那些 `.ascreen .row` 不带 ✓，
         所以这里的规则一条都不会漏到设置页去 ✓。 */
   .row[data-bubble]:not([data-bubble="plain"]) .bubble { position:relative; }
+  /* 给脑袋让出顶部那一条 ✓（卡片里没有 `.who` ✓，不吃下面那几条 ✓） */
+  .row[data-bubble]:not([data-bubble="plain"]) .bubble:not(.media) { padding-top:1.02em; }
 
-  /* ① 鸭鸭：鹅黄、圆滚，外侧伸一张扁嘴 ✓ */
+  /* 名字和气泡之间要给脑袋让位 ✓（让多少按脑袋最高处定，见各自那段 ✓） */
+  /* ⚠️ 只给**有脑袋的**气泡让位 ✓（`:has` 那半句 ✓）—— 图片 / 文件那种整块气泡
+     没有脑袋 ✓，也让位的话名字和图片之间会凭空多出一条空白 ✓。 */
+  .row[data-bubble="duck"]:has(> .wrap2 > .bubble:not(.media)) .who { margin-bottom:.95em; }
+  .row[data-bubble="pig"]:has(> .wrap2 > .bubble:not(.media))  .who { margin-bottom:.95em; }
+  .row[data-bubble="cat"]:has(> .wrap2 > .bubble:not(.media))  .who { margin-bottom:1.5em; }
+
+  /* ── 脸：三只共用（两只眼睛 + 左上高光 + 可选的口鼻 ✓）────────────
+     ⚠️ `left` / `right` **两头都显式写** ✓ —— 伪元素同时有 `left` 和 `right` 时
+        浏览器按 `left` 放（LTR ✓）。只写一边的话，文件里任何一条残留的
+        `left:12px` 都会把自己的脑袋钉死在气泡左边 ✓（实验室里踩过这一脚 ✓）。 */
+  .row[data-bubble="duck"] .bubble::before,
+  .row[data-bubble="pig"]  .bubble::before,
+  .row[data-bubble="cat"]  .bubble::before {
+    content:''; position:absolute; top:-.78em; width:1.3em; height:1.25em;
+    border-radius:50%; z-index:1; pointer-events:none;
+    background:
+      radial-gradient(circle at 33% 37%, var(--bt-eye) 0 .105em, transparent .14em),
+      radial-gradient(circle at 67% 37%, var(--bt-eye) 0 .105em, transparent .14em),
+      radial-gradient(circle at 34% 14%, var(--bt-glow) 0 .19em, transparent .24em),
+      radial-gradient(ellipse .17em .11em at 50% 80%, var(--bt-muzzle) 0 100%, transparent 100%),
+      radial-gradient(circle at 50% 73%, var(--bt-nose) 0 .05em, transparent .065em),
+      linear-gradient(180deg, var(--bt-face), var(--bt-face2));
+    filter:drop-shadow(0 .05em .06em rgba(0,0,0,.16));
+  }
+  /* ⚠️ 只对这三款生效 ✓ —— 别写成光秃秃的 `.row.mine .bubble::before` ✗，
+     那是给全站每一行都动伪元素 ✓（现在没事，以后谁用 `::before` 装东西就撞上了 ✓）。 */
+  .row:is([data-bubble="duck"],[data-bubble="pig"],[data-bubble="cat"]).mine .bubble::before { right:.53em; left:auto; }
+  .row:is([data-bubble="duck"],[data-bubble="pig"],[data-bubble="cat"]):not(.mine) .bubble::before { left:.53em; right:auto; }
+
+  /* ── ① 鸭鸭：鹅黄圆滚，脸下沿压一张宽扁的嘴 ✓ ─────────────────────
+     嘴比脸还宽 ✓ —— 宽到超出脸的两侧，一眼就是"鸭" ✓；
+     两瓣不画线 ✓，靠中间两道内阴影收窄一点 ✓。 */
   .row[data-bubble="duck"] {
-    --duck-mine:#ffdd7a;  --duck-mine-t:#6b4a06;
-    --duck-other:#fff0b8; --duck-other-t:#66500f;
-    --duck-edge:#e0a92c;  --duck-bill:#f2a63a;
+    --bt-face:#ffd75a; --bt-face2:#f3bf26; --bt-eye:#4d3604; --bt-glow:#fff0ac;
+    --bt-muzzle:transparent; --bt-nose:transparent;
+    --bt-bill:#f6a41f; --bt-bill2:#eb9712;
+    --dk-mine:#ffe6a0;  --dk-mine-t:#5b4205;
+    --dk-other:#fff3cf; --dk-other-t:#6c5310;
   }
   .row[data-bubble="duck"].mine .bubble {
-    background:var(--duck-mine); color:var(--duck-mine-t);
-    border:0; border-radius:20px 20px 9px 20px;
+    background:var(--dk-mine); color:var(--dk-mine-t); border:0;
+    border-radius:19px 19px 7px 19px;
+    box-shadow:0 1px 2px rgba(120,86,10,.10);
   }
-  /* ⚠️ 用 `:not(.mine)` 而不是 `.agent` ✗ —— 群里**别的人**说的话也得跟着变 ✓ */
+  /* ⚠️ 用 `:not(.mine)` 而不是 `.agent` ✗ —— 群里**别的人**说的话也得跟着变 ✓。
+     管家那一竖条在这三款上**没有了** ✓（脑袋本身就是"这是管家的颜色"✓），
+     留下的 1px 边框就够分人 ✓。 */
   .row[data-bubble="duck"]:not(.mine) .bubble {
-    background:var(--duck-other); color:var(--duck-other-t);
-    border:1px solid rgba(184,148,52,.34); border-radius:20px 20px 20px 9px;
+    background:var(--dk-other); color:var(--dk-other-t);
+    border:1px solid rgba(198,158,60,.42); border-radius:19px 19px 19px 7px;
+    box-shadow:0 1px 2px rgba(120,86,10,.06);
   }
-  /* 管家那一竖条还在 ✓ —— 换成这只动物的深色 ✓，人和管家仍然分得开 ✓ */
-  .row[data-bubble="duck"].agent .bubble { border-left:3px solid var(--duck-edge); }
-  /* 鸭嘴：扁、外侧圆 ✓（上喙一道浅槽 ✓）
-     ⚠️ **挂在气泡上**（`.bubble::after` ✓），不挂行 ✗→✓：
-        行里还有头像 ✓ —— `.row.mine` 是 `row-reverse` ✓，行的右边缘是**头像**的右边缘 ✗，
-        嘴会飘到头像旁边去 ✓。挂在气泡上，贴的永远是气泡自己那一边 ✓。 */
   .row[data-bubble="duck"] .bubble::after {
-    content:''; position:absolute; bottom:8px; width:15px; height:10px;
-    background:var(--duck-bill); pointer-events:none;
-    border-radius:3px 8px 8px 3px;
-    box-shadow:inset 0 -2px 0 rgba(120,70,0,.16);
+    content:''; position:absolute; top:.14em; width:1.5em; height:.48em;
+    background:linear-gradient(180deg, var(--bt-bill), var(--bt-bill2));
+    border-radius:.42em .42em .55em .55em / .22em .22em .42em .42em;
+    box-shadow:inset 0 .07em 0 rgba(255,240,180,.45),
+               inset .72em 0 0 -.68em rgba(150,90,0,.12),
+               inset -.72em 0 0 -.68em rgba(150,90,0,.12);
+    z-index:2; pointer-events:none;
   }
-  .row[data-bubble="duck"].mine .bubble::after { right:-10px; }
-  .row[data-bubble="duck"]:not(.mine) .bubble::after { left:-10px; transform:scaleX(-1); }
+  .row[data-bubble="duck"].mine .bubble::after { right:.43em; left:auto; }
+  .row[data-bubble="duck"]:not(.mine) .bubble::after { left:.43em; right:auto; }
 
-  /* ② 猪猪：樱粉、软乎，外侧顶一个猪鼻 ✓ */
+  /* ── ② 猪猪：樱粉软乎，一对耳朵 + 一枚猪鼻 ✓ ───────────────────
+     耳朵是脑袋本身的**两枚缩小投影** ✓（圆形 ✓，不用第二枚伪元素 ✓）；
+     鼻子横椭圆 + 两个鼻孔 ✓，压在脸的下沿 ✓。 */
   .row[data-bubble="pig"] {
-    --pig-mine:#ffc0d0;  --pig-mine-t:#6e2434;
-    --pig-other:#ffe0e8; --pig-other-t:#6e2b38;
-    --pig-edge:#d96a85;  --pig-snout:#e58ba2; --pig-nose:#93405a;
+    --bt-face:#f7a4b8; --bt-face2:#ef92a9; --bt-eye:#4d1723; --bt-glow:#ffc9d4;
+    --bt-muzzle:transparent; --bt-nose:transparent; --bt-ear:#ec93a9;
+    --pg-nose:#7b2a3f; --pg-snout:#e4768f; --pg-snout2:#e06e88;
+    --pg-mine:#ffccd9;  --pg-mine-t:#692231;
+    --pg-other:#ffe9ef; --pg-other-t:#71303d;
   }
   .row[data-bubble="pig"].mine .bubble {
-    background:var(--pig-mine); color:var(--pig-mine-t);
-    border:0; border-radius:22px 22px 12px 22px;
+    background:var(--pg-mine); color:var(--pg-mine-t); border:0;
+    border-radius:20px 20px 8px 20px;
+    box-shadow:0 1px 2px rgba(140,60,80,.10);
   }
   .row[data-bubble="pig"]:not(.mine) .bubble {
-    background:var(--pig-other); color:var(--pig-other-t);
-    border:1px solid rgba(214,104,128,.34); border-radius:22px 22px 22px 12px;
+    background:var(--pg-other); color:var(--pg-other-t);
+    border:1px solid rgba(214,114,138,.30); border-radius:20px 20px 20px 8px;
+    box-shadow:0 1px 2px rgba(140,60,80,.06);
   }
-  .row[data-bubble="pig"].agent .bubble { border-left:3px solid var(--pig-edge); }
-  /* 猪鼻：横椭圆 + 两个鼻孔 ✓（同样挂在气泡上 ✓） */
+  .row[data-bubble="pig"] .bubble::before {
+    box-shadow:-.5em -.42em 0 -.37em var(--bt-ear), .5em -.42em 0 -.37em var(--bt-ear);
+  }
   .row[data-bubble="pig"] .bubble::after {
-    content:''; position:absolute; bottom:9px; width:17px; height:13px;
-    border-radius:50%; pointer-events:none;
-    background:var(--pig-snout);
-    background-image:
-      radial-gradient(circle at 30% 50%, var(--pig-nose) 0 1.6px, transparent 1.8px),
-      radial-gradient(circle at 70% 50%, var(--pig-nose) 0 1.6px, transparent 1.8px);
+    content:''; position:absolute; top:.1em; width:.92em; height:.58em; border-radius:50%;
+    background:
+      radial-gradient(circle at 31% 52%, var(--pg-nose) 0 .1em, transparent .13em),
+      radial-gradient(circle at 69% 52%, var(--pg-nose) 0 .1em, transparent .13em),
+      linear-gradient(180deg, var(--pg-snout), var(--pg-snout2));
+    box-shadow:0 .07em .07em rgba(120,40,60,.15);
+    z-index:2; pointer-events:none;
   }
-  .row[data-bubble="pig"].mine .bubble::after { right:-11px; }
-  .row[data-bubble="pig"]:not(.mine) .bubble::after { left:-11px; }
+  .row[data-bubble="pig"].mine .bubble::after { right:.72em; left:auto; }
+  .row[data-bubble="pig"]:not(.mine) .bubble::after { left:.72em; right:auto; }
 
-  /* ③ 猫猫：我说的是薄荷绿、别人说的是蜜桃 ✓ —— 顶上竖两只尖耳朵 ✓ */
+  /* ── ③ 猫猫：薄荷 / 蜜桃，头顶竖两只尖耳 ✓ ─────────────────────
+     耳朵画在头**后面** ✓（`z-index:0` ✓）—— 只露上半截，才像从脑袋上长出来的 ✓；
+     耳窝里点一团粉 ✓，白口鼻 + 粉鼻头是第二版补的 ✓
+     （不加的话尖耳朵 + 黄脸会被看成狐狸 ✗ —— 实测过 ✓）。 */
   .row[data-bubble="cat"] {
-    --cat-mine:#bfe9d5;  --cat-mine-t:#17443a;
-    --cat-other:#ffd6b8; --cat-other-t:#63341a;
-    --cat-edge:#c9855a;
-    --cat-ear-mine:#8fcbb2; --cat-ear-other:#e8b48c;
+    --bt-eye:#33251a; --bt-glow:#ffffff;
+    --ct-mine:#c8eedb;  --ct-mine-t:#16443a;
+    --bt-muzzle:rgba(255,255,255,.55); --bt-nose:#d97f8f;
+    --ct-head-mine:#8ccfb2; --ct-ear-mine:#79c09f; --ct-inner-mine:#f3b3c3;
+    --ct-other:#ffe3ca; --ct-other-t:#613319;
+    --ct-head-other:#f2b98c; --ct-ear-other:#e8a877; --ct-inner-other:#f7a9a2;
   }
-  /* ⚠️ `margin-top` 是给耳朵留的位置 ✓ —— 不留就压到名字那一行上了 ✓。 */
-  .row[data-bubble="cat"] .bubble { position:relative; margin-top:7px; }
   .row[data-bubble="cat"].mine .bubble {
-    background:var(--cat-mine); color:var(--cat-mine-t);
-    border:0; border-radius:16px 16px 10px 16px;
-    --cat-ear: var(--cat-ear-mine);
+    background:var(--ct-mine); color:var(--ct-mine-t); border:0;
+    border-radius:17px 17px 8px 17px;
+    box-shadow:0 1px 2px rgba(20,80,60,.10);
+    --bt-face:var(--ct-head-mine); --bt-face2:var(--ct-head-mine);
+    --bt-ear:var(--ct-ear-mine); --bt-inner:var(--ct-inner-mine);
   }
   .row[data-bubble="cat"]:not(.mine) .bubble {
-    background:var(--cat-other); color:var(--cat-other-t);
-    border:1px solid rgba(200,125,80,.34); border-radius:16px 16px 16px 10px;
-    --cat-ear: var(--cat-ear-other);
+    background:var(--ct-other); color:var(--ct-other-t);
+    border:1px solid rgba(200,128,84,.28); border-radius:17px 17px 17px 8px;
+    box-shadow:0 1px 2px rgba(90,50,20,.06);
+    --bt-face:var(--ct-head-other); --bt-face2:var(--ct-head-other);
+    --bt-ear:var(--ct-ear-other); --bt-inner:var(--ct-inner-other);
+    --bt-muzzle:rgba(255,255,255,.55); --bt-nose:#c9666f;
   }
-  .row[data-bubble="cat"].agent .bubble { border-left:3px solid var(--cat-edge); }
-  .row[data-bubble="cat"] .bubble::before,
+  /* 一只伪元素画两只耳 ✓：底边留出中间那段给脑袋盖住 ✓ */
   .row[data-bubble="cat"] .bubble::after {
-    content:''; position:absolute; top:-7px; width:0; height:0;
-    border-left:5.5px solid transparent; border-right:5.5px solid transparent;
-    border-bottom:9px solid var(--cat-ear);
+    content:''; position:absolute; top:-1.24em; width:1.36em; height:.9em;
+    background:
+      radial-gradient(circle at 16% 62%, var(--bt-inner) 0 .14em, transparent .18em),
+      radial-gradient(circle at 84% 62%, var(--bt-inner) 0 .14em, transparent .18em),
+      var(--bt-ear);
+    clip-path:polygon(0% 100%, 14% 0%, 35% 100%, 65% 100%, 86% 0%, 100% 100%);
+    z-index:0; pointer-events:none;
   }
-  .row[data-bubble="cat"] .bubble::before { left:12px; }
-  .row[data-bubble="cat"] .bubble::after  { left:25px; }
+  .row[data-bubble="cat"].mine .bubble::after { right:.5em; left:auto; }
+  .row[data-bubble="cat"]:not(.mine) .bubble::after { left:.5em; right:auto; }
 
-  /* 奶霜是浅底 ✓ —— 上面那几组本来就是浅色 ✓，不用另起一套 ✓。
-     ⚠️ **夜阑 / 林深是深底** ✗ —— 浅黄浅粉贴在墨黑上会"发荧光" ✓，
-        字也压不住 ✓ → 这两套主题下换成**同色相的深色** ✓；
-        动物器官（嘴 / 鼻 / 耳）也换成实色 ✓，半透明的会看不见 ✓。 */
+  /* ── 深色两套主题：同色相压暗、字提亮 ✓（浅黄浅粉贴墨黑会"发荧光" ✗）── */
   [data-theme="dark"] .row[data-bubble="duck"],
   [data-theme="forest"] .row[data-bubble="duck"] {
-    --duck-mine:rgba(214,170,58,.30);  --duck-mine-t:#ffeab0;
-    --duck-other:rgba(214,170,58,.16); --duck-other-t:#f7e6bb;
-    --duck-edge:#d8a63a;               --duck-bill:#d9a03a;
+    --bt-face:#d9a93a; --bt-face2:#c8971f; --bt-eye:#2c1e02; --bt-glow:#f6d97e;
+    --bt-bill:#d29a2e; --bt-bill2:#c58c22;
+    --dk-mine:rgba(205,162,55,.32);  --dk-mine-t:#ffeab4;
+    --dk-other:rgba(205,162,55,.17); --dk-other-t:#f6e7bd;
   }
   [data-theme="dark"] .row[data-bubble="pig"],
   [data-theme="forest"] .row[data-bubble="pig"] {
-    --pig-mine:rgba(214,104,128,.30);  --pig-mine-t:#ffdfe7;
-    --pig-other:rgba(214,104,128,.15); --pig-other-t:#f9dde6;
-    --pig-edge:#d96a85;                --pig-snout:#c9778c; --pig-nose:#4a1d2a;
+    --bt-face:#b96d80; --bt-face2:#a95b70; --bt-eye:#2b0b12; --bt-glow:#d894a6;
+    --bt-ear:#b46a7d; --pg-snout:#c06a80; --pg-snout2:#b45f75; --pg-nose:#37101b;
+    --pg-mine:rgba(190,95,120,.33);  --pg-mine-t:#ffdde5;
+    --pg-other:rgba(190,95,120,.17); --pg-other-t:#f7dce4;
   }
   [data-theme="dark"] .row[data-bubble="cat"],
   [data-theme="forest"] .row[data-bubble="cat"] {
-    --cat-mine:rgba(72,168,136,.32);   --cat-mine-t:#d8f5e9;
-    --cat-other:rgba(206,124,78,.28);  --cat-other-t:#ffe3cf;
-    --cat-edge:#cd8455;
-    --cat-ear-mine:#2f7a63; --cat-ear-other:#8a4f2c;
+    --bt-eye:#122a22; --bt-glow:rgba(255,255,255,.75);
+    --ct-mine:rgba(64,155,125,.34);  --ct-mine-t:#d5f3e7;
+    --ct-other:rgba(190,118,74,.30); --ct-other-t:#ffe1cc;
+    --ct-head-mine:#3c8a70; --ct-ear-mine:#357c64; --ct-inner-mine:#b4657c;
+    --ct-head-other:#9a5c38; --ct-ear-other:#8d5232; --ct-inner-other:#c47b6f;
+    --bt-muzzle:rgba(255,255,255,.20); --bt-nose:#e0a2a6;
   }
 
-  /* **图片 / 文件 / 语音那种整块气泡不带器官** ✓ —— 里面没有"一句话" ✓，
-     硬贴一张嘴只会戳在照片边上 ✓（和 `.bubble.media` 原来"不给底色"一个道理 ✓）。 */
+  /* **图片 / 文件 / 语音那种整块气泡不带脑袋** ✓ —— 里面没有"一句话" ✓，
+     硬贴一张脸只会戳在照片边上 ✓（和 `.bubble.media` 原来"不给底色"一个道理 ✓）。 */
   .row[data-bubble]:not([data-bubble="plain"]) .bubble.media { border-radius:12px !important; }
-  .row[data-bubble="duck"] .bubble.media::after,
-  .row[data-bubble="pig"] .bubble.media::after,
-  .row[data-bubble="cat"] .bubble.media::before,
-  .row[data-bubble="cat"] .bubble.media::after { display:none; }
-  .row[data-bubble="cat"]:has(> .wrap2 > .bubble.media) .bubble { margin-top:0; }
+  .row[data-bubble]:not([data-bubble="plain"]) .bubble.media::before,
+  .row[data-bubble]:not([data-bubble="plain"]) .bubble.media::after { display:none; }
 
   .row:not(.mine):not(.agent) .bubble { border-bottom-left-radius:4px; }
   .time { font-size:11px; color:var(--muted); margin-top:2px; padding:0 4px; }
@@ -979,6 +1036,12 @@
   #space    { z-index:30; }   /* 和 `#me` 同档 ✓ —— 它们不会同时开 ✓ */
   #peer     { z-index:30; }   /* 同上 ✓ */
   #selfIntro{ z-index:31; }   /* 从「我的」再进一层 ✓ */
+  /* ★ 2026-10-27：气泡选择屏是**从「我的」推进来的** ✓（#me = 30 ✓）——
+     它原来只有 `.ascreen` 的 20 ✓，推上去却排在「我的」底下 ✓ →
+     屏幕上什么都不变 ✓，返回、把「我的」收掉之后才露出来 ✓
+     （用户报的"点了不马上弹出，返回后才有"就是这个 ✓，和 2026-10-09 那次同一个毛病 ✓）。
+     ⚠️ 以后**从 #me / #agent 推进来的新屏**，z-index 都得比来源那一屏高 ✓。 */
+  #bubbleSet{ z-index:32; }
   /* 自我介绍那个多行框：`.field` 是给单行输入用的 ✓，多行要自己说清楚 ✓ */
   #selfIntro textarea.field { min-height:150px; resize:none; line-height:1.6;
                               font-family:inherit; }
@@ -1378,12 +1441,13 @@
   #bubbleSet .bcard .tocardot { border-color:var(--line); }
   #bubbleSet .bcard.on .tocardot { border-color:var(--accent); background:var(--accent);
                                    box-shadow:inset 0 0 0 3px var(--panel); }
-  #bubbleSet .tprev { padding:12px 14px 0; background:var(--t-bg); }
+  /* ⚠️ 裁切挂在**卡片里这一层** ✓ —— 挂在气泡上会把探出来的脑袋切平 ✗（实测 ✓）。 */
+  #bubbleSet .tprev { padding:12px 14px 0; background:var(--t-bg); overflow:hidden; }
   /* 假 html 自己不给底色（卡已经给了 ✓）—— 它只当"属性开关"用 ✓ */
-  #bubbleSet .bstage { display:flex; flex-direction:column; gap:8px;
+  #bubbleSet .bstage { display:flex; flex-direction:column; gap:12px;
                        padding:0 0 14px; }
   #bubbleSet .bptop { display:flex; align-items:center; gap:8px;
-                      padding-bottom:9px; border-bottom:1px solid var(--t-line); }
+                      padding-bottom:12px; border-bottom:1px solid var(--t-line); }
   #bubbleSet .bptop span { width:16px; height:16px; border-radius:50%;
                            background:var(--t-accent-bg); }
   #bubbleSet .bptop b { width:54px; height:7px; border-radius:4px;
@@ -1397,7 +1461,6 @@
   #bubbleSet .brow .av { width:19px; height:19px; font-size:9px; }
   #bubbleSet .brow .bubble { font-size:12px; line-height:1.35;
                              padding:7px 10px; white-space:nowrap;
-                             overflow:hidden; text-overflow:ellipsis;
                              max-width:100%; }
   /* ⚠️ 预览里的气泡**不透明、不描边** ✓ —— 主界面那三个 `--bubble-*` 是半透明的 ✓
      （要透背景图 ✓），可卡里没有背景图 ✓，半透明只会让四个主题看起来一个样 ✓。
@@ -1406,14 +1469,12 @@
                --bubble-mine-bg:var(--t-accent-bg); }
   #bubbleSet .brow .bubble { color:var(--t-text); }
   #bubbleSet .brow.mine .bubble { color:var(--t-text); }
-  /* ⚠️ 器官的 `bottom` 是按主界面**正文行高**定的 ✓ ——
-     预览的字小一号 ✓，不跟下来的话嘴/鼻会戳在字下面 ✓。 */
-  #bubbleSet .row[data-bubble="duck"] .bubble::after { bottom:5px; width:13px; height:9px; }
-  #bubbleSet .row[data-bubble="pig"] .bubble::after  { bottom:6px; width:15px; height:12px; }
-  #bubbleSet .row[data-bubble="cat"] .bubble::before,
-  #bubbleSet .row[data-bubble="cat"] .bubble::after { border-left-width:4.5px;
-    border-right-width:4.5px; border-bottom-width:7px; top:-5px; }
-  #bubbleSet .row[data-bubble="cat"] .bubble { margin-top:5px; }
+  /* ⚠️ 预览这边**不用再抄一遍器官尺寸**了 ✓ —— 皮肤全用 `em` ✓，
+     气泡自己的 `font-size`（12px）就是标尺 ✓，脑袋自动小一号 ✓。
+     只剩一条要补：上面 `#bubbleSet .brow .bubble` 是 **ID 选择器** ✓，
+     它那条 `padding:7px 10px` 会压过皮肤的 `padding-top:1.02em` ✗ ——
+     不补的话预览里的嘴/鼻会戳在字上 ✓（实验室里见过 ✓）。 */
+  #bubbleSet .row[data-bubble]:not([data-bubble="plain"]) .bubble { padding-top:1.02em; }
   #themeSet .thint, #bubbleSet .thint {
     color:var(--muted); font-size:12.5px; line-height:1.6;
     text-align:center; margin:2px 8px 18px; }

@@ -493,6 +493,14 @@
     // ★★ **2026-10-09：`#me` 那一族提到 30/31** ✗→✓ —— 它们现在**比工坊那一摞还高** ✓
     //    （用户报的"在组件聊天里点我的头像没反应"就是这条 ✓，见 CSS 那一段 ✓）。
     //    → 所以这一族要挪到**这里**（表的最前面）✓，不能再留在下面 ✗。
+    // ★★ **气泡要排在「我的」那一族前面** ✗→✓（2026-10-27 晚）——
+    //    它是从「我的」推进来的 ✓，而「我的」在 z 30 ✓、它自己 32 ✓（见 CSS 那段 ✓）。
+    //    照"z-index 从大到小"这条铁律 ✓，它必须**排在 #meEdit / #me 之前** ✓：
+    //    写在后头的话（一开始就是 ✗），返回键会先关掉**下面那层「我的」** ✓，
+    //    气泡页留在屏幕上纹丝不动 ✓ —— 又是"按了没反应"那个形状 ✓。
+    //    ⚠️ 现在它是**所有屏里最高的一层** ✓（32 ✓），所以在屏里排第一 ✓；
+    //      以后再有比 32 高的屏，记得插到它上面 ✓。
+    if ($('#bubbleSet').classList.contains('on')) { popScreen('bubbleSet'); return; }
     if ($('#meEdit').classList.contains('on')) { closeMeEdit(); return; }
     if ($('#me').classList.contains('on')) { closeMe(); return; }
     if ($('#peer').classList.contains('on')) { closePeer(); return; }
@@ -519,8 +527,6 @@
     //   ⚠️ 没这一支的话，在主题页按返回会**隔着它把设置关掉** ✓
     //      （屏幕不动、人退到了群聊 ✓ —— 见 `android-back-key-only-knows-settings` ✓）。
     if ($('#themeSet').classList.contains('on')) { popScreen('themeSet'); return; }
-    // ★ **气泡**（2026-10-27）—— 同一条规矩，排在主题后面、设置之前 ✓。
-    if ($('#bubbleSet').classList.contains('on')) { popScreen('bubbleSet'); return; }
     // ★ 2026-10-23：读图不再是整屏子页 ✓ —— 它现在在 `#models` 里开半屏板子 ✓，
     //   返回键走上面那支 `#sheet` ✓（`closeSheet` ✓）。
     if ($('#models').classList.contains('on')) { popScreen('models'); return; }
