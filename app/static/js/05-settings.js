@@ -565,15 +565,34 @@
 
   // ── 气泡（2026-10-27）───────────────────────────────────────────────
   //
-  // ★ 四张卡：默认 / 鸭鸭 / 猪猪 / 猫猫 ✓（定义在 `01-core.js` 的 `BUBBLES` ✓）。
-  // ⚠️ 气泡**不进服务端** ✓ —— 和主题同一条规矩：本机 localStorage、按用户 id 分开 ✓
-  //    （`applyBubble` / `syncBubbleForUser` ✓）。
+  // ★ 两个入口、一套实现 ✓：
+  //   · 「我的」 → 我自己的 ✓（`openBubbleSet('me')` ✓）
+  //   · 「管家」 → 管家的 ✓（`openBubbleSet('agent')` ✓）
+  //
+  // ★★ 气泡是**人**的 ✓，不是这台设备的 ✗→✓（用户 2026-10-27 纠正过 ✓）：
+  //   我换成鸭鸭，雅雅那边看我的消息就是鸭鸭 ✓；她换猪猪，我这边立刻跟着变 ✓；
+  //   管家的那款**群里谁都能改** ✓。所以它**必须存服务端** ✓：
+  //   · 我的 → `POST /api/me/bubble {group_id, bubble}` ✓
+  //   · 管家 → `PATCH /api/groups/{id} {agent_bubble}` ✓
+  //   两边写完都会广播 `group_update` ✓ → `refreshGroup` 重拉成员 + `repaintBubbles` ✓。
+  //   ⚠️ 这里**不做本地缓存** ✓（和主题那套 localStorage 完全是两回事 ✗）——
+  //      留一份本地的，就一定会有"本机看着是鸭鸭、别人看着还是默认"的那一天 ✓。
+  //
   // ⚠️ 预览画的是**卡自己那一套** ✓ 两处都对：
   //    · 底色 / 正文色 → 抄**现在这套主题**的变量 ✓（`_curThemeVars` ✓）——
   //      气泡是皮肤 ✓，站在夜阑里就该看见"夜阑 + 鸭鸭" ✓，拿奶霜的颜色去预览是骗人 ✓。
-  //    · 气泡本身 → 走**真的那几条 CSS** ✓（`data-bubble` 挂在卡上一个假 `html` 上 ✓）——
+  //    · 气泡本身 → 走**真的那几条 CSS** ✓（`data-bubble` 挂在预览**行**上 ✓）——
   //      形状只在 `app.css` 里写了一份 ✓，这里再画一遍必和真界面长得不一样 ✓。
-  const openBubbleSet = () => { pushScreen('bubbleSet', 'settings'); renderBubbleSet(); };
+  let _bubbleTarget = 'me';       // 'me' | 'agent' ✓
+  let _bubbleBusy = false;
+
+  const openBubbleSet = (target) => {
+    _bubbleTarget = target === 'agent' ? 'agent' : 'me';
+    const h = $('#bubbleTitle');
+    if (h) h.textContent = _bubbleTarget === 'agent' ? '管家的气泡' : '我的气泡';
+    pushScreen('bubbleSet', 'settings');
+    renderBubbleSet();
+  };
 
   /** 现在这套主题的那几块颜色 ✓（给预览卡当底色用 ✓）。 */
   const _curThemeVars = () => {
@@ -581,16 +600,52 @@
     return t.vars.replace(/--p-/g, '--t-');
   };
 
+  /** 这个面板**此刻**选中的是哪款 ✓ —— 认服务端那份 ✓（本地只是刚写完先改的 ✓）。 */
+  const bubbleCurrent = () => _bubbleTarget === 'agent'
+    ? normBubble(group && group.agent_bubble)
+    : normBubble((me && me.bubble) || bubbleOfMember(me && me.id));
+
+  /** 存到服务端 ✓ —— **两个入口各一条路** ✓，界面上只有一个函数 ✓。
+   *
+   *  ⚠️ 保存成功**先按本地这份重画** ✓：广播回来还要几十毫秒 ✓，
+   *     不先画的话手指点下去像没反应 ✓。广播回来那条路会再对一次 ✓（同一个结果 ✓）。
+   */
+  const _saveBubble = async (id) => {
+    if (_bubbleBusy || !group) return;
+    const v = normBubble(id);
+    _bubbleBusy = true;
+    try {
+      if (_bubbleTarget === 'agent') {
+        // 群级的 ✓ —— `PATCH /groups/{id}` 只要成员身份 ✓（谁都能改 ✓）
+        await api(`/groups/${group.id}`,
+                  { method: 'PATCH', body: JSON.stringify({ agent_bubble: v }) });
+        group.agent_bubble = v;
+      } else {
+        const r = await api('/me/bubble',
+          { method: 'POST', body: JSON.stringify({ group_id: group.id, bubble: v }) });
+        if (me) me.bubble = normBubble(r && r.bubble);
+      }
+      repaintBubbles();                       // 屏上的消息立刻换 ✓
+      renderBubbleSet();                      // 「使用中」挪个位置 ✓
+      if ($('#me').classList.contains('on')) renderMe();
+      if ($('#agent').classList.contains('on') && !promptEditing) renderAgent();
+    } catch (e) { toast(e.message); }
+    finally { _bubbleBusy = false; }
+  };
+
   const renderBubbleSet = () => {
     const body = $('#bubbleBody');
     if (!body) return;
-    const cur = currentBubble();
+    const cur = bubbleCurrent();
     const themeCur = document.documentElement.dataset.theme || THEME_DEFAULT;
+    const isAgent = _bubbleTarget === 'agent';
     body.textContent = '';
 
     const hint = document.createElement('div');
     hint.className = 'thint';
-    hint.textContent = '只换气泡的样子，底色和字体跟着「主题」走。只在这台手机上生效。';
+    hint.textContent = isAgent
+      ? '管家所有消息的气泡。你们俩谁都能改，改完对方那边也会跟着变。'
+      : '选一款，群里其他人看到的、你自己看到的就是它。底色和字体跟着「主题」走。';
     body.appendChild(hint);
 
     BUBBLES.forEach(b => {
@@ -601,14 +656,13 @@
       card.setAttribute('aria-pressed', b.id === cur ? 'true' : 'false');
       card.setAttribute('style', _curThemeVars());
 
-      // 迷你聊天：两团气泡 + 各自的尾巴 ✓ / 一只小头像 + 标题 ✓
+      // 迷你聊天：两团气泡（各自带动物形态 ✓）+ 一只小头像 + 标题 ✓
       const prev = document.createElement('div');
       prev.className = 'tprev';
-      // ⚠️ 假 `html` ✓ —— 主题和气泡这两层**靠 `data-*` 挑规则** ✓，
-      //    卡里不挂这两个属性，`app.css` 里一条都不会命中 ✓（预览就成裸的了 ✓）。
+      // ⚠️ 主题那层还是要一个假 `data-theme` ✓ —— 深色那套规则靠它命中 ✓。
+      //    气泡**不再挂在这一层** ✓：挂到下面每一行上 ✓（真的界面也是这么挂的 ✓）。
       const stage = document.createElement('div');
       stage.dataset.theme = themeCur;
-      stage.dataset.bubble = b.id;
       stage.className = 'bstage';
 
       const top = document.createElement('div');
@@ -618,18 +672,34 @@
 
       const said = document.createElement('div');
       said.className = 'row brow agent';
-      said.dataset.bubble = b.id;   // 尾巴挂在**行**上 ✓，见 app.css 那段
+      said.dataset.bubble = b.id;
+      said.dataset.bubbleBy = 'agent';
+      const saidAv = document.createElement('div');
+      saidAv.className = 'av';
+      saidAv.textContent = isAgent ? '管' : '他';
+      const saidW = document.createElement('div');
+      saidW.className = 'wrap2';
       const saidB = document.createElement('div');
       saidB.className = 'bubble';
-      saidB.textContent = '今晚想记点什么？';
-      said.appendChild(saidB);
+      saidB.textContent = isAgent ? '今晚想记点什么？' : '你换好啦？';
+      saidW.appendChild(saidB);
+      said.append(saidAv, saidW);
+
       const mine = document.createElement('div');
       mine.className = 'row brow mine';
       mine.dataset.bubble = b.id;
+      mine.dataset.bubbleBy = 'u';
+      const mineAv = document.createElement('div');
+      mineAv.className = 'av';
+      mineAv.textContent = '我';
+      const mineW = document.createElement('div');
+      mineW.className = 'wrap2';
       const mineB = document.createElement('div');
       mineB.className = 'bubble';
       mineB.textContent = '记一笔晚饭';
-      mine.appendChild(mineB);
+      mineW.appendChild(mineB);
+      mine.append(mineAv, mineW);
+
       stage.append(said, mine);
       prev.appendChild(stage);
       card.appendChild(prev);
@@ -657,10 +727,7 @@
       meta.append(txt, dot);
       card.appendChild(meta);
 
-      card.onclick = () => {
-        applyBubble(b.id);    // 立即生效 + 记住 ✓
-        renderSettings();     // 这一屏跟着重画 ✓（「使用中」挪个位置 ✓），设置页右边也换掉 ✓
-      };
+      card.onclick = () => { _saveBubble(b.id); };
       body.appendChild(card);
     });
   };
@@ -1211,9 +1278,10 @@
     if (eTheme) eTheme.textContent = themeById(document.documentElement.dataset.theme || THEME_DEFAULT).name;
     // 主题页开着时，选完主题要重画（把「使用中」挪到新卡上 ✓）
     if ($('#themeSet').classList.contains('on')) renderThemeSet();
-    // ★ 2026-10-27：「气泡」右边写当前那套的名字 ✓，那一屏开着时选完也要重画 ✓。
-    const eBub = $('#vBubble');
-    if (eBub) eBub.textContent = bubbleById(currentBubble()).name;
+    // ★ 气泡（2026-10-27）**不再住在设置页** ✓ —— 它跟着人走 ✓，
+    //   入口在「我的」（自己的 ✓）和「管家」（群级的 ✓）✓。
+    //   ⚠️ 只留"那一屏开着就跟着重画" ✓：群更新广播回来时（别人改了管家的 ✓）
+    //      正开着的气泡面板要换「使用中」✓。
     if ($('#bubbleSet').classList.contains('on')) renderBubbleSet();
     const eAname = $('#vAname'); if (eAname) eAname.textContent = agentName();
     // ⚠️ 这里原来还给「群昵称」那一行填值 ✓（`#vMy` ✓）——
@@ -1412,8 +1480,9 @@
       else if (act === 'bg') openBgSet();
       // ★ 2026-10-19：「主题」—— 夜阑 / 奶霜 / 林深 ✓（只影响这台设备 ✓）
       else if (act === 'theme') openThemeSet();
-      // ★ 2026-10-27：「气泡」—— 默认 / 鸭鸭 / 猪猪 / 猫猫 ✓（只影响这台设备 ✓）
-      else if (act === 'bubble') openBubbleSet();
+      // ⚠️ 「气泡」**不在设置页**了 ✓（2026-10-27 用户纠正：它跟着人走 ✓，
+      //    入口在「我的」和「管家」✓）。`data-act="bubble"` 那一行也删了 ✓ ——
+      //    留着分支只会让下一个人以为这里还有个入口 ✗。
       else if (act === 'invite') inviteCodeNow();
       // ★ **退出当前空间**（红字居中，就在「退出登录」上面 ✓）—— 二次确认在它里面 ✓
       else if (act === 'leave') confirmLeaveSpace();
@@ -1532,6 +1601,14 @@
       // 密码那一行**右边不写值** ✓（壳那版就是空着 ✓）——
       // 换成一句灰话 ✓，省得右边空一格、看着像没加载出来 ✓。
       meRow('lock', '密码', '••••••', () => openMeEdit('password')),
+    ]));
+
+    // ★ 气泡（2026-10-27）✓ —— **入口在这里** ✓（用户定的：「我的」和「管家」✓）。
+    //   ⚠️ 它不是"这台手机的设置" ✗：选完**别人也看得见** ✓（存服务端 ✓，见上面那段 ✓）。
+    //   右边那一格写**现在这款的名字** ✓（和昵称/用户名那几行同一个形状 ✓）。
+    body.appendChild(secG(null, [
+      meRow('chat', '气泡', bubbleName((me && me.bubble) || bubbleOfMember(me && me.id)),
+            () => openBubbleSet('me')),
     ]));
 
     // ③ 自我介绍 ✓（2026-10-09 用户定的 ✓）—— 和管家的「性格」**同一个形状** ✓

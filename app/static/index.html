@@ -345,9 +345,9 @@
     <!-- ★ 聊天背景（2026-10-19）：**每个空间一份** ✓（存 `var/background/g<群号>/` ✓）——
          和上面那个"主题"不是一回事 ✗（主题是**这台设备**的 ✓）。 -->
     <div class="item" data-act="bg"><span class="ico" data-ico="image"></span><span class="k">背景</span><span class="v" id="vBg"></span><span class="chev" data-chev></span></div>
-    <!-- ★ 气泡（2026-10-27）：鸭鸭 / 猪猪 / 猫猫 ✓ —— 和「主题」一样**只存这台设备** ✓，
-         按用户 id 分开 ✓。它是盖在主题上的**皮肤** ✓：底色不动，只换两团气泡 ✓。 -->
-    <div class="item" data-act="bubble"><span class="ico" data-ico="chat"></span><span class="k">气泡</span><span class="v" id="vBubble"></span><span class="chev" data-chev></span></div>
+    <!-- ⚠️ 「气泡」**不在设置页** ✓（2026-10-27 用户纠正过 ✓）：
+         它跟着**人**走 ✓（存服务端 ✓，别人也看得见 ✓），
+         入口在「我的」（自己的 ✓）和「管家」（群级的 ✓）✓。 -->
     <!-- ★ 「模型」**只有管理员看得见** ✓（`renderSettings` 按 `me.is_admin` 显示 ✓）——
          藏起来只是**体验** ✓，闸门在 `/api/models/*` 的 `require_admin` ✓。 -->
     <div class="item" data-act="models" id="rowModels" style="display:none"><span class="ico" data-ico="layers"></span><span class="k">模型</span><span class="v" id="vModels"></span><span class="chev" data-chev></span></div>
@@ -411,7 +411,8 @@
   </header>
   <div class="abody" id="themeBody"></div>
 </div>
-<!-- ★ 2026-10-27：**气泡主题** —— 设置页「气泡」那一行进这里 ✓。
+<!-- ★ 2026-10-27：**气泡皮肤** —— 两个入口共用这一屏 ✓：
+     「我的」→ 我自己的 ✓ / 「管家」→ 群级的管家气泡 ✓（标题由 `openBubbleSet` 改 ✓）。
      ⚠️ 和 `#themeSet` 一样是整屏子页 ✓ → 必须列进 `_OTHER_SCREENS` ✓、
         并在 `__goBack` 里加一支 ✓（见 `android-back-key-only-knows-settings` ✓）。
      每张卡里用的是**现在这套主题**的颜色 ✓（`--p-*` 取自当前 `data-theme` ✓）——
@@ -425,7 +426,7 @@
         <polyline points="15 4.5 8.5 12 15 19.5" />
       </svg>
     </button>
-    <h2>气泡</h2>
+    <h2 id="bubbleTitle">我的气泡</h2>
     <div class="spacer"></div>
   </header>
   <div class="abody" id="bubbleBody"></div>

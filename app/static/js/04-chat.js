@@ -395,6 +395,9 @@
     if (m.quote) b.insertBefore(buildQuoteEl(m.quote), b.firstChild);
     const t = document.createElement('div'); t.className = 'time'; t.textContent = fmtTime(m.created_at);
     w.append(who, b, t); row.append(av, w);
+    // ★ 气泡（2026-10-27）：**这一行是谁的，就用谁现在选的那款** ✓
+    //   （按成员表查 ✓，消息里那份只是成员表还没到时的兜底 ✓，见 `bubbleForMsg` ✓）。
+    setRowBubble(row, m);
     if (prepend) $('#msgs').prepend(row);
     else { $('#msgs').appendChild(row); scrollDown(); }
     _fire('message', m, row);   // agent 的 ui/app.js 可以给这一条挂东西
@@ -595,6 +598,10 @@
         openAgentSettings();
       };
       row.querySelector('.who').textContent = agentName();
+      // ★ 流式那一行也要穿管家的气泡 ✓（它有 `data-bubble-by` ✓，落库后清掉、
+      //   由真正那条消息接着画 ✓；这中间换气泡也会被 `repaintBubbles` 重贴 ✓）。
+      row.dataset.bubble = normBubble(group && group.agent_bubble);
+      row.dataset.bubbleBy = 'agent';
       $('#msgs').appendChild(row);
       streamEl = row.querySelector('.bubble');
     }
@@ -664,6 +671,14 @@
         //   改法：**认住自己那个 id** ✓。列表怎么排都不影响 ✓。
         group = gs.find(g => g.id === group.id) || gs[0];
         members = await api(`/groups/${group.id}/members`);
+        // ★ 气泡（2026-10-27）：**换气泡就是靠这一趟广播回来的** ✓。
+        //   服务端写完 `group_members.bubble` / `groups.agent_bubble` 会广播
+        //   `group_update` ✓ → 这里重拉 ✓ → 下面 `repaintBubbles` 把在屏上的
+        //   每一行按**现在的**成员表重贴 ✓。**历史消息不重发、不落库** ✓，
+        //   所以"她改成猪猪"我这边一秒后就变 ✓，翻回去看老消息也一样是猪猪 ✓。
+        const mineRow = (members || []).find(x => x.id != null && Number(x.id) === Number(me && me.id));
+        if (mineRow) me.bubble = normBubble(mineRow.bubble);
+        repaintBubbles();
         // ★ 群一刷新就**重算状态配置** ✓ —— 唯一的入口 ✓。
         //   少这一句的后果：在「管家」里存完，状态条要等下次进 App 才变 ✗。
         if (typeof normalizeStatus === 'function') normalizeStatus();
@@ -1111,6 +1126,9 @@
     const row = document.createElement('div');
     row.className = 'row mine';
     row.dataset.temp = id;
+    // ★ 自己那条"先上屏"的也要立刻是对的气泡 ✓（不然传完一换，气泡跳一下 ✓）。
+    row.dataset.bubble = bubbleOfMember(me && me.id);
+    row.dataset.bubbleBy = (me && me.id != null) ? 'u' + me.id : '';
     const av = document.createElement('div');
     av.className = 'av';
     // 自己发的那条（先上屏、后上传 ✓）—— 用**自己的头像** ✓，没有才退回首字 ✓

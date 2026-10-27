@@ -41,6 +41,15 @@
     });
     m.appendChild(secG(null, rows1));
 
+    // ★ 管家的气泡（2026-10-27）✓ —— 入口在**这一屏** ✓（用户：「我的」和「管家」✓）。
+    //   ⚠️ 它是**群级**的 ✓：管家没有账号 ✓，所以挂在群上 ✓；
+    //      群里**谁都能改** ✓（用户原话：「管家的我们俩谁设置都可以」✓）。
+    //      存的是 `groups.agent_bubble` ✓，改完广播 `group_update` ✓ → 两边一起变 ✓。
+    m.appendChild(secG(null, [
+      meRow('chat', '气泡', bubbleName(group && group.agent_bubble),
+            () => openBubbleSet('agent')),
+    ]));
+
     m.appendChild(secG(null, [promptBlock()]));
   };
 

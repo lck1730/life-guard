@@ -472,156 +472,145 @@
   }
   .row.agent .bubble { background:var(--bubble-agent-bg); border:1px solid var(--line);
                        border-left:3px solid var(--agent); border-bottom-left-radius:4px; }
-  /* ── 气泡主题（2026-10-27）：鸭鸭 / 猪猪 / 猫猫 ───────────────────────
-     ★ 它是**盖在主题上的皮肤** ✓（`data-bubble` ✓，由 `01-core.js` 的
-       `applyBubble` 写 ✓）—— 底色 / 正文 / 顶栏一行都不动 ✓，
-       只换"我说的话"和"管家说的话"那两团 ✓。
-     ⚠️ 动物**一脸就认出来**靠三样东西，缺一样就分不清 ✓：
-        ① 配色（鸭=鹅黄 · 猪=樱粉 · 猫=薄荷+蜜桃 ✓，色相隔得够远 ✓）
-        ② 尾巴（鸭=短短一翘 · 猪=打卷 · 猫=细长上翘 ✓ —— 形状不同，不看色也认得出 ✓）
-        ③ 角（鸭左右都圆、猪四角都圆、猫左右带尖 ✓）
-       ⚠️ 所以**别只改颜色** ✗ —— 三个色号看一眼像孪生兄弟 ✓，
-          尾巴才是它们真正的名字 ✓。
-     ⚠️ 颜色写死在这里、**按主题深浅各一套** ✓（`[data-theme=cream]` 那支 ✓）——
-        气泡底色不跟 `--bubble-*` 走 ✓：那三个变量是半透明的 ✓（要透背景图 ✓），
-        动物色一透明就发灰 ✓，鸭鸭和猫猫又糊成一片 ✓。
-     ⚠️ 尾巴用伪元素画 ✓（`border-left/right: transparent` 拼一个三角 ✓）——
-        不引图片 ✓：它得跟着气泡底色走 ✓，两套主题各一张图就多两处会忘的地方 ✓。 */
-  /* ① 鸭鸭：鹅黄，圆滚，短尾巴往上一翘 ✓ */
-  [data-bubble="duck"] {
+  /* ── 气泡皮肤（2026-10-27）：鸭鸭 / 猪猪 / 猫猫 ───────────────────────
+     ★ 它是**盖在主题上的皮肤** ✓ —— 底色 / 正文 / 顶栏一行都不动 ✓，
+       只换气泡本身的**形状和配色** ✓。
+     ★★ `data-bubble` 挂在**每一行**上（`.row[data-bubble]` ✓，由 `setRowBubble` 写 ✓）：
+        一个群里可能同时有三款 ✓（我鸭鸭 / 她猪猪 / 管家猫猫 ✓）——
+        挂在容器上就只能全群一款 ✗（2026-10-27 用户纠正过 ✓）。
+     ★★ **不是换颜色** ✓（用户原话：「气泡不是换个颜色，而是要有对应的动物的图案，
+        比如气泡变成了别的形状，或者气泡边缘有了一个小动物图案形状」✓）。
+        三只动物各有一个**一眼认得出的器官** ✓：
+          鸭鸭 = 边上伸出一张**扁扁的橙色鸭嘴** ✓
+          猪猪 = 边上顶一个**粉色猪鼻**（两个鼻孔 ✓）
+          猫猫 = 顶上竖**两只尖耳朵** ✓
+        圆角也各不相同 ✓ —— 灰阶截图里也分得开 ✓。
+     ⚠️ 颜色写死在这里、**按主题深浅各一套** ✓ —— 气泡底色不跟 `--bubble-*` 走 ✗：
+        那三个变量是半透明的 ✓（要透背景图 ✓），动物色一透明就发灰 ✓。
+     ⚠️ 器官用伪元素画 ✓（`::before` / `::after` ✓）—— 不引图片 ✓：
+        它得跟着气泡底色/主题走 ✓，两套主题各一张图就多两处会忘的地方 ✓。
+     ⚠️ **只有消息行**带 `data-bubble` ✓ —— 设置页那些 `.ascreen .row` 不带 ✓，
+        所以这里的规则一条都不会漏到设置页去 ✓。 */
+  .row[data-bubble]:not([data-bubble="plain"]) .bubble { position:relative; }
+
+  /* ① 鸭鸭：鹅黄、圆滚，外侧伸一张扁嘴 ✓ */
+  .row[data-bubble="duck"] {
     --duck-mine:#ffdd7a;  --duck-mine-t:#6b4a06;
     --duck-other:#fff0b8; --duck-other-t:#66500f;
-    --duck-edge:#e0a92c;
+    --duck-edge:#e0a92c;  --duck-bill:#f2a63a;
   }
-  [data-bubble="duck"] .row.mine .bubble {
+  .row[data-bubble="duck"].mine .bubble {
     background:var(--duck-mine); color:var(--duck-mine-t);
-    border:0; border-radius:18px;
+    border:0; border-radius:20px 20px 9px 20px;
   }
-  /* ⚠️ 用 `:not(.mine)` 而不是 `.agent` ✗ —— 群里**别的人**说的话也得跟着变 ✓，
-     否则一套皮肤只染了两团、第三个人还是原来的灰 ✓（一眼像没铺满 ✓）。 */
-  [data-bubble="duck"] .row:not(.mine) .bubble {
+  /* ⚠️ 用 `:not(.mine)` 而不是 `.agent` ✗ —— 群里**别的人**说的话也得跟着变 ✓ */
+  .row[data-bubble="duck"]:not(.mine) .bubble {
     background:var(--duck-other); color:var(--duck-other-t);
-    border:1px solid rgba(184,148,52,.34);
+    border:1px solid rgba(184,148,52,.34); border-radius:20px 20px 20px 9px;
   }
   /* 管家那一竖条还在 ✓ —— 换成这只动物的深色 ✓，人和管家仍然分得开 ✓ */
-  [data-bubble="duck"] .row.agent .bubble { border-left:3px solid var(--duck-edge); }
-  /* ② 猪猪：樱粉，软乎，尾巴打个卷 ✓ */
-  [data-bubble="pig"] {
+  .row[data-bubble="duck"].agent .bubble { border-left:3px solid var(--duck-edge); }
+  /* 鸭嘴：扁、外侧圆 ✓（上喙一道浅槽 ✓）
+     ⚠️ **挂在气泡上**（`.bubble::after` ✓），不挂行 ✗→✓：
+        行里还有头像 ✓ —— `.row.mine` 是 `row-reverse` ✓，行的右边缘是**头像**的右边缘 ✗，
+        嘴会飘到头像旁边去 ✓。挂在气泡上，贴的永远是气泡自己那一边 ✓。 */
+  .row[data-bubble="duck"] .bubble::after {
+    content:''; position:absolute; bottom:8px; width:15px; height:10px;
+    background:var(--duck-bill); pointer-events:none;
+    border-radius:3px 8px 8px 3px;
+    box-shadow:inset 0 -2px 0 rgba(120,70,0,.16);
+  }
+  .row[data-bubble="duck"].mine .bubble::after { right:-10px; }
+  .row[data-bubble="duck"]:not(.mine) .bubble::after { left:-10px; transform:scaleX(-1); }
+
+  /* ② 猪猪：樱粉、软乎，外侧顶一个猪鼻 ✓ */
+  .row[data-bubble="pig"] {
     --pig-mine:#ffc0d0;  --pig-mine-t:#6e2434;
     --pig-other:#ffe0e8; --pig-other-t:#6e2b38;
-    --pig-edge:#d96a85;
+    --pig-edge:#d96a85;  --pig-snout:#e58ba2; --pig-nose:#93405a;
   }
-  [data-bubble="pig"] .row.mine .bubble {
+  .row[data-bubble="pig"].mine .bubble {
     background:var(--pig-mine); color:var(--pig-mine-t);
-    border:0; border-radius:20px;
+    border:0; border-radius:22px 22px 12px 22px;
   }
-  [data-bubble="pig"] .row:not(.mine) .bubble {
+  .row[data-bubble="pig"]:not(.mine) .bubble {
     background:var(--pig-other); color:var(--pig-other-t);
-    border:1px solid rgba(214,104,128,.34);
+    border:1px solid rgba(214,104,128,.34); border-radius:22px 22px 22px 12px;
   }
-  [data-bubble="pig"] .row.agent .bubble { border-left:3px solid var(--pig-edge); }
-  /* ③ 猫猫：我说的是薄荷绿、管家说的是蜜桃 ✓ —— 一眼两色，不靠深浅分 ✓ */
-  [data-bubble="cat"] {
+  .row[data-bubble="pig"].agent .bubble { border-left:3px solid var(--pig-edge); }
+  /* 猪鼻：横椭圆 + 两个鼻孔 ✓（同样挂在气泡上 ✓） */
+  .row[data-bubble="pig"] .bubble::after {
+    content:''; position:absolute; bottom:9px; width:17px; height:13px;
+    border-radius:50%; pointer-events:none;
+    background:var(--pig-snout);
+    background-image:
+      radial-gradient(circle at 30% 50%, var(--pig-nose) 0 1.6px, transparent 1.8px),
+      radial-gradient(circle at 70% 50%, var(--pig-nose) 0 1.6px, transparent 1.8px);
+  }
+  .row[data-bubble="pig"].mine .bubble::after { right:-11px; }
+  .row[data-bubble="pig"]:not(.mine) .bubble::after { left:-11px; }
+
+  /* ③ 猫猫：我说的是薄荷绿、别人说的是蜜桃 ✓ —— 顶上竖两只尖耳朵 ✓ */
+  .row[data-bubble="cat"] {
     --cat-mine:#bfe9d5;  --cat-mine-t:#17443a;
     --cat-other:#ffd6b8; --cat-other-t:#63341a;
     --cat-edge:#c9855a;
+    --cat-ear-mine:#8fcbb2; --cat-ear-other:#e8b48c;
   }
-  [data-bubble="cat"] .row.mine .bubble {
+  /* ⚠️ `margin-top` 是给耳朵留的位置 ✓ —— 不留就压到名字那一行上了 ✓。 */
+  .row[data-bubble="cat"] .bubble { position:relative; margin-top:7px; }
+  .row[data-bubble="cat"].mine .bubble {
     background:var(--cat-mine); color:var(--cat-mine-t);
-    border:0; border-radius:16px;
+    border:0; border-radius:16px 16px 10px 16px;
+    --cat-ear: var(--cat-ear-mine);
   }
-  [data-bubble="cat"] .row:not(.mine) .bubble {
+  .row[data-bubble="cat"]:not(.mine) .bubble {
     background:var(--cat-other); color:var(--cat-other-t);
-    border:1px solid rgba(200,125,80,.34);
+    border:1px solid rgba(200,125,80,.34); border-radius:16px 16px 16px 10px;
+    --cat-ear: var(--cat-ear-other);
   }
-  [data-bubble="cat"] .row.agent .bubble { border-left:3px solid var(--cat-edge); }
+  .row[data-bubble="cat"].agent .bubble { border-left:3px solid var(--cat-edge); }
+  .row[data-bubble="cat"] .bubble::before,
+  .row[data-bubble="cat"] .bubble::after {
+    content:''; position:absolute; top:-7px; width:0; height:0;
+    border-left:5.5px solid transparent; border-right:5.5px solid transparent;
+    border-bottom:9px solid var(--cat-ear);
+  }
+  .row[data-bubble="cat"] .bubble::before { left:12px; }
+  .row[data-bubble="cat"] .bubble::after  { left:25px; }
 
   /* 奶霜是浅底 ✓ —— 上面那几组本来就是浅色 ✓，不用另起一套 ✓。
      ⚠️ **夜阑 / 林深是深底** ✗ —— 浅黄浅粉贴在墨黑上会"发荧光" ✓，
-        字也压不住 ✓ → 这两套主题下换成**同色相的深色** ✓（糖桂花 / 酒酿樱桃 / 青瓷 / 熟透的桃 ✓）。 */
-  /* ⚠️ **两段都要写** ✓：
-     · `[a][b]` = 同一个元素上两个属性 ✓（预览卡那层假 `html` 就是 ✓）；
-     · `[a] [b]` = 真界面 ✓（`<html data-theme>` + `#msgs data-bubble` ✓）。
-     只写后者 → 预览卡里那条深色不生效 ✗（卡自己不是自己的祖先 ✗）。 */
-  [data-theme="dark"][data-bubble="duck"],
-  [data-theme="forest"][data-bubble="duck"],
-  [data-theme="dark"] [data-bubble="duck"],
-  [data-theme="forest"] [data-bubble="duck"] {
+        字也压不住 ✓ → 这两套主题下换成**同色相的深色** ✓；
+        动物器官（嘴 / 鼻 / 耳）也换成实色 ✓，半透明的会看不见 ✓。 */
+  [data-theme="dark"] .row[data-bubble="duck"],
+  [data-theme="forest"] .row[data-bubble="duck"] {
     --duck-mine:rgba(214,170,58,.30);  --duck-mine-t:#ffeab0;
     --duck-other:rgba(214,170,58,.16); --duck-other-t:#f7e6bb;
-    --duck-edge:#d8a63a;
+    --duck-edge:#d8a63a;               --duck-bill:#d9a03a;
   }
-  [data-theme="dark"][data-bubble="pig"],
-  [data-theme="forest"][data-bubble="pig"],
-  [data-theme="dark"] [data-bubble="pig"],
-  [data-theme="forest"] [data-bubble="pig"] {
+  [data-theme="dark"] .row[data-bubble="pig"],
+  [data-theme="forest"] .row[data-bubble="pig"] {
     --pig-mine:rgba(214,104,128,.30);  --pig-mine-t:#ffdfe7;
     --pig-other:rgba(214,104,128,.15); --pig-other-t:#f9dde6;
-    --pig-edge:#d96a85;
+    --pig-edge:#d96a85;                --pig-snout:#c9778c; --pig-nose:#4a1d2a;
   }
-  [data-theme="dark"][data-bubble="cat"],
-  [data-theme="forest"][data-bubble="cat"],
-  [data-theme="dark"] [data-bubble="cat"],
-  [data-theme="forest"] [data-bubble="cat"] {
+  [data-theme="dark"] .row[data-bubble="cat"],
+  [data-theme="forest"] .row[data-bubble="cat"] {
     --cat-mine:rgba(72,168,136,.32);   --cat-mine-t:#d8f5e9;
     --cat-other:rgba(206,124,78,.28);  --cat-other-t:#ffe3cf;
     --cat-edge:#cd8455;
+    --cat-ear-mine:#2f7a63; --cat-ear-other:#8a4f2c;
   }
-  /* ── 尾巴 ──
-     ⚠️ 挂在**行**上（`.row::after` ✓），不挂气泡 ✓ —— 气泡是 `overflow` 自由的 ✓，
-        但图片那种气泡会被 `.bubble.media` 的 `!important` 抹掉底色 ✓，
-        尾巴留在行上才不会跟着一起没 ✓。
-     ⚠️ 位置按**行**的那一侧算 ✓ —— `.row.mine` 是 `row-reverse` ✓，
-        气泡永远贴自己的外侧 ✓（和原来 `border-bottom-right-radius:4px` 同一个道理 ✓）。
-     ⚠️ 三只动物的尾巴**形状必须先分开** ✓：鸭 = 短粗平翘 ✓ / 猪 = 中部收窄、尖端回卷 ✓ /
-        猫 = 细长、往上挑 ✓。颜色只是加分 ✓（灰阶截图里也得认得出 ✓）。 */
-  [data-bubble]:not([data-bubble="plain"]) .row { position:relative; }
-  [data-bubble]:not([data-bubble="plain"]) .row::after {
-    content:''; position:absolute; bottom:10px; pointer-events:none;
-    width:0; height:0;
-  }
-  [data-bubble]:not([data-bubble="plain"]) .row.mine::after  { right:-6px; }
-  [data-bubble]:not([data-bubble="plain"]) .row:not(.mine)::after { left:-6px; }
 
-  /* 鸭鸭：一个短粗的三角，微微上翘 ✓ */
-  [data-bubble="duck"] .row.mine::after {
-    border-top:7px solid transparent; border-bottom:3px solid transparent;
-    border-left:8px solid var(--duck-mine);
-  }
-  [data-bubble="duck"] .row:not(.mine)::after {
-    border-top:7px solid transparent; border-bottom:3px solid transparent;
-    border-right:8px solid var(--duck-other);
-  }
-  /* 猪猪：两个叠起来的圆角块拼一个"卷" ✓ —— 比三角软，一眼不是鸭 ✓ */
-  [data-bubble="pig"] .row::after {
-    width:9px; height:9px; border-radius:0 0 0 9px;
-    border:3px solid transparent;
-  }
-  [data-bubble="pig"] .row.mine::after {
-    right:-7px; bottom:8px;
-    border-left-color:var(--pig-mine); border-bottom-color:var(--pig-mine);
-    border-bottom-left-radius:9px;
-  }
-  [data-bubble="pig"] .row:not(.mine)::after {
-    left:-7px; bottom:8px;
-    border-right-color:var(--pig-other); border-bottom-color:var(--pig-other);
-    border-bottom-right-radius:9px;
-  }
-  /* 猫猫：细长、往上挑的尖 ✓（比鸭鸭窄一半、高一半 ✓） */
-  [data-bubble="cat"] .row.mine::after {
-    bottom:11px;
-    border-top:11px solid transparent; border-bottom:1px solid transparent;
-    border-left:7px solid var(--cat-mine);
-  }
-  [data-bubble="cat"] .row:not(.mine)::after {
-    bottom:11px;
-    border-top:11px solid transparent; border-bottom:1px solid transparent;
-    border-right:7px solid var(--cat-other);
-  }
-  /* **图片 / 文件 / 语音那种整块气泡不出尾巴** ✓ —— 里面没有"一句话" ✓，
-     硬贴一个角只会戳在照片边上 ✓（和 `.bubble.media` 原来"不给底色"一个道理 ✓）。 */
-  [data-bubble]:not([data-bubble="plain"]) .row .bubble.media { border-radius:12px !important; }
-  [data-bubble]:not([data-bubble="plain"]) .row:has(> .wrap2 > .bubble.media)::after { display:none; }
+  /* **图片 / 文件 / 语音那种整块气泡不带器官** ✓ —— 里面没有"一句话" ✓，
+     硬贴一张嘴只会戳在照片边上 ✓（和 `.bubble.media` 原来"不给底色"一个道理 ✓）。 */
+  .row[data-bubble]:not([data-bubble="plain"]) .bubble.media { border-radius:12px !important; }
+  .row[data-bubble="duck"] .bubble.media::after,
+  .row[data-bubble="pig"] .bubble.media::after,
+  .row[data-bubble="cat"] .bubble.media::before,
+  .row[data-bubble="cat"] .bubble.media::after { display:none; }
+  .row[data-bubble="cat"]:has(> .wrap2 > .bubble.media) .bubble { margin-top:0; }
 
   .row:not(.mine):not(.agent) .bubble { border-bottom-left-radius:4px; }
   .time { font-size:11px; color:var(--muted); margin-top:2px; padding:0 4px; }
@@ -1352,9 +1341,10 @@
                                   background:var(--p-accent);
                                   box-shadow:inset 0 0 0 3px var(--p-panel); }
   /* ── 气泡选择（2026-10-27）────────────────────────────────────────────
-     四张卡，每张一个**迷你聊天** ✓（一问一答 + 两道尾巴 ✓）。
-     ⚠️ 卡里的 `stage` 是一个**假 `html`** ✓ —— 挂着 `data-theme` 和 `data-bubble` ✓，
-        所以里面那两团气泡走的**就是主界面那几条真规则** ✓（`[data-bubble=…] .row …` ✓）。
+     四张卡，每张一个**迷你聊天** ✓（一问一答 + 两道动物器官 ✓）。
+     ⚠️ 卡里的 `stage` 是一个**假 `html`** ✓ —— 只挂 `data-theme` ✓；
+        气泡的 `data-bubble` 挂在**预览的每一行**上 ✓（真界面也是这么挂的 ✓）。
+        所以里面那两团气泡走的**就是主界面那几条真规则** ✓（`.row[data-bubble=…]` ✓）。
         预览和真界面永远不会分家 ✓（形状只在上面写了一份 ✓）。
      ⚠️ 底色用 `--t-*` ✓（= 现在这套主题的 `--p-*` ✓，由 JS 抄进卡的 style ✓）——
         气泡是皮肤 ✓，站在夜阑里就该看见"夜阑 + 鸭鸭" ✓。
@@ -1398,10 +1388,13 @@
                            background:var(--t-accent-bg); }
   #bubbleSet .bptop b { width:54px; height:7px; border-radius:4px;
                         background:var(--t-text); opacity:.55; }
-  /* 两行气泡 —— 形状完全交给 `app.css` 上面那几条 ✓，这里只管排布 ✓。 */
-  #bubbleSet .brow { display:flex; position:relative; max-width:84%; margin:0 6px; }
+  /* 两行气泡 —— 形状完全交给上面那几条真规则 ✓，这里只管排布 ✓。 */
+  #bubbleSet .brow { display:flex; align-items:flex-start; gap:5px;
+                     position:relative; max-width:88%; margin:0 4px; }
   #bubbleSet .brow.agent { align-self:flex-start; }
   #bubbleSet .brow.mine { align-self:flex-end; }
+  /* 预览里的头像缩成一小颗 ✓（真界面是 34px ✓，这里照搬会压掉半张卡 ✓） */
+  #bubbleSet .brow .av { width:19px; height:19px; font-size:9px; }
   #bubbleSet .brow .bubble { font-size:12px; line-height:1.35;
                              padding:7px 10px; white-space:nowrap;
                              overflow:hidden; text-overflow:ellipsis;
@@ -1413,13 +1406,17 @@
                --bubble-mine-bg:var(--t-accent-bg); }
   #bubbleSet .brow .bubble { color:var(--t-text); }
   #bubbleSet .brow.mine .bubble { color:var(--t-text); }
-  /* ⚠️ 尾巴上的 `bottom` 是按主界面**正文行高**定的 ✓ ——
-     预览的字小一号 ✓，不跟下来的话尾巴会戳在字下面 ✓。 */
-  #bubbleSet [data-bubble="pig"] .row::after { bottom:6px; }
-  #bubbleSet [data-bubble="cat"] .row::after { bottom:8px; }
-  #bubbleSet [data-bubble="duck"] .row::after { bottom:8px; }
-  #themeSet .thint { color:var(--muted); font-size:12.5px; line-height:1.6;
-                     text-align:center; margin:2px 8px 18px; }
+  /* ⚠️ 器官的 `bottom` 是按主界面**正文行高**定的 ✓ ——
+     预览的字小一号 ✓，不跟下来的话嘴/鼻会戳在字下面 ✓。 */
+  #bubbleSet .row[data-bubble="duck"] .bubble::after { bottom:5px; width:13px; height:9px; }
+  #bubbleSet .row[data-bubble="pig"] .bubble::after  { bottom:6px; width:15px; height:12px; }
+  #bubbleSet .row[data-bubble="cat"] .bubble::before,
+  #bubbleSet .row[data-bubble="cat"] .bubble::after { border-left-width:4.5px;
+    border-right-width:4.5px; border-bottom-width:7px; top:-5px; }
+  #bubbleSet .row[data-bubble="cat"] .bubble { margin-top:5px; }
+  #themeSet .thint, #bubbleSet .thint {
+    color:var(--muted); font-size:12.5px; line-height:1.6;
+    text-align:center; margin:2px 8px 18px; }
   /* ★ 2026-10-14：这里原有一对 `.ascreen .swap`（保存下面那颗「取消/返回」小字的样式）✗
      —— 几屏的 `swap` 块全删了 ✓（改管家资料 · 我的 · 备注，见
      02-agent.js / 05-settings.js ✓），样式跟着拿掉 ✓。

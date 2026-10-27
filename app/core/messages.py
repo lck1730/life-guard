@@ -14,6 +14,7 @@ import re
 from typing import Any
 
 from ..db import execute, fetch_all, fetch_one, now
+from .bubbles import normalize_bubble
 from .hub import hub
 
 # 管家在 App 里的默认显示名（没配群级昵称时用它）
@@ -25,6 +26,11 @@ SELECT m.id, m.group_id, m.sender_id, m.sender_type, m.msg_type,
        -- 群内昵称优先于账号昵称：群昵称可改，账号名是登录凭证，两者互不影响
        COALESCE(gm.nickname, u.nickname) AS sender_nickname,
        u.avatar AS sender_avatar,
+       -- ★ 气泡（2026-10-27）：发送者自己选的那一款 ✓。
+       --   ⚠️ 人挂在 `group_members` ✓、管家挂在群上 ✓（它没有账号 ✓）——
+       --   两个来源都在这一趟里带出来 ✓，前端开页第一帧就能画对 ✓。
+       gm.bubble AS sender_bubble,
+       g.agent_bubble AS group_agent_bubble,
        -- 被引用的那条（如果有）。**必须在这里 JOIN 出来**：
        -- 客户端要在气泡上方画一小块引用条，光有 reply_to 这个 id 没东西可画，
        -- 让前端再发一次请求去取太重了。
@@ -36,6 +42,8 @@ SELECT m.id, m.group_id, m.sender_id, m.sender_type, m.msg_type,
 FROM messages m
 LEFT JOIN users u ON u.id = m.sender_id
 LEFT JOIN group_members gm ON gm.group_id = m.group_id AND gm.user_id = m.sender_id
+-- 管家的气泡挂群上 ✓（`sender_id` 是 NULL ✓，`gm` 那一支永远空 ✓）
+LEFT JOIN groups g ON g.id = m.group_id
 LEFT JOIN messages q ON q.id = m.reply_to
 LEFT JOIN users qu ON qu.id = q.sender_id
 LEFT JOIN group_members qgm ON qgm.group_id = q.group_id AND qgm.user_id = q.sender_id
@@ -88,6 +96,12 @@ def serialize(row: dict[str, Any]) -> dict[str, Any]:
         "sender_nickname": row.get("sender_nickname")
         or (DEFAULT_AGENT_NAME if row["sender_type"] == "agent" else None),
         "sender_avatar": row.get("sender_avatar"),
+        # ★ 气泡（2026-10-27）：管家取群上那份 ✓、人取自己那一格 ✓。
+        #   ⚠️ 它只是**开页/广播那一下的快照** ✓ —— 前端重画时以**现在的**成员表为准 ✓
+        #   （换气泡不重发历史消息 ✓，见 `bubbleForMsg` 那段注释 ✓）。
+        "sender_bubble": normalize_bubble(
+            row.get("group_agent_bubble") if row["sender_type"] == "agent"
+            else row.get("sender_bubble")),
         "msg_type": row["msg_type"],
         "content": row["content"],
         "media_path": row["media_path"],

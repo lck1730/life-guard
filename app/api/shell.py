@@ -48,9 +48,12 @@ from ..auth import (
     make_session_token,
     new_invite_code,
     new_uuid,
+    require_member,
     verify_password_any,
 )
 from ..config import settings
+from ..core.bubbles import BUBBLES as BUBBLE_IDS, normalize_bubble, store_bubble
+from ..core.messages import broadcast_group_update
 from ..db import execute, execute_rc, fetch_all, fetch_one, now
 
 log = logging.getLogger("lifeguard.shell")
@@ -357,12 +360,16 @@ async def read_me(request: Request) -> dict:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "未登录")
     pref = await fetch_one("SELECT last_ws FROM user_prefs WHERE user_id = ?", (me["id"],))
     # ★ 顺带把「自我介绍」带回来 ✓（一人一空间 ✓ → 不用问是哪个空间 ✓）。
+    #   ★ 气泡也一起带 ✓（2026-10-27）：它是**人**的属性 ✓、一空间一行 ✓，
+    #     所以和自我介绍同一条查询、同一个"取第一行"的规矩 ✓。
     intro = await fetch_one(
-        "SELECT self_intro FROM group_members WHERE user_id = ? ORDER BY joined_at LIMIT 1",
+        "SELECT self_intro, bubble FROM group_members WHERE user_id = ? "
+        "ORDER BY joined_at LIMIT 1",
         (me["id"],))
     return {**me, "is_admin": bool(me["is_admin"]),
             "last_ws": (pref or {}).get("last_ws"),
-            "self_intro": (intro or {}).get("self_intro") or ""}
+            "self_intro": (intro or {}).get("self_intro") or "",
+            "bubble": normalize_bubble((intro or {}).get("bubble"))}
 
 
 class SelfIntroIn(BaseModel):
@@ -388,6 +395,38 @@ async def set_self_intro(body: SelfIntroIn, request: Request) -> dict:
         # 还没进任何空间 ✓ —— 那也没有"群成员"这一行可写 ✓
         raise HTTPException(status.HTTP_409_CONFLICT, "你还没有生活空间，先建一个")
     return {"self_intro": text}
+
+
+class BubbleIn(BaseModel):
+    #: ⚠️ **必须带 group_id** ✓ —— 气泡挂在 `group_members` 上 ✓（人 × 空间 ✓），
+    #:    同一个账号在别的空间可以是另一款 ✓。不带就问不出去写哪一行 ✓。
+    group_id: int
+    #: `plain|duck|pig|cat` ✓。空字符串 = 回默认 ✓。
+    bubble: str = Field(default="", max_length=16)
+
+
+@router.post("/api/me/bubble")
+async def set_my_bubble(body: BubbleIn, request: Request) -> dict:
+    """设**自己的**气泡 ✓（2026-10-27 ✓）。
+
+    和自我介绍不一样，它**不是**"一人一份" ✓ —— 气泡跟着
+    `group_members` 走 ✓（见 `db.py` 那条迁移的说明 ✓），所以带 `group_id` ✓。
+
+    写完之后广播一次 `group_update` ✓：客户端收到就重拉成员 ✓、按**现在的**
+    成员表重画每一行气泡 ✓（见 `04-chat.js` 的 `refreshGroup` ✓）——
+    **历史消息不用重发** ✓，她换一款，我这边一秒钟后就是新的一款 ✓。
+    """
+    me = await _require_me(request)
+    group_id = int(body.group_id)
+    await require_member(group_id, int(me["id"]))
+    v = body.bubble.strip()
+    if v and v not in BUBBLE_IDS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "没有这个气泡")
+    await execute_rc(
+        "UPDATE group_members SET bubble = ? WHERE group_id = ? AND user_id = ?",
+        (store_bubble(v), group_id, int(me["id"])))
+    await broadcast_group_update(group_id)
+    return {"group_id": group_id, "bubble": normalize_bubble(v)}
 
 
 class NoteIn(BaseModel):

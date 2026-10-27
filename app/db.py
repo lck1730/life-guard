@@ -375,6 +375,14 @@ _MIGRATIONS: list[tuple[str, str, str]] = [
     ("groups", "deleting_at", "INTEGER"),
     # 自我介绍（见 SCHEMA 里那段 ✓）。老行补出来是 NULL ✓ = 没写 ✓。
     ("group_members", "self_intro", "TEXT"),
+    # ★ 2026-10-27：**这个人自己选的气泡**（`plain|duck|pig|cat` ✓，NULL = 默认 ✓）。
+    #   ⚠️ 它和**主题**不是一回事 ✗：主题是"这台设备"的 ✓（localStorage ✓），
+    #      气泡是**人**的 ✓ —— 雅雅设了猪猪，我这边的界面上**她的气泡就是猪猪** ✓
+    #      （所以必须进服务端、跟着成员表走 ✓）。
+    ("group_members", "bubble", "TEXT"),
+    # ★ 2026-10-27：**管家**的气泡 ✓（群级 ✓，群里谁都能改 ✓）。
+    #   管家没有账号 ✓（`sender_id` 是 NULL ✓）→ 没地方挂 ✓，只能挂群上 ✓。
+    ("groups", "agent_bubble", "TEXT"),
 ]
 
 

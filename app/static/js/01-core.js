@@ -189,58 +189,79 @@
           + '--p-accent:#8be4a0;--p-accent-bg:#2f5739;'
           + '--p-accent-line:#477552;--p-accent-soft:rgba(139,228,160,.14)' },
   ];
-  // ★ 2026-10-27：三套**气泡主题** —— 鸭鸭 / 猪猪 / 猫猫 ✓。
-  // ⚠️ 它不是第四套主题 ✗，是**盖在现在那套主题上的气泡皮肤** ✓：
-  //    底色 / 正文 / 顶栏一行都不动 ✓，只换**气泡本身** ✓（我说的 / 别人说的 / 管家说的 ✓）。
-  //    所以看不顺眼随时能回「默认」✓，不用连底色一起迁就 ✓。
-  // ⚠️ 形状做在 CSS 里（`app.css` 的 `[data-bubble=…]` ✓）——
+  // ★ 2026-10-27：三套**气泡皮肤** —— 鸭鸭 / 猪猪 / 猫猫 ✓。
+  //
+  // ⚠️ 它不是第四套主题 ✗：底色 / 正文 / 顶栏一行都不动 ✓，
+  //    只换**气泡本身**的形状和配色 ✓（我说的 / 别人说的 / 管家说的 ✓）。
+  //
+  // ★★ **气泡是「人」的，不是这台设备的** ✗→✓（用户 2026-10-27 纠正过 ✓）：
+  //    雅雅选了猪猪 ✓，**我这边的界面上她的消息就是猪猪** ✓；
+  //    我选的她那边同样看得见 ✓；管家的那款**群里谁都能改** ✓。
+  //    所以它必须**进服务端** ✓（`group_members.bubble` / `groups.agent_bubble` ✓，
+  //    见 `app/core/bubbles.py` ✓），和主题那套 localStorage 完全是两回事 ✗。
+  //    → 这个文件里只剩下"名字"和"一条消息该用哪款" ✓，**没有本地存档** ✓。
+  //
+  // ⚠️ 形状做在 CSS 里（`app.css` 的 `.row[data-bubble=…]` ✓）——
   //    这里只留名字和一句话 ✓，两边各写一份形状必对不上 ✓。
   const BUBBLES = [
-    { id: 'plain', name: '默认', desc: '跟着主题走，什么都不加' },
-    { id: 'duck',  name: '鸭鸭',  desc: '鹅黄圆滚，尾巴短短一翘' },
-    { id: 'pig',   name: '猪猪',  desc: '樱粉软乎，尾巴打个卷' },
-    { id: 'cat',   name: '猫猫',  desc: '薄荷与蜜桃，尾巴翘起来' },
+    { id: 'plain', name: '默认', desc: '清清爽爽，跟着主题走' },
+    { id: 'duck',  name: '鸭鸭',  desc: '鹅黄圆滚，边上伸出一张小鸭嘴' },
+    { id: 'pig',   name: '猪猪',  desc: '樱粉软乎，边上顶个小猪鼻' },
+    { id: 'cat',   name: '猫猫',  desc: '薄荷色，顶上竖两只猫耳' },
   ];
   const BUBBLE_DEFAULT = 'plain';
   const bubbleById = (id) => BUBBLES.find(b => b.id === id) || BUBBLES[0];
-  const bubbleOfUser = () => {
-    const uid = me && (me.id ?? me.username);
-    return (uid === undefined || uid === null || uid === '') ? '' : 'lg_bubble:u' + uid;
+  const normBubble = (id) => (BUBBLES.some(b => b.id === id) ? id : BUBBLE_DEFAULT);
+  /** 给人看的名字（「我的」「管家」里那一行显示它 ✓）。 */
+  const bubbleName = (id) => bubbleById(normBubble(id)).name;
+
+  /** 某个成员**此刻**的气泡（不在成员表里 → 默认 ✓）。 */
+  const bubbleOfMember = (uid) => {
+    const mb = (members || []).find(x => x.id != null && Number(x.id) === Number(uid));
+    return normBubble(mb ? mb.bubble : '');
   };
 
-  // ⚠️ **皮肤挂在 `#msgs` 上，不挂 `<html>`** ✗→✓（2026-10-27 实测）——
-  //    预览卡里那层假 `html` 是**真 `<html>` 的后代** ✓，属性挂太上面，
-  //    祖先那套规则会**漏进每一张卡** ✗：「默认」卡被染成当前动物色 ✓、
-  //    选中猫猫时鸭鸭卡也变成猫 ✓（三套规则都命中，后写的那套赢 ✓）。
-  //    挂到消息列表上：真界面照常命中 ✓，预览卡上面再没有别的 `data-bubble` ✓。
-  let _bubbleNow = BUBBLE_DEFAULT;
-  const currentBubble = () => _bubbleNow;
-  const applyBubble = (id) => {
-    const ok = BUBBLES.some(x => x.id === id) ? id : BUBBLE_DEFAULT;
-    _bubbleNow = ok;
-    const box = $('#msgs');
-    if (box) box.dataset.bubble = ok;
-    try {
-      localStorage.setItem('lg_bubble', ok);         // 登录前兜底（和主题同一个规矩 ✓）
-      const k = bubbleOfUser();
-      if (k) localStorage.setItem(k, ok);            // 这个账号自己的 ✓
-    } catch (e) {}
-    return ok;
+  /** 一条消息该用哪款 —— ★ **按现在的成员表查**，不用消息里那个快照 ✓。
+   *
+   *  消息里确实也带了一份 `sender_bubble` ✓（见 `core/messages.py` ✓），
+   *  那是**开页/断线补拉那一下**的快照 ✓：成员表还没到的时候先用它画 ✓
+   *  （第一帧就大致是对的 ✓）。成员表一到，就以成员表为准 ✓ ——
+   *  换气泡**不重发历史消息** ✓，靠 `repaintBubbles()` 把在屏上的行重贴一遍 ✓。
+   */
+  const bubbleForMsg = (m) => {
+    if (!m) return BUBBLE_DEFAULT;
+    if (m.sender_type === 'agent') return normBubble(group && group.agent_bubble);
+    const mb = (members || []).find(x => x.id != null && Number(x.id) === Number(m.sender_id));
+    return mb ? normBubble(mb.bubble) : normBubble(m.sender_bubble);
   };
 
-  /** 和 `syncThemeForUser` 同一条规矩：这个账号没选过就回「默认」✓，不继承别人的 ✓。 */
-  const syncBubbleForUser = () => {
-    let saved = '';
-    try {
-      const k = bubbleOfUser();
-      saved = k ? (localStorage.getItem(k) || '') : '';
-    } catch (e) {}
-    applyBubble(saved || BUBBLE_DEFAULT);
+  /** 给一行贴上气泡 + **记住这行是谁的** ✓（重画时只认这个 ✓，不靠消息表 ✓）。
+   *
+   *  ⚠️ `data-bubble` 挂在**每一行**上，不挂 `#msgs` / `<html>` ✗→✓（用户第二轮定的）：
+   *     一个群里同时可能有三款气泡 ✓（我鸭鸭 / 她猪猪 / 管家猫猫 ✓）——
+   *     挂在容器上就只能全群一款 ✗。挂在行上，各画各的 ✓，
+   *     预览卡也不会再被真界面的属性染到 ✓（那个坑见记忆 ✓）。
+   */
+  const setRowBubble = (row, m) => {
+    if (!row) return;
+    row.dataset.bubble = bubbleForMsg(m);
+    row.dataset.bubbleBy = (!m) ? ''
+      : m.sender_type === 'agent' ? 'agent'
+      : (m.sender_id != null ? 'u' + m.sender_id : '');
   };
 
-  // ⚠️ 要在 `me` 还是空的时候先贴一次 ✓ —— 和主题一样，为了**开页不闪** ✓
-  //    （登录后 `syncBubbleForUser` 会按这个账号重贴一遍 ✓）。
-  applyBubble(localStorage.getItem('lg_bubble') || BUBBLE_DEFAULT);
+  /** 把**已经在屏上的**每一行按"现在的"成员表重贴一遍 ✓。
+   *
+   *  什么时候调：成员表/群设置刷新之后 ✓（`refreshGroup` ✓）、
+   *  以及自己换完气泡 ✓。历史消息不动数据库 ✓、不重发 ✓。
+   */
+  const repaintBubbles = () => {
+    $$('#msgs .row[data-bubble-by]').forEach(row => {
+      const by = row.dataset.bubbleBy || '';
+      row.dataset.bubble = by === 'agent' ? normBubble(group && group.agent_bubble)
+        : (by.charAt(0) === 'u' ? bubbleOfMember(by.slice(1)) : BUBBLE_DEFAULT);
+    });
+  };
 
   const THEME_ALIAS = { light: 'cream' };   // 旧版本存过 'light'，别让老用户掉回默认
   const THEME_DEFAULT = 'dark';

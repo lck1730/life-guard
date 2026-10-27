@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 log = logging.getLogger("lifeguard.groups")
 
 from ..core.agent_status import clean_prompt, dumps
+from ..core.bubbles import BUBBLES as BUBBLE_IDS, normalize_bubble, store_bubble
 from ..auth import current_user, require_member
 from ..config import settings
 from ..db import execute, fetch_all, fetch_one, now
@@ -52,7 +53,7 @@ async def _groups_for(user_id: int) -> list[dict]:
     """
     return await fetch_all(
         """SELECT g.id, g.name, g.owner_id, g.invite_code, g.created_at, g.profile, g.agent_name,
-                  g.agent_status, g.agent_user_prompt, g.agent_avatar,
+                  g.agent_status, g.agent_user_prompt, g.agent_avatar, g.agent_bubble,
                   (SELECT COUNT(*) FROM group_members gm2 WHERE gm2.group_id = g.id) AS member_count
            FROM groups g
            JOIN group_members gm ON gm.group_id = g.id
@@ -194,6 +195,10 @@ def _normalize_rows(rows: list[dict]) -> list[dict]:
         except Exception:  # noqa: BLE001
             log.warning("群 %s 的状态配置过不了 normalize，按默认值给", r.get("id"))
             r["agent_status"] = dumps(None)
+        # ★ 管家的气泡（2026-10-27）✓ —— 老行是 NULL ✓、手改库写了怪值 ✓，
+        #   都在这一处归一 ✓，前端拿到的永远是四个 id 之一 ✓
+        #   （和 `_normalize_rows` 里其他"归一"同一层 ✓：绕过它就没有第二道 ✓）。
+        r["agent_bubble"] = normalize_bubble(r.get("agent_bubble"))
         # ★ 头像一律补版本号 ✓（见 `_agent_avatar_url` 那段）——
         #   "没配头像"照样给一个**带版本的默认图** ✓，
         #   不然前端会退回一个没版本号的 `/ui/avatar.png` → 又闪 ✓。
@@ -265,10 +270,13 @@ async def bootstrap(
     #      （老的那一屏没人进 ✓，所以一直没露出来 ✓）。
     #   → 读的就是**这个空间**那一行 ✓（前端那块显示的是"我在这个空间的自我介绍" ✓）。
     intro_row = await fetch_one(
-        "SELECT self_intro FROM group_members WHERE group_id = ? AND user_id = ?",
+        "SELECT self_intro, bubble FROM group_members WHERE group_id = ? AND user_id = ?",
         (int(g["id"]), int(user["id"])))
     me = dict(user)
     me["self_intro"] = (intro_row or {}).get("self_intro") or ""
+    # ★ 气泡（2026-10-27）：**我在这台设备上该长什么样** ✓ ——
+    #   跟着这一趟回去 ✓，开页第一帧就是对的 ✓（不用等成员表那张图 ✓）。
+    me["bubble"] = normalize_bubble((intro_row or {}).get("bubble"))
     # ★ 2026-10-11：**`is_admin` 要跟着这一趟回去** ✗→✓ ——
     #   前端靠它决定"设置里那一行「模型」要不要露出来" ✓。
     #   ⚠️ 那只是**藏一行** ✓（体验 ✓），**不是闸门** ✗ ——
@@ -319,18 +327,24 @@ async def members(group_id: int, user: dict = Depends(current_user)) -> list[dic
         # 用户按一下保存就等于**把昵称固化成了群昵称** ✗，以后改昵称就不跟着变了 ✓。
         """SELECT u.id, COALESCE(gm.nickname, u.nickname) AS nickname,
                   gm.nickname AS group_nickname, u.avatar,
-                  gm.role, gm.joined_at
+                  gm.bubble, gm.role, gm.joined_at
            FROM group_members gm JOIN users u ON u.id = gm.user_id
            WHERE gm.group_id = ? ORDER BY gm.joined_at ASC""",
         (group_id,),
     )
     for r in rows:
         r["is_agent"] = False
+        # ★ 气泡（2026-10-27）：NULL = 默认 ✓，吐给前端时统一成 `'plain'` ✓
+        #   （前端不用再判两种空值 ✓）。
+        r["bubble"] = normalize_bubble(r.get("bubble"))
+    # 管家的气泡挂**群**上 ✓（它没有账号 ✓，见 db.py 那条迁移 ✓）。
+    ag = await fetch_one("SELECT agent_bubble FROM groups WHERE id = ?", (group_id,))
     rows.append(
         {
             "id": None,          # 管家没有账号
             "nickname": await agent_name_for(group_id),
             "avatar": None,
+            "bubble": normalize_bubble((ag or {}).get("agent_bubble")),
             "role": "agent",
             "joined_at": 0,
             "is_agent": True,
@@ -354,6 +368,11 @@ class UpdateGroupIn(BaseModel):
     # ★ 「给管家的话」✓ —— 每个空间一段，每轮注入 ✓。
     agent_user_prompt: str | None = None
     agent_avatar: str | None = None  # 相对 ui_dir 的路径，如 "avatars/g7.png"
+    # ★ 2026-10-27：**管家的气泡** ✓（群级 ✓ —— 管家没有账号 ✓）。
+    #   群里**谁都能改** ✓（用户定的：「管家的我们俩谁设置都可以」✓）——
+    #   `update_group` 只要 `require_member` ✓，不是 owner 专属 ✓。
+    #   空字符串 / 'plain' = 回默认 ✓（落库存 NULL ✓）。
+    agent_bubble: str | None = None
 
 
 async def _sync_name_to_shell(request: Request, group_id: int, name: str) -> None:
@@ -439,6 +458,14 @@ async def update_group(
         params.append(clean_prompt(body.agent_user_prompt) or None)
     if body.agent_avatar is not None:
         fields.append("agent_avatar = ?"); params.append(body.agent_avatar.strip() or None)
+    if body.agent_bubble is not None:
+        # ⚠️ 不认识的 id **在这里就拒** ✓（422 ✓）—— 不悄悄回默认 ✗：
+        #    悄悄回默认的话，前端拿到的响应看起来"成功了" ✓，
+        #    但屏幕上那一团没变 ✓ —— 那是最难查的一类"没生效" ✓。
+        v = body.agent_bubble.strip()
+        if v and v not in BUBBLE_IDS:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "没有这个气泡")
+        fields.append("agent_bubble = ?"); params.append(store_bubble(v))
     if not fields:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "没有要修改的内容")
     params.append(group_id)
