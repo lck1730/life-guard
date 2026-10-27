@@ -510,6 +510,8 @@
     //   ⚠️ 没这一支的话，在主题页按返回会**隔着它把设置关掉** ✓
     //      （屏幕不动、人退到了群聊 ✓ —— 见 `android-back-key-only-knows-settings` ✓）。
     if ($('#themeSet').classList.contains('on')) { popScreen('themeSet'); return; }
+    // ★ **气泡**（2026-10-27）—— 同一条规矩，排在主题后面、设置之前 ✓。
+    if ($('#bubbleSet').classList.contains('on')) { popScreen('bubbleSet'); return; }
     // ★ 2026-10-23：读图不再是整屏子页 ✓ —— 它现在在 `#models` 里开半屏板子 ✓，
     //   返回键走上面那支 `#sheet` ✓（`closeSheet` ✓）。
     if ($('#models').classList.contains('on')) { popScreen('models'); return; }

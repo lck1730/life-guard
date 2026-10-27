@@ -228,6 +228,7 @@
   const _paintBoot = (c) => {
     me = c.me;
     syncThemeForUser();
+    syncBubbleForUser();
     notes = c.notes || {};
     group = c.group;
     members = Array.isArray(c.members) ? c.members : [];
@@ -274,6 +275,7 @@
     me = b.me;
     // ★ 知道是谁了，才能取"这个人自己选的主题" ✓（存在本机、按用户 id 分开 ✓）。
     syncThemeForUser();
+    syncBubbleForUser();
     // ★ 备注跟着这一趟一起下来 ✓（`{peer_id: 备注}` ✓）——
     //   它决定**每条消息画什么名字** ✓，晚一步到就会先按真名画一遍再被覆盖 ✓（看得见的闪 ✓）。
     notes = b.notes || {};

@@ -562,6 +562,110 @@
     });
   };
 
+
+  // ── 气泡（2026-10-27）───────────────────────────────────────────────
+  //
+  // ★ 四张卡：默认 / 鸭鸭 / 猪猪 / 猫猫 ✓（定义在 `01-core.js` 的 `BUBBLES` ✓）。
+  // ⚠️ 气泡**不进服务端** ✓ —— 和主题同一条规矩：本机 localStorage、按用户 id 分开 ✓
+  //    （`applyBubble` / `syncBubbleForUser` ✓）。
+  // ⚠️ 预览画的是**卡自己那一套** ✓ 两处都对：
+  //    · 底色 / 正文色 → 抄**现在这套主题**的变量 ✓（`_curThemeVars` ✓）——
+  //      气泡是皮肤 ✓，站在夜阑里就该看见"夜阑 + 鸭鸭" ✓，拿奶霜的颜色去预览是骗人 ✓。
+  //    · 气泡本身 → 走**真的那几条 CSS** ✓（`data-bubble` 挂在卡上一个假 `html` 上 ✓）——
+  //      形状只在 `app.css` 里写了一份 ✓，这里再画一遍必和真界面长得不一样 ✓。
+  const openBubbleSet = () => { pushScreen('bubbleSet', 'settings'); renderBubbleSet(); };
+
+  /** 现在这套主题的那几块颜色 ✓（给预览卡当底色用 ✓）。 */
+  const _curThemeVars = () => {
+    const t = themeById(document.documentElement.dataset.theme || THEME_DEFAULT);
+    return t.vars.replace(/--p-/g, '--t-');
+  };
+
+  const renderBubbleSet = () => {
+    const body = $('#bubbleBody');
+    if (!body) return;
+    const cur = currentBubble();
+    const themeCur = document.documentElement.dataset.theme || THEME_DEFAULT;
+    body.textContent = '';
+
+    const hint = document.createElement('div');
+    hint.className = 'thint';
+    hint.textContent = '只换气泡的样子，底色和字体跟着「主题」走。只在这台手机上生效。';
+    body.appendChild(hint);
+
+    BUBBLES.forEach(b => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'tcard bcard' + (b.id === cur ? ' on' : '');
+      card.dataset.bubblePick = b.id;
+      card.setAttribute('aria-pressed', b.id === cur ? 'true' : 'false');
+      card.setAttribute('style', _curThemeVars());
+
+      // 迷你聊天：两团气泡 + 各自的尾巴 ✓ / 一只小头像 + 标题 ✓
+      const prev = document.createElement('div');
+      prev.className = 'tprev';
+      // ⚠️ 假 `html` ✓ —— 主题和气泡这两层**靠 `data-*` 挑规则** ✓，
+      //    卡里不挂这两个属性，`app.css` 里一条都不会命中 ✓（预览就成裸的了 ✓）。
+      const stage = document.createElement('div');
+      stage.dataset.theme = themeCur;
+      stage.dataset.bubble = b.id;
+      stage.className = 'bstage';
+
+      const top = document.createElement('div');
+      top.className = 'bptop';
+      top.append(document.createElement('span'), document.createElement('b'));
+      stage.appendChild(top);
+
+      const said = document.createElement('div');
+      said.className = 'row brow agent';
+      said.dataset.bubble = b.id;   // 尾巴挂在**行**上 ✓，见 app.css 那段
+      const saidB = document.createElement('div');
+      saidB.className = 'bubble';
+      saidB.textContent = '今晚想记点什么？';
+      said.appendChild(saidB);
+      const mine = document.createElement('div');
+      mine.className = 'row brow mine';
+      mine.dataset.bubble = b.id;
+      const mineB = document.createElement('div');
+      mineB.className = 'bubble';
+      mineB.textContent = '记一笔晚饭';
+      mine.appendChild(mineB);
+      stage.append(said, mine);
+      prev.appendChild(stage);
+      card.appendChild(prev);
+
+      // 名字 + 一句话 + 右边的选中点
+      const meta = document.createElement('div');
+      meta.className = 'tmeta';
+      const txt = document.createElement('div');
+      txt.className = 'ttxt';
+      const name = document.createElement('div');
+      name.className = 'tname';
+      name.appendChild(document.createTextNode(b.name));
+      if (b.id === cur) {
+        const badge = document.createElement('span');
+        badge.className = 'tbadge';
+        badge.textContent = '使用中';
+        name.appendChild(badge);
+      }
+      const desc = document.createElement('div');
+      desc.className = 'tdesc';
+      desc.textContent = b.desc;
+      txt.append(name, desc);
+      const dot = document.createElement('span');
+      dot.className = 'tocardot';
+      meta.append(txt, dot);
+      card.appendChild(meta);
+
+      card.onclick = () => {
+        applyBubble(b.id);    // 立即生效 + 记住 ✓
+        renderSettings();     // 这一屏跟着重画 ✓（「使用中」挪个位置 ✓），设置页右边也换掉 ✓
+      };
+      body.appendChild(card);
+    });
+  };
+
+  $('#bubbleBack').onclick = () => popScreen('bubbleSet');
   $('#themeBack').onclick = () => popScreen('themeSet');
 
   // ── 读图（2026-10-23）—— **并进「模型」这一屏** ✓
@@ -1107,6 +1211,10 @@
     if (eTheme) eTheme.textContent = themeById(document.documentElement.dataset.theme || THEME_DEFAULT).name;
     // 主题页开着时，选完主题要重画（把「使用中」挪到新卡上 ✓）
     if ($('#themeSet').classList.contains('on')) renderThemeSet();
+    // ★ 2026-10-27：「气泡」右边写当前那套的名字 ✓，那一屏开着时选完也要重画 ✓。
+    const eBub = $('#vBubble');
+    if (eBub) eBub.textContent = bubbleById(currentBubble()).name;
+    if ($('#bubbleSet').classList.contains('on')) renderBubbleSet();
     const eAname = $('#vAname'); if (eAname) eAname.textContent = agentName();
     // ⚠️ 这里原来还给「群昵称」那一行填值 ✓（`#vMy` ✓）——
     //    **那一行和这个 DOM 都删了** ✗→✓（2026-10-08：一个人的名字只有一个 ✓）。
@@ -1304,6 +1412,8 @@
       else if (act === 'bg') openBgSet();
       // ★ 2026-10-19：「主题」—— 夜阑 / 奶霜 / 林深 ✓（只影响这台设备 ✓）
       else if (act === 'theme') openThemeSet();
+      // ★ 2026-10-27：「气泡」—— 默认 / 鸭鸭 / 猪猪 / 猫猫 ✓（只影响这台设备 ✓）
+      else if (act === 'bubble') openBubbleSet();
       else if (act === 'invite') inviteCodeNow();
       // ★ **退出当前空间**（红字居中，就在「退出登录」上面 ✓）—— 二次确认在它里面 ✓
       else if (act === 'leave') confirmLeaveSpace();
@@ -1799,7 +1909,7 @@
   //:    上左滑也会把收纳页推上来 ✗✓（用户看到的就是"到处都能滑出来" ✓）。
   //:    判据改成"**最上面那一屏**是不是这三屏之一" ✓。
   const _OTHER_SCREENS = [
-    '#settings', '#bgSet', '#themeSet', '#me', '#meAccount', '#space',
+    '#settings', '#bgSet', '#themeSet', '#bubbleSet', '#me', '#meAccount', '#space',
     '#peer', '#selfIntro', '#agent', '#agentEdit', '#login', '#init',
   ];
 

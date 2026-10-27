@@ -189,6 +189,59 @@
           + '--p-accent:#8be4a0;--p-accent-bg:#2f5739;'
           + '--p-accent-line:#477552;--p-accent-soft:rgba(139,228,160,.14)' },
   ];
+  // ★ 2026-10-27：三套**气泡主题** —— 鸭鸭 / 猪猪 / 猫猫 ✓。
+  // ⚠️ 它不是第四套主题 ✗，是**盖在现在那套主题上的气泡皮肤** ✓：
+  //    底色 / 正文 / 顶栏一行都不动 ✓，只换**气泡本身** ✓（我说的 / 别人说的 / 管家说的 ✓）。
+  //    所以看不顺眼随时能回「默认」✓，不用连底色一起迁就 ✓。
+  // ⚠️ 形状做在 CSS 里（`app.css` 的 `[data-bubble=…]` ✓）——
+  //    这里只留名字和一句话 ✓，两边各写一份形状必对不上 ✓。
+  const BUBBLES = [
+    { id: 'plain', name: '默认', desc: '跟着主题走，什么都不加' },
+    { id: 'duck',  name: '鸭鸭',  desc: '鹅黄圆滚，尾巴短短一翘' },
+    { id: 'pig',   name: '猪猪',  desc: '樱粉软乎，尾巴打个卷' },
+    { id: 'cat',   name: '猫猫',  desc: '薄荷与蜜桃，尾巴翘起来' },
+  ];
+  const BUBBLE_DEFAULT = 'plain';
+  const bubbleById = (id) => BUBBLES.find(b => b.id === id) || BUBBLES[0];
+  const bubbleOfUser = () => {
+    const uid = me && (me.id ?? me.username);
+    return (uid === undefined || uid === null || uid === '') ? '' : 'lg_bubble:u' + uid;
+  };
+
+  // ⚠️ **皮肤挂在 `#msgs` 上，不挂 `<html>`** ✗→✓（2026-10-27 实测）——
+  //    预览卡里那层假 `html` 是**真 `<html>` 的后代** ✓，属性挂太上面，
+  //    祖先那套规则会**漏进每一张卡** ✗：「默认」卡被染成当前动物色 ✓、
+  //    选中猫猫时鸭鸭卡也变成猫 ✓（三套规则都命中，后写的那套赢 ✓）。
+  //    挂到消息列表上：真界面照常命中 ✓，预览卡上面再没有别的 `data-bubble` ✓。
+  let _bubbleNow = BUBBLE_DEFAULT;
+  const currentBubble = () => _bubbleNow;
+  const applyBubble = (id) => {
+    const ok = BUBBLES.some(x => x.id === id) ? id : BUBBLE_DEFAULT;
+    _bubbleNow = ok;
+    const box = $('#msgs');
+    if (box) box.dataset.bubble = ok;
+    try {
+      localStorage.setItem('lg_bubble', ok);         // 登录前兜底（和主题同一个规矩 ✓）
+      const k = bubbleOfUser();
+      if (k) localStorage.setItem(k, ok);            // 这个账号自己的 ✓
+    } catch (e) {}
+    return ok;
+  };
+
+  /** 和 `syncThemeForUser` 同一条规矩：这个账号没选过就回「默认」✓，不继承别人的 ✓。 */
+  const syncBubbleForUser = () => {
+    let saved = '';
+    try {
+      const k = bubbleOfUser();
+      saved = k ? (localStorage.getItem(k) || '') : '';
+    } catch (e) {}
+    applyBubble(saved || BUBBLE_DEFAULT);
+  };
+
+  // ⚠️ 要在 `me` 还是空的时候先贴一次 ✓ —— 和主题一样，为了**开页不闪** ✓
+  //    （登录后 `syncBubbleForUser` 会按这个账号重贴一遍 ✓）。
+  applyBubble(localStorage.getItem('lg_bubble') || BUBBLE_DEFAULT);
+
   const THEME_ALIAS = { light: 'cream' };   // 旧版本存过 'light'，别让老用户掉回默认
   const THEME_DEFAULT = 'dark';
   const themeById = (id) => THEMES.find(t => t.id === id) || THEMES[0];
@@ -575,6 +628,8 @@
     clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
     talk: '<path d="M20.5 12a8.5 8.5 0 0 1-8.5 8.5H4.5V12a8.5 8.5 0 1 1 16 0z"/><circle cx="9" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r=".9" fill="currentColor" stroke="none"/>',
     mute: '<path d="M4 5.5l16 13"/><path d="M11 5.5 6.5 9H4v6h2.5L11 18.5z"/><path d="M15 9a4 4 0 0 1 1.6 3"/>',
+    // ★ 2026-10-27：「气泡」那一行 ✓ —— 两个气泡，小的那个带尾巴 ✓（就是这一项本身 ✓）。
+    chat: '<path d="M3.5 12.5A6.5 6.5 0 0 1 10 6h4.5a6 6 0 0 1 0 12H8.2L4.5 20.7V18A6.5 6.5 0 0 1 3.5 12.5z"/><circle cx="9" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="12.2" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="15.4" cy="12" r=".9" fill="currentColor" stroke="none"/>',
   };
 
   /** 一枚行内图标 ✓（`cls` 给 SVG 自己用 —— 只有「性格」那个朝下箭头要它 ✓）。 */
