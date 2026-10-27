@@ -1040,6 +1040,16 @@ async def _reconsider(
     return text or None
 
 
+#: 这几个工具**自己就会把内容推进群里** ✓ —— 工具成功返回后，模型再写的话
+#: 不是"还没发出去的消息"，而是它自己的收尾 ✓（见 `_stream_completion` 里那段）。
+#: ⚠️ 只放 `send_sticker` ✗→✓（2026-10-28 定）：它的失败面几乎为零
+#:   （编号由 schema 枚举兜住 ✓），所以"工具跑完"就等于"真发出去了" ✓。
+#:   `send_photo` / `group_say` **故意不放** ✗：发图会因为路径/后缀/体积失败 ✓，
+#:   那种时候模型接着说的正是"图没发出去，因为……" —— 那是**要发给人看的**
+#:   解释，不能按收尾丢掉 ✓。记账更不能放：它的正文全在工具之后 ✓。
+_DELIVERY_TOOLS = {"send_sticker"}
+
+
 async def _stream_completion(
     group_id: int,
     text_part: str,
@@ -1110,13 +1120,14 @@ async def _stream_completion(
             #   而 SSE 把这些段**拼成同一条正文**，于是群里看到的是两段粘在一起 ✓
             #   （实测消息 729 / 732，用户原话「它似乎又把一些思考吐出来了」）。
             #
-            #   判据是**结构**，不是措辞 ✓：`send_sticker` 这个工具真的执行完了、
+            #   判据是**结构**，不是措辞 ✓：**自己把消息发出去的工具**真的执行完了、
             #   而且前面已经说过话 → 后面的话是在**已经发出去的那条消息之后**
             #   自言自语，整段丢掉 ✓。前面没说话时保留（那才是它要说的）✓。
             #   ⚠️ 别推广到别的工具 ✗：记账是"工具跑完才说人话"（正文在工具之后）✓，
             #      按工具名区分，别按"工具之后的话都不要"。
+            #   `_DELIVERY_TOOLS` = 工具自己会把内容推进群里的那几个 ✓。
             sse_event = ""
-            sticker_delivered = False
+            delivered = False
             has_text = False
             async for line in resp.aiter_lines():
                 if not line:
@@ -1134,21 +1145,22 @@ async def _stream_completion(
                 except json.JSONDecodeError:
                     continue
                 if sse_event == "hermes.tool.progress":
-                    # 工具进度是自定义事件，不是正文；顺便靠它判断表情发出去没有。
+                    # 工具进度是自定义事件，不是正文；顺便靠它判断消息发出去没有。
                     if (
                         isinstance(chunk, dict)
-                        and chunk.get("tool") == "send_sticker"
+                        and chunk.get("tool") in _DELIVERY_TOOLS
                         and chunk.get("status") == "completed"
                         and has_text
                     ):
-                        sticker_delivered = True
-                        log.info("表情已发出且正文在前，丢弃工具返回后的收尾文字")
+                        delivered = True
+                        log.info("工具 %s 已把消息发出且正文在前，丢弃它之后的收尾文字",
+                                 chunk.get("tool"))
                     sse_event = ""
                     continue
                 sse_event = ""
                 for choice in chunk.get("choices") or []:
                     piece = (choice.get("delta") or {}).get("content")
-                    if piece and not sticker_delivered:
+                    if piece and not delivered:
                         if piece.strip():
                             has_text = True
                         yield piece
