@@ -1102,8 +1102,29 @@ async def _stream_completion(
                 body = (await resp.aread()).decode("utf-8", "replace")[:500]
                 raise RuntimeError(f"Hermes API {resp.status_code}: {body}")
 
+            # ★★ 表情发出去之后，它还会再补一段"收尾/自评"，那段不能进正文 ✗→✓（2026-10-28）★★
+            #
+            #   Hermes 一轮里会连着产出**好几段** assistant 文本：表情工具调用之前的
+            #   那段是**真正要发的话** ✓，工具返回之后它往往又写一段
+            #   「（已发出去）」「这段没问题，接得自然……还有别的要看的吗？」✗ ——
+            #   而 SSE 把这些段**拼成同一条正文**，于是群里看到的是两段粘在一起 ✓
+            #   （实测消息 729 / 732，用户原话「它似乎又把一些思考吐出来了」）。
+            #
+            #   判据是**结构**，不是措辞 ✓：`send_sticker` 这个工具真的执行完了、
+            #   而且前面已经说过话 → 后面的话是在**已经发出去的那条消息之后**
+            #   自言自语，整段丢掉 ✓。前面没说话时保留（那才是它要说的）✓。
+            #   ⚠️ 别推广到别的工具 ✗：记账是"工具跑完才说人话"（正文在工具之后）✓，
+            #      按工具名区分，别按"工具之后的话都不要"。
+            sse_event = ""
+            sticker_delivered = False
+            has_text = False
             async for line in resp.aiter_lines():
-                if not line or not line.startswith("data:"):
+                if not line:
+                    continue
+                if line.startswith("event:"):
+                    sse_event = line[6:].strip()
+                    continue
+                if not line.startswith("data:"):
                     continue
                 data = line[5:].strip()
                 if data == "[DONE]":
@@ -1112,9 +1133,24 @@ async def _stream_completion(
                     chunk = json.loads(data)
                 except json.JSONDecodeError:
                     continue
+                if sse_event == "hermes.tool.progress":
+                    # 工具进度是自定义事件，不是正文；顺便靠它判断表情发出去没有。
+                    if (
+                        isinstance(chunk, dict)
+                        and chunk.get("tool") == "send_sticker"
+                        and chunk.get("status") == "completed"
+                        and has_text
+                    ):
+                        sticker_delivered = True
+                        log.info("表情已发出且正文在前，丢弃工具返回后的收尾文字")
+                    sse_event = ""
+                    continue
+                sse_event = ""
                 for choice in chunk.get("choices") or []:
                     piece = (choice.get("delta") or {}).get("content")
-                    if piece:
+                    if piece and not sticker_delivered:
+                        if piece.strip():
+                            has_text = True
                         yield piece
 
 
