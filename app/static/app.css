@@ -472,166 +472,86 @@
   }
   .row.agent .bubble { background:var(--bubble-agent-bg); border:1px solid var(--line);
                        border-left:3px solid var(--agent); border-bottom-left-radius:4px; }
-  /* ── 气泡皮肤 第三版（2026-10-27 深夜）：鸭鸭 / 猪猪 / 猫猫 · 印花布 ──
-     ★ 还是**盖在主题上的皮肤** ✓ —— 底色 / 正文 / 顶栏一行不动 ✓，
-       只换气泡本身 ✓。
-     ★★ 前两版都**推翻重做**了 ✗→✓（用户：第一版"还是不好看，思路打开"✓、
-        第二版"太丑了……千万不要按现在思路来"✓）：
-        · 第一版：气泡侧面挂一件器官（嘴 / 鼻子 / 耳朵）✗ 像别了个挂件 ✓
-        · 第二版：一枚卡通小脑袋扒着上沿探头 ✗ 贴纸感 ✓
-        · **第三版：不在气泡上贴任何"零件"** ✓ —— 换成一匹**印花布** ✓：
-          气泡本身是柔和的渐变 + 一道斜上的柔光 ✓，
-          底纹是**同色系的一群小动物剪影** ✓（鸭 / 猪 / 猫 ✓，见下面每款的 `--b-ink` ✓）。
-          图案就是动物 ✓，但它是"布上的印花"，不是"贴上去的脸" ✓。
-     ★★ `data-bubble` 挂在**每一行**上 ✓（`.row[data-bubble]` ✓，由 `setRowBubble` 写 ✓）：
-        一个群里可能同时有三款 ✓（我鸭鸭 / 她猪猪 / 管家猫猫 ✓）——
-        挂在容器上就只能全群一款 ✗（2026-10-27 用户纠正过 ✓）。
-     ★ 剪影是 **SVG data URI** ✓（`url("data:image/svg+xml,…")` ✓）——
-        不引外部图 ✓、不联网 ✓；换颜色只需要改 URI 里那个 fill ✓。
-     ⚠️ 尺寸**一律用 em** ✓（`background-size:3.8em 3.8em` ✓）：标尺是气泡自己的
-        `font-size` ✓（群聊 15px ✓、选择页预览 12px ✓）→ 预览自动小一号 ✓，
-        不用再抄一遍像素值 ✗（第一版就是靠一堆 `bottom:5px` 硬对 ✗）。
-     ⚠️ 图案**必须很淡** ✓（浅色 .15 / 深色 .12 ✓）—— 它在字底下 ✓，
-        再深一点就会和正文抢 ✓。要调只调这个透明度 ✓。
-     ⚠️ 颜色写死在这里、**按主题深浅各一套** ✓ —— 气泡底色不跟 `--bubble-*` 走 ✗：
-        那三个变量是半透明的 ✓（要透背景图 ✓），印花色一透明就发灰 ✓。
-     ⚠️ `.bubble.media`（图片 / 文件那种整块 ✓）**不带印花** ✓ ——
-        里面没有"一句话" ✓，铺底纹只会让照片边上一圈花 ✓。
-     ⚠️ **只有消息行**带 `data-bubble` ✓ —— 设置页那些 `.ascreen .row` 不带 ✓，
-        所以这里的规则一条都不会漏到设置页去 ✓。 */
+  /* ── 气泡皮肤 第四版（2026-10-27）：鸭鸭 / 猪猪 / 猫猫 · 贴纸 ──
 
-  /* ① 鸭鸭 —— 印花：小鸭子 ✓ */
-  .row[data-bubble="duck"] {
-    --b-ink:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%239c7716%27%20fill-opacity%3D%27.15%27%20stroke%3D%27%239c7716%27%20stroke-opacity%3D%27.15%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Cellipse%20cx%3D%2214.6%22%20cy%3D%2215.6%22%20rx%3D%227.6%22%20ry%3D%225.2%22%2F%3E%3Cpath%20d%3D%22M20.6%2011.9%20L24%209.7%20L23.4%2015.6%20Z%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%229.2%22%20r%3D%224.1%22%2F%3E%3Cpath%20d%3D%22M5.6%208.6%20C3%208.5%201.4%209.4%201.2%2010.6%20C1.8%2011.6%203.6%2011.9%205.8%2011.2%20Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2019.6%20l-.6%202.4%20h1.4%20l.4-2.4z%20M14.4%2019.6%20l-.3%202.4%20h1.4%20l.1-2.4z%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Cellipse%20cx%3D%2214.6%22%20cy%3D%2215.6%22%20rx%3D%227.6%22%20ry%3D%225.2%22%2F%3E%3Cpath%20d%3D%22M20.6%2011.9%20L24%209.7%20L23.4%2015.6%20Z%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%229.2%22%20r%3D%224.1%22%2F%3E%3Cpath%20d%3D%22M5.6%208.6%20C3%208.5%201.4%209.4%201.2%2010.6%20C1.8%2011.6%203.6%2011.9%205.8%2011.2%20Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2019.6%20l-.6%202.4%20h1.4%20l.4-2.4z%20M14.4%2019.6%20l-.3%202.4%20h1.4%20l.1-2.4z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E");
-  }
-  .row[data-bubble="duck"].mine .bubble,
-  .row[data-bubble="duck"]:not(.mine) .bubble {
-    background-image:
-      linear-gradient(135deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.10) 26%,rgba(255,255,255,0) 46%),
-      var(--b-ink),
-      linear-gradient(158deg,#fff9e0 0%,#ffe9a9 52%,#ffdd87 100%);
-    background-size:auto,3.8em 3.8em,auto;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.85), 0 2px 5px rgba(90,60,10,.08);
-    border:0;
-  }
-  .row[data-bubble="duck"].mine .bubble {
-    color:#5b4406; border-radius:20px 20px 5px 20px;
-  }
-  .row[data-bubble="duck"]:not(.mine) .bubble {
-    color:#6b5310;
-    background-image:
-      linear-gradient(135deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.10) 26%,rgba(255,255,255,0) 46%),
-      url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%239c7716%27%20fill-opacity%3D%27.13%27%20stroke%3D%27%239c7716%27%20stroke-opacity%3D%27.13%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Cellipse%20cx%3D%2214.6%22%20cy%3D%2215.6%22%20rx%3D%227.6%22%20ry%3D%225.2%22%2F%3E%3Cpath%20d%3D%22M20.6%2011.9%20L24%209.7%20L23.4%2015.6%20Z%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%229.2%22%20r%3D%224.1%22%2F%3E%3Cpath%20d%3D%22M5.6%208.6%20C3%208.5%201.4%209.4%201.2%2010.6%20C1.8%2011.6%203.6%2011.9%205.8%2011.2%20Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2019.6%20l-.6%202.4%20h1.4%20l.4-2.4z%20M14.4%2019.6%20l-.3%202.4%20h1.4%20l.1-2.4z%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Cellipse%20cx%3D%2214.6%22%20cy%3D%2215.6%22%20rx%3D%227.6%22%20ry%3D%225.2%22%2F%3E%3Cpath%20d%3D%22M20.6%2011.9%20L24%209.7%20L23.4%2015.6%20Z%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%229.2%22%20r%3D%224.1%22%2F%3E%3Cpath%20d%3D%22M5.6%208.6%20C3%208.5%201.4%209.4%201.2%2010.6%20C1.8%2011.6%203.6%2011.9%205.8%2011.2%20Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2019.6%20l-.6%202.4%20h1.4%20l.4-2.4z%20M14.4%2019.6%20l-.3%202.4%20h1.4%20l.1-2.4z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E"),
-      linear-gradient(158deg,#fffdf4 0%,#fff5d8 55%,#ffedbe 100%);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 5px rgba(90,60,10,.06);
-    border:1px solid rgba(212,168,58,.42); border-radius:20px 20px 20px 5px;
-  }
-  [data-theme="dark"] .row[data-bubble="duck"].mine .bubble,
-  [data-theme="dark"] .row[data-bubble="duck"]:not(.mine) .bubble,
-  [data-theme="forest"] .row[data-bubble="duck"].mine .bubble,
-  [data-theme="forest"] .row[data-bubble="duck"]:not(.mine) .bubble {
-    color:#ffeab4;
-    background-image:
-      linear-gradient(135deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.02) 30%,rgba(255,255,255,0) 50%),
-      url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%23ffe1a0%27%20fill-opacity%3D%27.12%27%20stroke%3D%27%23ffe1a0%27%20stroke-opacity%3D%27.12%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Cellipse%20cx%3D%2214.6%22%20cy%3D%2215.6%22%20rx%3D%227.6%22%20ry%3D%225.2%22%2F%3E%3Cpath%20d%3D%22M20.6%2011.9%20L24%209.7%20L23.4%2015.6%20Z%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%229.2%22%20r%3D%224.1%22%2F%3E%3Cpath%20d%3D%22M5.6%208.6%20C3%208.5%201.4%209.4%201.2%2010.6%20C1.8%2011.6%203.6%2011.9%205.8%2011.2%20Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2019.6%20l-.6%202.4%20h1.4%20l.4-2.4z%20M14.4%2019.6%20l-.3%202.4%20h1.4%20l.1-2.4z%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Cellipse%20cx%3D%2214.6%22%20cy%3D%2215.6%22%20rx%3D%227.6%22%20ry%3D%225.2%22%2F%3E%3Cpath%20d%3D%22M20.6%2011.9%20L24%209.7%20L23.4%2015.6%20Z%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%229.2%22%20r%3D%224.1%22%2F%3E%3Cpath%20d%3D%22M5.6%208.6%20C3%208.5%201.4%209.4%201.2%2010.6%20C1.8%2011.6%203.6%2011.9%205.8%2011.2%20Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2019.6%20l-.6%202.4%20h1.4%20l.4-2.4z%20M14.4%2019.6%20l-.3%202.4%20h1.4%20l.1-2.4z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E"),
-      linear-gradient(158deg,rgba(146,106,26,.92) 0%,rgba(110,79,16,.9) 52%,rgba(84,60,11,.93) 100%);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.30);
-    border:1px solid rgba(255,214,120,.22);
-  }
-  [data-theme="dark"] .row[data-bubble="duck"].mine .bubble,
-  [data-theme="forest"] .row[data-bubble="duck"].mine .bubble {
-    border-radius:20px 20px 5px 20px;
-  }
+     参考图：三个**贴纸**气泡。拆开就四件事 ✓：
+       · 泡面是**近白 / 奶油底 + 一圈细彩线** ✓（不是花布、不是渐变 ✗）
+       · 外面再套一圈**白描边**（die-cut 那圈白）+ 一层柔和投影 ✓
+       · 左下角一条**圆头尾巴** ✓ —— 从圆角的切点长出来、往左下甩 ✓、外圈也白 ✓
+       · **角色的整个脑袋挂在左上角** ✓ —— 耳朵在气泡外、下巴探进气泡里 ✓
 
-  /* ① 猪猪 —— 印花：小猪 ✓ */
-  .row[data-bubble="pig"] {
-    --b-ink:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%23b45a75%27%20fill-opacity%3D%27.15%27%20stroke%3D%27%23b45a75%27%20stroke-opacity%3D%27.15%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Cellipse%20cx%3D%2214.4%22%20cy%3D%2214.6%22%20rx%3D%227.4%22%20ry%3D%225.6%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%2211.2%22%20r%3D%224.4%22%2F%3E%3Cpath%20d%3D%22M5.2%207.8%20L4%203.8%20L8.4%206.3%20Z%22%2F%3E%3Cpath%20d%3D%22M11.2%207.2%20L12%203%20L14.8%206.7%20Z%22%2F%3E%3Cellipse%20cx%3D%224.6%22%20cy%3D%2212.2%22%20rx%3D%222.7%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M10.4%2019.2%20l-.5%202.8%20h1.5%20l.3-2.8z%20M15%2019.3%20l-.2%202.7%20h1.5%20l.1-2.7z%22%2F%3E%3Cpath%20d%3D%22M21.4%2012.6%20c2.5%200%203.4%201.8%202.2%202.9%20-0.9.8-2.4.2-2.4-1%22%20fill%3D%22none%22%20stroke%3D%22%23b45a75%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Cellipse%20cx%3D%2214.4%22%20cy%3D%2214.6%22%20rx%3D%227.4%22%20ry%3D%225.6%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%2211.2%22%20r%3D%224.4%22%2F%3E%3Cpath%20d%3D%22M5.2%207.8%20L4%203.8%20L8.4%206.3%20Z%22%2F%3E%3Cpath%20d%3D%22M11.2%207.2%20L12%203%20L14.8%206.7%20Z%22%2F%3E%3Cellipse%20cx%3D%224.6%22%20cy%3D%2212.2%22%20rx%3D%222.7%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M10.4%2019.2%20l-.5%202.8%20h1.5%20l.3-2.8z%20M15%2019.3%20l-.2%202.7%20h1.5%20l.1-2.7z%22%2F%3E%3Cpath%20d%3D%22M21.4%2012.6%20c2.5%200%203.4%201.8%202.2%202.9%20-0.9.8-2.4.2-2.4-1%22%20fill%3D%22none%22%20stroke%3D%22%23b45a75%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E");
-  }
-  .row[data-bubble="pig"].mine .bubble,
-  .row[data-bubble="pig"]:not(.mine) .bubble {
-    background-image:
-      linear-gradient(135deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.10) 26%,rgba(255,255,255,0) 46%),
-      var(--b-ink),
-      linear-gradient(158deg,#fff1f6 0%,#fed0df 52%,#fcbcd0 100%);
-    background-size:auto,3.8em 3.8em,auto;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.85), 0 2px 5px rgba(90,60,10,.08);
-    border:0;
-  }
-  .row[data-bubble="pig"].mine .bubble {
-    color:#6a2333; border-radius:20px 20px 5px 20px;
-  }
-  .row[data-bubble="pig"]:not(.mine) .bubble {
-    color:#73303e;
-    background-image:
-      linear-gradient(135deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.10) 26%,rgba(255,255,255,0) 46%),
-      url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%23b45a75%27%20fill-opacity%3D%27.13%27%20stroke%3D%27%23b45a75%27%20stroke-opacity%3D%27.13%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Cellipse%20cx%3D%2214.4%22%20cy%3D%2214.6%22%20rx%3D%227.4%22%20ry%3D%225.6%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%2211.2%22%20r%3D%224.4%22%2F%3E%3Cpath%20d%3D%22M5.2%207.8%20L4%203.8%20L8.4%206.3%20Z%22%2F%3E%3Cpath%20d%3D%22M11.2%207.2%20L12%203%20L14.8%206.7%20Z%22%2F%3E%3Cellipse%20cx%3D%224.6%22%20cy%3D%2212.2%22%20rx%3D%222.7%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M10.4%2019.2%20l-.5%202.8%20h1.5%20l.3-2.8z%20M15%2019.3%20l-.2%202.7%20h1.5%20l.1-2.7z%22%2F%3E%3Cpath%20d%3D%22M21.4%2012.6%20c2.5%200%203.4%201.8%202.2%202.9%20-0.9.8-2.4.2-2.4-1%22%20fill%3D%22none%22%20stroke%3D%22%23b45a75%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Cellipse%20cx%3D%2214.4%22%20cy%3D%2214.6%22%20rx%3D%227.4%22%20ry%3D%225.6%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%2211.2%22%20r%3D%224.4%22%2F%3E%3Cpath%20d%3D%22M5.2%207.8%20L4%203.8%20L8.4%206.3%20Z%22%2F%3E%3Cpath%20d%3D%22M11.2%207.2%20L12%203%20L14.8%206.7%20Z%22%2F%3E%3Cellipse%20cx%3D%224.6%22%20cy%3D%2212.2%22%20rx%3D%222.7%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M10.4%2019.2%20l-.5%202.8%20h1.5%20l.3-2.8z%20M15%2019.3%20l-.2%202.7%20h1.5%20l.1-2.7z%22%2F%3E%3Cpath%20d%3D%22M21.4%2012.6%20c2.5%200%203.4%201.8%202.2%202.9%20-0.9.8-2.4.2-2.4-1%22%20fill%3D%22none%22%20stroke%3D%22%23b45a75%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E"),
-      linear-gradient(158deg,#fffafc 0%,#ffedf4 55%,#ffe2ed 100%);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 5px rgba(90,60,10,.06);
-    border:1px solid rgba(219,126,152,.40); border-radius:20px 20px 20px 5px;
-  }
-  [data-theme="dark"] .row[data-bubble="pig"].mine .bubble,
-  [data-theme="dark"] .row[data-bubble="pig"]:not(.mine) .bubble,
-  [data-theme="forest"] .row[data-bubble="pig"].mine .bubble,
-  [data-theme="forest"] .row[data-bubble="pig"]:not(.mine) .bubble {
-    color:#ffd9e2;
-    background-image:
-      linear-gradient(135deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.02) 30%,rgba(255,255,255,0) 50%),
-      url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%23ffc3d3%27%20fill-opacity%3D%27.12%27%20stroke%3D%27%23ffc3d3%27%20stroke-opacity%3D%27.12%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Cellipse%20cx%3D%2214.4%22%20cy%3D%2214.6%22%20rx%3D%227.4%22%20ry%3D%225.6%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%2211.2%22%20r%3D%224.4%22%2F%3E%3Cpath%20d%3D%22M5.2%207.8%20L4%203.8%20L8.4%206.3%20Z%22%2F%3E%3Cpath%20d%3D%22M11.2%207.2%20L12%203%20L14.8%206.7%20Z%22%2F%3E%3Cellipse%20cx%3D%224.6%22%20cy%3D%2212.2%22%20rx%3D%222.7%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M10.4%2019.2%20l-.5%202.8%20h1.5%20l.3-2.8z%20M15%2019.3%20l-.2%202.7%20h1.5%20l.1-2.7z%22%2F%3E%3Cpath%20d%3D%22M21.4%2012.6%20c2.5%200%203.4%201.8%202.2%202.9%20-0.9.8-2.4.2-2.4-1%22%20fill%3D%22none%22%20stroke%3D%22%23ffc3d3%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Cellipse%20cx%3D%2214.4%22%20cy%3D%2214.6%22%20rx%3D%227.4%22%20ry%3D%225.6%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%2211.2%22%20r%3D%224.4%22%2F%3E%3Cpath%20d%3D%22M5.2%207.8%20L4%203.8%20L8.4%206.3%20Z%22%2F%3E%3Cpath%20d%3D%22M11.2%207.2%20L12%203%20L14.8%206.7%20Z%22%2F%3E%3Cellipse%20cx%3D%224.6%22%20cy%3D%2212.2%22%20rx%3D%222.7%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M10.4%2019.2%20l-.5%202.8%20h1.5%20l.3-2.8z%20M15%2019.3%20l-.2%202.7%20h1.5%20l.1-2.7z%22%2F%3E%3Cpath%20d%3D%22M21.4%2012.6%20c2.5%200%203.4%201.8%202.2%202.9%20-0.9.8-2.4.2-2.4-1%22%20fill%3D%22none%22%20stroke%3D%22%23ffc3d3%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E"),
-      linear-gradient(158deg,rgba(140,58,83,.92) 0%,rgba(110,45,64,.9) 52%,rgba(88,35,51,.93) 100%);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.30);
-    border:1px solid rgba(255,150,180,.20);
-  }
-  [data-theme="dark"] .row[data-bubble="pig"].mine .bubble,
-  [data-theme="forest"] .row[data-bubble="pig"].mine .bubble {
-    border-radius:20px 20px 5px 20px;
-  }
+     ⚠️ 前两版被否的原因，别再走回去：
+       · 第二版「从顶上探头」 ✗ —— 只露一条边，像给气泡贴了个零件 ✗
+       · 第三版「泡面印花布」 ✗ —— 花纹铺满泡面，读起来是布料不是贴纸 ✗
+     这版的判据只有一条：**连头带泡，看着是一整张贴纸** ✓。
 
-  /* ① 猫猫 —— 印花：小猫 ✓ */
-  .row[data-bubble="cat"] {
-    --b-ink:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%233f9078%27%20fill-opacity%3D%27.15%27%20stroke%3D%27%233f9078%27%20stroke-opacity%3D%27.15%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%228.4%22%20r%3D%224.2%22%2F%3E%3Cpath%20d%3D%22M5.9%206.6%20L5.5%202.2%20L9.4%205.1%20Z%22%2F%3E%3Cpath%20d%3D%22M12.6%205%20L15.9%202.6%20L15.7%206.9%20Z%22%2F%3E%3Cpath%20d%3D%22M6.6%2013.2%20c0-2%202.5-3.4%205.8-3.4%203.4%200%206.2%201.6%206.2%204.2%200%202.8-1%204.9-2.2%206.4%20H8.9%20c-1.4-1.6-2.3-4-2.3-7.2%20Z%22%2F%3E%3Cpath%20d%3D%22M18.4%2019.6%20c3.4.4%204.4-1.7%203.4-3.2%20-.9-1.3-2.8-1.1-3.2.3%22%20fill%3D%22none%22%20stroke%3D%22%233f9078%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%228.4%22%20r%3D%224.2%22%2F%3E%3Cpath%20d%3D%22M5.9%206.6%20L5.5%202.2%20L9.4%205.1%20Z%22%2F%3E%3Cpath%20d%3D%22M12.6%205%20L15.9%202.6%20L15.7%206.9%20Z%22%2F%3E%3Cpath%20d%3D%22M6.6%2013.2%20c0-2%202.5-3.4%205.8-3.4%203.4%200%206.2%201.6%206.2%204.2%200%202.8-1%204.9-2.2%206.4%20H8.9%20c-1.4-1.6-2.3-4-2.3-7.2%20Z%22%2F%3E%3Cpath%20d%3D%22M18.4%2019.6%20c3.4.4%204.4-1.7%203.4-3.2%20-.9-1.3-2.8-1.1-3.2.3%22%20fill%3D%22none%22%20stroke%3D%22%233f9078%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E");
-  }
-  .row[data-bubble="cat"].mine .bubble,
-  .row[data-bubble="cat"]:not(.mine) .bubble {
-    background-image:
-      linear-gradient(135deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.10) 26%,rgba(255,255,255,0) 46%),
-      var(--b-ink),
-      linear-gradient(158deg,#f0fcf6 0%,#c6efdc 52%,#ace6cb 100%);
-    background-size:auto,3.8em 3.8em,auto;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.85), 0 2px 5px rgba(90,60,10,.08);
-    border:0;
-  }
-  .row[data-bubble="cat"].mine .bubble {
-    color:#0e4436; border-radius:20px 20px 5px 20px;
-  }
-  .row[data-bubble="cat"]:not(.mine) .bubble {
-    color:#175243;
-    background-image:
-      linear-gradient(135deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.10) 26%,rgba(255,255,255,0) 46%),
-      url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%233f9078%27%20fill-opacity%3D%27.13%27%20stroke%3D%27%233f9078%27%20stroke-opacity%3D%27.13%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%228.4%22%20r%3D%224.2%22%2F%3E%3Cpath%20d%3D%22M5.9%206.6%20L5.5%202.2%20L9.4%205.1%20Z%22%2F%3E%3Cpath%20d%3D%22M12.6%205%20L15.9%202.6%20L15.7%206.9%20Z%22%2F%3E%3Cpath%20d%3D%22M6.6%2013.2%20c0-2%202.5-3.4%205.8-3.4%203.4%200%206.2%201.6%206.2%204.2%200%202.8-1%204.9-2.2%206.4%20H8.9%20c-1.4-1.6-2.3-4-2.3-7.2%20Z%22%2F%3E%3Cpath%20d%3D%22M18.4%2019.6%20c3.4.4%204.4-1.7%203.4-3.2%20-.9-1.3-2.8-1.1-3.2.3%22%20fill%3D%22none%22%20stroke%3D%22%233f9078%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%228.4%22%20r%3D%224.2%22%2F%3E%3Cpath%20d%3D%22M5.9%206.6%20L5.5%202.2%20L9.4%205.1%20Z%22%2F%3E%3Cpath%20d%3D%22M12.6%205%20L15.9%202.6%20L15.7%206.9%20Z%22%2F%3E%3Cpath%20d%3D%22M6.6%2013.2%20c0-2%202.5-3.4%205.8-3.4%203.4%200%206.2%201.6%206.2%204.2%200%202.8-1%204.9-2.2%206.4%20H8.9%20c-1.4-1.6-2.3-4-2.3-7.2%20Z%22%2F%3E%3Cpath%20d%3D%22M18.4%2019.6%20c3.4.4%204.4-1.7%203.4-3.2%20-.9-1.3-2.8-1.1-3.2.3%22%20fill%3D%22none%22%20stroke%3D%22%233f9078%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E"),
-      linear-gradient(158deg,#f9fefb 0%,#ebfaf3 55%,#dcf6ea 100%);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 5px rgba(90,60,10,.06);
-    border:1px solid rgba(96,180,148,.36); border-radius:20px 20px 20px 5px;
-  }
-  [data-theme="dark"] .row[data-bubble="cat"].mine .bubble,
-  [data-theme="dark"] .row[data-bubble="cat"]:not(.mine) .bubble,
-  [data-theme="forest"] .row[data-bubble="cat"].mine .bubble,
-  [data-theme="forest"] .row[data-bubble="cat"]:not(.mine) .bubble {
-    color:#d0f5e7;
-    background-image:
-      linear-gradient(135deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.02) 30%,rgba(255,255,255,0) 50%),
-      url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%23bdf0dd%27%20fill-opacity%3D%27.12%27%20stroke%3D%27%23bdf0dd%27%20stroke-opacity%3D%27.12%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%228.4%22%20r%3D%224.2%22%2F%3E%3Cpath%20d%3D%22M5.9%206.6%20L5.5%202.2%20L9.4%205.1%20Z%22%2F%3E%3Cpath%20d%3D%22M12.6%205%20L15.9%202.6%20L15.7%206.9%20Z%22%2F%3E%3Cpath%20d%3D%22M6.6%2013.2%20c0-2%202.5-3.4%205.8-3.4%203.4%200%206.2%201.6%206.2%204.2%200%202.8-1%204.9-2.2%206.4%20H8.9%20c-1.4-1.6-2.3-4-2.3-7.2%20Z%22%2F%3E%3Cpath%20d%3D%22M18.4%2019.6%20c3.4.4%204.4-1.7%203.4-3.2%20-.9-1.3-2.8-1.1-3.2.3%22%20fill%3D%22none%22%20stroke%3D%22%23bdf0dd%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%228.4%22%20r%3D%224.2%22%2F%3E%3Cpath%20d%3D%22M5.9%206.6%20L5.5%202.2%20L9.4%205.1%20Z%22%2F%3E%3Cpath%20d%3D%22M12.6%205%20L15.9%202.6%20L15.7%206.9%20Z%22%2F%3E%3Cpath%20d%3D%22M6.6%2013.2%20c0-2%202.5-3.4%205.8-3.4%203.4%200%206.2%201.6%206.2%204.2%200%202.8-1%204.9-2.2%206.4%20H8.9%20c-1.4-1.6-2.3-4-2.3-7.2%20Z%22%2F%3E%3Cpath%20d%3D%22M18.4%2019.6%20c3.4.4%204.4-1.7%203.4-3.2%20-.9-1.3-2.8-1.1-3.2.3%22%20fill%3D%22none%22%20stroke%3D%22%23bdf0dd%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E"),
-      linear-gradient(158deg,rgba(31,101,78,.92) 0%,rgba(25,82,64,.9) 52%,rgba(20,67,52,.93) 100%);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.30);
-    border:1px solid rgba(120,220,185,.20);
-  }
-  [data-theme="dark"] .row[data-bubble="cat"].mine .bubble,
-  [data-theme="forest"] .row[data-bubble="cat"].mine .bubble {
-    border-radius:20px 20px 5px 20px;
-  }
+     实现：
+       · `.bubble::before` = 脑袋（SVG data URI，3.2em 见方 ✓）
+       · `.bubble::after`  = 尾巴（白圈 + 彩线**一起烘进那张 SVG** ✓ ——
+         想用 `filter:drop-shadow()` 给尾巴描白边，在深色主题下会把白边
+         糊进气泡**里面** ✗，实测过 ✓）
+       · 尺寸全用 **em** ✓ —— 12px 的预览卡和 15px 的真界面同比例 ✓
 
-  /* **图片 / 文件 / 语音那种整块气泡不带印花、也不带那圈柔光** ✓ */
-  .row[data-bubble]:not([data-bubble="plain"]) .bubble.media { border-radius:12px !important;
-    box-shadow:none !important; }
+     ⚠️ 尾巴垂到气泡下方 1.6em ✓，`.time` 的下边距在下面单独补 ✓。
+     ⚠️ 耳朵顶在气泡上方 1.65em ✓，气泡得让出 `margin-top:1.3em` ✓ ——
+        名字行底下还剩 ~2px 余量 ✓。一条带皮肤的消息因此比原来高 ~22% ✓（认了）。
+  */
+  .row[data-bubble="duck"] { --b-fill:#fffdf0; --b-line:#e2ae35; --b-ink:#5c4709; --b-shadow:rgba(140,104,20,.16);
+    --b-head:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cg%20stroke=%22%23d9a01c%22%20stroke-width=%222.9%22%20stroke-linejoin=%22round%22%20stroke-linecap=%22round%22%3E%20%3Cpath%20d=%22M38%2040%20q-5-9%203-13%20q-1%206%204%208%20Z%22%20fill=%22%23ffe066%22/%3E%20%3Cpath%20d=%22M48%2037%20q-1-11%208-11%20q-5%204-3%209%20Z%22%20fill=%22%23ffe066%22/%3E%20%3Cellipse%20cx=%2248%22%20cy=%2263%22%20rx=%2230%22%20ry=%2226.5%22%20fill=%22%23ffe066%22/%3E%20%3C/g%3E%20%3Cellipse%20cx=%2225%22%20cy=%2271%22%20rx=%225.6%22%20ry=%223.6%22%20fill=%22%23f9a83c%22%20opacity=%22.55%22/%3E%20%3Cellipse%20cx=%2271%22%20cy=%2271%22%20rx=%225.6%22%20ry=%223.6%22%20fill=%22%23f9a83c%22%20opacity=%22.55%22/%3E%20%3Ccircle%20cx=%2236%22%20cy=%2258%22%20r=%224.5%22%20fill=%22%234a3a1e%22/%3E%20%3Ccircle%20cx=%2260%22%20cy=%2258%22%20r=%224.5%22%20fill=%22%234a3a1e%22/%3E%20%3Ccircle%20cx=%2234.5%22%20cy=%2256.4%22%20r=%221.5%22%20fill=%22%23fff%22/%3E%20%3Ccircle%20cx=%2258.5%22%20cy=%2256.4%22%20r=%221.5%22%20fill=%22%23fff%22/%3E%20%3Cpath%20d=%22M35%2069%20q13-8%2026%200%20q-13%2010%20-26%200%20Z%22%20fill=%22%23f9a63a%22%20stroke=%22%23cf7d15%22%20stroke-width=%222.3%22%20stroke-linejoin=%22round%22/%3E%20%3Cpath%20d=%22M38%2071.6%20q10-3.6%2020%200%22%20fill=%22none%22%20stroke=%22%23cf7d15%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22/%3E%20%3Cg%20fill=%22%23f7c948%22%3E%20%3Cpath%20d=%22M82%2022%20l2.6%206.4%206.4%202.6%20-6.4%202.6%20-2.6%206.4%20-2.6-6.4%20-6.4-2.6%206.4-2.6%20Z%22/%3E%20%3Cpath%20d=%22M93%2044%20l1.7%204.3%204.3%201.7%20-4.3%201.7%20-1.7%204.3%20-1.7-4.3%20-4.3-1.7%204.3-1.7%20Z%22/%3E%20%3Ccircle%20cx=%2288%22%20cy=%2238%22%20r=%221.8%22/%3E%20%3C/g%3E%3C/svg%3E");
+    --b-tail:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='-6%20-3.5%2040%2027.5'%3E%3CclipPath%20id='m'%3E%3Crect%20x='-6'%20y='0'%20width='40'%20height='27.5'/%3E%3C/clipPath%3E%3Cpath%20d='M0%20-1.5%20L0%2011.5%20C0%2017.375%204.9%2018%206.5%2018%20C12.95%2015.48%2022.96%205.76%2028%20-1.5'%20fill='none'%20stroke='%23fffaf1'%20stroke-width='9.3'%20clip-path='url(%23m)'/%3E%3Cpath%20d='M0%20-1.5%20L28%20-1.5%20L28%200%20C22.96%205.76%2012.95%2015.48%206.5%2018%20C4.9%2018%200%2017.375%200%2011.5%20L0%20-1.5%20Z'%20fill='%23fffdf0'/%3E%3Cpath%20d='M0%20-1.5%20L0%2011.5%20C0%2017.375%204.9%2018%206.5%2018%20C12.95%2015.48%2022.96%205.76%2028%20-1.5'%20fill='none'%20stroke='%23e2ae35'%20stroke-width='1.5'/%3E%3C/svg%3E"); }
+  .row[data-bubble="pig"] { --b-fill:#fff7f5; --b-line:#dd9096; --b-ink:#6b3f3c; --b-shadow:rgba(150,80,84,.15);
+    --b-head:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cg%20stroke=%22%23b25a62%22%20stroke-width=%223%22%20stroke-linejoin=%22round%22%20stroke-linecap=%22round%22%3E%20%3Cellipse%20cx=%2227%22%20cy=%2232%22%20rx=%2213.5%22%20ry=%229.5%22%20transform=%22rotate(-34%2027%2032)%22%20fill=%22%23ffd8da%22/%3E%20%3Cellipse%20cx=%2269%22%20cy=%2232%22%20rx=%2213.5%22%20ry=%229.5%22%20transform=%22rotate(34%2069%2032)%22%20fill=%22%23ffd8da%22/%3E%20%3Cellipse%20cx=%2248%22%20cy=%2262%22%20rx=%2230%22%20ry=%2227%22%20fill=%22%23ffdedf%22/%3E%20%3C/g%3E%20%3Cellipse%20cx=%2227.5%22%20cy=%2232%22%20rx=%228%22%20ry=%225%22%20transform=%22rotate(-34%2027.5%2032)%22%20fill=%22%23f9b8bd%22/%3E%20%3Cellipse%20cx=%2268.5%22%20cy=%2232%22%20rx=%228%22%20ry=%225%22%20transform=%22rotate(34%2068.5%2032)%22%20fill=%22%23f9b8bd%22/%3E%20%3Cellipse%20cx=%2226%22%20cy=%2270%22%20rx=%225.4%22%20ry=%223.4%22%20fill=%22%23ffa9b2%22%20opacity=%22.85%22/%3E%20%3Cellipse%20cx=%2270%22%20cy=%2270%22%20rx=%225.4%22%20ry=%223.4%22%20fill=%22%23ffa9b2%22%20opacity=%22.85%22/%3E%20%3Ccircle%20cx=%2236%22%20cy=%2257%22%20r=%224.4%22%20fill=%22%234a2c2f%22/%3E%20%3Ccircle%20cx=%2260%22%20cy=%2257%22%20r=%224.4%22%20fill=%22%234a2c2f%22/%3E%20%3Ccircle%20cx=%2234.6%22%20cy=%2255.4%22%20r=%221.4%22%20fill=%22%23fff%22/%3E%20%3Ccircle%20cx=%2258.6%22%20cy=%2255.4%22%20r=%221.4%22%20fill=%22%23fff%22/%3E%20%3Cellipse%20cx=%2248%22%20cy=%2272%22%20rx=%2213%22%20ry=%229.6%22%20fill=%22%23ffc2c7%22%20stroke=%22%23b25a62%22%20stroke-width=%222.6%22/%3E%20%3Cellipse%20cx=%2243.4%22%20cy=%2272%22%20rx=%221.9%22%20ry=%222.5%22%20fill=%22%23a04b55%22/%3E%20%3Cellipse%20cx=%2252.6%22%20cy=%2272%22%20rx=%221.9%22%20ry=%222.5%22%20fill=%22%23a04b55%22/%3E%20%3Cg%20fill=%22%23f4888f%22%3E%20%3Cpath%20d=%22M82%2036%20q-4.6-6.4-8.4-2.6%20q-2.8%202.9%202.2%207.4%20l6.2%205.6%206.2-5.6%20q5-4.5%202.2-7.4%20q-3.8-3.8-8.4%202.6%20Z%22/%3E%20%3Cpath%20d=%22M92%2052%20q-3-4.2-5.5-1.7%20q-1.8%201.9%201.5%204.8%20l4%203.6%204-3.6%20q3.3-2.9%201.5-4.8%20q-2.5-2.5-5.5%201.7%20Z%22/%3E%20%3C/g%3E%3C/svg%3E");
+    --b-tail:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='-6%20-3.5%2040%2027.5'%3E%3CclipPath%20id='m'%3E%3Crect%20x='-6'%20y='0'%20width='40'%20height='27.5'/%3E%3C/clipPath%3E%3Cpath%20d='M0%20-1.5%20L0%2011.5%20C0%2017.375%204.9%2018%206.5%2018%20C12.95%2015.48%2022.96%205.76%2028%20-1.5'%20fill='none'%20stroke='%23fffaf1'%20stroke-width='9.3'%20clip-path='url(%23m)'/%3E%3Cpath%20d='M0%20-1.5%20L28%20-1.5%20L28%200%20C22.96%205.76%2012.95%2015.48%206.5%2018%20C4.9%2018%200%2017.375%200%2011.5%20L0%20-1.5%20Z'%20fill='%23fff7f5'/%3E%3Cpath%20d='M0%20-1.5%20L0%2011.5%20C0%2017.375%204.9%2018%206.5%2018%20C12.95%2015.48%2022.96%205.76%2028%20-1.5'%20fill='none'%20stroke='%23dd9096'%20stroke-width='1.5'/%3E%3C/svg%3E"); }
+  .row[data-bubble="cat"] { --b-fill:#fffdf6; --b-line:#c9a877; --b-ink:#5b4a30; --b-shadow:rgba(110,84,48,.16);
+    --b-head:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cg%20stroke=%22%23a8845a%22%20stroke-width=%223%22%20stroke-linejoin=%22round%22%20stroke-linecap=%22round%22%3E%20%3Cpath%20d=%22M20%2044%20L16%2013%20L45%2030%20Z%22%20fill=%22%23fffdf8%22/%3E%20%3Cpath%20d=%22M76%2044%20L80%2013%20L51%2030%20Z%22%20fill=%22%23fffdf8%22/%3E%20%3Cellipse%20cx=%2248%22%20cy=%2262%22%20rx=%2230%22%20ry=%2227%22%20fill=%22%23fffdf8%22/%3E%20%3C/g%3E%20%3Cpath%20d=%22M26%2040%20L24%2024%20L37%2032%20Z%22%20fill=%22%23f9c6c3%22/%3E%20%3Cpath%20d=%22M70%2040%20L72%2024%20L59%2032%20Z%22%20fill=%22%23f9c6c3%22/%3E%20%3Cellipse%20cx=%2226%22%20cy=%2273%22%20rx=%225.5%22%20ry=%223.4%22%20fill=%22%23f8b8b4%22%20opacity=%22.9%22/%3E%20%3Cellipse%20cx=%2270%22%20cy=%2273%22%20rx=%225.5%22%20ry=%223.4%22%20fill=%22%23f8b8b4%22%20opacity=%22.9%22/%3E%20%3Ccircle%20cx=%2237%22%20cy=%2261%22%20r=%224.6%22%20fill=%22%234b3a2e%22/%3E%20%3Ccircle%20cx=%2259%22%20cy=%2261%22%20r=%224.6%22%20fill=%22%234b3a2e%22/%3E%20%3Ccircle%20cx=%2235.5%22%20cy=%2259.3%22%20r=%221.5%22%20fill=%22%23fff%22/%3E%20%3Ccircle%20cx=%2257.5%22%20cy=%2259.3%22%20r=%221.5%22%20fill=%22%23fff%22/%3E%20%3Cpath%20d=%22M44.5%2067.5%20L51.5%2067.5%20L48%2071.5%20Z%22%20fill=%22%23f2a3a0%22/%3E%20%3Cpath%20d=%22M48%2071.5%20v2.2%20M48%2073.7%20q-3.6%203.4%20-6.6%200%20M48%2073.7%20q3.6%203.4%206.6%200%22%20fill=%22none%22%20stroke=%22%234b3a2e%22%20stroke-width=%221.9%22%20stroke-linecap=%22round%22/%3E%20%3Cpath%20d=%22M13%2062%20h8%20M13%2069%20l8%20-2.5%20M83%2062%20h-8%20M83%2069%20l-8%20-2.5%22%20fill=%22none%22%20stroke=%22%23a8845a%22%20stroke-width=%221.7%22%20stroke-linecap=%22round%22/%3E%20%3Cg%20fill=%22%23efa9a4%22%3E%20%3Cellipse%20cx=%2278%22%20cy=%2234%22%20rx=%223.4%22%20ry=%222.8%22/%3E%20%3Ccircle%20cx=%2274.4%22%20cy=%2229.4%22%20r=%221.5%22/%3E%3Ccircle%20cx=%2278.2%22%20cy=%2227.6%22%20r=%221.5%22/%3E%3Ccircle%20cx=%2281.8%22%20cy=%2229.6%22%20r=%221.5%22/%3E%20%3Cellipse%20cx=%2290%22%20cy=%2248%22%20rx=%223.1%22%20ry=%222.5%22/%3E%20%3Ccircle%20cx=%2286.8%22%20cy=%2243.9%22%20r=%221.4%22/%3E%3Ccircle%20cx=%2290.2%22%20cy=%2242.3%22%20r=%221.4%22/%3E%3Ccircle%20cx=%2293.4%22%20cy=%2244.1%22%20r=%221.4%22/%3E%20%3C/g%3E%3C/svg%3E");
+    --b-tail:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='-6%20-3.5%2040%2027.5'%3E%3CclipPath%20id='m'%3E%3Crect%20x='-6'%20y='0'%20width='40'%20height='27.5'/%3E%3C/clipPath%3E%3Cpath%20d='M0%20-1.5%20L0%2011.5%20C0%2017.375%204.9%2018%206.5%2018%20C12.95%2015.48%2022.96%205.76%2028%20-1.5'%20fill='none'%20stroke='%23fffaf1'%20stroke-width='9.3'%20clip-path='url(%23m)'/%3E%3Cpath%20d='M0%20-1.5%20L28%20-1.5%20L28%200%20C22.96%205.76%2012.95%2015.48%206.5%2018%20C4.9%2018%200%2017.375%200%2011.5%20L0%20-1.5%20Z'%20fill='%23fffdf6'/%3E%3Cpath%20d='M0%20-1.5%20L0%2011.5%20C0%2017.375%204.9%2018%206.5%2018%20C12.95%2015.48%2022.96%205.76%2028%20-1.5'%20fill='none'%20stroke='%23c9a877'%20stroke-width='1.5'/%3E%3C/svg%3E"); }
+
+  /* 深色主题 → 泡面压暗、字提亮 ✓。脑袋那张图两边通用 ✓（白脸在深色上正好像贴纸）。 */
+  [data-theme="dark"] .row[data-bubble="duck"], [data-theme="forest"] .row[data-bubble="duck"] {
+    --b-fill:#3b3320; --b-line:#e9c25c; --b-ink:#ffeec2; --b-shadow:rgba(0,0,0,.50);
+    --b-tail:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='-6%20-3.5%2040%2027.5'%3E%3CclipPath%20id='m'%3E%3Crect%20x='-6'%20y='0'%20width='40'%20height='27.5'/%3E%3C/clipPath%3E%3Cpath%20d='M0%20-1.5%20L0%2011.5%20C0%2017.375%204.9%2018%206.5%2018%20C12.95%2015.48%2022.96%205.76%2028%20-1.5'%20fill='none'%20stroke='%23fffaf1'%20stroke-width='9.3'%20clip-path='url(%23m)'/%3E%3Cpath%20d='M0%20-1.5%20L28%20-1.5%20L28%200%20C22.96%205.76%2012.95%2015.48%206.5%2018%20C4.9%2018%200%2017.375%200%2011.5%20L0%20-1.5%20Z'%20fill='%233b3320'/%3E%3Cpath%20d='M0%20-1.5%20L0%2011.5%20C0%2017.375%204.9%2018%206.5%2018%20C12.95%2015.48%2022.96%205.76%2028%20-1.5'%20fill='none'%20stroke='%23e9c25c'%20stroke-width='1.5'/%3E%3C/svg%3E"); }
+  [data-theme="dark"] .row[data-bubble="pig"], [data-theme="forest"] .row[data-bubble="pig"] {
+    --b-fill:#3c2b2e; --b-line:#e9a0a6; --b-ink:#ffe2e4; --b-shadow:rgba(0,0,0,.50);
+    --b-tail:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='-6%20-3.5%2040%2027.5'%3E%3CclipPath%20id='m'%3E%3Crect%20x='-6'%20y='0'%20width='40'%20height='27.5'/%3E%3C/clipPath%3E%3Cpath%20d='M0%20-1.5%20L0%2011.5%20C0%2017.375%204.9%2018%206.5%2018%20C12.95%2015.48%2022.96%205.76%2028%20-1.5'%20fill='none'%20stroke='%23fffaf1'%20stroke-width='9.3'%20clip-path='url(%23m)'/%3E%3Cpath%20d='M0%20-1.5%20L28%20-1.5%20L28%200%20C22.96%205.76%2012.95%2015.48%206.5%2018%20C4.9%2018%200%2017.375%200%2011.5%20L0%20-1.5%20Z'%20fill='%233c2b2e'/%3E%3Cpath%20d='M0%20-1.5%20L0%2011.5%20C0%2017.375%204.9%2018%206.5%2018%20C12.95%2015.48%2022.96%205.76%2028%20-1.5'%20fill='none'%20stroke='%23e9a0a6'%20stroke-width='1.5'/%3E%3C/svg%3E"); }
+  [data-theme="dark"] .row[data-bubble="cat"], [data-theme="forest"] .row[data-bubble="cat"] {
+    --b-fill:#37301f; --b-line:#dcbb8c; --b-ink:#f8eeda; --b-shadow:rgba(0,0,0,.50);
+    --b-tail:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='-6%20-3.5%2040%2027.5'%3E%3CclipPath%20id='m'%3E%3Crect%20x='-6'%20y='0'%20width='40'%20height='27.5'/%3E%3C/clipPath%3E%3Cpath%20d='M0%20-1.5%20L0%2011.5%20C0%2017.375%204.9%2018%206.5%2018%20C12.95%2015.48%2022.96%205.76%2028%20-1.5'%20fill='none'%20stroke='%23fffaf1'%20stroke-width='9.3'%20clip-path='url(%23m)'/%3E%3Cpath%20d='M0%20-1.5%20L28%20-1.5%20L28%200%20C22.96%205.76%2012.95%2015.48%206.5%2018%20C4.9%2018%200%2017.375%200%2011.5%20L0%20-1.5%20Z'%20fill='%2337301f'/%3E%3Cpath%20d='M0%20-1.5%20L0%2011.5%20C0%2017.375%204.9%2018%206.5%2018%20C12.95%2015.48%2022.96%205.76%2028%20-1.5'%20fill='none'%20stroke='%23dcbb8c'%20stroke-width='1.5'/%3E%3C/svg%3E"); }
+
+  .row[data-bubble]:not([data-bubble="plain"]) .bubble {
+    position:relative; background:var(--b-fill); color:var(--b-ink);
+    border:1.5px solid var(--b-line); padding:1.2em 1em 0.93em; margin-top:1.3em;
+    /* ⚠️ 这个 `!important` 是必须的 ✓：下面 `.row:not(.mine):not(.agent) .bubble`
+       和本规则**同权重 (0,4,0)、位置更靠后** ✓ —— 不加就会把左下角削成 4px ✗。
+       `图片那种整块气泡`那条也是 !important ✓ 且更具体 ✓，不会被打回来 ✓。 */
+    border-radius:1.2em !important;
+    box-shadow:0 0 0 0.26em #fffaf1, 0 0.3em 0.75em var(--b-shadow); }
+
+  /* 脑袋：整个挂在左上角 ✓ —— 不是从边上探头 */
+  .row[data-bubble]:not([data-bubble="plain"]) .bubble:not(.media)::before {
+    content:''; position:absolute; width:3.2em; height:3.2em; left:-0.88em; top:-1.648em;
+    background:var(--b-head) center/contain no-repeat; pointer-events:none; }
+  /* 尾巴：白圈和彩线都在图里 ✓，所以任意主题下都不会糊进泡面 */
+  .row[data-bubble]:not([data-bubble="plain"]) .bubble:not(.media)::after {
+    content:''; position:absolute; left:0.8em; bottom:-1.7em;
+    width:2.6667em; height:1.8333em;
+    background:var(--b-tail) center/100% 100% no-repeat; pointer-events:none; }
+
+  /* 自己发的 → 整张镜像 ✓（脑袋到右上角、尾巴到右下角） */
+  .row.mine[data-bubble]:not([data-bubble="plain"]) .bubble:not(.media)::before {
+    left:auto; right:-0.88em; transform:scaleX(-1); }
+  .row.mine[data-bubble]:not([data-bubble="plain"]) .bubble:not(.media)::after {
+    left:auto; right:0.8em; transform:scaleX(-1); }
+
+  /* 尾巴垂到气泡边框下方 ~24px ✓ —— 时间得让开 ✓（`.time` 11px → 2.45em ≈ 27px ✓） */
+  .row[data-bubble]:not([data-bubble="plain"]) .time { margin-top:2.45em; }
+
+  /* **图片 / 文件 / 语音那种整块气泡不贴纸** ✓：没脑袋、没尾巴、也没那圈白 */
+  .row[data-bubble]:not([data-bubble="plain"]) .bubble.media { margin-top:0; padding:4px;
+    border-radius:12px !important; box-shadow:none; }
+
+  /* 预览卡（12px 字号）✓ —— 尺寸全是 em ✓ 所以只要把 ID 级别的 padding/字色补回来 ✓ */
+  #bubbleSet .brow[data-bubble]:not([data-bubble="plain"]) .bubble {
+    padding:1.2em 1em 0.93em; color:var(--b-ink); }
   .row:not(.mine):not(.agent) .bubble { border-bottom-left-radius:4px; }
   .time { font-size:11px; color:var(--muted); margin-top:2px; padding:0 4px; }
   .row.mine .time { text-align:right; }
@@ -1367,7 +1287,7 @@
                                   background:var(--p-accent);
                                   box-shadow:inset 0 0 0 3px var(--p-panel); }
   /* ── 气泡选择（2026-10-27）────────────────────────────────────────────
-     四张卡，每张一个**迷你聊天** ✓（一问一答 + 两团印花气泡 ✓）。
+     四张卡，每张一个**迷你聊天** ✓（一问一答 + 两团贴纸气泡 ✓）。
      ⚠️ 卡里的 `stage` 是一个**假 `html`** ✓ —— 只挂 `data-theme` ✓；
         气泡的 `data-bubble` 挂在**预览的每一行**上 ✓（真界面也是这么挂的 ✓）。
         所以里面那两团气泡走的**就是主界面那几条真规则** ✓（`.row[data-bubble=…]` ✓）。
@@ -1409,7 +1329,7 @@
   #bubbleSet .tprev { padding:12px 14px 0; background:var(--t-bg); overflow:hidden; }
   /* 假 html 自己不给底色（卡已经给了 ✓）—— 它只当"属性开关"用 ✓ */
   #bubbleSet .bstage { display:flex; flex-direction:column; gap:12px;
-                       padding:0 0 14px; }
+                       padding:0 0 22px; }   /* 底边留给尾巴 ✓（12px 下垂 ~20.7px ✓，20px 会切一点 ✗） */
   #bubbleSet .bptop { display:flex; align-items:center; gap:8px;
                       padding-bottom:12px; border-bottom:1px solid var(--t-line); }
   #bubbleSet .bptop span { width:16px; height:16px; border-radius:50%;
@@ -1433,13 +1353,14 @@
                --bubble-mine-bg:var(--t-accent-bg); }
   #bubbleSet .brow .bubble { color:var(--t-text); }
   #bubbleSet .brow.mine .bubble { color:var(--t-text); }
-  /* ⚠️ 预览这里**不用再抄一遍尺寸**了 ✓ —— 印花布的底纹同样是 `em` 标尺 ✓
-     （`background-size:3.8em 3.8em` ✓）：气泡自己的 `font-size`（预览 12px / 群聊 15px ✓）
-     就是标尺 ✓，预览自动小一号 ✓。
-     ⚠️ 第三版的印花**不占内部空间** ✓ —— 所以这里**没有**任何 `padding` 补丁 ✗
-     （第二版的小脑袋是伪元素探出去的 ✓，才需要一条 ID 级 `padding-top` ✓）。
-     以后哪款皮肤要是再往气泡"里"塞东西 ✓，预览这边得用 ID 选择器补一遍 ✓：
-     上面 `#bubbleSet .brow .bubble` 的 `padding:7px 10px` 会压过 `.row[…] .bubble` ✗。 */
+  /* ⚠️ 预览卡里第四版皮肤的所有尺寸都是 `em` ✓ —— 气泡自己的 `font-size`
+     （预览 12px / 群聊 15px ✓）就是标尺 ✓，所以脑袋、尾巴、圆角、白圈自动小一号 ✓。
+     唯一要补的是**字色和 padding** ✓（见上面 `#bubbleSet .brow[data-bubble]:not(…)`
+     那条 ID 级规则 ✓）：这条 `#bubbleSet .brow .bubble` 的 `padding:7px 10px`
+     是 (1,2,0) ✓，会压过外面那条 `.row[…] .bubble` ✗ —— 所以那边必须带 ID 选择器 ✓。
+     ⚠️ 脑袋和尾巴都是**伪元素、不占内部空间** ✓ —— 预览这边**不用** `padding-top` 补丁 ✗
+     （`margin-top:1.3em` 是气泡自己的 ✓，两边同一个数 ✓）。
+     以后哪款皮肤要是再往气泡"里"塞东西 ✓，预览这边也得用 ID 选择器补一遍 ✓。 */
   #themeSet .thint, #bubbleSet .thint {
     color:var(--muted); font-size:12.5px; line-height:1.6;
     text-align:center; margin:2px 8px 18px; }
