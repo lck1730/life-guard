@@ -472,203 +472,166 @@
   }
   .row.agent .bubble { background:var(--bubble-agent-bg); border:1px solid var(--line);
                        border-left:3px solid var(--agent); border-bottom-left-radius:4px; }
-  /* ── 气泡皮肤 第二版（2026-10-27 晚）：鸭鸭 / 猪猪 / 猫猫 ─────────────
-     ★ 它是**盖在主题上的皮肤** ✓ —— 底色 / 正文 / 顶栏一行都不动 ✓，
-       只换气泡本身的**形状和配色** ✓。
-     ★★ `data-bubble` 挂在**每一行**上（`.row[data-bubble]` ✓，由 `setRowBubble` 写 ✓）：
+  /* ── 气泡皮肤 第三版（2026-10-27 深夜）：鸭鸭 / 猪猪 / 猫猫 · 印花布 ──
+     ★ 还是**盖在主题上的皮肤** ✓ —— 底色 / 正文 / 顶栏一行不动 ✓，
+       只换气泡本身 ✓。
+     ★★ 前两版都**推翻重做**了 ✗→✓（用户：第一版"还是不好看，思路打开"✓、
+        第二版"太丑了……千万不要按现在思路来"✓）：
+        · 第一版：气泡侧面挂一件器官（嘴 / 鼻子 / 耳朵）✗ 像别了个挂件 ✓
+        · 第二版：一枚卡通小脑袋扒着上沿探头 ✗ 贴纸感 ✓
+        · **第三版：不在气泡上贴任何"零件"** ✓ —— 换成一匹**印花布** ✓：
+          气泡本身是柔和的渐变 + 一道斜上的柔光 ✓，
+          底纹是**同色系的一群小动物剪影** ✓（鸭 / 猪 / 猫 ✓，见下面每款的 `--b-ink` ✓）。
+          图案就是动物 ✓，但它是"布上的印花"，不是"贴上去的脸" ✓。
+     ★★ `data-bubble` 挂在**每一行**上 ✓（`.row[data-bubble]` ✓，由 `setRowBubble` 写 ✓）：
         一个群里可能同时有三款 ✓（我鸭鸭 / 她猪猪 / 管家猫猫 ✓）——
         挂在容器上就只能全群一款 ✗（2026-10-27 用户纠正过 ✓）。
-     ★★ 第一版是"侧面长一件器官"（一张嘴 / 一个鼻子 / 两只耳朵 ✓），
-        贴在气泡外面像挂件 ✓；用户看完说"还是不好看，思路打开" ✗（同一天下午 ✓）——
-        第二版换成**一枚小脑袋扒着气泡上沿往外看** ✓：
-        一张共用的小脸（两只眼睛 ✓）+ 一件一眼认出它的器官（鸭嘴 / 猪鼻+耳朵 / 猫耳 ✓）。
-        三只的脸是同一段 CSS ✓ —— 以后要加第四只，只写器官那两三行就够 ✓。
-     ⚠️ 尺寸**一律用 em** ✓ —— 标尺是气泡自己的 `font-size`（群聊 15px ✓、
-        选择页预览 12px ✓）→ 预览自动小一号 ✓，那边不用再抄一遍像素值 ✗
-        （抄一遍 = 两边迟早长得不一样 ✓；第一版就是靠一堆 `bottom:5px` 硬对 ✗）。
-     ⚠️ 脑袋压在**上沿里面** ✓，所以带皮肤的气泡要把 `padding-top` 抬到 1.02em ✓：
-        文字从脑袋下面开始 ✓，嘴/鼻/耳永远戳不到字 ✓（预览字小一号时尤其明显 ✓）。
+     ★ 剪影是 **SVG data URI** ✓（`url("data:image/svg+xml,…")` ✓）——
+        不引外部图 ✓、不联网 ✓；换颜色只需要改 URI 里那个 fill ✓。
+     ⚠️ 尺寸**一律用 em** ✓（`background-size:3.8em 3.8em` ✓）：标尺是气泡自己的
+        `font-size` ✓（群聊 15px ✓、选择页预览 12px ✓）→ 预览自动小一号 ✓，
+        不用再抄一遍像素值 ✗（第一版就是靠一堆 `bottom:5px` 硬对 ✗）。
+     ⚠️ 图案**必须很淡** ✓（浅色 .15 / 深色 .12 ✓）—— 它在字底下 ✓，
+        再深一点就会和正文抢 ✓。要调只调这个透明度 ✓。
      ⚠️ 颜色写死在这里、**按主题深浅各一套** ✓ —— 气泡底色不跟 `--bubble-*` 走 ✗：
-        那三个变量是半透明的 ✓（要透背景图 ✓），动物色一透明就发灰 ✓。
-     ⚠️ 器官用伪元素画 ✓（`::before` / `::after` ✓）—— 不引图片 ✓：
-        它得跟着主题走 ✓，两套主题各一张图就多两处会忘的地方 ✓。
+        那三个变量是半透明的 ✓（要透背景图 ✓），印花色一透明就发灰 ✓。
+     ⚠️ `.bubble.media`（图片 / 文件那种整块 ✓）**不带印花** ✓ ——
+        里面没有"一句话" ✓，铺底纹只会让照片边上一圈花 ✓。
      ⚠️ **只有消息行**带 `data-bubble` ✓ —— 设置页那些 `.ascreen .row` 不带 ✓，
         所以这里的规则一条都不会漏到设置页去 ✓。 */
-  .row[data-bubble]:not([data-bubble="plain"]) .bubble { position:relative; }
-  /* 给脑袋让出顶部那一条 ✓（卡片里没有 `.who` ✓，不吃下面那几条 ✓） */
-  .row[data-bubble]:not([data-bubble="plain"]) .bubble:not(.media) { padding-top:1.02em; }
 
-  /* 名字和气泡之间要给脑袋让位 ✓（让多少按脑袋最高处定，见各自那段 ✓） */
-  /* ⚠️ 只给**有脑袋的**气泡让位 ✓（`:has` 那半句 ✓）—— 图片 / 文件那种整块气泡
-     没有脑袋 ✓，也让位的话名字和图片之间会凭空多出一条空白 ✓。 */
-  .row[data-bubble="duck"]:has(> .wrap2 > .bubble:not(.media)) .who { margin-bottom:.95em; }
-  .row[data-bubble="pig"]:has(> .wrap2 > .bubble:not(.media))  .who { margin-bottom:.95em; }
-  .row[data-bubble="cat"]:has(> .wrap2 > .bubble:not(.media))  .who { margin-bottom:1.5em; }
-
-  /* ── 脸：三只共用（两只眼睛 + 左上高光 + 可选的口鼻 ✓）────────────
-     ⚠️ `left` / `right` **两头都显式写** ✓ —— 伪元素同时有 `left` 和 `right` 时
-        浏览器按 `left` 放（LTR ✓）。只写一边的话，文件里任何一条残留的
-        `left:12px` 都会把自己的脑袋钉死在气泡左边 ✓（实验室里踩过这一脚 ✓）。 */
-  .row[data-bubble="duck"] .bubble::before,
-  .row[data-bubble="pig"]  .bubble::before,
-  .row[data-bubble="cat"]  .bubble::before {
-    content:''; position:absolute; top:-.78em; width:1.3em; height:1.25em;
-    border-radius:50%; z-index:1; pointer-events:none;
-    background:
-      radial-gradient(circle at 33% 37%, var(--bt-eye) 0 .105em, transparent .14em),
-      radial-gradient(circle at 67% 37%, var(--bt-eye) 0 .105em, transparent .14em),
-      radial-gradient(circle at 34% 14%, var(--bt-glow) 0 .19em, transparent .24em),
-      radial-gradient(ellipse .17em .11em at 50% 80%, var(--bt-muzzle) 0 100%, transparent 100%),
-      radial-gradient(circle at 50% 73%, var(--bt-nose) 0 .05em, transparent .065em),
-      linear-gradient(180deg, var(--bt-face), var(--bt-face2));
-    filter:drop-shadow(0 .05em .06em rgba(0,0,0,.16));
-  }
-  /* ⚠️ 只对这三款生效 ✓ —— 别写成光秃秃的 `.row.mine .bubble::before` ✗，
-     那是给全站每一行都动伪元素 ✓（现在没事，以后谁用 `::before` 装东西就撞上了 ✓）。 */
-  .row:is([data-bubble="duck"],[data-bubble="pig"],[data-bubble="cat"]).mine .bubble::before { right:.53em; left:auto; }
-  .row:is([data-bubble="duck"],[data-bubble="pig"],[data-bubble="cat"]):not(.mine) .bubble::before { left:.53em; right:auto; }
-
-  /* ── ① 鸭鸭：鹅黄圆滚，脸下沿压一张宽扁的嘴 ✓ ─────────────────────
-     嘴比脸还宽 ✓ —— 宽到超出脸的两侧，一眼就是"鸭" ✓；
-     两瓣不画线 ✓，靠中间两道内阴影收窄一点 ✓。 */
+  /* ① 鸭鸭 —— 印花：小鸭子 ✓ */
   .row[data-bubble="duck"] {
-    --bt-face:#ffd75a; --bt-face2:#f3bf26; --bt-eye:#4d3604; --bt-glow:#fff0ac;
-    --bt-muzzle:transparent; --bt-nose:transparent;
-    --bt-bill:#f6a41f; --bt-bill2:#eb9712;
-    --dk-mine:#ffe6a0;  --dk-mine-t:#5b4205;
-    --dk-other:#fff3cf; --dk-other-t:#6c5310;
+    --b-ink:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%239c7716%27%20fill-opacity%3D%27.15%27%20stroke%3D%27%239c7716%27%20stroke-opacity%3D%27.15%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Cellipse%20cx%3D%2214.6%22%20cy%3D%2215.6%22%20rx%3D%227.6%22%20ry%3D%225.2%22%2F%3E%3Cpath%20d%3D%22M20.6%2011.9%20L24%209.7%20L23.4%2015.6%20Z%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%229.2%22%20r%3D%224.1%22%2F%3E%3Cpath%20d%3D%22M5.6%208.6%20C3%208.5%201.4%209.4%201.2%2010.6%20C1.8%2011.6%203.6%2011.9%205.8%2011.2%20Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2019.6%20l-.6%202.4%20h1.4%20l.4-2.4z%20M14.4%2019.6%20l-.3%202.4%20h1.4%20l.1-2.4z%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Cellipse%20cx%3D%2214.6%22%20cy%3D%2215.6%22%20rx%3D%227.6%22%20ry%3D%225.2%22%2F%3E%3Cpath%20d%3D%22M20.6%2011.9%20L24%209.7%20L23.4%2015.6%20Z%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%229.2%22%20r%3D%224.1%22%2F%3E%3Cpath%20d%3D%22M5.6%208.6%20C3%208.5%201.4%209.4%201.2%2010.6%20C1.8%2011.6%203.6%2011.9%205.8%2011.2%20Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2019.6%20l-.6%202.4%20h1.4%20l.4-2.4z%20M14.4%2019.6%20l-.3%202.4%20h1.4%20l.1-2.4z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+  }
+  .row[data-bubble="duck"].mine .bubble,
+  .row[data-bubble="duck"]:not(.mine) .bubble {
+    background-image:
+      linear-gradient(135deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.10) 26%,rgba(255,255,255,0) 46%),
+      var(--b-ink),
+      linear-gradient(158deg,#fff9e0 0%,#ffe9a9 52%,#ffdd87 100%);
+    background-size:auto,3.8em 3.8em,auto;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.85), 0 2px 5px rgba(90,60,10,.08);
+    border:0;
   }
   .row[data-bubble="duck"].mine .bubble {
-    background:var(--dk-mine); color:var(--dk-mine-t); border:0;
-    border-radius:19px 19px 7px 19px;
-    box-shadow:0 1px 2px rgba(120,86,10,.10);
+    color:#5b4406; border-radius:20px 20px 5px 20px;
   }
-  /* ⚠️ 用 `:not(.mine)` 而不是 `.agent` ✗ —— 群里**别的人**说的话也得跟着变 ✓。
-     管家那一竖条在这三款上**没有了** ✓（脑袋本身就是"这是管家的颜色"✓），
-     留下的 1px 边框就够分人 ✓。 */
   .row[data-bubble="duck"]:not(.mine) .bubble {
-    background:var(--dk-other); color:var(--dk-other-t);
-    border:1px solid rgba(198,158,60,.42); border-radius:19px 19px 19px 7px;
-    box-shadow:0 1px 2px rgba(120,86,10,.06);
+    color:#6b5310;
+    background-image:
+      linear-gradient(135deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.10) 26%,rgba(255,255,255,0) 46%),
+      url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%239c7716%27%20fill-opacity%3D%27.13%27%20stroke%3D%27%239c7716%27%20stroke-opacity%3D%27.13%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Cellipse%20cx%3D%2214.6%22%20cy%3D%2215.6%22%20rx%3D%227.6%22%20ry%3D%225.2%22%2F%3E%3Cpath%20d%3D%22M20.6%2011.9%20L24%209.7%20L23.4%2015.6%20Z%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%229.2%22%20r%3D%224.1%22%2F%3E%3Cpath%20d%3D%22M5.6%208.6%20C3%208.5%201.4%209.4%201.2%2010.6%20C1.8%2011.6%203.6%2011.9%205.8%2011.2%20Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2019.6%20l-.6%202.4%20h1.4%20l.4-2.4z%20M14.4%2019.6%20l-.3%202.4%20h1.4%20l.1-2.4z%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Cellipse%20cx%3D%2214.6%22%20cy%3D%2215.6%22%20rx%3D%227.6%22%20ry%3D%225.2%22%2F%3E%3Cpath%20d%3D%22M20.6%2011.9%20L24%209.7%20L23.4%2015.6%20Z%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%229.2%22%20r%3D%224.1%22%2F%3E%3Cpath%20d%3D%22M5.6%208.6%20C3%208.5%201.4%209.4%201.2%2010.6%20C1.8%2011.6%203.6%2011.9%205.8%2011.2%20Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2019.6%20l-.6%202.4%20h1.4%20l.4-2.4z%20M14.4%2019.6%20l-.3%202.4%20h1.4%20l.1-2.4z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E"),
+      linear-gradient(158deg,#fffdf4 0%,#fff5d8 55%,#ffedbe 100%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 5px rgba(90,60,10,.06);
+    border:1px solid rgba(212,168,58,.42); border-radius:20px 20px 20px 5px;
   }
-  .row[data-bubble="duck"] .bubble::after {
-    content:''; position:absolute; top:.14em; width:1.5em; height:.48em;
-    background:linear-gradient(180deg, var(--bt-bill), var(--bt-bill2));
-    border-radius:.42em .42em .55em .55em / .22em .22em .42em .42em;
-    box-shadow:inset 0 .07em 0 rgba(255,240,180,.45),
-               inset .72em 0 0 -.68em rgba(150,90,0,.12),
-               inset -.72em 0 0 -.68em rgba(150,90,0,.12);
-    z-index:2; pointer-events:none;
+  [data-theme="dark"] .row[data-bubble="duck"].mine .bubble,
+  [data-theme="dark"] .row[data-bubble="duck"]:not(.mine) .bubble,
+  [data-theme="forest"] .row[data-bubble="duck"].mine .bubble,
+  [data-theme="forest"] .row[data-bubble="duck"]:not(.mine) .bubble {
+    color:#ffeab4;
+    background-image:
+      linear-gradient(135deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.02) 30%,rgba(255,255,255,0) 50%),
+      url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%23ffe1a0%27%20fill-opacity%3D%27.12%27%20stroke%3D%27%23ffe1a0%27%20stroke-opacity%3D%27.12%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Cellipse%20cx%3D%2214.6%22%20cy%3D%2215.6%22%20rx%3D%227.6%22%20ry%3D%225.2%22%2F%3E%3Cpath%20d%3D%22M20.6%2011.9%20L24%209.7%20L23.4%2015.6%20Z%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%229.2%22%20r%3D%224.1%22%2F%3E%3Cpath%20d%3D%22M5.6%208.6%20C3%208.5%201.4%209.4%201.2%2010.6%20C1.8%2011.6%203.6%2011.9%205.8%2011.2%20Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2019.6%20l-.6%202.4%20h1.4%20l.4-2.4z%20M14.4%2019.6%20l-.3%202.4%20h1.4%20l.1-2.4z%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Cellipse%20cx%3D%2214.6%22%20cy%3D%2215.6%22%20rx%3D%227.6%22%20ry%3D%225.2%22%2F%3E%3Cpath%20d%3D%22M20.6%2011.9%20L24%209.7%20L23.4%2015.6%20Z%22%2F%3E%3Ccircle%20cx%3D%228.8%22%20cy%3D%229.2%22%20r%3D%224.1%22%2F%3E%3Cpath%20d%3D%22M5.6%208.6%20C3%208.5%201.4%209.4%201.2%2010.6%20C1.8%2011.6%203.6%2011.9%205.8%2011.2%20Z%22%2F%3E%3Cpath%20d%3D%22M10.8%2019.6%20l-.6%202.4%20h1.4%20l.4-2.4z%20M14.4%2019.6%20l-.3%202.4%20h1.4%20l.1-2.4z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E"),
+      linear-gradient(158deg,rgba(146,106,26,.92) 0%,rgba(110,79,16,.9) 52%,rgba(84,60,11,.93) 100%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.30);
+    border:1px solid rgba(255,214,120,.22);
   }
-  .row[data-bubble="duck"].mine .bubble::after { right:.43em; left:auto; }
-  .row[data-bubble="duck"]:not(.mine) .bubble::after { left:.43em; right:auto; }
+  [data-theme="dark"] .row[data-bubble="duck"].mine .bubble,
+  [data-theme="forest"] .row[data-bubble="duck"].mine .bubble {
+    border-radius:20px 20px 5px 20px;
+  }
 
-  /* ── ② 猪猪：樱粉软乎，一对耳朵 + 一枚猪鼻 ✓ ───────────────────
-     耳朵是脑袋本身的**两枚缩小投影** ✓（圆形 ✓，不用第二枚伪元素 ✓）；
-     鼻子横椭圆 + 两个鼻孔 ✓，压在脸的下沿 ✓。 */
+  /* ① 猪猪 —— 印花：小猪 ✓ */
   .row[data-bubble="pig"] {
-    --bt-face:#f7a4b8; --bt-face2:#ef92a9; --bt-eye:#4d1723; --bt-glow:#ffc9d4;
-    --bt-muzzle:transparent; --bt-nose:transparent; --bt-ear:#ec93a9;
-    --pg-nose:#7b2a3f; --pg-snout:#e4768f; --pg-snout2:#e06e88;
-    --pg-mine:#ffccd9;  --pg-mine-t:#692231;
-    --pg-other:#ffe9ef; --pg-other-t:#71303d;
+    --b-ink:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%23b45a75%27%20fill-opacity%3D%27.15%27%20stroke%3D%27%23b45a75%27%20stroke-opacity%3D%27.15%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Cellipse%20cx%3D%2214.4%22%20cy%3D%2214.6%22%20rx%3D%227.4%22%20ry%3D%225.6%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%2211.2%22%20r%3D%224.4%22%2F%3E%3Cpath%20d%3D%22M5.2%207.8%20L4%203.8%20L8.4%206.3%20Z%22%2F%3E%3Cpath%20d%3D%22M11.2%207.2%20L12%203%20L14.8%206.7%20Z%22%2F%3E%3Cellipse%20cx%3D%224.6%22%20cy%3D%2212.2%22%20rx%3D%222.7%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M10.4%2019.2%20l-.5%202.8%20h1.5%20l.3-2.8z%20M15%2019.3%20l-.2%202.7%20h1.5%20l.1-2.7z%22%2F%3E%3Cpath%20d%3D%22M21.4%2012.6%20c2.5%200%203.4%201.8%202.2%202.9%20-0.9.8-2.4.2-2.4-1%22%20fill%3D%22none%22%20stroke%3D%22%23b45a75%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Cellipse%20cx%3D%2214.4%22%20cy%3D%2214.6%22%20rx%3D%227.4%22%20ry%3D%225.6%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%2211.2%22%20r%3D%224.4%22%2F%3E%3Cpath%20d%3D%22M5.2%207.8%20L4%203.8%20L8.4%206.3%20Z%22%2F%3E%3Cpath%20d%3D%22M11.2%207.2%20L12%203%20L14.8%206.7%20Z%22%2F%3E%3Cellipse%20cx%3D%224.6%22%20cy%3D%2212.2%22%20rx%3D%222.7%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M10.4%2019.2%20l-.5%202.8%20h1.5%20l.3-2.8z%20M15%2019.3%20l-.2%202.7%20h1.5%20l.1-2.7z%22%2F%3E%3Cpath%20d%3D%22M21.4%2012.6%20c2.5%200%203.4%201.8%202.2%202.9%20-0.9.8-2.4.2-2.4-1%22%20fill%3D%22none%22%20stroke%3D%22%23b45a75%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+  }
+  .row[data-bubble="pig"].mine .bubble,
+  .row[data-bubble="pig"]:not(.mine) .bubble {
+    background-image:
+      linear-gradient(135deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.10) 26%,rgba(255,255,255,0) 46%),
+      var(--b-ink),
+      linear-gradient(158deg,#fff1f6 0%,#fed0df 52%,#fcbcd0 100%);
+    background-size:auto,3.8em 3.8em,auto;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.85), 0 2px 5px rgba(90,60,10,.08);
+    border:0;
   }
   .row[data-bubble="pig"].mine .bubble {
-    background:var(--pg-mine); color:var(--pg-mine-t); border:0;
-    border-radius:20px 20px 8px 20px;
-    box-shadow:0 1px 2px rgba(140,60,80,.10);
+    color:#6a2333; border-radius:20px 20px 5px 20px;
   }
   .row[data-bubble="pig"]:not(.mine) .bubble {
-    background:var(--pg-other); color:var(--pg-other-t);
-    border:1px solid rgba(214,114,138,.30); border-radius:20px 20px 20px 8px;
-    box-shadow:0 1px 2px rgba(140,60,80,.06);
+    color:#73303e;
+    background-image:
+      linear-gradient(135deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.10) 26%,rgba(255,255,255,0) 46%),
+      url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%23b45a75%27%20fill-opacity%3D%27.13%27%20stroke%3D%27%23b45a75%27%20stroke-opacity%3D%27.13%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Cellipse%20cx%3D%2214.4%22%20cy%3D%2214.6%22%20rx%3D%227.4%22%20ry%3D%225.6%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%2211.2%22%20r%3D%224.4%22%2F%3E%3Cpath%20d%3D%22M5.2%207.8%20L4%203.8%20L8.4%206.3%20Z%22%2F%3E%3Cpath%20d%3D%22M11.2%207.2%20L12%203%20L14.8%206.7%20Z%22%2F%3E%3Cellipse%20cx%3D%224.6%22%20cy%3D%2212.2%22%20rx%3D%222.7%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M10.4%2019.2%20l-.5%202.8%20h1.5%20l.3-2.8z%20M15%2019.3%20l-.2%202.7%20h1.5%20l.1-2.7z%22%2F%3E%3Cpath%20d%3D%22M21.4%2012.6%20c2.5%200%203.4%201.8%202.2%202.9%20-0.9.8-2.4.2-2.4-1%22%20fill%3D%22none%22%20stroke%3D%22%23b45a75%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Cellipse%20cx%3D%2214.4%22%20cy%3D%2214.6%22%20rx%3D%227.4%22%20ry%3D%225.6%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%2211.2%22%20r%3D%224.4%22%2F%3E%3Cpath%20d%3D%22M5.2%207.8%20L4%203.8%20L8.4%206.3%20Z%22%2F%3E%3Cpath%20d%3D%22M11.2%207.2%20L12%203%20L14.8%206.7%20Z%22%2F%3E%3Cellipse%20cx%3D%224.6%22%20cy%3D%2212.2%22%20rx%3D%222.7%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M10.4%2019.2%20l-.5%202.8%20h1.5%20l.3-2.8z%20M15%2019.3%20l-.2%202.7%20h1.5%20l.1-2.7z%22%2F%3E%3Cpath%20d%3D%22M21.4%2012.6%20c2.5%200%203.4%201.8%202.2%202.9%20-0.9.8-2.4.2-2.4-1%22%20fill%3D%22none%22%20stroke%3D%22%23b45a75%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E"),
+      linear-gradient(158deg,#fffafc 0%,#ffedf4 55%,#ffe2ed 100%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 5px rgba(90,60,10,.06);
+    border:1px solid rgba(219,126,152,.40); border-radius:20px 20px 20px 5px;
   }
-  .row[data-bubble="pig"] .bubble::before {
-    box-shadow:-.5em -.42em 0 -.37em var(--bt-ear), .5em -.42em 0 -.37em var(--bt-ear);
+  [data-theme="dark"] .row[data-bubble="pig"].mine .bubble,
+  [data-theme="dark"] .row[data-bubble="pig"]:not(.mine) .bubble,
+  [data-theme="forest"] .row[data-bubble="pig"].mine .bubble,
+  [data-theme="forest"] .row[data-bubble="pig"]:not(.mine) .bubble {
+    color:#ffd9e2;
+    background-image:
+      linear-gradient(135deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.02) 30%,rgba(255,255,255,0) 50%),
+      url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%23ffc3d3%27%20fill-opacity%3D%27.12%27%20stroke%3D%27%23ffc3d3%27%20stroke-opacity%3D%27.12%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Cellipse%20cx%3D%2214.4%22%20cy%3D%2214.6%22%20rx%3D%227.4%22%20ry%3D%225.6%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%2211.2%22%20r%3D%224.4%22%2F%3E%3Cpath%20d%3D%22M5.2%207.8%20L4%203.8%20L8.4%206.3%20Z%22%2F%3E%3Cpath%20d%3D%22M11.2%207.2%20L12%203%20L14.8%206.7%20Z%22%2F%3E%3Cellipse%20cx%3D%224.6%22%20cy%3D%2212.2%22%20rx%3D%222.7%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M10.4%2019.2%20l-.5%202.8%20h1.5%20l.3-2.8z%20M15%2019.3%20l-.2%202.7%20h1.5%20l.1-2.7z%22%2F%3E%3Cpath%20d%3D%22M21.4%2012.6%20c2.5%200%203.4%201.8%202.2%202.9%20-0.9.8-2.4.2-2.4-1%22%20fill%3D%22none%22%20stroke%3D%22%23ffc3d3%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Cellipse%20cx%3D%2214.4%22%20cy%3D%2214.6%22%20rx%3D%227.4%22%20ry%3D%225.6%22%2F%3E%3Ccircle%20cx%3D%228.4%22%20cy%3D%2211.2%22%20r%3D%224.4%22%2F%3E%3Cpath%20d%3D%22M5.2%207.8%20L4%203.8%20L8.4%206.3%20Z%22%2F%3E%3Cpath%20d%3D%22M11.2%207.2%20L12%203%20L14.8%206.7%20Z%22%2F%3E%3Cellipse%20cx%3D%224.6%22%20cy%3D%2212.2%22%20rx%3D%222.7%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M10.4%2019.2%20l-.5%202.8%20h1.5%20l.3-2.8z%20M15%2019.3%20l-.2%202.7%20h1.5%20l.1-2.7z%22%2F%3E%3Cpath%20d%3D%22M21.4%2012.6%20c2.5%200%203.4%201.8%202.2%202.9%20-0.9.8-2.4.2-2.4-1%22%20fill%3D%22none%22%20stroke%3D%22%23ffc3d3%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E"),
+      linear-gradient(158deg,rgba(140,58,83,.92) 0%,rgba(110,45,64,.9) 52%,rgba(88,35,51,.93) 100%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.30);
+    border:1px solid rgba(255,150,180,.20);
   }
-  .row[data-bubble="pig"] .bubble::after {
-    content:''; position:absolute; top:.1em; width:.92em; height:.58em; border-radius:50%;
-    background:
-      radial-gradient(circle at 31% 52%, var(--pg-nose) 0 .1em, transparent .13em),
-      radial-gradient(circle at 69% 52%, var(--pg-nose) 0 .1em, transparent .13em),
-      linear-gradient(180deg, var(--pg-snout), var(--pg-snout2));
-    box-shadow:0 .07em .07em rgba(120,40,60,.15);
-    z-index:2; pointer-events:none;
+  [data-theme="dark"] .row[data-bubble="pig"].mine .bubble,
+  [data-theme="forest"] .row[data-bubble="pig"].mine .bubble {
+    border-radius:20px 20px 5px 20px;
   }
-  .row[data-bubble="pig"].mine .bubble::after { right:.72em; left:auto; }
-  .row[data-bubble="pig"]:not(.mine) .bubble::after { left:.72em; right:auto; }
 
-  /* ── ③ 猫猫：薄荷 / 蜜桃，头顶竖两只尖耳 ✓ ─────────────────────
-     耳朵画在头**后面** ✓（`z-index:0` ✓）—— 只露上半截，才像从脑袋上长出来的 ✓；
-     耳窝里点一团粉 ✓，白口鼻 + 粉鼻头是第二版补的 ✓
-     （不加的话尖耳朵 + 黄脸会被看成狐狸 ✗ —— 实测过 ✓）。 */
+  /* ① 猫猫 —— 印花：小猫 ✓ */
   .row[data-bubble="cat"] {
-    --bt-eye:#33251a; --bt-glow:#ffffff;
-    --ct-mine:#c8eedb;  --ct-mine-t:#16443a;
-    --bt-muzzle:rgba(255,255,255,.55); --bt-nose:#d97f8f;
-    --ct-head-mine:#8ccfb2; --ct-ear-mine:#79c09f; --ct-inner-mine:#f3b3c3;
-    --ct-other:#ffe3ca; --ct-other-t:#613319;
-    --ct-head-other:#f2b98c; --ct-ear-other:#e8a877; --ct-inner-other:#f7a9a2;
+    --b-ink:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%233f9078%27%20fill-opacity%3D%27.15%27%20stroke%3D%27%233f9078%27%20stroke-opacity%3D%27.15%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%228.4%22%20r%3D%224.2%22%2F%3E%3Cpath%20d%3D%22M5.9%206.6%20L5.5%202.2%20L9.4%205.1%20Z%22%2F%3E%3Cpath%20d%3D%22M12.6%205%20L15.9%202.6%20L15.7%206.9%20Z%22%2F%3E%3Cpath%20d%3D%22M6.6%2013.2%20c0-2%202.5-3.4%205.8-3.4%203.4%200%206.2%201.6%206.2%204.2%200%202.8-1%204.9-2.2%206.4%20H8.9%20c-1.4-1.6-2.3-4-2.3-7.2%20Z%22%2F%3E%3Cpath%20d%3D%22M18.4%2019.6%20c3.4.4%204.4-1.7%203.4-3.2%20-.9-1.3-2.8-1.1-3.2.3%22%20fill%3D%22none%22%20stroke%3D%22%233f9078%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%228.4%22%20r%3D%224.2%22%2F%3E%3Cpath%20d%3D%22M5.9%206.6%20L5.5%202.2%20L9.4%205.1%20Z%22%2F%3E%3Cpath%20d%3D%22M12.6%205%20L15.9%202.6%20L15.7%206.9%20Z%22%2F%3E%3Cpath%20d%3D%22M6.6%2013.2%20c0-2%202.5-3.4%205.8-3.4%203.4%200%206.2%201.6%206.2%204.2%200%202.8-1%204.9-2.2%206.4%20H8.9%20c-1.4-1.6-2.3-4-2.3-7.2%20Z%22%2F%3E%3Cpath%20d%3D%22M18.4%2019.6%20c3.4.4%204.4-1.7%203.4-3.2%20-.9-1.3-2.8-1.1-3.2.3%22%20fill%3D%22none%22%20stroke%3D%22%233f9078%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+  }
+  .row[data-bubble="cat"].mine .bubble,
+  .row[data-bubble="cat"]:not(.mine) .bubble {
+    background-image:
+      linear-gradient(135deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.10) 26%,rgba(255,255,255,0) 46%),
+      var(--b-ink),
+      linear-gradient(158deg,#f0fcf6 0%,#c6efdc 52%,#ace6cb 100%);
+    background-size:auto,3.8em 3.8em,auto;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.85), 0 2px 5px rgba(90,60,10,.08);
+    border:0;
   }
   .row[data-bubble="cat"].mine .bubble {
-    background:var(--ct-mine); color:var(--ct-mine-t); border:0;
-    border-radius:17px 17px 8px 17px;
-    box-shadow:0 1px 2px rgba(20,80,60,.10);
-    --bt-face:var(--ct-head-mine); --bt-face2:var(--ct-head-mine);
-    --bt-ear:var(--ct-ear-mine); --bt-inner:var(--ct-inner-mine);
+    color:#0e4436; border-radius:20px 20px 5px 20px;
   }
   .row[data-bubble="cat"]:not(.mine) .bubble {
-    background:var(--ct-other); color:var(--ct-other-t);
-    border:1px solid rgba(200,128,84,.28); border-radius:17px 17px 17px 8px;
-    box-shadow:0 1px 2px rgba(90,50,20,.06);
-    --bt-face:var(--ct-head-other); --bt-face2:var(--ct-head-other);
-    --bt-ear:var(--ct-ear-other); --bt-inner:var(--ct-inner-other);
-    --bt-muzzle:rgba(255,255,255,.55); --bt-nose:#c9666f;
+    color:#175243;
+    background-image:
+      linear-gradient(135deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.10) 26%,rgba(255,255,255,0) 46%),
+      url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%233f9078%27%20fill-opacity%3D%27.13%27%20stroke%3D%27%233f9078%27%20stroke-opacity%3D%27.13%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%228.4%22%20r%3D%224.2%22%2F%3E%3Cpath%20d%3D%22M5.9%206.6%20L5.5%202.2%20L9.4%205.1%20Z%22%2F%3E%3Cpath%20d%3D%22M12.6%205%20L15.9%202.6%20L15.7%206.9%20Z%22%2F%3E%3Cpath%20d%3D%22M6.6%2013.2%20c0-2%202.5-3.4%205.8-3.4%203.4%200%206.2%201.6%206.2%204.2%200%202.8-1%204.9-2.2%206.4%20H8.9%20c-1.4-1.6-2.3-4-2.3-7.2%20Z%22%2F%3E%3Cpath%20d%3D%22M18.4%2019.6%20c3.4.4%204.4-1.7%203.4-3.2%20-.9-1.3-2.8-1.1-3.2.3%22%20fill%3D%22none%22%20stroke%3D%22%233f9078%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%228.4%22%20r%3D%224.2%22%2F%3E%3Cpath%20d%3D%22M5.9%206.6%20L5.5%202.2%20L9.4%205.1%20Z%22%2F%3E%3Cpath%20d%3D%22M12.6%205%20L15.9%202.6%20L15.7%206.9%20Z%22%2F%3E%3Cpath%20d%3D%22M6.6%2013.2%20c0-2%202.5-3.4%205.8-3.4%203.4%200%206.2%201.6%206.2%204.2%200%202.8-1%204.9-2.2%206.4%20H8.9%20c-1.4-1.6-2.3-4-2.3-7.2%20Z%22%2F%3E%3Cpath%20d%3D%22M18.4%2019.6%20c3.4.4%204.4-1.7%203.4-3.2%20-.9-1.3-2.8-1.1-3.2.3%22%20fill%3D%22none%22%20stroke%3D%22%233f9078%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E"),
+      linear-gradient(158deg,#f9fefb 0%,#ebfaf3 55%,#dcf6ea 100%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 5px rgba(90,60,10,.06);
+    border:1px solid rgba(96,180,148,.36); border-radius:20px 20px 20px 5px;
   }
-  /* 一只伪元素画两只耳 ✓：底边留出中间那段给脑袋盖住 ✓ */
-  .row[data-bubble="cat"] .bubble::after {
-    content:''; position:absolute; top:-1.24em; width:1.36em; height:.9em;
-    background:
-      radial-gradient(circle at 16% 62%, var(--bt-inner) 0 .14em, transparent .18em),
-      radial-gradient(circle at 84% 62%, var(--bt-inner) 0 .14em, transparent .18em),
-      var(--bt-ear);
-    clip-path:polygon(0% 100%, 14% 0%, 35% 100%, 65% 100%, 86% 0%, 100% 100%);
-    z-index:0; pointer-events:none;
+  [data-theme="dark"] .row[data-bubble="cat"].mine .bubble,
+  [data-theme="dark"] .row[data-bubble="cat"]:not(.mine) .bubble,
+  [data-theme="forest"] .row[data-bubble="cat"].mine .bubble,
+  [data-theme="forest"] .row[data-bubble="cat"]:not(.mine) .bubble {
+    color:#d0f5e7;
+    background-image:
+      linear-gradient(135deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.02) 30%,rgba(255,255,255,0) 50%),
+      url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cg%20fill%3D%27%23bdf0dd%27%20fill-opacity%3D%27.12%27%20stroke%3D%27%23bdf0dd%27%20stroke-opacity%3D%27.12%27%3E%3Cg%20transform%3D%27translate%285%202%29%20rotate%28-12%2012%2012%29%27%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%228.4%22%20r%3D%224.2%22%2F%3E%3Cpath%20d%3D%22M5.9%206.6%20L5.5%202.2%20L9.4%205.1%20Z%22%2F%3E%3Cpath%20d%3D%22M12.6%205%20L15.9%202.6%20L15.7%206.9%20Z%22%2F%3E%3Cpath%20d%3D%22M6.6%2013.2%20c0-2%202.5-3.4%205.8-3.4%203.4%200%206.2%201.6%206.2%204.2%200%202.8-1%204.9-2.2%206.4%20H8.9%20c-1.4-1.6-2.3-4-2.3-7.2%20Z%22%2F%3E%3Cpath%20d%3D%22M18.4%2019.6%20c3.4.4%204.4-1.7%203.4-3.2%20-.9-1.3-2.8-1.1-3.2.3%22%20fill%3D%22none%22%20stroke%3D%22%23bdf0dd%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%27translate%2833%2032%29%20rotate%2811%2012%2012%29%20scale%28.88%29%27%3E%3Ccircle%20cx%3D%229.6%22%20cy%3D%228.4%22%20r%3D%224.2%22%2F%3E%3Cpath%20d%3D%22M5.9%206.6%20L5.5%202.2%20L9.4%205.1%20Z%22%2F%3E%3Cpath%20d%3D%22M12.6%205%20L15.9%202.6%20L15.7%206.9%20Z%22%2F%3E%3Cpath%20d%3D%22M6.6%2013.2%20c0-2%202.5-3.4%205.8-3.4%203.4%200%206.2%201.6%206.2%204.2%200%202.8-1%204.9-2.2%206.4%20H8.9%20c-1.4-1.6-2.3-4-2.3-7.2%20Z%22%2F%3E%3Cpath%20d%3D%22M18.4%2019.6%20c3.4.4%204.4-1.7%203.4-3.2%20-.9-1.3-2.8-1.1-3.2.3%22%20fill%3D%22none%22%20stroke%3D%22%23bdf0dd%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E"),
+      linear-gradient(158deg,rgba(31,101,78,.92) 0%,rgba(25,82,64,.9) 52%,rgba(20,67,52,.93) 100%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.30);
+    border:1px solid rgba(120,220,185,.20);
   }
-  .row[data-bubble="cat"].mine .bubble::after { right:.5em; left:auto; }
-  .row[data-bubble="cat"]:not(.mine) .bubble::after { left:.5em; right:auto; }
-
-  /* ── 深色两套主题：同色相压暗、字提亮 ✓（浅黄浅粉贴墨黑会"发荧光" ✗）── */
-  [data-theme="dark"] .row[data-bubble="duck"],
-  [data-theme="forest"] .row[data-bubble="duck"] {
-    --bt-face:#d9a93a; --bt-face2:#c8971f; --bt-eye:#2c1e02; --bt-glow:#f6d97e;
-    --bt-bill:#d29a2e; --bt-bill2:#c58c22;
-    --dk-mine:rgba(205,162,55,.32);  --dk-mine-t:#ffeab4;
-    --dk-other:rgba(205,162,55,.17); --dk-other-t:#f6e7bd;
-  }
-  [data-theme="dark"] .row[data-bubble="pig"],
-  [data-theme="forest"] .row[data-bubble="pig"] {
-    --bt-face:#b96d80; --bt-face2:#a95b70; --bt-eye:#2b0b12; --bt-glow:#d894a6;
-    --bt-ear:#b46a7d; --pg-snout:#c06a80; --pg-snout2:#b45f75; --pg-nose:#37101b;
-    --pg-mine:rgba(190,95,120,.33);  --pg-mine-t:#ffdde5;
-    --pg-other:rgba(190,95,120,.17); --pg-other-t:#f7dce4;
-  }
-  [data-theme="dark"] .row[data-bubble="cat"],
-  [data-theme="forest"] .row[data-bubble="cat"] {
-    --bt-eye:#122a22; --bt-glow:rgba(255,255,255,.75);
-    --ct-mine:rgba(64,155,125,.34);  --ct-mine-t:#d5f3e7;
-    --ct-other:rgba(190,118,74,.30); --ct-other-t:#ffe1cc;
-    --ct-head-mine:#3c8a70; --ct-ear-mine:#357c64; --ct-inner-mine:#b4657c;
-    --ct-head-other:#9a5c38; --ct-ear-other:#8d5232; --ct-inner-other:#c47b6f;
-    --bt-muzzle:rgba(255,255,255,.20); --bt-nose:#e0a2a6;
+  [data-theme="dark"] .row[data-bubble="cat"].mine .bubble,
+  [data-theme="forest"] .row[data-bubble="cat"].mine .bubble {
+    border-radius:20px 20px 5px 20px;
   }
 
-  /* **图片 / 文件 / 语音那种整块气泡不带脑袋** ✓ —— 里面没有"一句话" ✓，
-     硬贴一张脸只会戳在照片边上 ✓（和 `.bubble.media` 原来"不给底色"一个道理 ✓）。 */
-  .row[data-bubble]:not([data-bubble="plain"]) .bubble.media { border-radius:12px !important; }
-  .row[data-bubble]:not([data-bubble="plain"]) .bubble.media::before,
-  .row[data-bubble]:not([data-bubble="plain"]) .bubble.media::after { display:none; }
-
+  /* **图片 / 文件 / 语音那种整块气泡不带印花、也不带那圈柔光** ✓ */
+  .row[data-bubble]:not([data-bubble="plain"]) .bubble.media { border-radius:12px !important;
+    box-shadow:none !important; }
   .row:not(.mine):not(.agent) .bubble { border-bottom-left-radius:4px; }
   .time { font-size:11px; color:var(--muted); margin-top:2px; padding:0 4px; }
   .row.mine .time { text-align:right; }
@@ -1404,7 +1367,7 @@
                                   background:var(--p-accent);
                                   box-shadow:inset 0 0 0 3px var(--p-panel); }
   /* ── 气泡选择（2026-10-27）────────────────────────────────────────────
-     四张卡，每张一个**迷你聊天** ✓（一问一答 + 两道动物器官 ✓）。
+     四张卡，每张一个**迷你聊天** ✓（一问一答 + 两团印花气泡 ✓）。
      ⚠️ 卡里的 `stage` 是一个**假 `html`** ✓ —— 只挂 `data-theme` ✓；
         气泡的 `data-bubble` 挂在**预览的每一行**上 ✓（真界面也是这么挂的 ✓）。
         所以里面那两团气泡走的**就是主界面那几条真规则** ✓（`.row[data-bubble=…]` ✓）。
@@ -1441,7 +1404,8 @@
   #bubbleSet .bcard .tocardot { border-color:var(--line); }
   #bubbleSet .bcard.on .tocardot { border-color:var(--accent); background:var(--accent);
                                    box-shadow:inset 0 0 0 3px var(--panel); }
-  /* ⚠️ 裁切挂在**卡片里这一层** ✓ —— 挂在气泡上会把探出来的脑袋切平 ✗（实测 ✓）。 */
+  /* ⚠️ 裁切挂在**卡片里这一层** ✓ —— 气泡本身不再往外探了 ✓，
+     留着是防卡片圆角把气泡的柔光/阴影切掉 ✓。 */
   #bubbleSet .tprev { padding:12px 14px 0; background:var(--t-bg); overflow:hidden; }
   /* 假 html 自己不给底色（卡已经给了 ✓）—— 它只当"属性开关"用 ✓ */
   #bubbleSet .bstage { display:flex; flex-direction:column; gap:12px;
@@ -1469,12 +1433,13 @@
                --bubble-mine-bg:var(--t-accent-bg); }
   #bubbleSet .brow .bubble { color:var(--t-text); }
   #bubbleSet .brow.mine .bubble { color:var(--t-text); }
-  /* ⚠️ 预览这边**不用再抄一遍器官尺寸**了 ✓ —— 皮肤全用 `em` ✓，
-     气泡自己的 `font-size`（12px）就是标尺 ✓，脑袋自动小一号 ✓。
-     只剩一条要补：上面 `#bubbleSet .brow .bubble` 是 **ID 选择器** ✓，
-     它那条 `padding:7px 10px` 会压过皮肤的 `padding-top:1.02em` ✗ ——
-     不补的话预览里的嘴/鼻会戳在字上 ✓（实验室里见过 ✓）。 */
-  #bubbleSet .row[data-bubble]:not([data-bubble="plain"]) .bubble { padding-top:1.02em; }
+  /* ⚠️ 预览这里**不用再抄一遍尺寸**了 ✓ —— 印花布的底纹同样是 `em` 标尺 ✓
+     （`background-size:3.8em 3.8em` ✓）：气泡自己的 `font-size`（预览 12px / 群聊 15px ✓）
+     就是标尺 ✓，预览自动小一号 ✓。
+     ⚠️ 第三版的印花**不占内部空间** ✓ —— 所以这里**没有**任何 `padding` 补丁 ✗
+     （第二版的小脑袋是伪元素探出去的 ✓，才需要一条 ID 级 `padding-top` ✓）。
+     以后哪款皮肤要是再往气泡"里"塞东西 ✓，预览这边得用 ID 选择器补一遍 ✓：
+     上面 `#bubbleSet .brow .bubble` 的 `padding:7px 10px` 会压过 `.row[…] .bubble` ✗。 */
   #themeSet .thint, #bubbleSet .thint {
     color:var(--muted); font-size:12.5px; line-height:1.6;
     text-align:center; margin:2px 8px 18px; }

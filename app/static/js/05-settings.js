@@ -645,7 +645,7 @@
     hint.className = 'thint';
     hint.textContent = isAgent
       ? '管家所有消息的气泡。你们俩谁都能改，改完对方那边也会跟着变。'
-      : '选一款，群里其他人看到的、你自己看到的就是它。底色和字体跟着「主题」走。';
+      : '选一款，群里其他人看到的、你自己看到的就是它。深色主题下会自动压暗。';
     body.appendChild(hint);
 
     BUBBLES.forEach(b => {
@@ -656,7 +656,7 @@
       card.setAttribute('aria-pressed', b.id === cur ? 'true' : 'false');
       card.setAttribute('style', _curThemeVars());
 
-      // 迷你聊天：两团气泡（各自带动物形态 ✓）+ 一只小头像 + 标题 ✓
+      // 迷你聊天：两团气泡（印着各自的小动物 ✓）+ 一只小头像 + 标题 ✓
       const prev = document.createElement('div');
       prev.className = 'tprev';
       // ⚠️ 主题那层还是要一个假 `data-theme` ✓ —— 深色那套规则靠它命中 ✓。

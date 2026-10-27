@@ -205,9 +205,9 @@
   //    这里只留名字和一句话 ✓，两边各写一份形状必对不上 ✓。
   const BUBBLES = [
     { id: 'plain', name: '默认', desc: '清清爽爽，跟着主题走' },
-    { id: 'duck',  name: '鸭鸭',  desc: '鹅黄的小鸭，扒着气泡上沿往外看' },
-    { id: 'pig',   name: '猪猪',  desc: '樱粉的小猪，耳朵和鼻子顶在气泡边上' },
-    { id: 'cat',   name: '猫猫',  desc: '薄荷色的猫，两只耳朵从气泡顶上冒出来' },
+    { id: 'duck',  name: '鸭鸭',  desc: '鹅黄印花布，一群小鸭子在走' },
+    { id: 'pig',   name: '猪猪',  desc: '樱粉印花布，小猪圆滚滚' },
+    { id: 'cat',   name: '猫猫',  desc: '薄荷印花布，小猫排排走' },
   ];
   const BUBBLE_DEFAULT = 'plain';
   const bubbleById = (id) => BUBBLES.find(b => b.id === id) || BUBBLES[0];
