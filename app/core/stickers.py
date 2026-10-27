@@ -107,14 +107,18 @@ def meaning(sid: str) -> str:
 def describe_for_agent(sid: str, *, sender_type: str = "user") -> str:
     """写进管家看到的记录里的那一句。
 
-    ⚠️ **编号要给它** ✓ —— 用户定的就是这个：表情有编号，含义是初始的，
-       要结合语境理解 ✓。所有权也写出来 ✓：
-       群友发了管家的表情，管家才知道可以怎么接 ✓。
+    ⚠️ **不把编号写进来** ✗→✓（2026-10-28）—— 编号是**工具层的索引** ✓，
+       留在 `send_sticker` 的枚举里就够了 ✓；写进记录它就会当谈资说出来 ✓
+       （用户原话：「管家把 305 说出来了，这是他区分的方法，但不能说出来」✓）。
+       记录里只写**哪一套·叫什么·初始含义** ✓ —— 判断接不接这些够用 ✓。
+       所有权照样写出来 ✓：群友发了管家的表情，它才知道可以怎么接 ✓。
     """
     s = get(sid)
     if not s:
         return "[表情]（清单里没有这个编号）"
-    text = f"[表情 {sid}｜{label(sid)}｜初始含义：{s.get('meaning') or '未标注'}]"
+    text = f"[表情｜{label(sid)}｜初始含义：{s.get('meaning') or '未标注'}]"
     if sender_type == "user" and s.get("owner") == "butler":
         text += "（群友发了管家的猫猫表情）"
+    elif sender_type == "agent":
+        text += "（你自己发的）"
     return text

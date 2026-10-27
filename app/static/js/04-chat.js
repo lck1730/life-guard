@@ -1078,15 +1078,18 @@
       p.querySelector('#stOk').onclick = closeSheet;
       return;
     }
+    // ⚠️ **管家那一组放最后** ✓（2026-10-28 用户）—— 群友的两套更常用。
+    //    底色按类别固定 ✓（不按位置轮换 ✓），以后加组也不会把颜色挪乱 ✓。
     const cats = (stickerCatalog.categories || []).slice().sort((a, b) =>
-      a.key === 'butler' ? -1 : b.key === 'butler' ? 1 : 0);
+      a.key === 'butler' ? 1 : b.key === 'butler' ? -1 : 0);
+    const ST_TINT = { butler: 'st-g0', doctor: 'st-g1', coder: 'st-g2' };
     let html = '<h3>表情</h3><div class="st-scroll">';
     cats.forEach((c, i) => {
       const items = all.filter(s => s.category === c.key);
       if (!items.length) return;
       // ★ 分组**只靠底色和圆角** ✓，一个字都不写 ✓（2026-10-27 用户：不要那么多字、
       //   不要文字分组 ✓）。颜色按清单顺序轮换 ✓，以后加组也不会挤在一起 ✓。
-      html += `<div class="st-group st-g${i % 3}"><div class="st-grid">` + items.map(s =>
+      html += `<div class="st-group ${ST_TINT[c.key] || 'st-g' + (i % 3)}"><div class="st-grid">` + items.map(s =>
         `<button class="st-item" data-sid="${_esc(s.id)}" aria-label="${_esc(s.name)}">
            <img loading="lazy" src="${stickerImg(s, true)}" alt="">
          </button>`).join('') + '</div></div>';
