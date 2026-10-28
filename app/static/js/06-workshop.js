@@ -1138,6 +1138,11 @@
   const renderClock = () => {
     const box = $('#clockBody');
     if (!box) return;
+    // ⚠️ 重画前**先记住已经打的字** ✓ —— `loadClock()` 回来还会再画一次 ✓，
+    //   直接清空会把「变提醒」带过来的那句话（和用户刚打的字）抹掉 ✓
+    //   （2026-10-28 截图里就是这样：托盘点「变提醒」，输入框是空的 ✓）。
+    const old = box.querySelector('.rm-quick input');
+    const keep = old ? old.value : '';
     box.innerHTML = '';
 
     const q = mkel('div', 'rm-quick');
@@ -1145,7 +1150,7 @@
     inp.type = 'text';
     inp.maxLength = 80;
     inp.placeholder = '要提醒什么？';
-    inp.value = clockPrefill || '';
+    inp.value = clockPrefill || keep || '';
     clockPrefill = '';
     q.appendChild(inp);
 
@@ -1175,6 +1180,7 @@
         });
         sfx('bell'); haptic('soft');
         toast('记下了');
+        inp.value = '';      // 定好之后这次**该清** ✓（renderClock 会保住已有的字 ✓）
         await loadClock();
       } catch (e) { toast(e.message || '没记上'); }
       add.disabled = false;
@@ -1242,6 +1248,12 @@
   const renderLedger = () => {
     const box = $('#ledgerBody');
     if (!box) return;
+    // 和提醒那边同一个坑 ✓：`loadLedger()` 回来会再画一次 ✓，
+    // 重画前先把**已经填的金额和备注**留住 ✓（不然「记一笔」带过来的话会消失 ✓）。
+    const oldAmt = box.querySelector('.lg-amt input');
+    const oldNote = box.querySelector('.lg-note');
+    const keepAmt = oldAmt ? oldAmt.value : '';
+    const keepNote = oldNote ? oldNote.value : '';
     box.innerHTML = '';
 
     // ① 本月小结：**只数列表里这些** ✓（limit 300 ✓，正常够用 ✓；
@@ -1278,6 +1290,7 @@
     amtInp.type = 'text';
     amtInp.inputMode = 'decimal';
     amtInp.placeholder = '0.00';
+    amtInp.value = keepAmt;
     amtRow.appendChild(amtInp);
     q.appendChild(amtRow);
 
@@ -1298,7 +1311,7 @@
     note.type = 'text';
     note.maxLength = 80;
     note.placeholder = '买了什么';
-    note.value = ledgerPrefill || '';
+    note.value = ledgerPrefill || keepNote || '';
     ledgerPrefill = '';
     q.appendChild(note);
 
@@ -1318,6 +1331,7 @@
         });
         sfx('paper'); haptic('soft');
         toast('记上了');
+        amtInp.value = ''; note.value = '';   // 记上之后这次**该清** ✓
         await loadLedger();
       } catch (e) { toast(e.message || '没记上'); }
       add.disabled = false;
