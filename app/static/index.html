@@ -329,6 +329,75 @@
   <div class="cpwrap" id="compWrap"></div>
 </div>
 
+<!-- ★ 2026-10-28：**今日明信片**（纸上小屋 · IA「点窗 → 今日」✓）——
+     从屋里那扇窗推进来 ✓，是一张从本子上撕下来的纸片 ✓：
+     猫爪邮票 / 当天邮戳 / 管家三行 / 一个问题 / 两个动作 ✓。
+
+     ⚠️ 数据**只从眼前这屏聊天里数** ✓（没有新接口 ✓ —— 提醒/账本还只有内部票 ✓），
+        所以措辞用「我数到」✓，不假装是全天全量 ✓（见 06-workshop.js 里那段 ✓）。
+     ⚠️ 这又是一屏整屏子页 ✓ → `_OTHER_SCREENS` 和 `__goBack` **两处都要有** ✓
+        （见 `android-back-key-only-knows-settings` ✓）；z-index 23 ✓
+        （比工坊 22 高一档 ✓、比组件页 26 低一档 ✓）。
+     ⚠️ 页面上**没有返回箭头** ✓（和主题/背景那些屏一个规矩 ✓）：系统返回 ✓。
+     ⚠️ 这里**不写一句"这是你今天的明信片"** ✗ —— 用户定的「不要介绍性文字」✓：
+        页面自己说明功能的那一句不要 ✓；邮戳上的日期 / 管家写的话是**内容** ✓。 -->
+<div class="screen ascreen" id="today">
+  <div class="pc-scene" aria-hidden="true"></div>
+  <div class="pc-stage">
+    <article class="pc-card" id="pcCard" aria-label="今日明信片">
+      <div class="pc-sheet">
+        <!-- 邮票：撕齿边 + 猫爪 ✓（纯装饰 ✓） -->
+        <div class="pc-stamp" aria-hidden="true">
+          <svg viewBox="0 0 56 62" width="100%" height="100%">
+            <rect x=".7" y=".7" width="54.6" height="60.6" rx="1.4"
+                  fill="#fbf3e2" stroke="#c9a77c" stroke-width="1.4"
+                  stroke-dasharray="2.2 2.2"/>
+            <rect x="6" y="6" width="44" height="46" fill="#c05a4a"/>
+            <g fill="#fbefd8">
+              <ellipse cx="28" cy="36.5" rx="8.2" ry="6.6"/>
+              <circle cx="18.4" cy="26.6" r="3.1"/>
+              <circle cx="24.2" cy="23.2" r="3.3"/>
+              <circle cx="31.8" cy="23.2" r="3.3"/>
+              <circle cx="37.6" cy="26.6" r="3.1"/>
+            </g>
+            <text x="28" y="58.4" text-anchor="middle" font-size="6.4"
+                  fill="#a8845c" font-family="Georgia,serif">80</text>
+          </svg>
+        </div>
+        <!-- 邮戳：两个圈 + 三道波纹 ✓；日期由 JS 填进圈里 ✓（`#pcDate` ✓） -->
+        <div class="pc-mark" aria-hidden="true">
+          <svg viewBox="0 0 118 74" width="100%" height="100%">
+            <g fill="none" stroke="currentColor" stroke-linecap="round">
+              <circle cx="33" cy="37" r="27" stroke-width="1.5"/>
+              <circle cx="33" cy="37" r="21.5" stroke-width="1"/>
+              <path d="M66 26c6-3 12 3 18 0s12 3 18 0 12 3 16 0" stroke-width="1.4"/>
+              <path d="M66 36c6-3 12 3 18 0s12 3 18 0 12 3 16 0" stroke-width="1.4"/>
+              <path d="M66 46c6-3 12 3 18 0s12 3 18 0" stroke-width="1.4"/>
+            </g>
+          </svg>
+          <span class="pc-date" id="pcDate"></span>
+        </div>
+
+        <div class="pc-body">
+          <p class="pc-line" id="pcL1"></p>
+          <p class="pc-line" id="pcL2"></p>
+          <p class="pc-line" id="pcL3"></p>
+          <div class="pc-rule" aria-hidden="true"></div>
+          <div class="pc-q">
+            <div class="pc-qlab">今晚问你们一个</div>
+            <p class="pc-ask" id="pcAsk"></p>
+          </div>
+        </div>
+
+        <div class="pc-acts">
+          <button type="button" class="pc-act" id="pcWrite">写一句</button>
+          <button type="button" class="pc-act" id="pcBook">记一笔</button>
+        </div>
+      </div>
+    </article>
+  </div>
+</div>
+
 <!-- 设置 -->
 <div class="screen" id="settings">
   <header class="sub">

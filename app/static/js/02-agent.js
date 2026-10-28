@@ -505,6 +505,9 @@
     if ($('#me').classList.contains('on')) { closeMe(); return; }
     if ($('#peer').classList.contains('on')) { closePeer(); return; }
     if ($('#compView').classList.contains('on')) { closeComp(); return; }
+    // ★ 2026-10-28：今日明信片（z 23 ✓）—— 从屋里点窗推进来的 ✓，
+    //   压在工坊(22)上面 ✓、在组件页(26)下面 ✓ → 照铁律插在这两行之间 ✓。
+    if ($('#today').classList.contains('on')) { closeToday(); return; }
     if ($('#workshop').classList.contains('on')) { closeWorkshop(); return; }
     if ($('#agentEdit').classList.contains('on')) { closeAgentEdit(); return; }
     if ($('#agent').classList.contains('on')) { closeAgentSettings(); return; }

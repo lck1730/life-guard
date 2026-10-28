@@ -792,6 +792,11 @@
       //   热区比那排书放大一圈 ✓ —— 书上只有 ~59×58 CSS px ✓，照原样太难点准 ✓。
       '<rect class="ws-obj" data-slug="bookkeeping-panel" x="580" y="360" ' +
         'width="112" height="110" fill="transparent" style="cursor:pointer"/>' +
+      // ★ 2026-10-28：**那扇窗** ✓ —— 点它 = 今日明信片 ✓（IA「点窗 → 今日」✓）。
+      //   窗框 58..552 × 118..762 ✓，热区往里收一圈 ✓（别压到窗台外 ✓）。
+      //   和账本那排书（x≥580）、闹钟（708,296）、画框（632,538）都不挨着 ✓。
+      '<rect class="ws-window" x="96" y="156" width="420" height="548" ' +
+        'fill="transparent" style="cursor:pointer"/>' +
       // 二狗 ✓ —— 点它回主群聊 ✓
       flatCatSvg() +
       // 来找它玩的小蝴蝶 ✓ —— 画在猫上面 ✓，停在鼻尖时不会被挡住 ✓
@@ -864,6 +869,16 @@
     // ★ 点猫 → 先让它蹦一下（爱心 + 瞪眼 ✓），再回主群聊 ✓
     //   ⚠️ 不能直接 closeWorkshop ✗ —— 那一下动作就看不见了 ✓。
     //   ⚠️ 连点两下要挡住 ✗ —— 会 pop 两次 ✓，把主群聊也退掉 ✓。
+    // ★ 点窗 → **今日明信片** ✓（2026-10-28 ✓，IA「点窗 → 今日」✓）。
+    //   这一屏是推在屋子**上面**的 ✓（z 23 > 22 ✓）—— 退回来还是这间屋 ✓。
+    const win = svg.querySelector('.ws-window');
+    if (win) {
+      win.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        openToday();
+      });
+    }
+
     const cat = svg.querySelector('.ws-cat');
     if (cat) {
       let leaving = false;
@@ -893,6 +908,149 @@
       paintCanvas();
     }
   };
+
+  // ── 今日明信片（2026-10-28，纸上小屋 · IA「点窗 → 今日」）─────────────
+  //
+  // 从屋里那扇窗推进来的一张**撕边纸片** ✓：猫爪邮票 / 当天邮戳 /
+  // 管家三行 / 一个问题 / 两个动作 ✓（见 docs/ui-redesign-2026-10-28.md 3.3 ✓）。
+  //
+  // ★ **数据只从眼前这屏聊天里数** ✓ —— 提醒/账本还只有内部票 ✓，
+  //   公开接口一个都没有 ✓（`/records/*`、`/reminders/*` 都要内部票 ✓）。
+  //   所以措辞是「我数到」✓，不假装是全天全量 ✓。
+  //   ⚠️ 接上公开接口之后，把 `pcCount` 换掉就行 ✓（下面这些行不用动 ✓）。
+  //
+  // ⚠️ **别另起一个 08-today.js** ✗ —— 整个前端是一个 IIFE ✓，
+  //   它在 `06-workshop.js` 末尾就关掉了 ✓（`07-scene.js` 在外面 ✓）。
+  //   新文件拿不到 `$` / `pushScreen` / `toast` / `openComp` / `wsCanvas` ✓。
+  //   所以这段必须**留在这个 IIFE 里** ✓、在 `window.LifeGuard` 导出之前 ✓。
+
+  const PC_QUESTIONS = [
+    '第一次一起吃饭，吃的是什么？',
+    '今天有哪一分钟，你想再看一遍？',
+    '最近一次一起大笑，是因为什么？',
+    '这周想做、却还没做的一件小事，是什么？',
+    '如果今天能重来一个小时，你想回到哪一段？',
+    '对方今天说的哪句话，你想留下来？',
+    '明天想一起吃什么？',
+    '还记得你们第一次一起出门，是去哪吗？',
+  ];
+
+  /** 今天 0 点（本地 ✓，和 `fmtTime` 一个时区 ✓）。 */
+  const pcDayStart = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  };
+
+  /** 从聊天 DOM 里数今天：条数 / 最早 / 最晚 / 各类媒体 ✓。 */
+  const pcCount = () => {
+    const start = pcDayStart();
+    const out = { n: 0, first: 0, last: 0, photo: 0, sticker: 0, voice: 0, file: 0 };
+    document.querySelectorAll('#msgs .row[data-ts]').forEach(function (r) {
+      const ts = (Number(r.dataset.ts) || 0) * 1000;
+      if (!ts || ts < start) return;
+      out.n++;
+      if (!out.first || ts < out.first) out.first = ts;
+      if (!out.last || ts > out.last) out.last = ts;
+      const b = r.querySelector('.bubble');
+      if (!b) return;
+      if (b.classList.contains('photo')) out.photo++;
+      else if (b.classList.contains('sticker')) out.sticker++;
+      else if (b.classList.contains('voice-note')) out.voice++;
+      else if (b.classList.contains('file-note')) out.file++;
+    });
+    return out;
+  };
+
+  const pcHHMM = (ms) => {
+    const d = new Date(ms);
+    return String(d.getHours()).padStart(2, '0') + ':' +
+           String(d.getMinutes()).padStart(2, '0');
+  };
+
+  /** 三行短句 ✓ —— 不抒情过头 ✓，只说眼前数得到的东西 ✓。 */
+  const pcLines = (s) => {
+    if (!s.n) return ['今天还没有人开口。', '窗台上的光很好。', '我替你们守着纸和笔。'];
+    const L = ['今天，我数到 ' + s.n + ' 张字条。'];
+    if (s.first && s.last && s.first !== s.last)
+      L.push('最早 ' + pcHHMM(s.first) + '，最晚 ' + pcHHMM(s.last) + '。');
+    else if (s.first)
+      L.push('都在 ' + pcHHMM(s.first) + ' 前后。');
+    else
+      L.push('都收在纸上了。');
+    const bits = [];
+    if (s.photo) bits.push(s.photo + ' 张照片');
+    if (s.sticker) bits.push(s.sticker + ' 个表情');
+    if (s.voice) bits.push(s.voice + ' 条语音');
+    if (s.file) bits.push(s.file + ' 份文件');
+    L.push(bits.length ? '夹着 ' + bits.join('、') + '。' : '只有字，没有图。');
+    return L;
+  };
+
+  /** 一天一个问题 ✓ —— 按"第几天"取模 ✓，同一天开几次都是同一句 ✓。 */
+  const pcQuestion = () => {
+    const d = new Date();
+    const seed = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+    return PC_QUESTIONS[seed % PC_QUESTIONS.length];
+  };
+
+  const renderToday = () => {
+    const lines = pcLines(pcCount());
+    ['#pcL1', '#pcL2', '#pcL3'].forEach(function (sel, i) {
+      const el = $(sel);
+      if (el) el.textContent = lines[i] || '';
+    });
+    const q = $('#pcAsk');
+    if (q) q.textContent = pcQuestion();
+    // 邮戳里那两行：月.日 + 周几 ✓（`b`/`i` 是样式钩子 ✓，不是强调语义 ✓）
+    const el = $('#pcDate');
+    if (el) {
+      const d = new Date();
+      el.textContent = '';
+      const b = document.createElement('b');
+      b.textContent = (d.getMonth() + 1) + '.' + d.getDate();
+      const i = document.createElement('i');
+      i.textContent = '周' + '日一二三四五六'[d.getDay()];
+      el.appendChild(b);
+      el.appendChild(i);
+    }
+  };
+
+  const openToday = () => {
+    renderToday();            // ⚠️ 每次开都现数 ✓ —— 字条是刚才才落的 ✓
+    pushScreen('today');
+    _syncStatusBar();         // 纸也是浅色 ✓ → 深色状态栏图标 ✓
+  };
+
+  const closeToday = () => {
+    popScreen('today');
+    setTimeout(_syncStatusBar, 220);   // 等退场收完再按"最上面是谁"报 ✓
+  };
+
+  /** 写一句 → 退回书桌 → 落座回聊天 → 光标在输入框 ✓。 */
+  const pcWrite = () => {
+    closeToday();
+    setTimeout(function () {
+      if ($('#workshop').classList.contains('on')) closeWorkshop();
+      setTimeout(function () {
+        const t = $('#text');
+        if (t) t.focus();
+      }, 260);
+    }, 210);
+  };
+
+  /** 记一笔 → 直接翻到账本那件物 ✓（和点书架上那本同一个出口 ✓）。 */
+  const pcBook = () => {
+    const c = wsCanvas.find(function (x) { return x.slug === 'bookkeeping-panel'; });
+    if (!c) { toast('还没有账本，让管家先做一个'); return; }
+    closeToday();
+    setTimeout(function () {
+      openComp(c.slug, c.title || '记账', (c.spot && c.spot.tint) || '');
+    }, 220);
+  };
+
+  if ($('#pcWrite')) $('#pcWrite').addEventListener('click', pcWrite);
+  if ($('#pcBook')) $('#pcBook').addEventListener('click', pcBook);
 
   // ── 3D 卧室视图（2026-10-15 大升级，M1）──────────────────────────
   // 按需加载 `/static/room3d.js`（925KB three.js ✗ → 不进 app.js ✓，只在用时拉），

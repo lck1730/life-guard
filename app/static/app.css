@@ -2450,3 +2450,162 @@
     filter:drop-shadow(0 1px 1px rgba(70,45,20,.25));
     pointer-events:none;
   }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     纸上小屋 · 今日明信片（2026-10-28）
+     IA：「点窗 → 今日」✓（docs/ui-redesign-2026-10-28.md ✓）。
+
+     它不是"又一个设置页" ✓ —— 是一张**从本子上撕下来的纸片** ✓：
+     撕边靠 `clip-path` ✓、邮戳靠 `multiply` 压在邮票上 ✓、
+     三行字用衬线/楷体（和信簿页眉同一套字 ✓）。
+     ⚠️ 阴影不能写在 `.pc-sheet` 上 ✗ —— `clip-path` 会把 box-shadow 一起剪掉 ✓；
+        所以"影子"挂在外层 `.pc-card` 的 `filter:drop-shadow` ✓（跟着剪出来的形状走 ✓）。
+     ⚠️ 整屏暖色是**故意的** ✓：屋里没有主题切换 ✓，这扇窗也不该跟着变 ✓。
+     ═══════════════════════════════════════════════════════════════════ */
+  #today { z-index:23; background:#e6cfab; overflow:hidden; }
+  #today .pc-scene {
+    position:absolute; inset:0;
+    background:
+      radial-gradient(130% 92% at 50% -8%, #fdf3da 0%, #f2ddba 40%, #e2c79c 72%, #c8a474 100%);
+  }
+  #today .pc-scene::after {
+    content:''; position:absolute; inset:0;
+    background:
+      radial-gradient(100% 66% at 50% 108%, rgba(108,70,28,.20), transparent 60%),
+      radial-gradient(120% 90% at 50% 48%, transparent 52%, rgba(88,58,24,.16) 100%);
+  }
+  #today .pc-stage {
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    padding:calc(20px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+  }
+
+  /* ── 纸片 ─────────────────────────────────────────────────────────── */
+  #today .pc-card {
+    width:min(332px, 86vw); transform:rotate(-1.1deg);
+    filter:drop-shadow(0 18px 26px rgba(78,50,22,.26))
+           drop-shadow(0 2px 4px rgba(78,50,22,.12));
+    animation:pcSettle .54s cubic-bezier(.22,1,.36,1) both;
+  }
+  @keyframes pcSettle {
+    from { opacity:0; transform:translateY(18px) scale(.972) rotate(-2.6deg); }
+    to   { opacity:1; transform:translateY(0) scale(1) rotate(-1.1deg); }
+  }
+  #today .pc-sheet {
+    position:relative; display:flex; flex-direction:column;
+    height:min(500px, 72vh);
+    background:
+      radial-gradient(120% 82% at 18% 0%, #fffdf7 0%, rgba(255,253,247,0) 56%),
+      linear-gradient(168deg, #fcf5e6 0%, #f8eed9 58%, #f2e4cb 100%);
+    /* 撕边：四条边都是一串很浅的起伏 ✓（不是锯齿海报那种 ✗） */
+    clip-path:polygon(
+      0.6% 1.1%, 4% 0.4%, 8% 1.3%, 12% 0.5%, 16% 1.2%, 20% 0.4%,
+      24% 1.4%, 28% 0.5%, 32% 1.1%, 36% 0.3%, 40% 1.3%, 44% 0.5%,
+      48% 1.2%, 52% 0.4%, 56% 1.3%, 60% 0.5%, 64% 1.1%, 68% 0.3%,
+      72% 1.3%, 76% 0.4%, 80% 1.2%, 84% 0.5%, 88% 1.3%, 92% 0.4%,
+      96% 1.1%, 99.4% 0.5%,
+      100% 6%, 99.3% 16%, 100% 27%, 99.4% 38%, 100% 50%,
+      99.3% 61%, 100% 73%, 99.4% 84%, 99.9% 94%,
+      96% 99.6%, 92% 98.8%, 88% 99.7%, 84% 99%, 80% 99.8%, 76% 98.9%,
+      72% 99.7%, 68% 99%, 64% 99.8%, 60% 98.9%, 56% 99.7%, 52% 99%,
+      48% 99.8%, 44% 98.9%, 40% 99.7%, 36% 99%, 32% 99.8%, 28% 98.9%,
+      24% 99.7%, 20% 99%, 16% 99.8%, 12% 98.9%, 8% 99.7%, 4% 98.8%,
+      0.4% 99.6%,
+      0% 92%, 0.7% 82%, 0.1% 71%, 0.8% 60%, 0% 49%,
+      0.7% 38%, 0.1% 27%, 0.8% 16%, 0% 6%);
+  }
+  /* 纸的纤维：两道很淡的纹 ✓，只做质地、不抢字 ✓ */
+  #today .pc-sheet::after {
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:
+      repeating-linear-gradient(92deg,
+        rgba(124,92,50,.020) 0 1px, rgba(124,92,50,0) 1px 4px),
+      repeating-linear-gradient(1deg,
+        rgba(124,92,50,.014) 0 1px, rgba(124,92,50,0) 1px 7px);
+  }
+  /* 竖排的 POST CARD（明信片背面的那行小字 ✓）—— 是装饰，不是说明 ✓ */
+  #today .pc-sheet::before {
+    /* ⚠️ 别放正中 ✗ —— 那正是正文 / 手画线经过的地方 ✓（第一版压上去了 ✓）*/
+    content:'POST CARD'; position:absolute; left:13px; top:18px;
+    writing-mode:vertical-rl;
+    font-family:Georgia,"Times New Roman",serif; font-size:8.5px;
+    letter-spacing:.34em; color:rgba(150,110,65,.42); pointer-events:none;
+  }
+
+  /* ── 邮票 / 邮戳 ──────────────────────────────────────────────────── */
+  #today .pc-stamp {
+    position:absolute; top:16px; right:18px; width:56px; height:62px;
+    transform:rotate(2.2deg);
+    filter:drop-shadow(0 1px 1px rgba(90,60,30,.18));
+  }
+  #today .pc-mark {
+    position:absolute; top:42px; right:8px; width:118px; height:74px;
+    color:#54677a; opacity:.55; mix-blend-mode:multiply;
+    transform:rotate(-8deg); pointer-events:none;
+  }
+  #today .pc-date {
+    position:absolute; left:6px; top:50%; width:54px;
+    transform:translateY(-50%); display:flex; flex-direction:column;
+    align-items:center; gap:1px; line-height:1.05;
+    font-family:Georgia,"Times New Roman",serif;
+  }
+  #today .pc-date b { font-size:11.5px; font-weight:600; letter-spacing:.02em; }
+  #today .pc-date i { font-style:normal; font-size:8.5px; letter-spacing:.10em; }
+
+  /* ── 正文 ─────────────────────────────────────────────────────────── */
+  #today .pc-body {
+    position:relative; flex:1; min-height:0;
+    padding:126px 24px 6px 28px;
+  }
+  #today .pc-line {
+    margin:0; color:#4a3624;
+    font-family:"Kaiti SC","STKaiti","KaiTi","AR PL UKai CN",
+                "Noto Serif CJK SC","Songti SC",serif;
+    font-size:15px; line-height:1.95; letter-spacing:.02em;
+  }
+  /* 手画的一道线 ✓（和信簿页眉那条是同一支笔 ✓） */
+  #today .pc-rule {
+    height:4px; margin:16px 0 14px; opacity:.5; pointer-events:none;
+    background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2714%27%20height%3D%274%27%20viewBox%3D%270%200%2014%204%27%3E%3Cpath%20d%3D%27M0%203%20Q3.5%20.6%207%203%20T14%203%27%20fill%3D%27none%27%20stroke%3D%27%23b07a4a%27%20stroke-width%3D%271.2%27%20stroke-linecap%3D%27round%27%2F%3E%3C%2Fsvg%3E") repeat-x left center / 14px 4px;
+  }
+  #today .pc-qlab {
+    color:#a1866a; font-size:10.5px; letter-spacing:.22em; margin:0 0 7px;
+    font-family:"Kaiti SC","STKaiti","KaiTi","AR PL UKai CN",
+                "Noto Serif CJK SC","Songti SC",serif;
+  }
+  #today .pc-ask {
+    margin:0; color:#3f2d1c; text-wrap:balance;
+    font-family:"Kaiti SC","STKaiti","KaiTi","AR PL UKai CN",
+                "Noto Serif CJK SC","Songti SC",serif;
+    font-size:17px; line-height:1.62; letter-spacing:.02em;
+  }
+
+  /* ── 两个动作：两张小纸签 ✓（不是 App 那种通栏按钮 ✗）────────────── */
+  #today .pc-acts {
+    position:relative; display:flex; justify-content:center; gap:12px;
+    padding:0 22px 26px;
+  }
+  #today .pc-act {
+    appearance:none; -webkit-appearance:none;
+    border:1px solid rgba(169,127,80,.55); border-radius:2px;
+    background:linear-gradient(180deg, rgba(255,252,243,.92), rgba(246,233,210,.72));
+    color:#7c5230; font-family:inherit; font-size:14px;
+    letter-spacing:.14em; padding:10px 18px 10px 20px;
+    box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 2px 4px rgba(100,70,35,.10);
+    transform:rotate(-.9deg); cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #today #pcBook { transform:rotate(1deg); }
+  #today .pc-act:active {
+    transform:translateY(1px) rotate(0);
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 1px 2px rgba(100,70,35,.16);
+  }
+  #today .pc-act:focus-visible { outline:2px solid #b25241; outline-offset:2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #today .pc-card { animation:none; }
+  }
+  /* 矮一点的屏幕：先把正文上边距收一点 ✓（别让字贴到邮戳上 ✓） */
+  @media (max-height:700px) {
+    #today .pc-sheet { height:min(500px, 78vh); }
+    #today .pc-body { padding-top:116px; }
+  }

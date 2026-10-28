@@ -1986,6 +1986,9 @@
   const _OTHER_SCREENS = [
     '#settings', '#bgSet', '#themeSet', '#bubbleSet', '#me', '#meAccount', '#space',
     '#peer', '#selfIntro', '#agent', '#agentEdit', '#login', '#init',
+    // ★ 2026-10-28：今日明信片 ✓ —— 整屏子页 ✓，报给原生一律 `'settings'` ✓
+    //   （只有 `#chat` 报 `'chat'` ✓）；它在 `__goBack` 里的位置见 z 23 ✓。
+    '#today',
   ];
 
   const _whichScreen = () => {
