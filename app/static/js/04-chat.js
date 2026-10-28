@@ -129,6 +129,16 @@
     probe.src = url;
   };
 
+  // ★ 2026-10-28：气泡上面那行名字不显示了 ✓ —— 名字挂到**头像**上 ✓
+  //   （`title` 桌面端悬停看得到 ✓，`aria-label` 读屏器念得出来 ✓）。
+  //   ⚠️ 只写属性、不画任何字 ✗（用户：「上面的介绍文字去掉」✓）。
+  const nameTag = (av, name) => {
+    const s = String(name || '').trim();
+    if (!av || !s) return;
+    av.title = s;
+    av.setAttribute('aria-label', s);
+  };
+
   // 管家的头像：**群自己那张优先** ✓（`group.agent_avatar` = `avatars/g7.png` ✓），
   // 没配才退回服务端那张全局的 `/ui/avatar.png` ✓。
   let agentAvatarUrl = null;      // null=还没探测；false=没有；字符串=可用
@@ -337,8 +347,12 @@
       };
     }
     const w = document.createElement('div'); w.className = 'wrap2';
-    const who = document.createElement('div'); who.className = 'who';
-    who.textContent = dispName(m);        // ★ 备注在这里生效 ✓（显示层唯一出口 ✓）
+    // ★ 2026-10-28：**名字那行不建了** ✓（用户：「我的气泡，管家气泡，上面的介绍
+    //   文字去掉」✓）。原来是一个 `.who` 节点 ✓ —— 用 CSS `display:none` 藏不掉
+    //   那个"空行"✗（`.wrap2` 是块级流 ✓，子盒子照样各占一行 ✓ → 头像和气泡之间
+    //   留一截空白 ✓），所以他看到的还是"没去掉" ✓。
+    //   名字改挂到头像上 ✓：摸得到、看不见 ✓（测试选条目 / 读屏器还认得出是谁 ✓）。
+    nameTag(av, dispName(m));            // ★ 备注在这里生效 ✓（显示层唯一出口 ✓）
     const b = document.createElement('div'); b.className = 'bubble';
     // ⚠️ **引用条不能在正文之前挂** ✗→✓（2026-10-07 深夜，用户报的：
     //    「虽然引用了吗，但是聊天界面看不出来」✓）。
@@ -411,7 +425,7 @@
     // ★ **正文画完了才挂引用条** ✓（见上面那段 ✓）—— 插到最前面 ✓。
     if (m.quote) b.insertBefore(buildQuoteEl(m.quote), b.firstChild);
     const t = document.createElement('div'); t.className = 'time'; t.textContent = fmtTime(m.created_at);
-    w.append(who, b, t); row.append(av, w);
+    w.append(b, t); row.append(av, w);
     // ★ 气泡（2026-10-27）：**这一行是谁的，就用谁现在选的那款** ✓
     //   （按成员表查 ✓，消息里那份只是成员表还没到时的兜底 ✓，见 `bubbleForMsg` ✓）。
     setRowBubble(row, m);
@@ -604,7 +618,7 @@
     if (!streamEl) {
       const row = document.createElement('div');
       row.className = 'row agent';
-      row.innerHTML = '<div class="av">管</div><div class="wrap2"><div class="who"></div><div class="bubble"></div></div>';
+      row.innerHTML = '<div class="av">管</div><div class="wrap2"><div class="bubble"></div></div>';
       // 这一行原来**硬编码了「管」** ✗ —— 别的气泡都走 applyAgentAvatar ✓，
       // 只有它没有 ✓ → 管家一开口，头像会从图**跳回**一个「管」字 ✗。
       const sav = row.querySelector('.av');
@@ -614,7 +628,7 @@
         if (pressFired) return;
         openAgentSettings();
       };
-      row.querySelector('.who').textContent = agentName();
+      nameTag(sav, agentName());   // 2026-10-28：不画那行字了 ✓，名字挂头像上 ✓
       // ★ 流式那一行也要穿管家的气泡 ✓（它有 `data-bubble-by` ✓，落库后清掉、
       //   由真正那条消息接着画 ✓；这中间换气泡也会被 `repaintBubbles` 重贴 ✓）。
       row.dataset.bubble = normBubble(group && group.agent_bubble);
@@ -1239,6 +1253,7 @@
     av.className = 'av';
     // 自己发的那条（先上屏、后上传 ✓）—— 用**自己的头像** ✓，没有才退回首字 ✓
     paintAvatar(av, me && me.avatar, (me && me.nickname) || '我');
+    nameTag(av, (me && me.nickname) || '');   // 2026-10-28：名字挂头像上 ✓
     av.onclick = (ev) => { ev.stopPropagation(); if (!pressFired) openMe(); };
     const w = document.createElement('div'); w.className = 'wrap2';
     const b = document.createElement('div'); b.className = 'bubble';
