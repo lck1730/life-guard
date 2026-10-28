@@ -325,6 +325,45 @@
 
   applyTheme(localStorage.getItem('lg_theme') || THEME_DEFAULT);
 
+  // ★ 2026-10-28：**昼夜光线**（纸上小屋 · P0）✓
+  //
+  // 信纸按**本机时间**微微变暖 / 变冷 ✓ —— 不是反色，也不是滤镜：
+  // 只换 CSS 里 `--paper*` / `--light-*` 几个值 ✓，正文颜色一个都不动 ✓
+  // （对比度靠 `--text` 撑住 ✓，不能交给"感觉" ✓）。
+  //
+  //   晨 6–11 dawn / 昼 11–17 day / 昏 17–20 dusk / 夜 20–6 night
+  //
+  // ⚠️ **不走服务端** ✗：异地两个人各看各的窗外 ✓（各按自己手机的钟）✓。
+  // ⚠️ 只挂一个 5 分钟的小定时器 ✓：要跨过整点才换 ✓，不必每分钟算 ✓。
+  //    页面在后台会被浏览器节流 ✓，回来最多晚 5 分钟 ✓ —— 看不出来 ✓。
+  const lightPeriod = (d) => {
+    const h = (d || new Date()).getHours();
+    if (h >= 6 && h < 11) return 'dawn';
+    if (h >= 11 && h < 17) return 'day';
+    if (h >= 17 && h < 20) return 'dusk';
+    return 'night';
+  };
+  const applyLight = () => {
+    const p = lightPeriod();
+    const el = document.documentElement;
+    if (el.dataset.light !== p) el.dataset.light = p;
+    return p;
+  };
+  applyLight();
+  try { setInterval(applyLight, 5 * 60 * 1000); } catch (e) {}
+  // 调试 / 截图钩子（和 `__openArch` 一样）：
+  window.__light = applyLight;
+
+  // 二狗在纸角：点一下蹦一下（P0 只有这个反应；长按开管家面板以后接）
+  const ergouEl = document.getElementById('ergou');
+  if (ergouEl) {
+    ergouEl.addEventListener('click', () => {
+      if (ergouEl.classList.contains('hop')) return;   // 蹦到一半不叠加
+      ergouEl.classList.add('hop');
+      setTimeout(() => ergouEl.classList.remove('hop'), 640);
+    });
+  }
+
   const explain = (data, status) => {
     if (!data) return '请求失败 ' + status;
     if (typeof data === 'string') return data;

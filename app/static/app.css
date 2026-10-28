@@ -2007,3 +2007,208 @@
   @media (prefers-reduced-motion: reduce) {
     .ascreen .btn-save:active { transform:none; }
   }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     纸上小屋 · P0（2026-10-28）
+     聊天 = 书桌上摊开的一页信纸。
+
+     规矩（和这份文件其它地方一致）：
+       · 只换“表面”，不动任何尺寸：气泡、头像、顶栏 40px、输入框 42px 全都不改。
+       · 新样式全部挂在 `#chat` 下，别的屏一个字都不碰。
+       · **用户自己设过聊天背景时（`.has-bg`）整套让路** ——
+         那张图是他们的，纸不能盖上去。
+       · 纸纹 / 横线 / 红线都是**背景层**，不参与布局、不吃点击。
+       · 昼夜光线只动 `--paper*` 几个值 + 一层暖光，正文颜色不动。
+
+     ⚠️ 这是追加在文件末尾的一段 —— 级联上它赢，所以只写“要改的那几条”，
+        没有重抄原来的规则。
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  /* ── 纸的颜色（三套主题各一份）─────────────────────────────────────── */
+  :root[data-theme="cream"], :root[data-theme="light"] {
+    --paper:#fbf3e3;          /* 信纸底 */
+    --paper-2:#f4e8d2;        /* 笔盘 / 次级纸 */
+    --paper-slip:#fffdf7;     /* 输入框那张小纸条 */
+    --paper-edge:#e6d7be;     /* 纸边、分隔 */
+    --paper-rule:rgba(180,150,110,.20);    /* 横线：很淡，只提示“这是纸” */
+    --paper-margin:rgba(196,106,84,.28);   /* 左侧红线 */
+    --paper-grain:rgba(120,85,40,.05);
+    --light-glow:rgba(255,214,150,.16);    /* 光源 */
+    --light-wash:rgba(255,244,224,0);      /* 整页罩色 */
+  }
+  :root[data-theme="dark"] {
+    --paper:#191619;          /* 夜灯：暖黑，不是冷蓝黑 */
+    --paper-2:#211d21;
+    --paper-slip:#241f24;
+    --paper-edge:#342c31;
+    --paper-rule:rgba(214,178,132,.10);
+    --paper-margin:rgba(214,112,92,.20);
+    --paper-grain:rgba(255,220,180,.03);
+    --light-glow:rgba(242,200,121,.10);
+    --light-wash:rgba(0,0,0,0);
+  }
+  :root[data-theme="forest"] {
+    --paper:#10201a;
+    --paper-2:#16281f;
+    --paper-slip:#1a2e23;
+    --paper-edge:#2a4032;
+    --paper-rule:rgba(190,214,172,.08);
+    --paper-margin:rgba(214,112,92,.18);
+    --paper-grain:rgba(220,240,200,.025);
+    --light-glow:rgba(242,200,121,.08);
+    --light-wash:rgba(0,0,0,0);
+  }
+
+  /* ── 昼夜光线（`data-light` 由 01-core.js 按本机时间挂上去）─────────
+     晨 6–11 / 昼 11–17 / 昏 17–20 / 夜 20–6。
+     ⚠️ 只微微变暖变冷：正文对比度靠 `--text` 撑住，这里不碰它。 */
+  :root[data-theme="cream"][data-light="dawn"],
+  :root[data-theme="light"][data-light="dawn"] {
+    --paper:#fdf3e1; --light-glow:rgba(255,186,120,.20);
+    --light-wash:rgba(255,196,150,.035);
+  }
+  :root[data-theme="cream"][data-light="day"],
+  :root[data-theme="light"][data-light="day"] {
+    --paper:#fbf3e3; --light-glow:rgba(255,228,176,.14);
+    --light-wash:rgba(255,255,255,0);
+  }
+  :root[data-theme="cream"][data-light="dusk"],
+  :root[data-theme="light"][data-light="dusk"] {
+    --paper:#f9edda; --light-glow:rgba(240,146,78,.18);
+    --light-wash:rgba(208,116,64,.045);
+  }
+  :root[data-theme="cream"][data-light="night"],
+  :root[data-theme="light"][data-light="night"] {
+    --paper:#f4e7d0; --light-glow:rgba(242,196,118,.16);
+    --light-wash:rgba(96,70,42,.05);
+  }
+  :root[data-theme="dark"][data-light="night"] {
+    --paper:#191619; --light-glow:rgba(242,200,121,.14);
+  }
+  :root[data-theme="dark"][data-light="day"] {
+    --paper:#1b181b; --light-glow:rgba(255,224,170,.07);
+  }
+  :root[data-theme="forest"][data-light="night"] {
+    --paper:#10201a; --light-glow:rgba(242,200,121,.11);
+  }
+
+  /* ── 纸面本身 ─────────────────────────────────────────────────────── */
+  /* 用背景层画，不用伪元素整块盖 —— 这样“有没有自定义背景”都只差一个选择器。 */
+  #chat:not(.has-bg) {
+    background:
+      /* 很细的纸纹（3%）*/
+      radial-gradient(circle at 50% 50%, var(--paper-grain) 0 .5px, transparent .7px) 0 0 / 4px 4px,
+      /* 右上角的窗光 */
+      radial-gradient(120% 80% at 88% -8%, var(--light-glow), transparent 60%),
+      /* 整页的冷暖罩色 */
+      linear-gradient(var(--light-wash), var(--light-wash)),
+      var(--paper);
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+    transition: background-color 400ms ease;
+  }
+
+  /* 纸页的横线 + 左侧红线：**画在滚动区自己的背景上** ✓
+     —— 滚动的是内容，纸不动（背景默认不随 overflow 内容滚）✓。
+     ⚠️ 不要用 `#msgs::before` 画红线 ✗：#msgs 是 flex 列，
+        伪元素会变成**一个 flex 项**，把第一条消息顶下去 ✓。 */
+  #chat:not(.has-bg) #msgs {
+    padding-left: 42px;                     /* 让出左侧红线，正文从线右边开始 */
+    background-image:
+      linear-gradient(to right, transparent 0 29px,
+                      var(--paper-margin) 29px 30px, transparent 30px),
+      repeating-linear-gradient(to bottom, transparent 0 31px,
+                      var(--paper-rule) 31px 32px);
+    background-position: 0 0, 0 6px;
+    background-repeat: no-repeat, repeat;
+  }
+
+  /* 顶栏：不再是“一条通栏”，是纸页的页眉 */
+  #chat:not(.has-bg) header.top {
+    background: transparent;
+    border-bottom: 1px solid var(--paper-edge);
+  }
+
+  /* 输入区：桌沿上的笔盘 */
+  #chat:not(.has-bg) #composer {
+    background: var(--paper-2);
+    border-top: 1px solid var(--paper-edge);
+    box-shadow: 0 -10px 28px rgba(70,45,20,.05);
+  }
+  #chat:not(.has-bg) #text {
+    background: var(--paper-slip);
+    border-color: var(--paper-edge);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 1px 0 rgba(70,45,20,.04);
+  }
+  /* 深色两套不要那道白色内阴影（会把纸压暗）*/
+  :root[data-theme="dark"] #chat:not(.has-bg) #text,
+  :root[data-theme="forest"] #chat:not(.has-bg) #text {
+    box-shadow: 0 1px 0 rgba(0,0,0,.12);
+  }
+  /* 引用条也换成纸条，别在纸上再贴一块灰板 */
+  #chat:not(.has-bg) #qbar {
+    background: var(--paper-slip);
+    border-color: var(--paper-edge);
+  }
+  /* 微信那种灰底“时间胶囊”在这里不需要 —— 时间已经够淡 */
+  .time { letter-spacing: .02em; }
+
+  /* 尊重系统“减少动态效果” */
+  @media (prefers-reduced-motion: reduce) {
+    #chat:not(.has-bg) { transition: none; }
+  }
+
+  /* ── 二狗在纸角（2026-10-28 · P0）────────────────────────────────────
+     位置：笔盘（`#composer`）上沿的最右边 —— 也就是这页纸的**右下角**。
+     窗口 48px、图宽 64px（`erdog.svg` 是 140:160 ✓）→ 正好露出脑袋和一点肩 ✓，
+     下面被窗口裁掉 ✓，看着就是**从桌沿后面探出半个身子** ✓。
+
+     ⚠️ 它**不是**新角色 ✗：就是小屋地板上那只（同一份 `erdog.svg` ✓）。
+     ⚠️ 呼吸只动 `transform` ✓、4.6s 一次 ✓、页面看不见时浏览器自己节流 ✓；
+        系统开了"减少动态效果"就停 ✓。
+     ⚠️ 不挡字：`#msgs` 底部留 58px ✓ —— 停在最新一条时，正文永远在猫上面 ✓。
+        （滚到中间时它会短暂盖过消息 ✓ —— 那是"猫坐在纸上"的一部分 ✓，
+          而且它只有 48px 高、贴着右边缘 ✓。）
+     ─────────────────────────────────────────────────────────────────── */
+  #chat #msgs { padding-bottom: 58px; }
+
+  #ergou {
+    position:absolute; right:10px; top:-48px;
+    width:64px; height:48px; overflow:hidden;
+    cursor:pointer; z-index:2;
+    transform-origin:50% 100%;
+    filter:drop-shadow(0 3px 4px rgba(70,45,20,.18));
+    animation:ergou-breathe 4.6s ease-in-out infinite;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #ergou img { display:block; width:64px; height:73px; }
+  /* 两只爪子搭在桌沿上（画在裁剪窗的最底边，和图片同色系） */
+  #ergou::before, #ergou::after {
+    content:''; position:absolute; bottom:0; width:12px; height:8px;
+    background:#fbe7c6; border:2px solid #c4671f; border-radius:50% 50% 45% 45%;
+    z-index:2; box-sizing:border-box;
+  }
+  #ergou::before { left:12px; }
+  #ergou::after  { right:12px; }
+  /* 深色两套：描边别亮得扎眼，压一点 */
+  :root[data-theme="dark"] #ergou, :root[data-theme="forest"] #ergou {
+    filter:drop-shadow(0 3px 6px rgba(0,0,0,.45)) brightness(.96);
+  }
+
+  @keyframes ergou-breathe {
+    0%, 100% { transform:translateY(0) scale(1); }
+    50%      { transform:translateY(-1.5px) scale(1.014); }
+  }
+  /* 点一下：蹦一下 —— 620ms 回原样，期间不重复触发 */
+  #ergou.hop { animation:ergou-hop .62s cubic-bezier(.22,1,.36,1); }
+  @keyframes ergou-hop {
+    0%   { transform:translateY(0) scale(1); }
+    28%  { transform:translateY(-7px) scale(1.05,.95); }
+    52%  { transform:translateY(0) scale(.97,1.03); }
+    74%  { transform:translateY(-2px) scale(1); }
+    100% { transform:translateY(0) scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #ergou { animation:none; }
+    #ergou.hop { animation:none; }
+  }
