@@ -1,18 +1,24 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="cream">
 <head>
 <meta charset="utf-8">
 <!-- interactive-widget：让键盘弹出时**收缩内容**而不是把页面顶上去。
      不写这个的话，安卓 WebView 会把输入框推到看不见的地方。 -->
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
-<meta name="theme-color" content="#0f1115">
+<meta name="theme-color" content="#f6f0e4">
 <script>
-  // ★ 2026-10-19：先把上次用的主题贴上 ✓ —— 奶霜/林深用户不必先闪一下深色底 ✓。
+  // ★ 2026-10-19：先把上次用的主题贴上 ✓ —— 不必先闪一下默认底色 ✓。
   //   登录后 `syncThemeForUser()` 会按账号换成这个人自己的那套 ✓。
+  // ★ 2026-10-28：默认改成奶霜 ✓ —— 没存过就是 `<html>` 上写的 `cream` ✓；
+  //   存过夜阑/林深的也要贴回来 ✓（原来只认奶霜和林深 ✗，夜阑用户会先闪一帧奶白 ✓）。
+  //   `theme-color`（安卓状态栏底色）也一起改 ✓ —— 否则那一栏会一直是深色 ✓。
   try {
     var _t = localStorage.getItem('lg_theme');
     if (_t === 'light') _t = 'cream';   // 旧版本存过的名字
-    if (_t === 'cream' || _t === 'forest') document.documentElement.dataset.theme = _t;
+    if (_t === 'cream' || _t === 'dark' || _t === 'forest')
+      document.documentElement.dataset.theme = _t;
+    var _tc = { cream: '#f6f0e4', dark: '#0f1115', forest: '#12231a' }[document.documentElement.dataset.theme];
+    if (_tc) document.querySelector('meta[name=theme-color]').content = _tc;
   } catch (e) {}
 </script>
 <title>生活管家</title>

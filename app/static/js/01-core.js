@@ -166,22 +166,24 @@
   // ── 主题 ──
   //
   // ★ 2026-10-19：三套主题 —— 夜阑（黑）/ 奶霜（奶白）/ 林深（深林绿）。
+  // ★ 2026-10-28：**默认改成奶霜** ✓（用户定的 ✓）—— 数组也跟着把它排到第一 ✓，
+  //   选择面板第一张就是默认那套 ✓，`themeById` 兜底也落在它上面 ✓。
   // ⚠️ 主题是**个人的** ✓ —— 只存在这台设备的 localStorage 里 ✓，而且按
   //    用户 id 分开存（`lg_theme:u<id>` ✓）→ 同一个群里两个人各用各的 ✓，
   //    换账号登录也不会把上一个人的主题带过去 ✓。服务端完全不知道这件事 ✓。
   const THEMES = [
-    { id: 'dark', name: '夜阑', desc: '墨黑与夜蓝，安静得刚好',
-      color: '#0f1115', light: false,
-      vars: '--p-bg:#0f1115;--p-panel:#171a21;--p-panel2:#1e222b;'
-          + '--p-line:#262b36;--p-text:#e6e8ee;--p-muted:#8b93a7;'
-          + '--p-accent:#6ea8ff;--p-accent-bg:#1e3a5f;'
-          + '--p-accent-line:#35507a;--p-accent-soft:rgba(90,140,255,.10)' },
     { id: 'cream', name: '奶霜', desc: '暖白与焦糖，像一杯温牛奶',
       color: '#f6f0e4', light: true,
       vars: '--p-bg:#f6f0e4;--p-panel:#fffcf5;--p-panel2:#efe7d8;'
           + '--p-line:#e4d8c5;--p-text:#2d2822;--p-muted:#706658;'
           + '--p-accent:#9a5b2e;--p-accent-bg:#f2e1cb;'
           + '--p-accent-line:#d8be9e;--p-accent-soft:rgba(154,91,46,.10)' },
+    { id: 'dark', name: '夜阑', desc: '墨黑与夜蓝，安静得刚好',
+      color: '#0f1115', light: false,
+      vars: '--p-bg:#0f1115;--p-panel:#171a21;--p-panel2:#1e222b;'
+          + '--p-line:#262b36;--p-text:#e6e8ee;--p-muted:#8b93a7;'
+          + '--p-accent:#6ea8ff;--p-accent-bg:#1e3a5f;'
+          + '--p-accent-line:#35507a;--p-accent-soft:rgba(90,140,255,.10)' },
     { id: 'forest', name: '林深', desc: '深林与苔绿，沉静而有生气',
       color: '#12231a', light: false,
       vars: '--p-bg:#12231a;--p-panel:#1a2f22;--p-panel2:#233a2b;'
@@ -264,7 +266,7 @@
   };
 
   const THEME_ALIAS = { light: 'cream' };   // 旧版本存过 'light'，别让老用户掉回默认
-  const THEME_DEFAULT = 'dark';
+  const THEME_DEFAULT = 'cream';            // ★ 2026-10-28：默认改成奶霜（原来是夜阑）
   const themeById = (id) => THEMES.find(t => t.id === id) || THEMES[0];
   const themeOfUser = () => {
     const uid = me && (me.id ?? me.username);
@@ -300,6 +302,26 @@
     } catch (e) {}
     applyTheme(saved || THEME_DEFAULT);
   };
+
+  // ★ 2026-10-28：**默认从夜阑改成奶霜** ✓ —— 光改 `THEME_DEFAULT` 不够 ✗。
+  //   `applyTheme` 每次开机都会把当时那套写进 `lg_theme` / `lg_theme:u<id>` ✓，
+  //   所以老设备上"存着的"其实还是旧的默认值 ✓ → `saved || THEME_DEFAULT`
+  //   永远走 saved 那半边 ✓ → 改了也看不见 ✓。
+  //   所以补一次**一次性迁移** ✓：只把值**正好等于旧默认 `dark`**（以及更早的
+  //   `light` ✓，`applyTheme` 里有别名 ✓）的键改成 `cream` ✓。
+  //   ⚠️ 跑过就打 `lg_theme_v2` 标记 ✓ —— 之后谁再自己选夜阑都不会被动 ✓。
+  try {
+    if (!localStorage.getItem('lg_theme_v2')) {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+      keys.forEach(k => {
+        if (!k || (k !== 'lg_theme' && k.indexOf('lg_theme:u') !== 0)) return;
+        const v = localStorage.getItem(k);
+        if (v === 'dark' || v === 'light') localStorage.setItem(k, 'cream');
+      });
+      localStorage.setItem('lg_theme_v2', '1');
+    }
+  } catch (e) { /* 隐私模式之类存不了就算了，主题照样能切换 */ }
 
   applyTheme(localStorage.getItem('lg_theme') || THEME_DEFAULT);
 
