@@ -427,6 +427,11 @@
   .row .who { font-size:12px; color:var(--accent); font-weight:600;
               margin-bottom:3px; padding-left:4px; }
   .row.mine .who { text-align:right; padding-right:4px; }
+  /* ★ 2026-10-28：聊天气泡上面的**名字那行删掉** ✓（用户：「我的气泡，管家气泡，
+     上面的介绍文字去掉」✓ —— 自己/管家/AI 那几条流式行都算 ✓）。
+     ⚠️ 只藏、不删节点 ✗ —— `.who` 还被改昵称那处（`refreshMembers` ✓）
+        和流式行拿去写字 ✓，节点留着少改一处 ✓。 */
+  .row .who { display:none; }
   .bubble { padding:9px 13px; border-radius:14px; background:var(--bubble-bg);
             word-break:break-word; white-space:pre-wrap; }
   .bubble .at { color:var(--accent); font-weight:600; }
