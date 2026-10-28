@@ -2235,6 +2235,37 @@
     #ergou { animation:none; }
     #ergou.hop { animation:none; }
   }
+  /* ── 二狗的表情（2026-10-28 · P1）────────────────────────────────────
+     眨眼 / 打盹 = **切眼睛的 opacity** ✓ —— `erdog.svg` 启动时被**内联**进页面 ✓
+     （见 `01-core.js`）；还套着 `<img>` 的时候 CSS 够不着里面的眼睛 ✗。
+     看人打字 / 瞥新消息 = **整只歪一点** ✓ —— transform 挂在**内层 svg** 上 ✓：
+     呼吸和蹦跳都在外层 `#ergou` 上 ✓，两层各动各的，不会互相打断 ✓。
+     ⚠️ 只动 `transform` / `opacity` ✓。 */
+  #ergou > svg { display:block; width:64px; height:73px; }
+  #ergou > svg, #ergou > img {
+    transform-origin:50% 90%;
+    transition:transform .26s cubic-bezier(.22,1,.36,1);
+  }
+  #ergou .lid { opacity:0; transition:opacity .09s linear; }
+  #ergou[data-mood="blink"] .eye-w,
+  #ergou[data-mood="blink"] .eye-i,
+  #ergou[data-mood="blink"] .eye-h,
+  #ergou[data-mood="doze"] .eye-w,
+  #ergou[data-mood="doze"] .eye-i,
+  #ergou[data-mood="doze"] .eye-h { opacity:0; transition:opacity .08s linear; }
+  #ergou[data-mood="blink"] .lid,
+  #ergou[data-mood="doze"] .lid { opacity:1; }
+  /* 看着你打字：往左下方歪一点 ✓ */
+  #ergou[data-mood="watch"] > svg,
+  #ergou[data-mood="watch"] > img { transform:translate(-3px, 1px) rotate(-2.5deg); }
+  /* 瞥一眼新消息：歪得更明显一点，一下就回来 ✓ */
+  #ergou[data-mood="glance"] > svg,
+  #ergou[data-mood="glance"] > img { transform:translate(-5px, 0) rotate(-4.5deg); }
+  /* 打盹：呼吸放慢 ✓（`:not(.hop)` ✓ —— 点它那一下还得是 620ms 的蹦 ✓） */
+  #ergou[data-mood="doze"]:not(.hop) { animation-duration:7.4s; }
+  @media (prefers-reduced-motion: reduce) {
+    #ergou > svg, #ergou > img, #ergou .lid { transition:none; }
+  }
   /* ═══════════════════════════════════════════════════════════════════
      纸上小屋 · P1-a（2026-10-28）
      页眉手写感 / 日期和纸胶带 / 三种声音三种形状 / 回到最新的红丝带

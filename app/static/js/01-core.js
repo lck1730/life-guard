@@ -354,14 +354,103 @@
   // 调试 / 截图钩子（和 `__openArch` 一样）：
   window.__light = applyLight;
 
-  // 二狗在纸角：点一下蹦一下（P0 只有这个反应；长按开管家面板以后接）
+  // ── 二狗在纸角（P0 蹦一下 → 2026-10-28 P1 有表情了）────────────────
+  //   ★ 眼睛画在 `erdog.svg` 里 ✓ —— `<img>` 里的元素 CSS 够不着 ✗ →
+  //     启动时把这个文件**内联**进来 ✓（画只留一份 ✓，不抄第二份 ✗）。
+  //     内联失败就还是那张 `<img>` ✓ —— 只是不会眨眼，别的照旧 ✓。
+  //   ★ 三种状态：看着你打字（watch）/ 瞥一眼新消息（glance）/
+  //     发呆（doze：闭眼 + 呼吸放慢 ✓；眨眼 blink 一直在 ✓）。
+  //     ⚠️ 页在后台就**不排定时** ✓ —— 手机本来就会节流 ✓，
+  //        攒一堆回来补放看着像抽风 ✗。
   const ergouEl = document.getElementById('ergou');
   if (ergouEl) {
+    fetch('/static/erdog.svg').then(r => r.ok ? r.text() : '').then(txt => {
+      const i = txt ? txt.indexOf('<svg') : -1;
+      if (i >= 0 && ergouEl.isConnected) ergouEl.innerHTML = txt.slice(i);
+    }).catch(() => {});
+
+    let moodTimer = 0, blinkTimer = 0, idleTimer = 0;
+    const setMood = (m) => {
+      if (m) ergouEl.dataset.mood = m;
+      else delete ergouEl.dataset.mood;
+    };
+    const scheduleBlink = () => {
+      clearTimeout(blinkTimer);
+      blinkTimer = setTimeout(() => {
+        // 正忙着别的表情就不眨 ✓（打盹时眼睛本来就闭着 ✓）
+        if (document.hidden || ergouEl.dataset.mood) { scheduleBlink(); return; }
+        setMood('blink');
+        setTimeout(() => {
+          if (ergouEl.dataset.mood === 'blink') setMood('');
+          scheduleBlink();
+        }, 130);
+      }, 3500 + Math.random() * 3500);
+    };
+    // 发呆：90 秒没动静就闭眼睡 ✓
+    const scheduleDoze = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (document.hidden) { scheduleDoze(); return; }
+        if (!ergouEl.dataset.mood) setMood('doze');
+      }, 90000);
+    };
+    // 临时状态：到点自己撤 ✓（从打盹里被叫醒也是这条路 ✓）
+    const mood = (m, ms) => {
+      clearTimeout(moodTimer);
+      setMood(m);
+      scheduleDoze();
+      moodTimer = setTimeout(() => { setMood(''); scheduleBlink(); }, ms);
+    };
+    const wake = () => {
+      if (ergouEl.dataset.mood === 'doze') setMood('');
+      scheduleDoze();
+    };
+
+    // 点一下：蹦一下（P0 原样 ✓；长按开管家面板以后接 ✓）
     ergouEl.addEventListener('click', () => {
       if (ergouEl.classList.contains('hop')) return;   // 蹦到一半不叠加
       ergouEl.classList.add('hop');
       setTimeout(() => ergouEl.classList.remove('hop'), 640);
+      wake();
     });
+
+    // 看着你打字：一直在打就一直续上 ✓，停手 1.8s 自己收 ✓
+    const textEl = document.getElementById('text');
+    if (textEl) {
+      const onType = () => mood('watch', 1800);
+      textEl.addEventListener('input', onType);
+      textEl.addEventListener('focus', onType);
+    }
+
+    // 别人来消息了：歪头看一眼 ✓（自己的、管家自己的都不算 ✓）
+    const msgsEl = document.getElementById('msgs');
+    if (msgsEl && typeof MutationObserver !== 'undefined') {
+      let armed = false;
+      setTimeout(() => { armed = true; }, 3000);   // 开屏那一批不算 ✓
+      new MutationObserver((list) => {
+        if (!armed || document.hidden) return;
+        for (const rec of list) {
+          for (const n of rec.addedNodes || []) {
+            if (n.nodeType !== 1 || !n.classList) continue;
+            if (n.classList.contains('row') && !n.classList.contains('mine') &&
+                !n.classList.contains('agent') && n === msgsEl.lastElementChild) {
+              mood('glance', 1500);
+              return;
+            }
+          }
+        }
+      }).observe(msgsEl, { childList: true });
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        clearTimeout(blinkTimer); clearTimeout(idleTimer); clearTimeout(moodTimer);
+        setMood('');
+      } else { scheduleBlink(); scheduleDoze(); }
+    });
+
+    scheduleBlink();
+    scheduleDoze();
   }
 
   const explain = (data, status) => {
