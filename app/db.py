@@ -182,6 +182,28 @@ CREATE TABLE IF NOT EXISTS reminders (
 );
 CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(enabled, fire_at);
 
+-- ★ 2026-10-28：**回忆墙**（P3 ✓）。
+--
+--   用户把某句话「钉到墙上」时，这里存一份**当时的快照** ✓ ——
+--   不是外键引用原消息 ✗：那条消息会被撤回/删掉 ✓，而回忆墙上那张
+--   是他特意留下来的 ✓，不该跟着一起消失 ✓。
+--   `message_id` 只用来**去重**（同一条别钉两次 ✓），不参与读取 ✓。
+CREATE TABLE IF NOT EXISTS memories (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    message_id  INTEGER,                 -- 来源消息（可空；只用于去重）
+    msg_type    TEXT    NOT NULL DEFAULT 'text',
+    text        TEXT,
+    media_path  TEXT,
+    media_meta  TEXT,
+    sender_nick TEXT,
+    created_by  INTEGER,
+    created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_memories_group ON memories(group_id, id DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_msg
+    ON memories(group_id, message_id) WHERE message_id IS NOT NULL;
+
 
 -- ── 创意工坊：用户做的组件 ──────────────────────────────────────────────
 --

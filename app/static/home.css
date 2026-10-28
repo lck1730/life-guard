@@ -1,0 +1,732 @@
+/* ═════════════════════════════════════════════════════════════════════
+   纸上小屋 · 2026-10-28（P2 / P3）
+   ─────────────────────────────────────────────────────────────────────
+   ★ **新东西全部写在这里** ✓，`app.css` 一个字节都不动 ✓ ——
+     它和 `05-settings.js` 一样是 CRLF ✓，动一次整文件都会"变" ✓
+     （git 里看着像把整个文件重写了一遍 ✓，改没改反而看不出来 ✓）。
+
+   这里住的五样：
+     ① 夜灯（手动关灯：暖黑 + 台灯黄）
+     ② 文具托盘（长按消息）
+     ③ 工具扇（点 +）
+     ④ 三屏新界面：提醒 / 账本 / 回忆墙
+     ⑤ 管家面板（底部 sheet）+ 设置页的开关
+
+   ⚠️ 只动**新加的东西** ✓：下面每个选择器都是这次新建的 id / class ✓。
+      要改老的（气泡、纸、输入区）请回 `app.css` ✓。
+   ═════════════════════════════════════════════════════════════════════ */
+
+/* ── 共用的几个颜色 ───────────────────────────────────────────────────
+   琥珀 = 木头 / 黄铜 / 灯 ✓；苔绿 = 纸上的绿线 ✓。
+   ⚠️ 全部压在半透明里 ✓ —— 深色主题下也不会跳出来刺眼 ✓。 */
+:root {
+  --honey: #c08a45;
+  --honey-ink: #8d5a24;
+  --honey-soft: rgba(192, 138, 69, .14);
+  --moss: #7b8f62;
+  --tape: rgba(226, 196, 140, .55);
+  --tape-edge: rgba(160, 122, 68, .28);
+  --h-shadow: 0 14px 34px rgba(74, 58, 38, .20);
+  --h-shadow-lg: 0 22px 60px rgba(38, 26, 14, .34);
+  --hand: "Kaiti SC", "STKaiti", "KaiTi", "Songti SC", serif;
+}
+[data-theme="dark"], [data-theme="forest"] {
+  --honey: #d8a460;
+  --honey-ink: #e8c08a;
+  --honey-soft: rgba(216, 164, 96, .13);
+  --moss: #9db684;
+  --tape: rgba(214, 184, 122, .22);
+  --tape-edge: rgba(214, 184, 122, .18);
+  --h-shadow: 0 14px 34px rgba(0, 0, 0, .42);
+  --h-shadow-lg: 0 22px 60px rgba(0, 0, 0, .55);
+}
+
+/* ═══ ① 夜灯 ═══════════════════════════════════════════════════════════
+   ★ **不是反色** ✓ —— 是"把灯关了"：暖黑底、台灯打在右下角 ✓、纸变成
+     深牛皮纸 ✓、字还在（对比度不掉）✓。
+   ★ 只对**奶霜**生效 ✓：另外两套本来就是深底 ✓，再叠一层只会糊 ✓。
+   ⚠️ `data-manual-lamp` 由 `01-core.js` 的 `applyLight()` 挂上 ✓ ——
+      **白天开的灯也是夜灯** ✓（"开灯"就是开灯 ✓，不是"按钟来"）。
+   ⚠️ 这儿覆盖的是**主题变量** ✓（不是给每个屏各写一份背景 ✗）——
+      所以聊天、设置、新三屏会一起变暗 ✓（关灯是整个屋的事 ✓）。 */
+:root[data-manual-lamp="on"][data-theme="cream"],
+:root[data-manual-lamp="on"][data-theme="light"] {
+  --bg: #171310;
+  --panel: #221b15;
+  --panel2: #2b221a;
+  --text: #f2e7d4;
+  --muted: #b8a68a;
+  --line: #3a2f24;
+  --accent: #e0a45e;
+  --accent-bg: #3a2a1c;
+  --on-accent: #1a1208;
+  --accent-a: rgba(224, 164, 94, .16);
+  --accent-line: #5a4530;
+  --accent-soft: rgba(224, 164, 94, .10);
+  --hover: #2a2119;
+  --avatar-bg: #332a20;
+  --quote-bg: rgba(224, 196, 160, .14);
+  --bubble-bg: rgba(48, 39, 30, .70);
+  --bubble-agent-bg: rgba(40, 32, 24, .76);
+  --bubble-mine-bg: rgba(96, 62, 32, .62);
+  --danger: #e08a78;
+  --danger-soft: rgba(224, 138, 120, .35);
+  --bg-scrim: rgba(0, 0, 0, .30);
+  --ok: #7fbf8a; --warn: #e0b45c; --bad: #e08578;
+  --warn2: #d8b06a;
+  --shadow-md: 0 6px 24px rgba(0, 0, 0, .40);
+  --shadow-lg: 0 18px 50px rgba(0, 0, 0, .52);
+  /* 纸 */
+  --paper: #241d17;
+  --paper-2: #2b231b;
+  --paper-slip: #31281f;
+  --paper-edge: #3d3125;
+  --paper-rule: rgba(214, 178, 132, .10);
+  --paper-margin: rgba(214, 112, 92, .24);
+  --paper-grain: rgba(255, 220, 180, .03);
+  --light-glow: rgba(255, 186, 100, .22);
+  --light-wash: rgba(0, 0, 0, 0);
+}
+/* 台灯本身：右下角一圈暖光 ✓（`screen` 们在下面，所以 z 压得比它们高一点、
+   比弹层低 ✓ —— 光要照在纸上，但别盖住弹层 ✓）。
+   ⚠️ 只给"关着灯"的时候挂 ✓。 */
+:root[data-manual-lamp="on"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 82% at 86% 92%,
+                    rgba(255, 196, 110, .34),
+                    rgba(255, 168, 74, .10) 44%,
+                    transparent 72%);
+  mix-blend-mode: screen;
+}
+/* 灯开着时，小屋那张浅底的画也得暗一档 ✓ —— 不然推开门是白天 ✗。 */
+:root[data-manual-lamp="on"] #workshop,
+:root[data-manual-lamp="on"] #today { background: #14100d; }
+:root[data-manual-lamp="on"] #workshop .ws-flat { filter: brightness(.62) saturate(.9) sepia(.12); }
+
+/* ═══ ② 文具托盘（长按一条消息）═══════════════════════════════════════
+   ★ 形状：从底下推上来的一张**牛皮纸托盘** ✓ —— 上面贴一条纸胶带 ✓，
+     中间是那句话（像从本子上撕下来的一角 ✓），下面五个动作 ✓。
+   ⚠️ 五个动作是**真能做的五件** ✓：引用 / 钉到墙上 / 变成提醒 / 记一笔 / 复制 ✓。
+      「删除」**没做** ✗ —— 服务端根本没有删消息的口子 ✓（见 04-chat.js 那段 ✓）。
+   ⚠️ 动作条**不能只是图标** ✓：每个都有字 ✓（图标猜不出来 ✓）。 */
+#tray { position: fixed; inset: 0; z-index: 57; display: none; }
+#tray.on { display: block; }
+#tray .tray-scrim {
+  position: absolute; inset: 0;
+  background: rgba(28, 20, 12, .34);
+  opacity: 0; transition: opacity .22s ease;
+}
+#tray.on .tray-scrim { opacity: 1; }
+#tray .tray-card {
+  position: absolute;
+  left: 8px; right: 8px;
+  bottom: calc(var(--inset-bottom, 0px) + var(--kb, 0px) + 8px);
+  background: var(--paper-2, var(--panel));
+  border: 1px solid var(--paper-edge, var(--line));
+  border-radius: 18px;
+  padding: 16px 14px 12px;
+  box-shadow: var(--h-shadow-lg);
+  transform: translateY(calc(100% + 24px));
+  transition: transform .3s cubic-bezier(.22, 1, .36, 1);
+  background-image:
+    radial-gradient(circle at 50% 50%, var(--paper-grain, transparent) 0 .5px, transparent .7px);
+  background-size: 4px 4px;
+}
+#tray.on .tray-card { transform: none; }
+#tray .tray-tape {
+  position: absolute; left: 50%; top: -9px;
+  width: 76px; height: 20px; margin-left: -38px;
+  background: var(--tape);
+  border-left: 1px dashed var(--tape-edge);
+  border-right: 1px dashed var(--tape-edge);
+  transform: rotate(-1.4deg);
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .10);
+}
+#tray .tray-prev {
+  padding: 2px 4px 10px 12px;
+  border-left: 2px solid var(--paper-margin, rgba(196, 106, 84, .3));
+  margin: 2px 2px 10px;
+}
+#tray .tray-who {
+  font-size: 12.5px; color: var(--muted); margin-bottom: 3px;
+  letter-spacing: .3px;
+}
+#tray .tray-txt {
+  font-size: 15px; line-height: 1.55; color: var(--text);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; word-break: break-word;
+}
+#tray .tray-acts { display: flex; gap: 4px; }
+#tray .tray-act {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px 2px 8px;
+  border-radius: 12px;
+  color: var(--text);
+  transition: background .16s ease, transform .16s cubic-bezier(.22, 1, .36, 1);
+}
+#tray .tray-act:active { background: var(--honey-soft); transform: scale(.94); }
+#tray .tray-act .ti {
+  width: 40px; height: 40px; border-radius: 13px;
+  display: grid; place-items: center;
+  background: var(--honey-soft);
+  color: var(--honey-ink);
+  border: 1px solid var(--tape-edge);
+}
+#tray .tray-act .tl { font-size: 11px; color: var(--muted); white-space: nowrap; }
+#tray .tray-act.warm .ti { background: rgba(196, 106, 84, .13); color: #b0603f; }
+[data-theme="dark"] #tray .tray-act.warm .ti,
+[data-theme="forest"] #tray .tray-act.warm .ti { color: #e0a08a; }
+
+/* ═══ ③ 工具扇（点 +）════════════════════════════════════════════════
+   ★ 从 + 那里**向上展开**的一把扇子 ✓ —— 每样是一个"小物件"：
+     不是一样的圆角方块 ✓，形状 / 颜色 / 倾斜都各差一点 ✓（像真从抽屉里
+     拿出来的 ✓）。
+   ⚠️ **表情和语音不在扇子里** ✓ —— 它们本来就有自己的按钮 ✓（输入区那排 ✓）。
+   ⚠️ 扇子只是**加法** ✓：相册 / 拍摄 / 文件 / 音频 一个都没少 ✓。 */
+#toolFan { position: fixed; inset: 0; z-index: 56; display: none; }
+#toolFan.on { display: block; }
+#toolFan .tf-scrim {
+  position: absolute; inset: 0; z-index: 0;
+  background: rgba(28, 20, 12, .26);
+  opacity: 0; transition: opacity .2s ease;
+}
+#toolFan.on .tf-scrim { opacity: 1; }
+/* 从 + 那里漫出来的一团暖光 ✓ —— 让七件小东西**有同一块"桌面"** ✓，
+   不然就是七个白块浮在聊天字上 ✓（第一版截图就是这样 ✓）。
+   ⚠️ 得压在物件**下面** ✓：scrim 0 < 光 1 < #tfItems 2 ✓。 */
+#toolFan::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: radial-gradient(circle 470px at 100% 100%,
+    rgba(255, 252, 244, .52), rgba(255, 252, 244, .24) 42%, rgba(255, 252, 244, 0) 68%);
+  opacity: 0; transition: opacity .28s ease;
+}
+#toolFan.on::after { opacity: 1; }
+#toolFan .tf-item {
+  position: absolute;
+  width: 76px; margin: 0 0 0 -38px;
+  transform: translate(0, 0) scale(.35);
+  opacity: 0;
+  transition:
+    transform .36s cubic-bezier(.22, 1, .36, 1),
+    opacity .2s ease;
+}
+#toolFan .tf-item .tf-obj {
+  width: 66px; height: 66px; margin: 0 auto;
+  display: grid; place-items: center;
+  color: var(--c, var(--honey-ink));
+  background: var(--paper-slip, var(--panel));
+  border: 1px solid var(--paper-edge, var(--line));
+  /* 四角不一样 → 像从抽屉里摸出来的一张卡片 ✓ */
+  border-radius: 22px 26px 20px 27px;
+  box-shadow: var(--h-shadow);
+  position: relative;
+}
+#toolFan .tf-item .tf-obj::after {
+  content: "";
+  position: absolute; inset: -3px;
+  border-radius: inherit;
+  border: 1px dashed var(--tape-edge);
+  opacity: .55;
+}
+#toolFan .tf-item .tf-lbl {
+  display: block; margin-top: 7px;
+  font-size: 11.5px; color: var(--text);
+  text-align: center;
+  background: var(--paper-slip, var(--panel));
+  border-radius: 9px;
+  padding: 2px 1px;
+  box-shadow: 0 4px 10px rgba(38, 26, 14, .12);
+}
+#toolFan .tf-item.wide { width: 86px; margin-left: -43px; }
+#toolFan .tf-item.wide .tf-obj { width: 74px; height: 74px; }
+/* 扇子展开那一下：**从 + 那儿弹出来** ✓（位置由 JS 现算 ✓，这里只管缩放/透明度 ✓） */
+#toolFan.on .tf-item { transform: translate(0, 0) scale(1); opacity: 1; }
+#toolFan .tf-item .tf-obj svg { width: 29px; height: 29px; }
+
+/* 图标尺寸：`ico()` 给的是**没有宽高的 svg** ✓ —— 不给尺寸就是浏览器默认的
+   300×150 ✗（第一次就是这么炸的 ✓）。新加的三处各自钉死 ✓。 */
+#tray .tray-act .ti svg { width: 21px; height: 21px; }
+#tfItems { position: absolute; inset: 0; z-index: 2; }
+
+/* ═══ ④ 三屏新界面：提醒 / 账本 / 回忆墙 ══════════════════════════════
+   ★ 三屏都是 `.screen.ascreen` ✓ —— 从**屋里**推上来 ✓，
+     所以 z = 24 ✓（> 今日 23 ✓ / < 组件页 26 ✓，见 02-agent.js 那段 ✓）。
+   ⚠️ 三屏都**没有返回箭头** ✓（和主题/背景/今日一个规矩 ✓）：
+      右上是**收起**（×）✓、系统返回键同一个出口 ✓。
+   ⚠️ `_OTHER_SCREENS` + `__goBack` **两处都要有** ✓
+      （见 `android-back-key-only-knows-settings` ✓）。 */
+#clock, #ledgerBook, #memoryWall { z-index: 24; }
+
+.hx {
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  color: var(--muted);
+}
+.hx:active { color: var(--text); }
+
+/* 三个新屏共用的"纸面"底 ✓ —— 它们是屋子里的东西，所以走纸色 ✓。 */
+#clock, #ledgerBook {
+  background:
+    radial-gradient(120% 80% at 88% -8%, var(--light-glow, transparent), transparent 60%),
+    linear-gradient(var(--light-wash, transparent), var(--light-wash, transparent)),
+    var(--paper, var(--bg));
+}
+#clock header.sub, #ledgerBook header.sub {
+  background: transparent;
+  border-bottom: 1px solid var(--paper-edge, var(--line));
+}
+#clock header.sub h2, #ledgerBook header.sub h2 {
+  font-family: var(--hand);
+  font-size: 19px;
+  letter-spacing: .06em;
+}
+/* 小标题（"今天"、"本月"…）：**不是功能说明** ✓，是分组标签 ✓。 */
+.h-sec {
+  font-size: 12px; letter-spacing: .12em; color: var(--muted);
+  margin: 18px 4px 8px;
+}
+.h-sec:first-child { margin-top: 4px; }
+
+/* —— 提醒 —— */
+#clock .abody { padding: 14px 14px 30px; }
+.rm-quick {
+  background: var(--paper-slip, var(--panel));
+  border: 1px solid var(--paper-edge, var(--line));
+  border-radius: 16px;
+  padding: 12px 12px 10px;
+  box-shadow: var(--h-shadow);
+}
+.rm-quick input {
+  width: 100%;
+  border: 0; outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  padding: 6px 2px 10px;
+}
+.rm-quick input::placeholder { color: var(--muted); opacity: .75; }
+.rm-when { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.rm-chip {
+  padding: 7px 12px; border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--honey-ink);
+  background: var(--honey-soft);
+  border: 1px solid var(--tape-edge);
+}
+.rm-chip.on {
+  background: var(--honey);
+  color: #fffaf0;
+  border-color: transparent;
+}
+.rm-add {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 15px; font-weight: 600;
+  color: var(--on-accent);
+  background: var(--accent);
+}
+.rm-add:active { transform: scale(.985); }
+.rm-list { margin-top: 4px; }
+.rm-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 4px;
+  border-bottom: 1px dashed var(--paper-edge, var(--line));
+}
+.rm-row.off { opacity: .42; }
+.rm-clock {
+  flex: 0 0 58px;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-variant-numeric: tabular-nums;
+  color: var(--honey-ink);
+  line-height: 1.15;
+}
+.rm-clock b { display: block; font-size: 18px; font-weight: 600; }
+.rm-clock i { display: block; font-style: normal; font-size: 11px; color: var(--muted); margin-top: 3px; }
+.rm-mid { flex: 1; min-width: 0; }
+.rm-text { font-size: 15px; line-height: 1.5; word-break: break-word; }
+.rm-tag {
+  display: inline-block; margin-top: 4px;
+  font-size: 11px; color: var(--moss);
+  border: 1px solid var(--tape-edge);
+  border-radius: 999px; padding: 1px 8px;
+}
+.rm-del {
+  flex: 0 0 auto;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  color: var(--muted);
+  border-radius: 10px;
+}
+.rm-del:active { background: var(--honey-soft); color: var(--danger); }
+.h-empty {
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 34px 10px 20px;
+  line-height: 1.8;
+}
+
+/* —— 账本 —— */
+#ledgerBook .abody { padding: 14px 14px 30px; }
+.lg-sum {
+  display: flex; gap: 10px;
+  background: var(--paper-slip, var(--panel));
+  border: 1px solid var(--paper-edge, var(--line));
+  border-radius: 18px;
+  padding: 16px 14px;
+  box-shadow: var(--h-shadow);
+}
+.lg-sum > div { flex: 1; text-align: center; }
+.lg-sum .k { font-size: 11.5px; color: var(--muted); letter-spacing: .08em; }
+.lg-sum .v {
+  margin-top: 6px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 21px;
+  color: var(--text);
+}
+.lg-sum .v.out { color: #b0603f; }
+.lg-sum .v.in { color: var(--moss); }
+[data-theme="dark"] .lg-sum .v.out,
+[data-theme="forest"] .lg-sum .v.out { color: #e0a08a; }
+.lg-quick {
+  margin-top: 14px;
+  background: var(--paper-slip, var(--panel));
+  border: 1px solid var(--paper-edge, var(--line));
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: var(--h-shadow);
+}
+.lg-amt { display: flex; align-items: baseline; gap: 6px; padding: 2px 2px 10px; }
+.lg-amt .cur { font-family: Georgia, serif; font-size: 22px; color: var(--honey-ink); }
+.lg-amt input {
+  flex: 1; min-width: 0;
+  border: 0; outline: none; background: transparent;
+  color: var(--text);
+  font-family: Georgia, "Times New Roman", serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+}
+.lg-amt input::placeholder { color: var(--muted); opacity: .6; font-size: 18px; }
+.lg-cats { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.lg-note {
+  width: 100%;
+  border: 1px solid var(--paper-edge, var(--line));
+  border-radius: 10px;
+  background: var(--paper, var(--panel));
+  color: var(--text);
+  padding: 10px 11px;
+  font-size: 14.5px;
+  margin-bottom: 10px;
+  outline: none;
+}
+.lg-note::placeholder { color: var(--muted); opacity: .75; }
+.lg-add {
+  width: 100%; padding: 12px; border-radius: 12px;
+  font-size: 15px; font-weight: 600;
+  color: var(--on-accent); background: var(--accent);
+}
+.lg-day {
+  font-size: 12px; color: var(--muted);
+  margin: 20px 4px 6px;
+  letter-spacing: .06em;
+}
+.lg-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 4px;
+  border-bottom: 1px dashed var(--paper-edge, var(--line));
+}
+.lg-row .cat {
+  flex: 0 0 auto;
+  font-size: 11px; color: var(--honey-ink);
+  background: var(--honey-soft);
+  border-radius: 8px;
+  padding: 3px 8px;
+}
+.lg-row .nt { flex: 1; min-width: 0; font-size: 14.5px; word-break: break-word; }
+.lg-row .nt small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+.lg-row .amt {
+  flex: 0 0 auto;
+  font-family: Georgia, serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 15.5px;
+}
+.lg-row .amt.out { color: #b0603f; }
+.lg-row .amt.in { color: var(--moss); }
+[data-theme="dark"] .lg-row .amt.out,
+[data-theme="forest"] .lg-row .amt.out { color: #e0a08a; }
+
+/* —— 回忆墙 —— */
+#memoryWall {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(120, 84, 44, .08) 0 1px, transparent 1.4px) 0 0 / 5px 5px,
+    radial-gradient(130% 90% at 50% -10%, rgba(255, 214, 154, .16), transparent 62%),
+    #c9a273;
+}
+[data-theme="dark"] #memoryWall,
+[data-theme="forest"] #memoryWall {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 226, 180, .05) 0 1px, transparent 1.4px) 0 0 / 5px 5px,
+    radial-gradient(130% 90% at 50% -10%, rgba(255, 196, 120, .10), transparent 62%),
+    #2a2118;
+}
+#memoryWall header.sub {
+  background: transparent;
+  border-bottom: 1px solid rgba(90, 60, 30, .18);
+}
+[data-theme="dark"] #memoryWall header.sub,
+[data-theme="forest"] #memoryWall header.sub { border-bottom-color: rgba(255, 220, 170, .10); }
+#memoryWall header.sub h2 {
+  font-family: var(--hand);
+  font-size: 19px; letter-spacing: .06em;
+  color: #4a3420;
+}
+[data-theme="dark"] #memoryWall header.sub h2,
+[data-theme="forest"] #memoryWall header.sub h2 { color: #f0e0c6; }
+[data-theme="dark"] #memoryWall .hx,
+[data-theme="forest"] #memoryWall .hx { color: rgba(240, 224, 198, .65); }
+#memoryWall .abody { padding: 16px 14px 34px; }
+.mw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 14px;
+  align-items: start;   /* 卡片**按自己的内容长** ✓；不然同一行会被最高的那张抻齐、留一大片白 ✗ */
+}
+.mw-card {
+  position: relative;
+  background: #fffdf6;
+  padding: 9px 9px 0;
+  border-radius: 3px;
+  box-shadow: 0 8px 18px rgba(52, 34, 16, .30), 0 1px 0 rgba(255, 255, 255, .7) inset;
+  transform: rotate(var(--tilt, 0deg));
+}
+.mw-card::before {           /* 和纸胶带 ✓ */
+  content: "";
+  position: absolute;
+  top: -8px; left: 50%;
+  width: 54px; height: 17px; margin-left: -27px;
+  background: var(--tape);
+  border-left: 1px dashed var(--tape-edge);
+  border-right: 1px dashed var(--tape-edge);
+  transform: rotate(var(--tape-tilt, -2deg));
+  border-radius: 2px;
+}
+.mw-card .mw-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: #efe6d5;
+  border-radius: 1px;
+}
+.mw-card .mw-quote {
+  font-family: var(--hand);
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: #3d2f20;
+  padding: 12px 4px 14px;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.mw-card .mw-quote::before { content: "「"; color: #b98a52; }
+.mw-card .mw-quote::after  { content: "」"; color: #b98a52; }
+.mw-card .mw-cap {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 4px;
+  font-size: 10.5px; color: #8a7860;
+  padding: 0 4px 10px;
+}
+.mw-card .mw-x {
+  position: absolute;
+  right: -7px; top: -7px;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(255, 250, 240, .94);
+  color: #8a6a4a;
+  box-shadow: 0 3px 10px rgba(52, 34, 16, .28);
+  font-size: 14px;
+}
+.mw-empty {
+  margin: 26px 6px;
+  padding: 30px 18px;
+  border: 2px dashed rgba(90, 60, 30, .30);
+  border-radius: 10px;
+  text-align: center;
+  color: #5c4327;
+  font-family: var(--hand);
+  font-size: 16px;
+  line-height: 1.9;
+}
+[data-theme="dark"] .mw-empty,
+[data-theme="forest"] .mw-empty { border-color: rgba(255, 220, 170, .18); color: #e6d3b2; }
+/* 钉墙时那一下：卡片**飞进来** ✓（不是淡入 ✓）。 */
+.mw-card.fresh { animation: mwDrop .5s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes mwDrop {
+  from { opacity: 0; transform: translateY(-24px) rotate(calc(var(--tilt, 0deg) * 3)) scale(.9); }
+  to   { opacity: 1; transform: rotate(var(--tilt, 0deg)); }
+}
+
+/* ═══ ⑤ 管家面板（点二狗）═════════════════════════════════════════════
+   ★ 底部 sheet ✓ —— 和二狗说话的地方 ✓：它会什么（四个真按钮）、
+     它记得（屋里真有的几样计数）。
+   ⚠️ **不放模型/提示词** ✓ —— 那些在「我们的家 → 工作间」✓。
+   ⚠️ 这里**没有一句"我是你的生活管家"** ✗ —— 用户定的不要介绍性文字 ✓；
+      名字 + 四个按钮就是全部说明 ✓。 */
+#butler { z-index: 51; }
+#butler .panel {
+  background: var(--paper-2, var(--panel));
+  border-top: 1px solid var(--paper-edge, var(--line));
+  border-radius: 20px 20px 0 0;
+  padding: 18px 16px calc(16px + var(--inset-bottom, 0px));
+  max-height: 78vh;
+  overflow-y: auto;
+}
+.bs-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.bs-av {
+  width: 52px; height: 60px;
+  flex: 0 0 auto;
+  display: grid; place-items: center;
+}
+.bs-av img { width: 100%; height: 100%; object-fit: contain; }
+.bs-who { flex: 1; min-width: 0; }
+.bs-who .n { font-family: var(--hand); font-size: 20px; letter-spacing: .04em; }
+.bs-who .s { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.bs-caps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.bs-cap {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 2px 10px;
+  border-radius: 14px;
+  background: var(--paper-slip, var(--panel));
+  border: 1px solid var(--paper-edge, var(--line));
+  color: var(--honey-ink);
+  font-size: 11.5px;
+}
+.bs-cap:active { background: var(--honey-soft); transform: scale(.96); }
+.bs-cap svg { width: 24px; height: 24px; }
+.bs-facts {
+  margin-top: 16px;
+  background: var(--paper-slip, var(--panel));
+  border: 1px solid var(--paper-edge, var(--line));
+  border-radius: 14px;
+  overflow: hidden;
+}
+.bs-fact {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+.bs-fact + .bs-fact { border-top: 1px solid var(--paper-edge, var(--line)); }
+.bs-fact .fk { flex: 1; min-width: 0; color: var(--muted); }
+.bs-fact .fv { color: var(--text); font-variant-numeric: tabular-nums; }
+.bs-note {
+  margin-top: 12px;
+  display: flex; gap: 8px;
+}
+.bs-note button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--honey-soft);
+  color: var(--honey-ink);
+  font-size: 14px;
+  border: 1px solid var(--tape-edge);
+}
+
+/* ═══ ⑥ 我们的家：分组标题 + 开关 ════════════════════════════════════
+   ★ 设置页还是那一张一张卡 ✓，只是**分了房间** ✓（住户 / 小屋 / 管家 /
+     工作间 / 门厅 ✓）。组标题是**房间名** ✓，不是功能说明 ✓。
+   ⚠️ 行**一个都没删** ✓（我的 / 管家 / 空间 / 主题 / 背景 / 模型 / 邀请码 /
+      检查更新 / 退出 ✓）—— 只是挪了房间 ✓。 */
+#settings .house-sec {
+  font-size: 12px;
+  letter-spacing: .16em;
+  color: var(--muted);
+  padding: 20px 6px 8px;
+  font-family: var(--hand);
+}
+#settings .house-sec:first-child { padding-top: 4px; }
+/* 开关：一行里右边那一枚 ✓ */
+#settings .item .sw {
+  flex: 0 0 auto;
+  width: 46px; height: 27px;
+  border-radius: 999px;
+  background: var(--line);
+  position: relative;
+  transition: background .18s ease;
+}
+#settings .item .sw::after {
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 21px; height: 21px;
+  border-radius: 50%;
+  background: var(--panel);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  transition: transform .2s cubic-bezier(.22, 1, .36, 1);
+}
+#settings .item .sw.on { background: var(--accent); }
+#settings .item .sw.on::after { transform: translateX(19px); background: #fffdf8; }
+
+/* ═══ ⑥ 长按 = 文具托盘（取代"自由复制"）═════════════════════════════
+   ★ `app.css` 里给气泡开了 `user-select:text` + `touch-callout:default` ✓
+     （那会儿要的是"能自己选字"✓）。现在长按有托盘了 ✓，
+     系统那层选择手柄就**别再弹** ✗ —— 两套一起出来会打架 ✓
+     （安卓的手柄还会把托盘压在下面 ✓，见
+     `android-webview-no-programmatic-handles` ✓）。复制走托盘那格 ✓。
+   ⚠️ **只关气泡的** ✓：输入框、回忆墙上的字照样能选 ✓。 */
+#chat .row .bubble, #chat .row .bubble * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* 托盘 / 扇子 / 管家面板开着时，底下那层别跟着滚 ✓ */
+body:has(#tray.on),
+body:has(#toolFan.on),
+body:has(#butler.on) { overflow: hidden; }
+
+/* 账本底下那条"去老面板看看"✓ —— 它是一颗按钮 ✓，不是说明文字 ✓。 */
+#ledgerBook .bs-note {
+  display: block;
+  width: 100%;
+  margin-top: 22px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--honey-soft);
+  color: var(--honey-ink);
+  font-size: 14px;
+  border: 1px solid var(--tape-edge);
+}
+
+/* ═══ 无障碍 ═════════════════════════════════════════════════════════
+   ★ 房间里的物件热区 ≥ 44×44 ✓（SVG 里那几个 rect 已按这个放大 ✓，
+      见 06-workshop.js 的 `buildFlatScene` ✓）。
+   ★ 系统开了"减少动态"→ 扇子 / 托盘 / 钉墙 都**直接出现** ✓（不缩不飞 ✓）。 */
+@media (prefers-reduced-motion: reduce) {
+  #tray .tray-card,
+  #toolFan .tf-item,
+  #settings .item .sw,
+  #settings .item .sw::after,
+  .mw-card.fresh {
+    transition: none !important;
+    animation: none !important;
+  }
+  #tray .tray-card { transform: none; }
+  #toolFan .tf-item { opacity: 1; }
+}
+
+/* 130% 字体时别把托盘挤成两行 ✓ */
+@media (max-width: 340px) {
+  #tray .tray-act .tl { font-size: 10px; }
+  #tray .tray-act .ti { width: 36px; height: 36px; }
+  .lg-sum .v { font-size: 18px; }
+}

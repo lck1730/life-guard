@@ -483,6 +483,13 @@
     // ⚠️ 这里原来有两支：长按那张小卡片（z 58 ✓）和"自由复制"那个文本框（z 57 ✓）——
     //    **2026-10-11 两个一起没了** ✓（用户：「长按消息不再有小卡片，就是默认系统的
     //    复制行为」✓）→ 返回键也就没有它们要关的了 ✓。
+    // ★ 2026-10-28（P2/P3）：三张新弹层 ✓ —— 托盘 57 > 工具扇 56 > 管家面板 51 ✓，
+    //   都**比弹层（sheet 50）高** ✓ → 照铁律排在 sheet 上面 ✓。
+    //   ⚠️ 少一支的话，返回键会**隔着托盘把底下的屏关掉** ✓
+    //     （屏幕上托盘纹丝不动 ✓ —— 又是"按了没反应"那个形状 ✓）。
+    if ($('#tray').classList.contains('on')) { closeTray(); return; }
+    if ($('#toolFan').classList.contains('on')) { closeToolFan(); return; }
+    if ($('#butler').classList.contains('on')) { closeButler(); return; }
     if ($('#sheet').classList.contains('on')) { closeSheet(); return; }
     // ★ 创意工坊那几屏（2026-10-07）—— **压在管家那三屏上面** ✓：
     //   组件页 > 工坊 > 编状态 > 改资料 > 管家列表 > 群设置 ✓。
@@ -505,6 +512,12 @@
     if ($('#me').classList.contains('on')) { closeMe(); return; }
     if ($('#peer').classList.contains('on')) { closePeer(); return; }
     if ($('#compView').classList.contains('on')) { closeComp(); return; }
+    // ★ 2026-10-28（P2）：提醒 / 账本 / 回忆墙（z 24 ✓）—— 从屋里点物件推进来的 ✓，
+    //   压在今日(23)/工坊(22)上面 ✓、在组件页(26)下面 ✓ → 照铁律插在这两行之间 ✓。
+    //   ⚠️ 三屏互不同时开 ✓（都从屋里推 ✓），谁开着关谁 ✓。
+    if ($('#clock').classList.contains('on')) { hLeave('clock'); return; }
+    if ($('#ledgerBook').classList.contains('on')) { hLeave('ledgerBook'); return; }
+    if ($('#memoryWall').classList.contains('on')) { hLeave('memoryWall'); return; }
     // ★ 2026-10-28：今日明信片（z 23 ✓）—— 从屋里点窗推进来的 ✓，
     //   压在工坊(22)上面 ✓、在组件页(26)下面 ✓ → 照铁律插在这两行之间 ✓。
     if ($('#today').classList.contains('on')) { closeToday(); return; }

@@ -283,10 +283,16 @@
       const k = themeOfUser();
       if (k) localStorage.setItem(k, id);           // 这个账号自己的
     } catch (e) { /* 隐私模式存不了就算了，主题照样生效 */ }
+    // ★ 2026-10-28（P3）：**灯开着的时候，奶霜其实变成暖黑底** ✓ ——
+    //   状态栏还报"浅底"的话，深色图标就压在暖黑上、看不见了 ✗。
+    //   ⚠️ 这里**直接读 localStorage** ✓，不调 `_lampPref` ✓ ——
+    //      `applyTheme` 在下面那个 `const` **之前**就会被调一次（第 326 行 ✓），
+    //      碰它就是 TDZ（"Cannot access before initialization" ✓，整屏白 ✗）。
+    const _lampNow = (() => { try { return localStorage.getItem('lg_lamp') === '1'; } catch (e) { return false; } })();
     const meta = document.querySelector('meta[name=theme-color]');
-    if (meta) meta.content = theme.color;
-    // 让原生同步状态栏图标的明暗：奶霜是浅底，另外两套是深底
-    try { window.LifeGuardNative?.setLightStatusBar?.(!!theme.light); } catch {}
+    if (meta) meta.content = _lampNow ? '#171310' : theme.color;
+    // 让原生同步状态栏图标的明暗：奶霜是浅底，另外两套是深底；灯开着 → 深底
+    try { window.LifeGuardNative?.setLightStatusBar?.(_lampNow ? false : !!theme.light); } catch {}
     return id;
   };
 
@@ -343,16 +349,141 @@
     if (h >= 17 && h < 20) return 'dusk';
     return 'night';
   };
-  const applyLight = () => {
-    const p = lightPeriod();
+  // ★ 2026-10-28（P3）：**夜灯可以手动开着** ✓ —— 设计里「关灯」是一件事 ✓：
+  //   按钟走是自动 ✓；手动打开就一直是夜灯 ✓（白天也想关灯的人有开关 ✓）。
+  //   存**这台设备** ✓（和主题一样，不惊动服务端、不给别人 ✓）。
+  const _lampPref = () => {
+    try { return localStorage.getItem('lg_lamp') === '1'; } catch (e) { return false; }
+  };
+  // 状态栏底色 / 图标明暗**只有一个出口** ✓ —— 主题和夜灯都会改这两样 ✓，
+  // 两处各写一遍的话，总有一条路忘了同步（这就是"改了但没生效"那种 ✓）。
+  const _THEME_META = { cream: '#f6f0e4', dark: '#0f1115', forest: '#12231a' };
+  const _syncChrome = () => {
     const el = document.documentElement;
+    const on = _lampPref();
+    const tid = el.dataset.theme || THEME_DEFAULT;
+    const meta = document.querySelector('meta[name=theme-color]');
+    if (meta) meta.content = on ? '#171310' : (_THEME_META[tid] || _THEME_META.cream);
+    let light = false;
+    try { light = !!themeById(tid).light; } catch (e) {}
+    try { window.LifeGuardNative?.setLightStatusBar?.(on ? false : light); } catch (e) {}
+  };
+  window.__syncChrome = _syncChrome;
+  const applyLight = () => {
+    const el = document.documentElement;
+    const on = _lampPref();
+    const p = on ? 'night' : lightPeriod();
+    el.dataset.manualLamp = on ? 'on' : 'off';
     if (el.dataset.light !== p) el.dataset.light = p;
+    _syncChrome();
     return p;
+  };
+  const setLamp = (on) => {
+    try { localStorage.setItem('lg_lamp', on ? '1' : '0'); } catch (e) {}
+    applyLight();
+    if (on) sfx('bell'); // 开关本身给一记很轻的铃 ✓（关灯不出声 ✓ —— 静下来才对 ✓）
   };
   applyLight();
   try { setInterval(applyLight, 5 * 60 * 1000); } catch (e) {}
   // 调试 / 截图钩子（和 `__openArch` 一样）：
   window.__light = applyLight;
+  window.__lamp = (on) => { setLamp(!!on); return !!on; };
+  const lampOn = () => _lampPref();
+
+  // ── 声音与触感（P3）───────────────────────────────────────────────
+  //
+  // 三个 UI 声：纸（发送）/ 啵（贴纸、钉上墙）/ 铃（提醒到点）。
+  // ⚠️ **不自动播** ✗ —— 只在这个 App 的点击/长按回调里响 ✓（浏览器要求
+  //    用户手势之后才允许 AudioContext ✓）。开屏静默 ✓。
+  // ⚠️ 两个开关都**默认开** ✓，但都是"可以关"的 ✓ —— 夜里躺床上的人不想被
+  //    "啵"一声打扰 ✓；关掉之后整个 App 就真的不响了 ✓（不是只关一半 ✓）。
+  // ⚠️ 触感走原生（壳里有 `vibrate` 就叫 ✓），没有就退回 `navigator.vibrate` ✓；
+  //    再没有就**什么都不做** ✓（不是错误 ✓）。
+  const _prefOn = (k, dft) => {
+    try { const v = localStorage.getItem('lg_' + k); return v === null ? dft : v === '1'; }
+    catch (e) { return dft; }
+  };
+  const _prefSet = (k, on) => {
+    try { localStorage.setItem('lg_' + k, on ? '1' : '0'); } catch (e) {}
+  };
+  let _sndOn = _prefOn('sound', true);
+  let _hapOn = _prefOn('haptic', true);
+  const soundOn = () => _sndOn;
+  const hapticOn = () => _hapOn;
+
+  let _ac = null;
+  const _audio = () => {
+    if (_ac) return _ac;
+    try {
+      const C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      _ac = new C();
+    } catch (e) { _ac = null; }
+    return _ac;
+  };
+  /** 一个很短的 UI 声。kind: 'paper' | 'pop' | 'bell' */
+  const sfx = (kind) => {
+    if (!_sndOn) return;
+    const ac = _audio();
+    if (!ac) return;
+    if (ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
+    const t0 = ac.currentTime;
+    try {
+      if (kind === 'paper') {
+        // 纸声 = 一小段衰减噪声（不需要音频文件 ✓）
+        const n = Math.max(1, Math.floor(ac.sampleRate * 0.09));
+        const buf = ac.createBuffer(1, n, ac.sampleRate);
+        const ch = buf.getChannelData(0);
+        for (let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.6);
+        const src = ac.createBufferSource();
+        const bp = ac.createBiquadFilter();
+        const g = ac.createGain();
+        bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 0.8;
+        g.gain.value = 0.16;
+        src.buffer = buf; src.connect(bp); bp.connect(g); g.connect(ac.destination);
+        src.start(t0);
+      } else if (kind === 'bell') {
+        [880, 1320].forEach((f, i) => {
+          const o = ac.createOscillator(), g = ac.createGain();
+          o.type = 'sine'; o.frequency.value = f;
+          g.gain.setValueAtTime(0.0001, t0 + i * 0.11);
+          g.gain.exponentialRampToValueAtTime(0.09, t0 + i * 0.11 + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.11 + 0.7);
+          o.connect(g); g.connect(ac.destination);
+          o.start(t0 + i * 0.11); o.stop(t0 + i * 0.11 + 0.75);
+        });
+      } else {
+        // 啵：一个很短的上滑正弦 ✓
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(420, t0);
+        o.frequency.exponentialRampToValueAtTime(760, t0 + 0.055);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.10, t0 + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.13);
+        o.connect(g); g.connect(ac.destination);
+        o.start(t0); o.stop(t0 + 0.15);
+      }
+    } catch (e) { /* 播不出来就算了 ✓ 界面不能因为声音坏掉 */ }
+  };
+  /** kind: 'soft' | 'hard' */
+  const haptic = (kind) => {
+    if (!_hapOn) return;
+    const ms = kind === 'hard' ? 18 : 8;
+    try {
+      const N = window.LifeGuardNative;
+      if (N && typeof N.vibrate === 'function') { N.vibrate(ms); return; }
+    } catch (e) {}
+    try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
+  };
+  const setSound = (on) => {
+    _sndOn = !!on; _prefSet('sound', _sndOn);
+    if (_sndOn) sfx('pop');
+  };
+  const setHaptic = (on) => {
+    _hapOn = !!on; _prefSet('haptic', _hapOn);
+    if (_hapOn) haptic('soft');
+  };
 
   // ── 二狗在纸角（P0 蹦一下 → 2026-10-28 P1 有表情了）────────────────
   //   ★ 眼睛画在 `erdog.svg` 里 ✓ —— `<img>` 里的元素 CSS 够不着 ✗ →
@@ -801,6 +932,19 @@
     mute: '<path d="M4 5.5l16 13"/><path d="M11 5.5 6.5 9H4v6h2.5L11 18.5z"/><path d="M15 9a4 4 0 0 1 1.6 3"/>',
     // ★ 2026-10-27：「气泡」那一行 ✓ —— 两个气泡，小的那个带尾巴 ✓（就是这一项本身 ✓）。
     chat: '<path d="M3.5 12.5A6.5 6.5 0 0 1 10 6h4.5a6 6 0 0 1 0 12H8.2L4.5 20.7V18A6.5 6.5 0 0 1 3.5 12.5z"/><circle cx="9" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="12.2" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="15.4" cy="12" r=".9" fill="currentColor" stroke="none"/>',
+    // ★ 2026-10-28（P2/P3）：纸上小屋这一轮新用到的几枚 ✓ ——
+    //   全部走同一套画法（24 格、描边、圆端点 ✓），粗细由 `ico()` 统一给 ✓。
+    lamp: '<path d="M8 3.5h8l3.5 7.5h-15z"/><path d="M12 11v6.5"/><path d="M8.5 20.5h7"/><path d="M10 6.5h4"/>',
+    sound: '<path d="M4 9.5h3L12 6v12l-5-3.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/>',
+    haptic: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M3.5 9v6M20.5 9v6"/><path d="M10.5 5.5h3"/>',
+    quote: '<path d="M9.5 7H6.5A2.5 2.5 0 0 0 4 9.5V12h3.5L5.5 16.5"/><path d="M19.5 7H16.5A2.5 2.5 0 0 0 14 9.5V12h3.5L15.5 16.5"/>',
+    pin: '<path d="M9 3.5h6l-1 5 3 3.5H7L10 8.5z"/><path d="M12 12v8"/>',
+    book: '<path d="M4.5 6A2.5 2.5 0 0 1 7 3.5h12V20H7a2.5 2.5 0 0 0-2.5 2.5z"/><path d="M4.5 6v13"/><path d="M8.5 8h6.5M8.5 11.5h4.5"/>',
+    copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/>',
+    camera: '<path d="M4 8.5h3l1.5-2h7L17 8.5h3v10H4z"/><circle cx="12" cy="13.2" r="3.2"/>',
+    file: '<path d="M13.5 3.5H7.5A1.5 1.5 0 0 0 6 5v14a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V8z"/><polyline points="13.5 3.5 13.5 8 18 8"/><path d="M9 13h6M9 16.5h4"/>',
+    audio: '<path d="M4 12h1.5M7.5 8.5v7M11 5.5v13M14.5 9v6M18 7.5v9M20.5 11v2"/>',
+    frame: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M7.5 15.5l3-3 2.5 2.5 2-2 2.5 2.5"/><circle cx="9.2" cy="9.2" r="1.1"/>',
   };
 
   /** 一枚行内图标 ✓（`cls` 给 SVG 自己用 —— 只有「性格」那个朝下箭头要它 ✓）。 */

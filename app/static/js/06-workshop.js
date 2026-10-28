@@ -87,13 +87,25 @@
   //   小屋是浅奶油底 ✓，深色主题下原来那套浅色状态栏图标会**看不见** ✗。
   //   所以这一摞屏里：停在小屋 → 深色图标 ✓；进组件 / 对话 → 按用户主题还原 ✓。
   //   ⚠️ 壳那边没有这个 API 时（浏览器里）静默跳过 ✓。
+  //
+  // ★ 2026-10-28（P2/P3）：浅底又多了三屏 ✓（提醒 / 账本 / 回忆墙 ✓）——
+  //   它们和今日明信片一样是**纸** ✓，停在上头就得是深色图标 ✓。
+  //   夜灯亮着时反过来 ✓（整间屋子都暗了 ✓）。判据只有一处 ✓，别处都调它 ✓。
   const _syncStatusBar = () => {
     let light = true;
     try { light = !!themeById(document.documentElement.dataset.theme).light; } catch (e) {}
-    const onScene = $('#workshop').classList.contains('on')
+    const onPaper = ['#workshop', '#today', '#clock', '#ledgerBook', '#memoryWall']
+      .some((s) => { const el = $(s); return !!el && el.classList.contains('on'); })
       && !$('#compView').classList.contains('on');
-    try { window.LifeGuardNative?.setLightStatusBar?.(onScene ? true : light); } catch (e) {}
+    let lamp = false;
+    try { lamp = localStorage.getItem('lg_lamp') === '1'; } catch (e) {}
+    try {
+      window.LifeGuardNative?.setLightStatusBar?.(onPaper ? true : (lamp ? false : light));
+    } catch (e) {}
   };
+  // 新三屏在 **04 / 05 / 02** 那边也要能用这一下 ✓（它们都在同一个 IIFE 里 ✓，
+  // 在那边直接调也行 ✓；挂个 window 是为了以后拆文件时别断 ✓）。
+  window.__syncStatusBar = _syncStatusBar;
 
   // ── 进空间：**跟着手指拉** ✗→✓（2026-10-24 用户定的）────────────────────
   //
@@ -790,13 +802,26 @@
         'width="268" height="92" fill="transparent" style="cursor:pointer"/>' +
       // 账本搬到**书架**上 ✓（桌上那本让给聊天了 ✓）。
       //   热区比那排书放大一圈 ✓ —— 书上只有 ~59×58 CSS px ✓，照原样太难点准 ✓。
-      '<rect class="ws-obj" data-slug="bookkeeping-panel" x="580" y="360" ' +
-        'width="112" height="110" fill="transparent" style="cursor:pointer"/>' +
+      // ★ 2026-10-28（P2）：**改指向原生账本屏** ✓（`#ledgerBook` ✓）——
+      //   原来是开管家做的 `bookkeeping-panel` 组件 ✓。两边**同一张表** ✓，
+      //   老面板那条路没断 ✓（账本屏底下留了一颗按钮 ✓，见上面的 `openLedger` ✓）。
+      '<rect class="ws-shelf" x="580" y="360" width="112" height="110" ' +
+        'fill="transparent" style="cursor:pointer" role="button" aria-label="账本"/>' +
       // ★ 2026-10-28：**那扇窗** ✓ —— 点它 = 今日明信片 ✓（IA「点窗 → 今日」✓）。
       //   窗框 58..552 × 118..762 ✓，热区往里收一圈 ✓（别压到窗台外 ✓）。
       //   和账本那排书（x≥580）、闹钟（708,296）、画框（632,538）都不挨着 ✓。
       '<rect class="ws-window" x="96" y="156" width="420" height="548" ' +
-        'fill="transparent" style="cursor:pointer"/>' +
+        'fill="transparent" style="cursor:pointer" role="button" aria-label="今日"/>' +
+      // ★ 2026-10-28（P2）：屋里**三样东西各开一屏** ✓ ——
+      //   挂钟 → 提醒 ✓（钟点就是时间 ✓）；挂画 → 回忆墙 ✓（挂着的是回忆 ✓）；
+      //   火漆信 → 「我们的家」✓（信里是两个人过日子的事 ✓）。
+      //   ⚠️ 热区**贴着物本身** ✓，不另加看得见的按钮 ✓（屋里不放第二层 UI ✓）。
+      '<rect class="ws-clock" x="652" y="240" width="112" height="112" ' +
+        'fill="transparent" style="cursor:pointer" role="button" aria-label="提醒"/>' +
+      '<rect class="ws-paint" x="632" y="538" width="208" height="164" ' +
+        'fill="transparent" style="cursor:pointer" role="button" aria-label="回忆"/>' +
+      '<rect class="ws-mail" x="590" y="1090" width="84" height="64" ' +
+        'fill="transparent" style="cursor:pointer" role="button" aria-label="我们的家"/>' +
       // 二狗 ✓ —— 点它回主群聊 ✓
       flatCatSvg() +
       // 来找它玩的小蝴蝶 ✓ —— 画在猫上面 ✓，停在鼻尖时不会被挡住 ✓
@@ -811,11 +836,21 @@
       '<rect x="0" y="0" width="900" height="1600" fill="none" stroke="#8a5a3a" ' +
         'stroke-width="80" opacity=".05" pointer-events="none"/>';
 
-    svg.querySelectorAll('.ws-obj').forEach(function (el) {
-      el.addEventListener('click', function () {
-        const c = wsCanvas.find(function (x) { return x.slug === 'bookkeeping-panel'; });
-        if (c) openComp(c.slug, c.title || '记账', (c.spot && c.spot.tint) || '');
-      });
+    // ★ 2026-10-28（P2）：屋里**每个物开自己那一屏** ✓ ——
+    //   书架的账本 → 账本屏 ✓；挂钟 → 提醒 ✓；挂画 → 回忆墙 ✓；火漆信 → 我们的家 ✓。
+    //   热区都在物身上 ✓（见上面那几块透明 rect ✓），屋里照样**一个按钮都不多** ✓。
+    const wire = function (sel, fn) {
+      const el = svg.querySelector(sel);
+      if (el) el.addEventListener('click', function (ev) { ev.stopPropagation(); fn(); });
+    };
+    wire('.ws-shelf', function () { openLedger(); });
+    wire('.ws-clock', function () { openClock(); });
+    wire('.ws-paint', function () { openMemoryWall(); });
+    // 信 → 我们的家 ✓。⚠️ 设置是 z10、屋子是 z22 ✓ —— **先退屋再进设置** ✓，
+    //   不然设置页会藏在屋子底下 ✗（看着像"点了没反应"✓）。
+    wire('.ws-mail', function () {
+      closeWorkshop();
+      setTimeout(function () { openSettings(); }, 260);
     });
 
     // ★ 点桌上的信簿 → **落座** ✓（3.1）—— 镜头俯冲进书页，收尾就是聊天 ✓。
@@ -879,6 +914,9 @@
       });
     }
 
+    // ★ 2026-10-28（P2）：点二狗 → **管家面板** ✓（原来是"蹦一下回聊天"✓）。
+    //   蹦那一下留着 ✓（它应一声 ✓），落点换成面板 ✓ —— 屋里找管家就该跟管家说话 ✓，
+    //   而不是把人一脚踢回聊天 ✓（那条路一直有 ✓：桌上的信簿 = 落座进聊天 ✓）。
     const cat = svg.querySelector('.ws-cat');
     if (cat) {
       let leaving = false;
@@ -890,7 +928,7 @@
         if (jump && jump.beginElement) jump.beginElement();
         const tilt = svg.querySelector('#wsCatTilt');
         if (tilt && tilt.beginElement) tilt.beginElement();
-        setTimeout(function () { closeWorkshop(); }, 520);   // 动作播完再走 ✓
+        setTimeout(function () { leaving = false; openButler(); }, 520);  // 动作播完再开 ✓
       });
     }
     wrap.appendChild(svg);
@@ -1041,16 +1079,640 @@
 
   /** 记一笔 → 直接翻到账本那件物 ✓（和点书架上那本同一个出口 ✓）。 */
   const pcBook = () => {
-    const c = wsCanvas.find(function (x) { return x.slug === 'bookkeeping-panel'; });
-    if (!c) { toast('还没有账本，让管家先做一个'); return; }
+    // ★ 2026-10-28（P2）：今日那颗「记账」→ **原生账本屏** ✓（原来是组件 ✓）。
+    //   今日和账本都是 z 23 / 24 ✓ → 先把今日收掉再开 ✓（不然它俩会叠着 ✓）。
     closeToday();
-    setTimeout(function () {
-      openComp(c.slug, c.title || '记账', (c.spot && c.spot.tint) || '');
-    }, 220);
+    setTimeout(function () { openLedger(); }, 220);
   };
 
   if ($('#pcWrite')) $('#pcWrite').addEventListener('click', pcWrite);
   if ($('#pcBook')) $('#pcBook').addEventListener('click', pcBook);
+
+  // ══ 纸上小屋 · P2：提醒 / 账本 / 回忆墙 / 文具托盘 / 工具扇 / 管家面板 ══
+  //
+  // ★ **数据只走公开接口** ✓（`/api/groups/<id>/records|reminders|memories` ✓，
+  //   cookie 鉴权 ✓，见 `app/api/home.py` ✓）—— 不给网页开内部票那条路 ✓。
+  // ★ 账本是**原生**的一屏 ✓，但它和管家做的 `bookkeeping-panel` 组件
+  //   **读的是同一张 `records` 表** ✓ —— 两个入口看到的是同一笔账 ✓，
+  //   不会"这边记了那边不知道"✓。组件那个入口还在 ✓（账本屏底下留了一条 ✓）。
+  // ⚠️ 三屏都要在 `_OTHER_SCREENS` + `__goBack` 里 ✓（z 24 ✓，见 index.html 那段 ✓）。
+  // ⚠️ 这段必须留在 IIFE 里 ✓、在 `window.LifeGuard` 导出之前 ✓
+  //   （理由和今日明信片那段一模一样 ✓）。
+
+  const h0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const hDay = (ts) => { const d = new Date(ts * 1000); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const hDayLabel = (ts) => {
+    const day = hDay(ts), t = h0();
+    if (day === t) return '今天';
+    if (day === t - 86400000) return '昨天';
+    const d = new Date(day);
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  };
+  const hHM = (ts) => {
+    const d = new Date(ts * 1000);
+    return String(d.getHours()).padStart(2, '0') + ':' +
+           String(d.getMinutes()).padStart(2, '0');
+  };
+  /** 钱：**两位小数、不带符号** ✓ —— 正负由调用处决定（支出不加、收入加 + ✓）。 */
+  const hMoney = (n) => (Math.round(Math.abs(Number(n) || 0) * 100) / 100).toFixed(2);
+  const hBtn = (cls, txt, fn) => {
+    const b = mkel('button', cls, txt);
+    b.type = 'button';
+    if (fn) b.onclick = fn;
+    return b;
+  };
+  /** 三屏的进出：**状态栏那一下跟着走** ✓（纸是浅的 → 深色图标 ✓；
+   *  灯开着 / 深色主题时又反回来 ✓，判据全在 `_syncStatusBar` ✓）。 */
+  const hEnter = (id) => { pushScreen(id); _syncStatusBar(); };
+  const hLeave = (id) => { popScreen(id); setTimeout(_syncStatusBar, 220); };
+
+  // ── 提醒（点墙上的挂钟 / 长按消息「变提醒」/ 工具扇 ✓）───────────────
+  let clockRows = [], clockPrefill = '', clockPick = 'm10';
+  const CLOCK_WHEN = [
+    { k: 'm10', label: '10 分钟', spec: () => ({ in_minutes: 10 }) },
+    { k: 'h1',  label: '1 小时',  spec: () => ({ in_minutes: 60 }) },
+    { k: 'am8', label: '早上 8 点', spec: () => ({ hour: 8, minute: 0 }) },
+    { k: 'pm8', label: '晚上 8 点', spec: () => ({ hour: 20, minute: 0 }) },
+  ];
+
+  const renderClock = () => {
+    const box = $('#clockBody');
+    if (!box) return;
+    box.innerHTML = '';
+
+    const q = mkel('div', 'rm-quick');
+    const inp = mkel('input');
+    inp.type = 'text';
+    inp.maxLength = 80;
+    inp.placeholder = '要提醒什么？';
+    inp.value = clockPrefill || '';
+    clockPrefill = '';
+    q.appendChild(inp);
+
+    const when = mkel('div', 'rm-when');
+    CLOCK_WHEN.forEach(function (w) {
+      const c = hBtn('rm-chip' + (clockPick === w.k ? ' on' : ''), w.label, function () {
+        clockPick = w.k;
+        haptic('soft');
+        // ⚠️ **只在原地换样式** ✓，不整屏重画 ✗ —— 重画会把已经打的字抹掉 ✓。
+        when.querySelectorAll('.rm-chip').forEach(function (x) {
+          x.classList.toggle('on', x === c);
+        });
+      });
+      when.appendChild(c);
+    });
+    q.appendChild(when);
+
+    const add = hBtn('rm-add', '定好', async function () {
+      const text = inp.value.trim();
+      if (!text) { inp.focus(); return; }
+      const w = CLOCK_WHEN.find(function (x) { return x.k === clockPick; }) || CLOCK_WHEN[0];
+      add.disabled = true;
+      try {
+        await api(`/groups/${group.id}/reminders`, {
+          method: 'POST',
+          body: JSON.stringify(Object.assign({ text: text }, w.spec())),
+        });
+        sfx('bell'); haptic('soft');
+        toast('记下了');
+        await loadClock();
+      } catch (e) { toast(e.message || '没记上'); }
+      add.disabled = false;
+    });
+    q.appendChild(add);
+    box.appendChild(q);
+
+    const list = mkel('div', 'rm-list');
+    if (!clockRows.length) {
+      list.appendChild(mkel('div', 'h-empty', '还没有提醒。'));
+    } else {
+      let lastDay = '';
+      clockRows.forEach(function (r) {
+        const day = hDayLabel(r.fire_at);
+        if (day !== lastDay) { lastDay = day; list.appendChild(mkel('div', 'h-sec', day)); }
+        const row = mkel('div', 'rm-row' + (r.enabled ? '' : ' off'));
+        const clk = mkel('div', 'rm-clock');
+        clk.appendChild(mkel('b', null, hHM(r.fire_at)));
+        clk.appendChild(mkel('i', null, r.repeat_daily ? '每天' : ''));
+        const mid = mkel('div', 'rm-mid');
+        mid.appendChild(mkel('div', 'rm-text', r.text || ''));
+        if (!r.enabled) mid.appendChild(mkel('span', 'rm-tag', '已停'));
+        const del = hBtn('rm-del', '✕', async function () {
+          const yes = await confirmBox({
+            title: '取消这条提醒？',
+            body: r.text || '',
+            ok: '取消它',
+            danger: true,
+          });
+          if (!yes) return;
+          try {
+            await api(`/groups/${group.id}/reminders/${r.id}`, { method: 'DELETE' });
+            haptic('soft');
+            await loadClock();
+          } catch (e) { toast(e.message || '没取掉'); }
+        });
+        del.setAttribute('aria-label', '取消这条提醒');
+        row.append(clk, mid, del);
+        list.appendChild(row);
+      });
+    }
+    box.appendChild(list);
+  };
+
+  const loadClock = async () => {
+    try {
+      const d = await api(`/groups/${group.id}/reminders`);
+      clockRows = (d && d.items) || [];
+    } catch (e) { clockRows = []; }
+    renderClock();
+  };
+  /** `prefill` = 长按消息「变提醒」带过来的那句话 ✓。 */
+  const openClock = (prefill) => {
+    clockPrefill = prefill || '';
+    clockRows = [];
+    renderClock();          // 先给壳 ✓，不等网络 ✓
+    hEnter('clock');
+    loadClock();
+  };
+
+  // ── 账本（点书架那本 / 长按消息「记一笔」/ 工具扇 / 今日「记一笔」✓）───
+  let ledgerRows = [], ledgerPrefill = '', ledgerKind = 'out', ledgerCat = '餐饮';
+  const LG_CATS = ['餐饮', '日用', '交通', '玩乐', '其他'];
+
+  const renderLedger = () => {
+    const box = $('#ledgerBody');
+    if (!box) return;
+    box.innerHTML = '';
+
+    // ① 本月小结：**只数列表里这些** ✓（limit 300 ✓，正常够用 ✓；
+    //   不够的话多出来的不算进合计 ✓ —— 所以口径写的是"这 300 笔"✓）。
+    let out = 0, inc = 0;
+    ledgerRows.forEach(function (r) {
+      const a = Number(r.amount) || 0;
+      if (a >= 0) out += a; else inc -= a;
+    });
+    const sum = mkel('div', 'lg-sum');
+    const cell = function (k, v, cls) {
+      const d = mkel('div');
+      d.appendChild(mkel('div', 'k', k));
+      d.appendChild(mkel('div', 'v' + (cls ? ' ' + cls : ''), v));
+      return d;
+    };
+    sum.appendChild(cell('共', String(ledgerRows.length) + ' 笔'));
+    sum.appendChild(cell('花掉', '¥' + hMoney(out), 'out'));
+    sum.appendChild(cell('进账', '¥' + hMoney(inc), 'in'));
+    box.appendChild(sum);
+
+    // ② 记一笔
+    const q = mkel('div', 'lg-quick');
+    const amtRow = mkel('div', 'lg-amt');
+    const kindBtn = hBtn('rm-chip', '支出', function () {
+      ledgerKind = ledgerKind === 'out' ? 'in' : 'out';
+      kindBtn.textContent = ledgerKind === 'out' ? '支出' : '收入';
+      kindBtn.classList.toggle('on', ledgerKind === 'in');
+      haptic('soft');
+    });
+    kindBtn.classList.toggle('on', ledgerKind === 'in');
+    amtRow.append(kindBtn, mkel('span', 'cur', '¥'));
+    const amtInp = mkel('input');
+    amtInp.type = 'text';
+    amtInp.inputMode = 'decimal';
+    amtInp.placeholder = '0.00';
+    amtRow.appendChild(amtInp);
+    q.appendChild(amtRow);
+
+    const cats = mkel('div', 'lg-cats');
+    LG_CATS.forEach(function (c) {
+      const b = hBtn('rm-chip' + (ledgerCat === c ? ' on' : ''), c, function () {
+        ledgerCat = c;
+        cats.querySelectorAll('.rm-chip').forEach(function (x) {
+          x.classList.toggle('on', x === b);
+        });
+        haptic('soft');
+      });
+      cats.appendChild(b);
+    });
+    q.appendChild(cats);
+
+    const note = mkel('input', 'lg-note');
+    note.type = 'text';
+    note.maxLength = 80;
+    note.placeholder = '买了什么';
+    note.value = ledgerPrefill || '';
+    ledgerPrefill = '';
+    q.appendChild(note);
+
+    const add = hBtn('lg-add', '记上', async function () {
+      const a = Math.abs(Number(String(amtInp.value).replace(',', '.')));
+      if (!isFinite(a) || a <= 0) { amtInp.focus(); return; }
+      const v = ledgerKind === 'in' ? -Math.round(a * 100) / 100 : Math.round(a * 100) / 100;
+      add.disabled = true;
+      try {
+        await api(`/groups/${group.id}/records`, {
+          method: 'POST',
+          body: JSON.stringify({
+            amount: v,
+            category: ledgerCat,
+            note: note.value.trim(),
+          }),
+        });
+        sfx('paper'); haptic('soft');
+        toast('记上了');
+        await loadLedger();
+      } catch (e) { toast(e.message || '没记上'); }
+      add.disabled = false;
+    });
+    q.appendChild(add);
+    box.appendChild(q);
+
+    // ③ 流水：**按天分堆** ✓（同一天不重复写日期 ✓）
+    // 先按**哪一天**倒序（spent_at 才是"这笔记在哪天"✓），同一天里再按**记下来的先后**倒序 ✓
+    // （不能只按 spent_at 排：它同一天全是一个值，前后顺序就靠库返回的顺序凑巧 ✓）
+    const rows = ledgerRows.slice().sort(function (a, b) {
+      const da = hDay(a.spent_at || a.created_at || 0);
+      const db = hDay(b.spent_at || b.created_at || 0);
+      if (da !== db) return db - da;
+      return ((b.created_at || b.spent_at || 0) - (a.created_at || a.spent_at || 0));
+    });
+    if (!rows.length) {
+      box.appendChild(mkel('div', 'h-empty', '账本还是空的。'));
+    } else {
+      let lastDay = '';
+      rows.forEach(function (r) {
+        const ts = r.spent_at || r.created_at || 0;
+        if (!ts) return;
+        const day = hDayLabel(ts);
+        if (day !== lastDay) { lastDay = day; box.appendChild(mkel('div', 'lg-day', day)); }
+        const row = mkel('div', 'lg-row');
+        row.appendChild(mkel('span', 'cat', r.category || '其他'));
+        const nt = mkel('div', 'nt');
+        nt.appendChild(document.createTextNode(r.note || '（没写）'));
+        // ⚠️ 时间取 `created_at`（记下来的那一刻）✓，**不用 `spent_at`** ✗：
+        //   管家写账时把 spent_at 存成**当天 0 点（UTC）** = 北京 08:00 ✓，
+        //   拿来显示"几点"会每一笔都是 08:00（2026-10-28 截图里就是这样 ✓）。
+        //   分堆仍用 spent_at（那是"哪天的账"✓），只是不显示它的钟点。
+        nt.appendChild(mkel('small', null, hHM(r.created_at || ts)));
+        row.appendChild(nt);
+        const a = Number(r.amount) || 0;
+        const amt = mkel('span', 'amt ' + (a >= 0 ? 'out' : 'in'),
+          (a >= 0 ? '' : '+') + '¥' + hMoney(a));
+        row.appendChild(amt);
+        box.appendChild(row);
+      });
+    }
+
+    // ④ 管家做的那个账本面板 —— **同一张表** ✓，想去老样子看看的还能去 ✓
+    const comp = (wsCanvas || []).find(function (x) { return x.slug === 'bookkeeping-panel'; });
+    if (comp) {
+      const more = hBtn('bs-note', '打开管家的账本面板', function () {
+        hLeave('ledgerBook');
+        setTimeout(function () { openComp(comp.slug, comp.title || '记账', (comp.spot && comp.spot.tint) || ''); }, 220);
+      });
+      more.style.marginTop = '22px';
+      box.appendChild(more);
+    }
+  };
+
+  const loadLedger = async () => {
+    try {
+      const d = await api(`/groups/${group.id}/records?kind=bookkeeping&limit=300`);
+      ledgerRows = (d && d.items) || [];
+    } catch (e) { ledgerRows = []; }
+    renderLedger();
+  };
+  const openLedger = (prefill) => {
+    ledgerPrefill = prefill || '';
+    ledgerRows = [];
+    renderLedger();
+    hEnter('ledgerBook');
+    loadLedger();
+  };
+
+  // ── 回忆墙（点挂画 / 长按消息「钉上墙」/ 工具扇 ✓）───────────────────
+  let memoryRows = [];
+  const MW_TILTS = ['-2.2deg', '1.6deg', '2.4deg', '-1.4deg', '1deg', '-2.6deg'];
+
+  const renderMemory = () => {
+    const box = $('#memoryBody');
+    if (!box) return;
+    box.innerHTML = '';
+    if (!memoryRows.length) {
+      box.appendChild(mkel('div', 'mw-empty', '墙还空着。长按一句话，钉上来。'));
+      return;
+    }
+    const grid = mkel('div', 'mw-grid');
+    memoryRows.forEach(function (m, i) {
+      const card = mkel('div', 'mw-card');
+      card.style.setProperty('--tilt', MW_TILTS[i % MW_TILTS.length]);
+      card.style.setProperty('--tape-tilt', (i % 2 ? '2deg' : '-2deg'));
+      if (m.media_path && m.msg_type === 'image') {
+        const img = document.createElement('img');
+        img.className = 'mw-img';
+        img.src = '/media/' + m.media_path;
+        img.alt = '';
+        img.loading = 'lazy';
+        card.appendChild(img);
+      }
+      if (m.text) card.appendChild(mkel('div', 'mw-quote', m.text));
+      const cap = mkel('div', 'mw-cap');
+      cap.appendChild(mkel('span', null, (m.created_at ? hDayLabel(m.created_at) : '')));
+      cap.appendChild(mkel('span', null, m.sender_nick || ''));
+      card.appendChild(cap);
+      const x = hBtn('mw-x', '✕', async function () {
+        const yes = await confirmBox({
+          title: '从墙上取下这张？',
+          body: '取下之后，原来那条消息还在。',
+          ok: '取下',
+          danger: true,
+        });
+        if (!yes) return;
+        try {
+          await api(`/groups/${group.id}/memories/${m.id}`, { method: 'DELETE' });
+          haptic('soft');
+          await loadMemory();
+        } catch (e) { toast(e.message || '没取下来'); }
+      });
+      x.setAttribute('aria-label', '从墙上取下');
+      card.appendChild(x);
+      grid.appendChild(card);
+    });
+    box.appendChild(grid);
+  };
+
+  const loadMemory = async () => {
+    try {
+      const d = await api(`/groups/${group.id}/memories?limit=200`);
+      memoryRows = (d && d.items) || [];
+    } catch (e) { memoryRows = []; }
+    renderMemory();
+  };
+  const openMemoryWall = () => {
+    memoryRows = [];
+    renderMemory();
+    hEnter('memoryWall');
+    loadMemory();
+  };
+
+  if ($('#clockClose')) $('#clockClose').onclick = function () { hLeave('clock'); };
+  if ($('#ledgerClose')) $('#ledgerClose').onclick = function () { hLeave('ledgerBook'); };
+  if ($('#memoryClose')) $('#memoryClose').onclick = function () { hLeave('memoryWall'); };
+
+  // ── 文具托盘（长按一条消息）─────────────────────────────────────────
+  //
+  // ★ 五个动作**都是真能做的** ✓（引用 / 钉到墙上 / 变成提醒 / 记一笔 / 复制 ✓）。
+  // ⚠️ **「删除」没做** ✗ —— 服务端**根本没有删消息的口子** ✓
+  //    （`/groups/<id>/messages` 只有 GET/POST ✓）。
+  //    加一个假按钮，或者拿"撤回"去凑，都是骗人 ✓ —— 宁可少一格 ✓。
+  let trayMsg = null;
+
+  const trayPreview = (m) => {
+    if (!m) return '［消息］';
+    if (m.msg_type === 'text') return m.content || '';
+    if (m.msg_type === 'sticker') return '［表情］';
+    if (m.msg_type === 'image') return '［图片］';
+    if (m.msg_type === 'file') {
+      const meta = m.media_meta || {};
+      return '［文件］' + (meta.original_name || '');
+    }
+    if (m.msg_type === 'audio' || m.msg_type === 'voice') return '［语音］';
+    return '［消息］';
+  };
+
+  const closeTray = function () {
+    const t = $('#tray');
+    if (t) t.classList.remove('on');
+    trayMsg = null;
+  };
+
+  const openTray = function (row) {
+    const m = _msgs.get(Number(row.dataset.id));
+    if (!m) return;
+    trayMsg = m;
+    const who = $('#trayWho');
+    if (who) who.textContent = m.sender_type === 'agent' ? agentName() : (m.sender_nickname || '我');
+    const txt = $('#trayTxt');
+    if (txt) txt.textContent = trayPreview(m);
+    const acts = $('#trayActs');
+    if (!acts) return;
+    acts.innerHTML = '';
+    const body = m.msg_type === 'text' ? (m.content || '') : '';
+    const A = [
+      { ico: 'quote', lbl: '引用', fn: function () { setQuote(m); closeTray(); sfx('paper'); toast('引用它'); } },
+      { ico: 'pin', lbl: '钉上墙', fn: function () { pinMemory(m); } },
+      { ico: 'clock', lbl: '变提醒', fn: function () { closeTray(); openClock(body); } },
+      { ico: 'book', lbl: '记一笔', fn: function () { closeTray(); openLedger(body); } },
+      { ico: 'copy', lbl: '复制', fn: function () {
+        if (!body) { toast('这条没有字'); return; }
+        copyText(body); closeTray();
+      } },
+    ];
+    A.forEach(function (a) {
+      const b = mkel('button', 'tray-act' + (a.ico === 'pin' ? ' warm' : ''));
+      b.type = 'button';
+      const ic = mkel('span', 'ti');
+      ic.appendChild(ico(a.ico));
+      b.append(ic, mkel('span', 'tl', a.lbl));
+      b.onclick = a.fn;
+      acts.appendChild(b);
+    });
+    haptic('soft');
+    const t = $('#tray');
+    if (t) t.classList.add('on');
+  };
+
+  const pinMemory = async function (m) {
+    try {
+      const d = await api(`/groups/${group.id}/memories`, {
+        method: 'POST',
+        body: JSON.stringify({ message_id: m.id }),
+      });
+      sfx('pop'); haptic('soft');
+      toast(d && d.duplicated ? '这张已经在墙上了' : '钉到墙上了');
+    } catch (e) { toast(e.message || '没钉上'); }
+    closeTray();
+  };
+
+  if ($('#trayScrim')) $('#trayScrim').onclick = closeTray;
+
+  // ── 工具扇（点 +）───────────────────────────────────────────────────
+  //
+  // ★ 从 + 那儿**向上展开** ✓ —— 两圈：近的一圈是四样"从手机里拿"✓，
+  //   远的一圈是三样"屋子里的东西"✓。位置是**现算的** ✓（按 + 的当前位置 ✓），
+  //   换手机 / 键盘弹起都对 ✓。
+  // ⚠️ **表情和语音不在扇子里** ✓ —— 它们本来就有自己的按钮 ✓（输入区那排 ✓）。
+  const closeToolFan = function () {
+    const f = $('#toolFan');
+    if (f) f.classList.remove('on');
+  };
+
+  const openToolFan = function () {
+    const btn = $('#pickMedia');
+    const box = $('#tfItems');
+    if (!btn || !box) return;
+    const r = btn.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    box.innerHTML = '';
+    const fan = $('#toolFan');
+    // ★ 两圈弧 ✓：**内圈 4 件**（相册/拍摄/文件/音频，R196 ✓）、
+    //   **外圈 3 件**（账本/提醒/回忆，R300 ✓）。
+    // ⚠️ 间距是算过的 ✗ **不是随手写的**：一件 76 宽 / 94 高 ✓，
+    //   同一圈相邻两件**弦长要 ≥ 80** ✓ → 内圈每件隔 24° ✓、外圈 30° ✓。
+    //   （第一版 R118 挤 4 件，弦长才 44 ✓ —— 截图里图标直接摞在一起 ✓。）
+    // ⚠️ 角度以 **-90° = 正上** ✓、-180° = 正左 ✓ 量，扇面从**左下扫到右上** ✓。
+    const T = [
+      { ico: 'image',  lbl: '相册', a: -170, R: 196, tilt: -9,
+        fn: function () { closeToolFan(); $('#fileGallery').click(); } },
+      { ico: 'camera', lbl: '拍摄', a: -146, R: 196, tilt: -3,
+        fn: function () {
+          closeToolFan();
+          if (isNative && window.LifeGuardNative.takePhoto) window.LifeGuardNative.takePhoto();
+          else $('#fileCamera').click();
+        } },
+      { ico: 'file',   lbl: '文件', a: -122, R: 196, tilt: 3,
+        fn: function () { closeToolFan(); $('#fileDoc').click(); } },
+      { ico: 'audio',  lbl: '音频', a: -98,  R: 196, tilt: 9,
+        fn: function () { closeToolFan(); $('#fileAudio').click(); } },
+      { ico: 'book',   lbl: '账本', a: -160, R: 300, tilt: -7,
+        fn: function () { closeToolFan(); openLedger(); } },
+      { ico: 'clock',  lbl: '提醒', a: -130, R: 300, tilt: 0,
+        fn: function () { closeToolFan(); openClock(); } },
+      { ico: 'frame',  lbl: '回忆', a: -100, R: 300, tilt: 7,
+        fn: function () { closeToolFan(); openMemoryWall(); } },
+    ];
+    const vw = window.innerWidth || 390, vh = window.innerHeight || 844;
+    // 先算全，**再整体平移** ✓ —— 一件一件单夹会把扇面挤变形 ✓
+    // （卡片 76 宽 → 左右各让 38 ✓；整件 94 高、图标顶在 y-33 ✓）
+    let P = T.map(function (t) {
+      const rad = t.a * Math.PI / 180;
+      return { x: cx + Math.cos(rad) * t.R, y: cy + Math.sin(rad) * t.R };
+    });
+    const dx = Math.min(0, (vw - 44) - Math.max.apply(null, P.map(p => p.x)));
+    const dx2 = Math.max(0, 44 - Math.min.apply(null, P.map(p => p.x)));
+    const dy = Math.min(0, (vh - 108) - Math.max.apply(null, P.map(p => p.y)));
+    P = P.map(function (p) { return { x: p.x + dx + dx2, y: p.y + dy }; });
+    T.forEach(function (t, i) {
+      const { x, y } = P[i];
+      const el = mkel('button', 'tf-item');
+      el.type = 'button';
+      el.setAttribute('aria-label', t.lbl);
+      el.style.left = Math.round(x) + 'px';
+      el.style.top = Math.round(y - 33) + 'px';
+      el.style.transitionDelay = (i * 26) + 'ms, ' + (i * 26) + 'ms';
+      const obj = mkel('span', 'tf-obj');
+      obj.appendChild(ico(t.ico));
+      obj.style.transform = 'rotate(' + t.tilt + 'deg)';
+      el.append(obj, mkel('span', 'tf-lbl', t.lbl));
+      el.onclick = t.fn;
+      box.appendChild(el);
+    });
+    haptic('soft');
+    if (fan) fan.classList.add('on');
+  };
+
+  if ($('#tfScrim')) $('#tfScrim').onclick = closeToolFan;
+
+  // ── 管家面板（点屋里那只二狗 ✓）──────────────────────────────────────
+  //
+  // ★ 只列**真能做的事** ✓（账本 / 提醒 / 回忆 / 说句话 ✓）和
+  //   **屋里真有的数** ✓（空间 / 账本 / 提醒 / 回忆 / 成员 ✓）。
+  // ⚠️ **不放模型和提示词** ✓（那是「我们的家 → 管家 / 工作间」✓）；
+  // ⚠️ **也不写"我是你的生活管家"** ✗ —— 名字 + 四件事 + 几个数 ✓，
+  //    就是这块板的全部 ✓（用户定的「不要介绍性文字」✓）。
+  const closeButler = function () {
+    const b = $('#butler');
+    if (b) b.classList.remove('on');
+  };
+
+  const loadButlerFacts = async function () {
+    const box = $('#bsFacts');
+    if (!box) return;
+    const set = function (k, v) {
+      const el = box.querySelector('[data-fk="' + k + '"]');
+      if (el) el.textContent = v;
+    };
+    set('mb', (members || []).length + ' 人');
+    const d = await Promise.all([
+      api(`/groups/${group.id}/records?kind=bookkeeping&limit=1000`).catch(function () { return null; }),
+      api(`/groups/${group.id}/reminders`).catch(function () { return null; }),
+      api(`/groups/${group.id}/memories?limit=500`).catch(function () { return null; }),
+    ]);
+    const recs = d[0], rems = d[1], mems = d[2];
+    set('rec', recs ? (String(recs.count != null ? recs.count : (recs.items || []).length) + ' 笔') : '—');
+    set('rem', rems ? (String(((rems.items || []).filter(function (x) { return x.enabled; })).length) + ' 条') : '—');
+    set('mem', mems ? (String((mems.items || []).length) + ' 张') : '—');
+  };
+
+  const openButler = function () {
+    const p = $('#butlerPanel');
+    if (!p) return;
+    p.innerHTML = '';
+
+    const head = mkel('div', 'bs-head');
+    const av = mkel('div', 'bs-av');
+    const im = document.createElement('img');
+    im.src = '/static/erdog.svg';
+    im.alt = '';
+    av.appendChild(im);
+    const who = mkel('div', 'bs-who');
+    who.appendChild(mkel('div', 'n', agentName()));
+    who.appendChild(mkel('div', 's', (group && group.name) || ''));
+    head.append(av, who);
+    p.appendChild(head);
+
+    const caps = mkel('div', 'bs-caps');
+    [
+      { ico: 'book', lbl: '账本', fn: function () { closeButler(); openLedger(); } },
+      { ico: 'clock', lbl: '提醒', fn: function () { closeButler(); openClock(); } },
+      { ico: 'frame', lbl: '回忆', fn: function () { closeButler(); openMemoryWall(); } },
+      { ico: 'chat', lbl: '说句话', fn: function () {
+        closeButler();
+        setTimeout(function () {
+          if ($('#workshop').classList.contains('on')) closeWorkshop();
+          setTimeout(function () { const t = $('#text'); if (t) t.focus(); }, 260);
+        }, 120);
+      } },
+    ].forEach(function (c) {
+      const b = mkel('button', 'bs-cap');
+      b.type = 'button';
+      b.appendChild(ico(c.ico));
+      b.appendChild(mkel('span', null, c.lbl));
+      b.onclick = c.fn;
+      caps.appendChild(b);
+    });
+    p.appendChild(caps);
+
+    const facts = mkel('div', 'bs-facts');
+    facts.id = 'bsFacts';
+    // ⚠️ 不列「空间」那行 ✗ —— 名字已经写在头上那行小字里了 ✓，
+    //   同一屏把「大象的鼻子很长」印两遍是废行 ✓（2026-10-28 截图里就是这样 ✓）。
+    [
+      ['账本', 'rec', '…'],
+      ['提醒', 'rem', '…'],
+      ['回忆', 'mem', '…'],
+      ['成员', 'mb', (members || []).length + ' 人'],
+    ].forEach(function (row) {
+      const r = mkel('div', 'bs-fact');
+      r.appendChild(mkel('span', 'fk', row[0]));
+      const v = mkel('span', 'fv', row[2]);
+      v.dataset.fk = row[1];
+      r.appendChild(v);
+      facts.appendChild(r);
+    });
+    p.appendChild(facts);
+
+    haptic('soft');
+    $('#butler').classList.add('on');
+    loadButlerFacts();
+  };
+
+  if ($('#butler')) {
+    $('#butler').addEventListener('click', function (e) {
+      if (e.target && e.target.id === 'butler') closeButler();
+    });
+  }
+  // 桌角那只二狗 → 管家面板 ✓（原来是"蹦一下回聊天"✓）。
+  //   `buildFlatScene` 里那段已经把"蹦一下"放在了前面 ✓，这里只把落点换掉 ✓。
 
   // ── 3D 卧室视图（2026-10-15 大升级，M1）──────────────────────────
   // 按需加载 `/static/room3d.js`（925KB three.js ✗ → 不进 app.js ✓，只在用时拉），

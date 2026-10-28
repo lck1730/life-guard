@@ -53,6 +53,7 @@ from .core.messages import current_status_for
 from .models.proxy import router as models_proxy_router
 from .models.routes import router as models_router
 from .api.groups import router as groups_router
+from .api.home import router as home_router
 from .api.internal import _records_spec, router as internal_router
 from .api.media import router as media_router
 from .api.shell import router as shell_router
@@ -124,6 +125,9 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 
 app.include_router(groups_router)
+# ★ 2026-10-28：纸上小屋的公开接口（账本 / 提醒 / 回忆墙 ✓）。
+#   和 groups 同前缀但路径不重叠 ✓；挂在 groups 后面，具体路径优先 ✓。
+app.include_router(home_router)
 app.include_router(media_router)
 app.include_router(internal_router)
 # ★ 2026-10-08 合并：**「壳」那一半搬进来了** ✓（登录 / 注册 / 账号 / 生活空间 ✓）。

@@ -1302,6 +1302,11 @@
     }
     // ★ 2026-10-11：「模型」这一行**只有管理员看得见** ✓ ——
     //   藏入口只是体验 ✓，闸门在服务端（`/api/models/*` 的 `require_admin` ✓）。
+    // ★ 2026-10-28（P3）：三个开关（夜灯 / 声音 / 触感）✓ —— **照实报** ✓。
+    //   ⚠️ 这里只**显示**状态 ✓；真正翻开关走 `data-act` 那条 ✓。
+    const swL = $('#swLamp'); if (swL) swL.classList.toggle('on', lampOn());
+    const swS = $('#swSound'); if (swS) swS.classList.toggle('on', soundOn());
+    const swH = $('#swHaptic'); if (swH) swH.classList.toggle('on', hapticOn());
     const rm = $('#rowModels');
     if (rm) rm.style.display = (me && me.is_admin) ? '' : 'none';
   };
@@ -1503,6 +1508,12 @@
       //    它是条**死路**：设置里那一行 DOM 早就被拿掉了 ✓（用户"后续我自有安排"✓），
       //    所以那个分支永远不会被触发 ✓，只会让人以为"有个组件入口在设置里" ✗。
       //    2026-10-07 创意工坊搬到群聊右上角 ✓，这条删掉 ✓。
+      // ★ 2026-10-28（P3）：三个开关 ✓ —— 点一下翻一面 ✓，就地改、不推开新屏 ✓。
+      //   ⚠️ 开灯那一下**有铃** ✓（`setLamp` 里 ✓）；关灯**不出声** ✓（静下来才对 ✓）。
+      else if (act === 'lamp') { setLamp(!lampOn()); renderSettings(); }
+      // `setSound` 打开时会自己「啵」一声 ✓（听着就是开了 ✓）、关掉则彻底不响 ✓。
+      else if (act === 'sound') { setSound(!soundOn()); renderSettings(); }
+      else if (act === 'haptic') { setHaptic(!hapticOn()); renderSettings(); }
       else if (act === 'logout') logout();
     };
   });
@@ -1973,8 +1984,9 @@
   // ⚠️ `#msgcard` 从这一串里**去掉了** ✗→✓（2026-10-11）—— 那张长按小卡片整个删了 ✓。
   //    留着它**不会报错** ✓（`$(s)` 是 null ✓、`.some` 直接跳过 ✓），
   //    但那就是**一个永远为假的判断** ✓ —— 下一个人读到会以为"世上还有这么个东西" ✓。
+  // ⚠️ 2026-10-28：**三张新弹层**（托盘 / 工具扇 / 管家面板）也归这儿 ✓ —— 开着就不认手势 ✓。
   const _overlayOn = () =>
-    ['#sheet', '#modal'].some(s => $(s) && $(s).classList.contains('on'));
+    ['#sheet', '#modal', '#tray', '#toolFan', '#butler'].some(s => $(s) && $(s).classList.contains('on'));
 
   //: 除了这三屏之外，**其余任何一屏开着就不认手势** ✓（用户 2026-10-09：
   //: 「[组件沙箱]界面，只有在主群聊时右滑才出现，不能到处出现」✓）。
@@ -1989,6 +2001,9 @@
     // ★ 2026-10-28：今日明信片 ✓ —— 整屏子页 ✓，报给原生一律 `'settings'` ✓
     //   （只有 `#chat` 报 `'chat'` ✓）；它在 `__goBack` 里的位置见 z 23 ✓。
     '#today',
+    // ★ 2026-10-28（P2）：提醒 / 账本 / 回忆墙 ✓ —— 从屋里推上来的整屏子页 ✓，
+    //   z 24（> 今日 23 ✓ / < 组件页 26 ✓）；`__goBack` 的位置见 02-agent.js ✓。
+    '#clock', '#ledgerBook', '#memoryWall',
   ];
 
   const _whichScreen = () => {

@@ -23,6 +23,11 @@
 </script>
 <title>生活管家</title>
 <link rel="stylesheet" href="/static/app.css">
+<!-- ★ 2026-10-28：**纸上小屋 P2/P3 的新样式** ✓ —— 文具托盘 / 工具扇 /
+     提醒 / 账本 / 回忆墙 / 管家面板 / 夜灯 / 设置页的分组和开关 ✓。
+     ⚠️ 单独一个文件 ✓：`app.css` 是 CRLF ✓，往它中间插一行会让**整份**
+        在 git 里看着像被重写 ✓ —— 老规矩的改动就跟着看不清了 ✓。 -->
+<link rel="stylesheet" href="/static/home.css">
 </head>
 <body>
 
@@ -398,6 +403,46 @@
   </div>
 </div>
 
+<!-- ★★ 2026-10-28：**纸上小屋 · P2 的三屏** ✓ —— 提醒 / 账本 / 回忆墙 ✓
+     都是**屋里的东西**（墙上的挂钟 ✓、小架子上的账本 ✓、挂画背后的回忆 ✓）：
+     从屋里对应的物件推进来 ✓，也可以从长按消息的文具托盘直接过来 ✓。
+
+     ⚠️ 三屏都是整屏子页 ✓ → `_OTHER_SCREENS` 和 `__goBack` **两处都要有** ✓
+        （漏一处：第一次返回没反应、第二次直接退 App ✗，见
+        `android-back-key-only-knows-settings` ✓）；z-index 24 ✓
+        （今日明信片 23 之上 ✓、组件页 26 之下 ✓）。
+     ⚠️ 页面上**没有返回箭头** ✓（和主题 / 背景 / 今日一个规矩 ✓）——
+        右上是「收起」× ✓，系统返回键同一个出口 ✓。
+     ⚠️ 三屏里**一个字的介绍都没有** ✓（用户定的「不要介绍性文字」✓）：
+        标题是屏名 ✓、分组是真分组（今天 / 本月 ✓）、空态是"还没有…"✓ ——
+        没有一句"这里可以管理你的提醒"✗。 -->
+<div class="screen ascreen" id="clock">
+  <header class="sub">
+    <div class="spacer"></div>
+    <h2>提醒</h2>
+    <button class="hx" id="clockClose" aria-label="收起">✕</button>
+  </header>
+  <div class="abody" id="clockBody"></div>
+</div>
+
+<div class="screen ascreen" id="ledgerBook">
+  <header class="sub">
+    <div class="spacer"></div>
+    <h2>账本</h2>
+    <button class="hx" id="ledgerClose" aria-label="收起">✕</button>
+  </header>
+  <div class="abody" id="ledgerBody"></div>
+</div>
+
+<div class="screen ascreen" id="memoryWall">
+  <header class="sub">
+    <div class="spacer"></div>
+    <h2>回忆墙</h2>
+    <button class="hx" id="memoryClose" aria-label="收起">✕</button>
+  </header>
+  <div class="abody" id="memoryBody"></div>
+</div>
+
 <!-- 设置 -->
 <div class="screen" id="settings">
   <header class="sub">
@@ -417,15 +462,32 @@
     <div class="spacer"></div>
   </header>
   <div class="body">
-    <!-- ★★ **行序 2026-10-24 用户定的**（原话：「顺序：我的，管家，空间，主题，背景，
-         模型，邀请码，检查更新」✓）—— 八行**一张卡** ✓，退出两行仍单独一张卡 ✓。
-         ⚠️ 这条注释取代之前所有"行序"老注释 ✓（2026-10-06 / 10-08 / 10-09 那几条 ✓）——
-            顺序以**这里**为准 ✓，再改就改这里 ✓。 -->
+    <!-- ★★ **2026-10-28：八行一张卡 → 五个房间** ✓（纸上小屋 · P2「我们的家」）——
+         行**一个都没删** ✓，只是按"这是谁的事"分了组 ✓：
+           住户（我 / 邀请码）· 小屋（这间屋子长什么样）·
+           管家（它是谁）· 工作间（壳的事）· 门厅（走）
+         ⚠️ 组名是**房间名** ✓，不是功能说明 ✗（用户定的「不要介绍性文字」✓）。
+         ⚠️ 行序：组内顺序沿用 2026-10-24 用户定的那条 ✓
+            （我的，管家，空间，主题，背景，模型，邀请码，检查更新 ✓）——
+            跨组之后，"我的"仍在最前 ✓、"检查更新"仍在最后 ✓，中间那串的
+            相对顺序也没变 ✓（只是中间插进了「管家」这一组 ✓）。
+         ⚠️ 新增三行：夜灯 / 声音 / 触感 ✓（P3 ✓）—— 都是**开关** ✓，
+            不是那种点进去还要再选一次的 ✓（`.sw` ✓，见 home.css 那段 ✓）。 -->
 
+    <div class="house-sec">住户</div>
     <div class="sec-g">
       <div class="grp gcard">
     <div class="item" data-act="shell"><span class="ico" data-ico="user"></span><span class="k">我的</span><span class="v" id="vMe"></span><span class="chev" data-chev></span></div>
-    <div class="item" data-act="agentprofile"><span class="ico" data-ico="bot"></span><span class="k">管家</span><span class="v" id="vAname"></span><span class="chev" data-chev></span></div>
+    <!-- ★ 邀请码：点了是**复制** ✓（满员时说的话也一样 ✓）；右边那一格
+         **异步填** ✓（`refreshSpaceInfo` ✓）—— "满员没有"要问服务端 ✓。 -->
+    <div class="item" data-act="invite"><span class="ico" data-ico="link"></span><span class="k">邀请码</span><span class="v" id="vInvite"></span><span class="chev" data-chev></span></div>
+
+      </div>
+    </div>
+
+    <div class="house-sec">小屋</div>
+    <div class="sec-g">
+      <div class="grp gcard">
     <div class="item" data-act="gname"><span class="ico" data-ico="space"></span><span class="k">空间</span><span class="v" id="vGname"></span><span class="chev" data-chev></span></div>
     <!-- ★ 主题（2026-10-19）：三套可选（夜阑 / 奶霜 / 林深 ✓），选完立即生效 ✓。
          ⚠️ 只存这台设备、按用户 id 分开 ✓，不进服务端、不给空间里的别人 ✓。 -->
@@ -433,21 +495,40 @@
     <!-- ★ 聊天背景（2026-10-19）：**每个空间一份** ✓（存 `var/background/g<群号>/` ✓）——
          和上面那个"主题"不是一回事 ✗（主题是**这台设备**的 ✓）。 -->
     <div class="item" data-act="bg"><span class="ico" data-ico="image"></span><span class="k">背景</span><span class="v" id="vBg"></span><span class="chev" data-chev></span></div>
+    <!-- ★ 夜灯（2026-10-28）：**手动关灯** ✓ —— 白天也能开 ✓（就是"开灯"✓，
+         不按钟来 ✓）。只对奶霜有可见效果 ✓（另外两套本来就是深底 ✓）。
+         ⚠️ 存的是**这台设备**的偏好 ✓（`lg_lamp` ✓）—— 和主题同一个规矩 ✓。 -->
+    <div class="item" data-act="lamp"><span class="ico" data-ico="lamp"></span><span class="k">夜灯</span><span class="sw" id="swLamp"></span></div>
+    <div class="item" data-act="sound"><span class="ico" data-ico="sound"></span><span class="k">声音</span><span class="sw" id="swSound"></span></div>
+    <div class="item" data-act="haptic"><span class="ico" data-ico="haptic"></span><span class="k">触感</span><span class="sw" id="swHaptic"></span></div>
     <!-- ⚠️ 「气泡」**不在设置页** ✓（2026-10-27 用户纠正过 ✓）：
          它跟着**人**走 ✓（存服务端 ✓，别人也看得见 ✓），
          入口在「我的」（自己的 ✓）和「管家」（群级的 ✓）✓。 -->
+
+      </div>
+    </div>
+
+    <div class="house-sec">管家</div>
+    <div class="sec-g">
+      <div class="grp gcard">
+    <div class="item" data-act="agentprofile"><span class="ico" data-ico="bot"></span><span class="k">管家</span><span class="v" id="vAname"></span><span class="chev" data-chev></span></div>
     <!-- ★ 「模型」**只有管理员看得见** ✓（`renderSettings` 按 `me.is_admin` 显示 ✓）——
          藏起来只是**体验** ✓，闸门在 `/api/models/*` 的 `require_admin` ✓。 -->
     <div class="item" data-act="models" id="rowModels" style="display:none"><span class="ico" data-ico="layers"></span><span class="k">模型</span><span class="v" id="vModels"></span><span class="chev" data-chev></span></div>
-    <!-- ★ 邀请码：点了是**复制** ✓（满员时说的话也一样 ✓）；右边那一格
-         **异步填** ✓（`refreshSpaceInfo` ✓）—— "满员没有"要问服务端 ✓。 -->
-    <div class="item" data-act="invite"><span class="ico" data-ico="link"></span><span class="k">邀请码</span><span class="v" id="vInvite"></span><span class="chev" data-chev></span></div>
+
+      </div>
+    </div>
+
+    <div class="house-sec">工作间</div>
+    <div class="sec-g">
+      <div class="grp gcard">
     <!-- 手动查更新。自动检查是"开 App 时问一次"；这一条随时能问。右边是当前壳的版本号。 -->
     <div class="item" data-act="update"><span class="ico" data-ico="refresh"></span><span class="k">检查更新</span><span class="v" id="vAppVer"></span><span class="chev" data-chev></span></div>
 
       </div>
     </div>
 
+    <div class="house-sec">门厅</div>
     <div class="sec-g">
       <div class="grp gcard quit">
     <!-- ★ **退出当前空间**（2026-10-09 用户定的 ✓，原话：
@@ -549,6 +630,38 @@
 </div>
 
 <div class="sheet" id="sheet"><div class="panel" id="sheetPanel"></div></div>
+
+<!-- ★★ 2026-10-28：**文具托盘**（长按一条消息 ✓，纸上小屋 · P2）——
+     从底下推上来的一张牛皮纸托盘 ✓：上面一条纸胶带 ✓、中间是那句话
+     （像从本子上撕下来的一角 ✓）、下面五个真动作 ✓。
+     ⚠️ **动作按钮由 JS 画** ✓（`06-workshop.js` 的 `openTray` ✓）——
+        每个都得绑到闭合体内的函数上（`quoteById` / `pushScreen` / `api` ✓），
+        写在 HTML 里只能靠全局挂，那等于把内部东西往外露 ✗。
+     ⚠️ **必须在 body 底下** ✓（`position:fixed` 的层叠上下文那条老坑 ✓）。 -->
+<div id="tray" role="dialog" aria-modal="true" aria-label="消息操作">
+  <div class="tray-scrim" id="trayScrim"></div>
+  <div class="tray-card" id="trayCard">
+    <div class="tray-tape" aria-hidden="true"></div>
+    <div class="tray-prev">
+      <div class="tray-who" id="trayWho"></div>
+      <div class="tray-txt" id="trayTxt"></div>
+    </div>
+    <div class="tray-acts" id="trayActs"></div>
+  </div>
+</div>
+
+<!-- ★★ 2026-10-28：**工具扇**（点 +）—— 从 + 那里向上展开 ✓。
+     ⚠️ 扇面由 JS 量 `#pickMedia` 的位置再摆 ✓（每个宽窄 / 倾斜都差一点 ✓，
+        像真从抽屉里摸出来的 ✓），所以这里只留空壳 ✓。 -->
+<div id="toolFan" role="dialog" aria-modal="true" aria-label="附件与工具">
+  <div class="tf-scrim" id="tfScrim"></div>
+  <div id="tfItems"></div>
+</div>
+
+<!-- ★★ 2026-10-28：**管家面板**（点屋里那只二狗 ✓）——
+     `.sheet` 那一套 ✓（从底下上来 ✓、点暗处收 ✓），所以只换里面那张纸 ✓。
+     ⚠️ 不放模型 / 提示词 ✓ —— 那些在「我们的家 → 工作间 / 管家」✓。 -->
+<div class="sheet" id="butler"><div class="panel" id="butlerPanel"></div></div>
 
 <!-- ★ 确认框（2026-10-07 深夜）—— 用户定的：删东西不要"按钮上改字"那种提示，
      「只需要删除的时候弹出个框提示一下，二次确认就行」✓。 -->

@@ -543,23 +543,20 @@
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
   };
 
-  // ── 长按：头像 → @ 他；气泡 → **什么都不做**（交给系统）✗→✓（2026-10-11）──
+  // ── 长按：头像 → @ 他；气泡 → **文具托盘** ✓（2026-10-28，P2）─────────
   //
-  // ★ 用户这次定的（原话）：「长按消息不再有小卡片，就是默认系统的复制行为」✓。
+  // ⚠️ **这条改过四次，把来路写清楚** ✗（不然下次又绕回来）：
+  //     · 2026-10-07：让给浏览器 ✓（选中文字 → 系统那套自由复制 ✓）
+  //     · 2026-10-08：收回来 ✓（弹一张小卡片：自由复制 / 引用 ✓）
+  //     · 2026-10-11：卡片整个不要了 ✓（引用搬去右滑 ✓，长按交还系统 ✓）
+  //     · 2026-10-28（现在）：**换成文具托盘** ✓ —— 引用 / 钉到墙上 /
+  //       变成提醒 / 记一笔 / 复制 ✓（见 06-workshop.js 的 `openTray` ✓）。
   //
-  // ⚠️ **这条改过三次，把来路写清楚** ✗（不然下次又绕回来）：
-  //     · 2026-10-07：长按**让给浏览器** ✓（选中文字 → 系统那套自由复制 ✓）
-  //     · 2026-10-08：**收回来自己处理** ✓ —— 弹一张小卡片（自由复制 / 引用 ✓），
-  //       为此把 CSS 里气泡的选择整个关掉了 ✓
-  //     · 2026-10-11（现在）：**卡片整个不要了** ✓ —— 回到第一天那个样子 ✓。
-  //   之所以现在能回去：**引用搬到了右滑** ✓（见 `05-settings.js` ✓），
-  //   长按这条不用再替它扛着了 ✓。
-  //
-  // ⚠️ 下面那个分支里**故意什么都不做** ✗ —— 看着像"把代码删空了" ✓，
-  //    其实**这个空就是那个功能本身** ✓：气泡的 CSS 已经把
-  //    `user-select` / `-webkit-touch-callout` 打开了 ✓（见 app.css 那段 ✓），
-  //    长按自然就出系统那排（选中 + 复制/全选/搜索 ✓），拦不拦都一样 ✓。
-  //    ⚠️ **别在这儿补 `preventDefault`** ✗ —— 补了就等于又把它关回去 ✓。
+  // ★ 为什么又收回来了 ✓：这四个新动作**系统那排给不了** ✓；
+  //   "自由复制"没有丢 ✓ —— 它挪进托盘第五格 ✓（`copyText` ✓，
+  //   一键全选复制 ✓，比拖那两根手柄准 ✓）。
+  // ⚠️ 气泡上的 `user-select` 跟着**关掉了** ✓（见 home.css 那段 ✓）——
+  //   两套一起出来会打架 ✓（安卓的选择手柄还会把托盘压在下面 ✓）。
   const onPressStart = (e) => {
     if (!e.target.closest) return;
     const row = e.target.closest('#msgs .row[data-id]');
@@ -570,11 +567,16 @@
     pressTimer = setTimeout(() => {
       pressTimer = null;
       pressFired = true;
-      // ★ **只剩头像这一条了** ✓ —— 它不是"消息那张卡片" ✓，
-      //   而且 @ 这件事**没有别的手势替得了** ✓（右滑已经被引用占了 ✓）。
+      // 头像 → @ 他 ✓（这件事**没有别的手势替得了** ✓）；
+      // 气泡 → 托盘 ✓（2026-10-28 ✓）。
       if (onAvatar) atFromRow(row);
+      else openTray(row);
     }, PRESS_MS);
   };
+  // ⚠️ 长按气泡时浏览器仍可能想弹"选词 / 分享"那层 ✓ —— 挡掉 ✓（只挡气泡 ✓）。
+  $('#msgs').addEventListener('contextmenu', (e) => {
+    if (e.target.closest && e.target.closest('.bubble')) e.preventDefault();
+  });
 
   /** 长按头像 → 把这个人 @ 进输入框 ✓。 */
   const atFromRow = (row) => {
@@ -890,6 +892,8 @@
     const t = ta.value.trim();
     const items = pending.slice();          // 快照 ✓：发的过程里队列会变 ✓
     if (!t && !items.length) return;
+    // ★ 2026-10-28：**手上有回应** ✓（纸声 + 轻震 ✓）—— 声音/触感各自有开关 ✓。
+    sfx('paper'); haptic('soft');
     closeAtMenu();
     ta.value = ''; ta.style.height = 'auto';
     syncSendBtn('');
@@ -1019,69 +1023,15 @@
   //   ⚠️ 全部进群聊的 `pending` 队列 ✓。
   $('#fileDoc').addEventListener('change', e => { pickAdd(e.target.files[0], 'file'); e.target.value = ''; });
   $('#fileAudio').addEventListener('change', e => { pickAdd(e.target.files[0], 'audio'); e.target.value = ''; });
-  $('#pickMedia').onclick = () => {
-    const p = $('#sheetPanel');
-    // 微信的排布：横向一排，圆角方块图标 + 下方小字。顺序也是 相册 在前、拍摄 在后。
-    p.innerHTML = `
-      <div class="plus-grid" style="margin-top:4px">
-        <!-- ⚠️ 这里原来有第三块「创意工坊」✗→✓（2026-10-08 挪去右上角了 ✓）——
-             用户：「原先，创意工坊在底部聊天框的➕里，现在来到[主群聊]右上角」✓。 -->
-        <button class="plus-item" id="pkGallery">
-          <span class="ico">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
-                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="4.5" width="18" height="15" rx="2.5"/>
-              <circle cx="8.5" cy="9.5" r="1.4"/>
-              <path d="M3.5 16.5l4.6-4.3a1.6 1.6 0 0 1 2.2 0l3.2 3 2-1.8a1.6 1.6 0 0 1 2.2 0l3.3 3.1"/>
-            </svg>
-          </span>
-          <span class="lbl">相册</span>
-        </button>
-        <button class="plus-item" id="pkCamera">
-          <span class="ico">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
-                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 8h3l1.4-2h7.2L17 8h3a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 4 8z"/>
-              <circle cx="12" cy="13.2" r="3.2"/>
-            </svg>
-          </span>
-          <span class="lbl">拍摄</span>
-        </button>
-        <button class="plus-item" id="pkDoc">
-          <span class="ico">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
-                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10A1.5 1.5 0 0 0 18.5 19V8.5z"/>
-              <polyline points="13.5 3.5 13.5 8.5 18.5 8.5"/>
-            </svg>
-          </span>
-          <span class="lbl">文件</span>
-        </button>
-        <button class="plus-item" id="pkAudio">
-          <span class="ico">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
-                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 18V6l10-2v12"/>
-              <circle cx="6.6" cy="18" r="2.4"/><circle cx="16.6" cy="16" r="2.4"/>
-            </svg>
-          </span>
-          <span class="lbl">音频</span>
-        </button>
-      </div>
-      <div class="actions"><button class="btn-ghost" id="pkCancel">取消</button></div>`;
-    // 拍照必须走原生：`<input capture>` 在 MIUI 上会被忽略，点开是相册。
-    p.querySelector('#pkCamera').onclick = () => {
-      closeSheet();
-      if (isNative && window.LifeGuardNative.takePhoto) window.LifeGuardNative.takePhoto();
-      else $('#fileCamera').click();          // 浏览器里退回原生 input
-    };
-    p.querySelector('#pkGallery').onclick = () => { closeSheet(); $('#fileGallery').click(); };
-    // ★ 文件 / 音频（2026-10-08）✓
-    p.querySelector('#pkDoc').onclick = () => { closeSheet(); $('#fileDoc').click(); };
-    p.querySelector('#pkAudio').onclick = () => { closeSheet(); $('#fileAudio').click(); };
-    p.querySelector('#pkCancel').onclick = closeSheet;
-    openSheet();
-  };
+  // ── ＋ ：**工具扇** ✓（2026-10-28，P2）──────────────────────────────
+  //
+  // ★ 原来是底部弹一张四格的"更多"卡片 ✓（相册 / 拍摄 / 文件 / 音频 ✓）。
+  //   现在改成**从 + 那儿向上展开的一把扇子** ✓（见 06-workshop.js 的
+  //   `openToolFan` ✓）—— 四样照旧 ✓，另外**多三样屋子里的东西** ✓
+  //   （账本 / 提醒 / 回忆 ✓）。
+  // ⚠️ 为什么实现挪进 06 ✓：扇子要**现算 + 的位置** ✓、还要调 `openLedger`
+  //   那一套 ✓ —— 它们都在 06 那个 IIFE 里 ✓（04 只留这一行入口 ✓）。
+  $('#pickMedia').onclick = () => openToolFan();
 
   // ── 表情包（2026-10-27）────────────────────────────────────────────
   //
@@ -1191,6 +1141,8 @@
     const tempId = 'st' + Date.now() + Math.random().toString(36).slice(2, 6);
     addTempBubble(tempId, 'sticker', stickerImg(s, false));
     scrollDown();
+    // ★ 2026-10-28：表情发出去要有声 ✓ —— 一张贴纸的「啵」✓（不是系统音 ✓）。
+    sfx('pop'); haptic('soft');
     try {
       const msg = await api(`/groups/${group.id}/messages`, {
         method: 'POST',
