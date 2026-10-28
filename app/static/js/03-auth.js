@@ -374,7 +374,10 @@
   //   （`group.agent_status` ✓，形状与默认值定义在 `app/agent_status.py` ✓）。
   //   留着它是因为两种边角：老服务端、以及 `typing` 这一档不在新配置里 ✓
   //   —— 少了它，"正在输入"会变成一个**空的状态条** ✗。
-  const STATUS_TEXT = { idle:'正在窥屏…', thinking:'正在思考…', typing:'正在输入…', lurking:'打算继续窥屏…' };
+  // ★ 2026-10-28：**「窥屏」这个词不要了** ✓（纸上小屋：它是屋里的猫，不是一个监视器 ✓）。
+  //   只动**默认文案** ✓ —— 每个空间自己存的那几条一个字都不碰 ✓
+  //   （`group.agent_status` ✓，默认值在 `app/core/agent_status.py` ✓）。
+  const STATUS_TEXT = { idle:'在煮茶…', thinking:'正在想事情…', typing:'正在输入…', lurking:'在打盹…' };
 
   // ★ 背景图的**本机缓存** ✓ —— 2026-10-20。
   //   服务端那条 `/api/groups/{id}/background/file` 已经带 `?v=` + `immutable` ✓，

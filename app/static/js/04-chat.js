@@ -19,6 +19,60 @@
     return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
   };
 
+  // ── 日期胶带（2026-10-28 · 纸上小屋）──────────────────────────────
+  //
+  // 每换一天，消息流里插一条「和纸胶带」✓（`#msgs > .daytape` ✓，见 app.css ✓）。
+  // 滚动时吸顶是 CSS 的 `position:sticky` 自己做的 ✓ —— 这里只管**什么时候插** ✓。
+  //
+  // ⚠️ 判断用**本机时区** ✓（和右边那个 `.time` 同一条口径 ✓）：
+  //    库里存的是 UTC 秒 ✓，`new Date(s*1000)` 落到本机 ✓。
+  //
+  // ⚠️ **追加**和**往回翻**是两条路 ✗：
+  //    · 追加（首屏 / 新消息）→ 在 `addMsg` 里跟前一条比一下就行 ✓；
+  //    · 往回翻（`prepend`）→ 整段插完**重排一遍** ✓（`renderDays` ✓）——
+  //      翻历史时是**倒着 prepend** ✓，边插边判会把同一天拆成好几条胶带 ✓。
+  const dayKey = s => {
+    const d = new Date(s * 1000);
+    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  };
+  const dayLabel = s => {
+    const d = new Date(s * 1000), now = new Date();
+    const same = (a, b) => a.getFullYear() === b.getFullYear()
+      && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    const y = new Date(now); y.setDate(now.getDate() - 1);
+    const md = (d.getMonth() + 1) + '月' + d.getDate() + '日';
+    if (same(d, now)) return '今天 · ' + md;
+    if (same(d, y)) return '昨天 · ' + md;
+    if (d.getFullYear() !== now.getFullYear()) return d.getFullYear() + '年' + md;
+    return md + ' · 周' + '日一二三四五六'[d.getDay()];
+  };
+  const mkTape = s => {
+    const t = document.createElement('div');
+    t.className = 'daytape';
+    t.dataset.day = String(dayKey(s));
+    t.textContent = dayLabel(s);
+    return t;
+  };
+  /** 追加一条之后：跟前一条（跳过胶带和发送中的临时行）比日期，不一样就插一条。 */
+  const tapeBefore = (row, ts) => {
+    let prev = row.previousElementSibling;
+    while (prev && !prev.dataset.ts) prev = prev.previousElementSibling;
+    if (!prev || dayKey(+prev.dataset.ts) !== dayKey(ts)) {
+      row.parentNode.insertBefore(mkTape(ts), row);
+    }
+  };
+  /** 往回翻之后：把胶带全拆了、按顺序重排一遍（`loadOlder` 里调一次 ✓）。 */
+  const renderDays = () => {
+    const box = $('#msgs');
+    box.querySelectorAll('.daytape').forEach(t => t.remove());
+    let last = '';
+    for (const el of Array.from(box.children)) {
+      if (!el.dataset || !el.dataset.ts) continue;
+      const k = String(dayKey(+el.dataset.ts));
+      if (k !== last) { box.insertBefore(mkTape(+el.dataset.ts), el); last = k; }
+    }
+  };
+
   // 把正文里的 @某人 高亮出来，让"我 @ 了谁"一眼可见
   //: 这个群**真有的**组件，`[{name, slug}]` ✓ —— 消息里的名字靠它标蓝可点 ✓。
   //:
@@ -289,8 +343,9 @@
       //    "做完了"那条到的时候，那个组件**刚刚落成** ✓ ——
       //    拿旧索引画的话，它自己的名字**不会变蓝** ✓（而那正是最该点的那一次 ✓）。
       refreshCompIndex().then(put);
+      sys.dataset.ts = m.created_at;         // 日期胶带靠它 ✓
       if (prepend) $('#msgs').prepend(sys);
-      else { $('#msgs').appendChild(sys); scrollDown(); }
+      else { $('#msgs').appendChild(sys); tapeBefore(sys, m.created_at); scrollDown(); }
       return;
     }
     const mine = m.sender_id !== null && m.sender_id === me.id;
@@ -298,6 +353,7 @@
     const row = document.createElement('div');
     row.className = 'row' + (mine ? ' mine' : '') + (isAgent ? ' agent' : '');
     row.dataset.id = m.id;
+    row.dataset.ts = m.created_at;            // 日期胶带靠它 ✓
     const av = document.createElement('div');
     av.className = 'av';
     // ★ 2026-10-06：**和「我的」用同一张图** ✓。
@@ -416,7 +472,7 @@
     //   （按成员表查 ✓，消息里那份只是成员表还没到时的兜底 ✓，见 `bubbleForMsg` ✓）。
     setRowBubble(row, m);
     if (prepend) $('#msgs').prepend(row);
-    else { $('#msgs').appendChild(row); scrollDown(); }
+    else { $('#msgs').appendChild(row); tapeBefore(row, m.created_at); scrollDown(); }
     _fire('message', m, row);   // agent 的 ui/app.js 可以给这一条挂东西
   };
 
@@ -440,6 +496,10 @@
       // **倒着 prepend**：每 prepend 一次都插在最前，所以要从新到旧反着来，
       // 最终顺序才是正的。
       for (let i = older.length - 1; i >= 0; i--) addMsg(older[i], true);
+      // ★ 2026-10-28：倒着 prepend 完，把日期胶带整体重排一遍 ✓
+      //   （边插边判会把同一天拆成好几条 ✓，见 `renderDays` 的说明 ✓）。
+      //   ⚠️ 必须在补滚动位置**之前** ✔ —— 插胶带会改 scrollHeight ✓。
+      renderDays();
       oldestId = older[0].id;
       if (older.length < 50) historyDone = true;
       // 把"新增的高度"补进滚动位置 —— 视觉上停在你原来那条消息上，不跳
@@ -454,8 +514,12 @@
     const b = $('#msgs');
     // 离底部 80px 以内就算"还在底部" → 之后新消息/图片撑开高度时继续跟着
     stickBottom = (b.scrollHeight - b.scrollTop - b.clientHeight) < 80;
+    // ★ 2026-10-28：往上翻了才让红丝带出来 ✓（一条也放不下的时候不出现 ✓）
+    $('#ribbon').classList.toggle('on', !stickBottom && b.scrollHeight > b.clientHeight + 120);
     if (b.scrollTop < 60) loadOlder();      // 滚到顶 → 往回翻历史
   });
+  // 点红丝带 = 回到底部 ✓（`scrollDown(true)` 会顺手把 stickBottom 扳回 true ✓）
+  $('#ribbon').onclick = () => scrollDown(true);
 
   // ── 长按消息 → 引用 ────────────────────────────────────────────────
   //

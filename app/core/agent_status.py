@@ -13,9 +13,9 @@
 
 ```json
 {
-  "idle":     {"on": true,  "lines": ["正在窥屏…"], "every": 600},
-  "thinking": {"on": true,  "lines": ["正在思考…"]},
-  "silent":   {"on": true,  "lines": ["打算继续窥屏…"]}
+  "idle":     {"on": true,  "lines": ["在窗边煮茶…", "在擦桌子…"], "every": 600},
+  "thinking": {"on": true,  "lines": ["正在想事情…"]},
+  "silent":   {"on": true,  "lines": ["在打盹…"]}
 }
 ```
 
@@ -58,10 +58,13 @@ EVERY_MAX = 24 * 3600
 #:   不然会出现「输入框让你写到 800、后端悄悄截到别的数」那种错 ✓）。
 MAX_PROMPT = 800
 
+#: ★ 2026-10-28：默认文案从「窥屏」换成了「屋里的猫」那一套 ✓
+#:   （在煮茶 / 在擦桌子 / 在打盹 ✓）。**只影响新空间和没存过文案的** ✓ ——
+#:   已经存过 `agent_status` 的空间一个字都不动 ✓（`normalize` 优先用存下来的 ✓）。
 DEFAULT_CONFIG: dict = {
-    "idle": {"on": True, "lines": ["正在窥屏…"], "every": 600},
-    "thinking": {"on": True, "lines": ["正在思考…"]},
-    "silent": {"on": True, "lines": ["打算继续窥屏…"]},
+    "idle": {"on": True, "lines": ["在窗边煮茶…", "在擦桌子…", "趴在纸角打盹…"], "every": 600},
+    "thinking": {"on": True, "lines": ["正在想事情…"]},
+    "silent": {"on": True, "lines": ["在打盹…"]},
 }
 
 

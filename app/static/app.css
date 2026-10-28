@@ -2212,3 +2212,130 @@
     #ergou { animation:none; }
     #ergou.hop { animation:none; }
   }
+  /* ═══════════════════════════════════════════════════════════════════
+     纸上小屋 · P1-a（2026-10-28）
+     页眉手写感 / 日期和纸胶带 / 三种声音三种形状 / 回到最新的红丝带
+
+     规矩照旧：只换表面、不动尺寸；能挂 `#chat` 的都挂在 `#chat` 下。
+     气泡那几条例外 —— 它们靠 `[data-bubble="plain"]` 认人，
+     用户选了鸭鸭 / 猪猪 / 猫猫的那些行，一个像素都不碰 ✓。
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* ── 纸条的颜色（三套主题各一份）────────────────────────────────── */
+  :root[data-theme="cream"], :root[data-theme="light"] {
+    --note-other:#fffdf7; --note-other-line:#7e8f63;
+    --note-mine:#f8e7c6;  --note-mine-ink:#3d2e1c; --note-mine-line:#e2c69a;
+    --note-shadow:0 1px 1px rgba(90,65,30,.05), 0 3px 10px rgba(90,65,30,.045);
+    --tape-bg:rgba(233,205,160,.94); --tape-ink:#87673f;
+    --tape-sheen:rgba(255,255,255,.34);
+    --ribbon-a:#bd4a3f; --ribbon-b:#96322c;
+  }
+  :root[data-theme="dark"] {
+    --note-other:#251f24; --note-other-line:#7f9670;
+    --note-mine:#332a22;  --note-mine-ink:#f4e7d2; --note-mine-line:#5a4634;
+    --note-shadow:0 1px 1px rgba(0,0,0,.20), 0 3px 10px rgba(0,0,0,.12);
+    --tape-bg:rgba(98,82,58,.92); --tape-ink:#e2cba7;
+    --tape-sheen:rgba(255,240,210,.12);
+    --ribbon-a:#a9453c; --ribbon-b:#7d2925;
+  }
+  :root[data-theme="forest"] {
+    --note-other:#1b2e24; --note-other-line:#94b981;
+    --note-mine:#27392b;  --note-mine-ink:#eaf4e5; --note-mine-line:#3d5a46;
+    --note-shadow:0 1px 1px rgba(0,0,0,.20), 0 3px 10px rgba(0,0,0,.12);
+    --tape-bg:rgba(76,96,64,.92); --tape-ink:#dcebcf;
+    --tape-sheen:rgba(230,255,220,.10);
+    --ribbon-a:#a9453c; --ribbon-b:#7d2925;
+  }
+
+  /* ── 页眉：手写体 + 一道手画的线 ─────────────────────────────────────
+     ⚠️ 手机上没有楷体时这里会落回系统字体 ✓ —— 所以"手写感"不能只靠字体 ✗：
+        底下那道歪歪扭扭的线才是主角 ✓（它是张 SVG，画在 `::after` 上 ✓）。 */
+  #chat header.top .gname {
+    display:inline-block; max-width:100%; position:relative;
+    padding-bottom:5px;
+    font-family:"Kaiti SC","STKaiti","KaiTi","AR PL UKai CN",
+                "Noto Serif CJK SC","Songti SC",serif;
+    font-weight:600; letter-spacing:.04em;
+  }
+  #chat header.top .gname::after {
+    content:''; position:absolute; left:5%; right:5%; bottom:1px; height:4px;
+    background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2714%27%20height%3D%274%27%20viewBox%3D%270%200%2014%204%27%3E%3Cpath%20d%3D%27M0%203%20Q3.5%20.6%207%203%20T14%203%27%20fill%3D%27none%27%20stroke%3D%27%23b07a4a%27%20stroke-width%3D%271.2%27%20stroke-linecap%3D%27round%27%2F%3E%3C%2Fsvg%3E") repeat-x left bottom / 14px 4px;
+    opacity:.55; pointer-events:none;
+  }
+  :root[data-theme="dark"] #chat header.top .gname::after {
+    background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2714%27%20height%3D%274%27%20viewBox%3D%270%200%2014%204%27%3E%3Cpath%20d%3D%27M0%203%20Q3.5%20.6%207%203%20T14%203%27%20fill%3D%27none%27%20stroke%3D%27%238f7a63%27%20stroke-width%3D%271.2%27%20stroke-linecap%3D%27round%27%2F%3E%3C%2Fsvg%3E");
+    opacity:.7;
+  }
+  :root[data-theme="forest"] #chat header.top .gname::after {
+    background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2714%27%20height%3D%274%27%20viewBox%3D%270%200%2014%204%27%3E%3Cpath%20d%3D%27M0%203%20Q3.5%20.6%207%203%20T14%203%27%20fill%3D%27none%27%20stroke%3D%27%237f9a72%27%20stroke-width%3D%271.2%27%20stroke-linecap%3D%27round%27%2F%3E%3C%2Fsvg%3E");
+    opacity:.7;
+  }
+
+  /* ── 日期：一条和纸胶带，滚动时自己吸顶 ───────────────────────────────
+     `position:sticky` 是浏览器算的 ✓，不挂 scroll 监听 ✓。
+     每换一天插一条 ✓（`04-chat.js` 里）；下一条上来时把上一条顶走 ✓ ——
+     这正是 sticky 的默认行为 ✓，不用写一行 JS ✓。 */
+  #msgs > .daytape {
+    position:sticky; top:0; z-index:3; align-self:center;
+    margin:2px 0 0; padding:3px 14px 4px;
+    font-size:11px; letter-spacing:.10em; line-height:1.4;
+    color:var(--tape-ink);
+    background:var(--tape-bg);
+    box-shadow:inset 0 1px 0 var(--tape-sheen), 0 1px 3px rgba(70,45,20,.10);
+    clip-path:polygon(2% 0, 98% 0, 100% 18%, 97.5% 44%, 100% 70%, 98% 100%,
+                      2% 100%, 0 72%, 2.5% 46%, 0 20%);
+    pointer-events:none; white-space:nowrap;
+  }
+  /* 胶带在**正文栏**里居中 ✓（红边 42 / 右边 14 → 内容中心比屏幕偏右 14px）；
+     加个右侧 28 的外边距，居中时正好让回来 ✓。有自定义背景（没有红线）时不加 ✓。 */
+  #chat:not(.has-bg) #msgs > .daytape { margin-right:28px; }
+
+  /* ── 三种声音三种形状（只在没选贴纸皮肤时）───────────────────────────
+     ⚠️ 只认 `[data-bubble="plain"]` ✓ —— 鸭鸭 / 猪猪 / 猫猫继续走上面那套 ✓。 */
+  .row[data-bubble="plain"]:not(.mine):not(.agent) .bubble:not(.media) {
+    background:var(--note-other);
+    border:1px solid var(--paper-edge);
+    border-left:3px solid var(--note-other-line);
+    border-radius:3px 12px 12px 3px;
+    box-shadow:var(--note-shadow);
+  }
+  .row[data-bubble="plain"].mine .bubble:not(.media) {
+    background:var(--note-mine);
+    color:var(--note-mine-ink);
+    border:1px solid var(--note-mine-line);
+    border-radius:12px 3px 3px 12px;
+    box-shadow:var(--note-shadow);
+  }
+  /* 管家：不装气泡，像直接写在纸上的一行字 ✓ */
+  .row[data-bubble="plain"].agent .bubble:not(.media) {
+    background:transparent; border:0; box-shadow:none;
+    padding:1px 0 0; border-radius:0;
+  }
+  /* 管家那行正文挨着纸的左边线太紧 —— 给一点点呼吸 ✓（不碰别人） */
+  .row[data-bubble="plain"].agent .wrap2 { padding-right:2px; }
+
+  /* ── 回到最新：右缘一条红丝带 ───────────────────────────────────────
+     只在"人往上翻了"的时候出现 ✓（`04-chat.js` 的 scroll 里管 ✓）；
+     点一下 = 回到底部 ✓。 */
+  #ribbon {
+    position:absolute; right:0; top:48%; width:24px; height:86px;
+    border:0; padding:0; background:none; cursor:pointer;
+    z-index:4; opacity:0; pointer-events:none;
+    transform:translateY(-50%);
+    transition:opacity .25s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #ribbon::before {
+    content:''; position:absolute; inset:0 3px 0 4px;
+    background:linear-gradient(180deg, var(--ribbon-a), var(--ribbon-b));
+    clip-path:polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+    box-shadow:inset 1px 0 0 rgba(255,255,255,.20);
+    filter:drop-shadow(0 2px 3px rgba(70,20,15,.28));
+    border-radius:1px;
+  }
+  #ribbon.on { opacity:1; pointer-events:auto; }
+  #ribbon:active::before { transform:translateY(2px); }
+
+  @media (prefers-reduced-motion: reduce) {
+    #ribbon { transition:none; }
+  }

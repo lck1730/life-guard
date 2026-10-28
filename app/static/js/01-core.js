@@ -735,10 +735,12 @@
   };
 
   // 服务端那份配置（`group.agent_status` 是个 JSON **字符串** ✓）。
+  // ★ 2026-10-28：默认文案跟着「纸上小屋」换掉了 ✓（原来是「窥屏」那一套 ✓）——
+  //   只有**新空间 / 没存过文案**的时候才走这里 ✓，存过的原样不动 ✓。
   const agentCfg = () => statusCfg || {
-    idle: { on: true, lines: ['正在窥屏…'], every: 600 },
-    thinking: { on: true, lines: ['正在思考…'] },
-    silent: { on: true, lines: ['打算继续窥屏…'] },
+    idle: { on: true, lines: ['在窗边煮茶…', '在擦桌子…', '趴在纸角打盹…'], every: 600 },
+    thinking: { on: true, lines: ['正在想事情…'] },
+    silent: { on: true, lines: ['在打盹…'] },
   };
 
   /** 改配置**只有一个出口** ✓ —— 整份发上去（服务端是整份替换 ✓）。 */

@@ -202,6 +202,11 @@
     </button>
   </header>
   <div id="msgs"></div>
+  <!-- ★ 2026-10-28：**回到最新** ✓（纸上小屋 · P1-a）——
+       一条红丝带挂在纸的右缘 ✓，只有人往上翻的时候才出现 ✓（`.on` ✓）。
+       点一下回到底部 ✓。位置 / 出现时机全在 `04-chat.js` 的 scroll 里管 ✓，
+       这里只留一个按钮 ✓（真正的可点区域是它，丝带画在 `::before` 上 ✓）。 -->
+  <button id="ribbon" aria-label="回到最新消息"></button>
   <div id="composer">
     <div id="atMenu"></div>
     <!-- 引用条：长按气泡选了「引用」之后出现在这里，发完自动消失。
