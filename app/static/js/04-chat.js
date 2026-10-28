@@ -1072,8 +1072,7 @@
     const p = $('#sheetPanel');
     const all = stickerCatalog.stickers || [];
     if (!all.length) {
-      p.innerHTML = `<h3>表情</h3>
-        <div class="st-empty" id="stLoading">表情正在加载…<br>稍等一下；一直这样的话，退出去再进来一次。</div>
+      p.innerHTML = `<div class="st-empty" id="stLoading">表情正在加载…<br>稍等一下；一直这样的话，退出去再进来一次。</div>
         <div class="actions"><button class="btn-solid" id="stOk">知道了</button></div>`;
       p.querySelector('#stOk').onclick = closeSheet;
       return;
@@ -1083,7 +1082,7 @@
     const cats = (stickerCatalog.categories || []).slice().sort((a, b) =>
       a.key === 'butler' ? 1 : b.key === 'butler' ? -1 : 0);
     const ST_TINT = { butler: 'st-g0', doctor: 'st-g1', coder: 'st-g2' };
-    let html = '<h3>表情</h3><div class="st-scroll">';
+    let html = '<div class="st-scroll">';
     cats.forEach((c, i) => {
       const items = all.filter(s => s.category === c.key);
       if (!items.length) return;
