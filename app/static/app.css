@@ -427,14 +427,11 @@
   .row .who { font-size:12px; color:var(--accent); font-weight:600;
               margin-bottom:3px; padding-left:4px; }
   .row.mine .who { text-align:right; padding-right:4px; }
-  /* ★ 2026-10-28：聊天气泡上面的**名字那行去掉** ✓（用户：「我的气泡，管家气泡，
-     上面的介绍文字去掉」✓ —— 自己/管家/别人那几行都算 ✓）。
-     ⚠️ 做法是**节点整个不建** ✗，不是 `display:none` ✗ —— 第一版就是拿 CSS 藏，
-        结果看不到效果（2026-10-28 他报的「介绍文字还在」）。藏起来的节点照样占
-        一条**空行**（`.wrap2` 是块级流，每个子盒子独占一行 ✓）→ 头像和气泡之间
-        留一截空白，看着像那行还在 ✓。名字的出口改成 `.av` 的 `title`+`aria-label`
-        （见 `04-chat.js` 的 `nameTag`）→ 摸得到、看不见 ✓。
-     ⚠️ 设置页那几个 `.who`（`ascreen .prof .who` ✓）**一点不动** ✓ —— 那不是聊天行 ✓。 */
+  /* ★ 2026-10-28：聊天气泡上面的**名字那行删掉** ✓（用户：「我的气泡，管家气泡，
+     上面的介绍文字去掉」✓ —— 自己/管家/AI 那几条流式行都算 ✓）。
+     ⚠️ 只藏、不删节点 ✗ —— `.who` 还被改昵称那处（`refreshMembers` ✓）
+        和流式行拿去写字 ✓，节点留着少改一处 ✓。 */
+  .row .who { display:none; }
   .bubble { padding:9px 13px; border-radius:14px; background:var(--bubble-bg);
             word-break:break-word; white-space:pre-wrap; }
   .bubble .at { color:var(--accent); font-weight:600; }

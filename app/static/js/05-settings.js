@@ -1682,13 +1682,10 @@
       const m = _msgs.get(Number(row.dataset.id));
       if (!m || m.sender_id !== me.id) return;
       m.sender_nickname = me.nickname;
-      // 2026-10-28：名字那行已经不建了 ✓ —— 改挂头像的 `title`/`aria-label` ✓
-      //   （和 `04-chat.js` 的 `nameTag` 同一处出口 ✓；节点没了、这里别再找 `.who` ✗）。
+      const w = row.querySelector('.who');
+      if (w) w.textContent = me.nickname || '';
       const a = row.querySelector('.av');
-      if (a) {
-        paintAvatar(a, shellURL(me.avatar), me.nickname || '我');
-        if (me.nickname) { a.title = me.nickname; a.setAttribute('aria-label', me.nickname); }
-      }
+      if (a) paintAvatar(a, shellURL(me.avatar), me.nickname || '我');
     });
   };
 
