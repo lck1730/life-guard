@@ -641,12 +641,10 @@
     const isAgent = _bubbleTarget === 'agent';
     body.textContent = '';
 
-    const hint = document.createElement('div');
-    hint.className = 'thint';
-    hint.textContent = isAgent
-      ? '管家所有消息的气泡。你们俩谁都能改，改完对方那边也会跟着变。'
-      : '选一款，群里其他人看到的、你自己看到的就是它。深色主题下会自动压暗。';
-    body.appendChild(hint);
+    // ★ 2026-10-28：**没有那句说明了** ✗→✓（用户：「选一款，群里其他人看到的、
+    //   你自己看到的就是它。深色主题下会自动压暗。」这类**介绍性文字**不要 ✓
+    //   —— 指的是"讲这一页是干嘛的"那句话 ✓，不是气泡旁边的昵称 ✗）。
+    //   卡片自己会说话：选中的那块有高亮 ✓、预览就是真气泡 ✓。
 
     BUBBLES.forEach(b => {
       const card = document.createElement('button');
