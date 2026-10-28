@@ -407,7 +407,7 @@
     //    "引用条在气泡最上面" ✓，效果一样 ✓）。
     _msgs.set(m.id, m);          // 长按引用时要回头找这条消息的完整信息
     if (m.msg_type === 'image' && m.media_path) {
-      b.classList.add('media');
+      b.classList.add('media', 'photo');
       const img = document.createElement('img');
       img.src = '/media/' + m.media_path;
       img.loading = 'lazy';
@@ -432,15 +432,26 @@
         b.textContent = '[表情]';
       }
     } else if (m.msg_type === 'file' && m.media_path) {
-      b.classList.add('media');
+      b.classList.add('media', 'file-note');
       b.appendChild(fileCard(m));
     } else if (m.msg_type === 'audio' && m.media_path) {
       b.classList.add('media');
       b.appendChild(audioBar(m));
     } else if (m.msg_type === 'voice') {
+      b.classList.add('voice-note');
       const v = document.createElement('div');
       v.className = 'vmsg';
-      v.innerHTML = '<span class="bars">▮▮▮</span>';
+      // ★ 2026-10-28：原来那三个 `▮` 换成一段画出来的声纹 ✓。
+      //   高度是一串写死的数 ✓ —— 只做样子，不解码音频 ✓。
+      //   撕口由 CSS 画在气泡右边 ✓（`.bubble.voice-note`）。
+      const wave = document.createElement('span');
+      wave.className = 'wave';
+      for (const h of [5, 9, 6, 12, 8, 14, 10, 6, 13, 8, 15, 9, 6, 11, 7, 10]) {
+        const bar = document.createElement('i');
+        bar.style.height = h + 'px';
+        wave.appendChild(bar);
+      }
+      v.appendChild(wave);
       const dur = document.createElement('span');
       dur.className = 'dur';
       dur.textContent = ((m.media_meta && m.media_meta.duration) || 0) + "''";
