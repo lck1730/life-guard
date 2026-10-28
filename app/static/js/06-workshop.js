@@ -783,10 +783,15 @@
         'preserveAspectRatio="xMidYMid meet"/>' +
       // 环境动效（光/尘/花瓣）✓ 压在屋子上、猫下面 ✓
       '<g pointer-events="none">' + flatFxSvg() + '</g>' +
-      // 账本热区（桌上摊开的账本 ✓）—— 透明、可点 → 进记账。
+      // ★ 2026-10-28：桌上摊开那本现在是**信簿** ✓ —— 点它 = **落座** ✓
+      //   （镜头俯冲进书页 → 聊天 ✓，见下面 `ws-chatbook` 那段 ✓）。
       //   ⚠️ <image> 引的 svg 没法点子元素 ✓，所以盖一块透明 rect 当入口 ✓。
-      '<rect class="ws-obj" data-slug="bookkeeping-panel" x="318" y="1028" ' +
+      '<rect class="ws-chatbook" x="318" y="1028" ' +
         'width="268" height="92" fill="transparent" style="cursor:pointer"/>' +
+      // 账本搬到**书架**上 ✓（桌上那本让给聊天了 ✓）。
+      //   热区比那排书放大一圈 ✓ —— 书上只有 ~59×58 CSS px ✓，照原样太难点准 ✓。
+      '<rect class="ws-obj" data-slug="bookkeeping-panel" x="580" y="360" ' +
+        'width="112" height="110" fill="transparent" style="cursor:pointer"/>' +
       // 二狗 ✓ —— 点它回主群聊 ✓
       flatCatSvg() +
       // 来找它玩的小蝴蝶 ✓ —— 画在猫上面 ✓，停在鼻尖时不会被挡住 ✓
@@ -807,6 +812,54 @@
         if (c) openComp(c.slug, c.title || '记账', (c.spot && c.spot.tint) || '');
       });
     });
+
+    // ★ 点桌上的信簿 → **落座** ✓（3.1）—— 镜头俯冲进书页，收尾就是聊天 ✓。
+    //   · `transform-origin` 打在**书心**上 ✓ → 缩放时书心不动 ✓；
+    //   · 再用 `translate` 把书心挪到**屏幕正中** ✓ → 看着像人俯下去 ✓；
+    //   · 位置**现算** ✓（`getScreenCTM` ✓）—— 换手机、换高度都对 ✓。
+    //   ⚠️ 连点要挡住 ✗ —— 会 `closeWorkshop` 两次 ✓，把聊天也退掉 ✓。
+    //   ⚠️ `animationend` **不能** `{once:true}` ✗ —— 屋里别的 CSS 动画
+    //      （萤火/蝴蝶… ✓）冒泡上来会先把监听摘掉 ✓ → 这一下就永远等不到 ✓。
+    const book = svg.querySelector('.ws-chatbook');
+    if (book) {
+      let sitting = false;
+      book.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        if (sitting) return;
+        sitting = true;
+        const scr = $('#workshop');
+        try {
+          const r = wrap.getBoundingClientRect();
+          const pt = svg.createSVGPoint();
+          pt.x = 452; pt.y = 1074;           // 桌上这本摊开书的中心 ✓
+          const p = pt.matrixTransform(svg.getScreenCTM());
+          const ox = p.x - r.left, oy = p.y - r.top;
+          wrap.style.setProperty('--sit-ox', ox.toFixed(1) + 'px');
+          wrap.style.setProperty('--sit-oy', oy.toFixed(1) + 'px');
+          wrap.style.setProperty('--sit-dx', (r.width / 2 - ox).toFixed(1) + 'px');
+          wrap.style.setProperty('--sit-dy', (r.height / 2 - oy).toFixed(1) + 'px');
+        } catch (e) { /* 算不出来就原地放大 ✓，落座照走 ✓ */ }
+        wrap.classList.add('ws-sit');
+        // ★ 整屏淡出要挂在**这一屏**上 ✓ —— 只淡 `.ws-scene` 的话，底下露出来的是
+        //   这一屏自己的米色底 ✗，不是聊天 ✓（看着像闪了一下白 ✓）。
+        if (scr) scr.classList.add('ws-sitting');
+        let done = false;
+        const go = function () {
+          if (done) return;
+          done = true;
+          wrap.removeEventListener('animationend', onEnd);
+          closeWorkshop();
+          // ⚠️ 退场动画（~200ms ✓）走完再摘 ✓；早摘会在中途闪回小屋 ✗。
+          setTimeout(function () {
+            if (scr) scr.classList.remove('ws-sitting');
+            wrap.classList.remove('ws-sit');
+          }, 320);
+        };
+        const onEnd = function (e) { if (e.target === wrap) go(); };
+        wrap.addEventListener('animationend', onEnd);
+        setTimeout(go, 760);                 // 不派发 animationend 的兜底 ✓
+      });
+    }
 
     // ★ 点猫 → 先让它蹦一下（爱心 + 瞪眼 ✓），再回主群聊 ✓
     //   ⚠️ 不能直接 closeWorkshop ✗ —— 那一下动作就看不见了 ✓。

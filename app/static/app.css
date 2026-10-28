@@ -1013,6 +1013,29 @@
      preserveAspectRatio slice → 竖向填满、对称裁边、不留米色空白条 ✓
      （ws-room 那套是按高撑宽 → 会横滑 ✗；meet 会出上下空白条 ✗）*/
   #workshop .ws-flat { width:100%; height:100%; display:block; }
+  /* ★ 2026-10-28：**落座** ✓ —— 点桌上那本摊开的信簿，镜头俯冲进书页 ✓。
+     两件事同时发生：书心不动、画面放大 2.6 倍，把书心推到屏幕正中 ✓；
+     最后四成整屏淡出 ✓ —— 露出来的是底下的**聊天** ✓（书页 → 聊天 ✓）。
+     ⚠️ 淡出必须挂在 `#workshop` 这一屏上 ✗→✓ —— 只淡 `.ws-scene` 会露出
+        这一屏自己的米色底 ✓（看着像闪一下白 ✓）。
+     ⚠️ 两个 `--sit-*` 是 `06-workshop.js` 现算的 ✓（书心在屏上的位置 ✓）。 */
+  #workshop.ws-sitting { animation:wsSitFade .62s cubic-bezier(.22,1,.36,1) forwards; }
+  @keyframes wsSitFade {
+    0%, 56% { opacity:1; }
+    100%    { opacity:0; }
+  }
+  #workshop .ws-scene.ws-sit {
+    transform-origin:var(--sit-ox, 50%) var(--sit-oy, 50%);
+    animation:wsSit .62s cubic-bezier(.22,1,.36,1) forwards;
+    will-change:transform;
+  }
+  @keyframes wsSit {
+    from { transform:translate(0px, 0px) scale(1); }
+    to   { transform:translate(var(--sit-dx, 0px), var(--sit-dy, 0px)) scale(2.6); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #workshop.ws-sitting, #workshop .ws-scene.ws-sit { animation-duration:.18s; }
+  }
   #workshop .ws-room .rm-wall { fill:#d9c7a8; }
   #workshop .ws-room .rm-side { fill:#c9b696; }
   #workshop .ws-room .rm-floor { fill:#9c7549; }
