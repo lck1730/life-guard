@@ -1976,12 +1976,15 @@
 
   /* ── 日期胶带（2026-10-29，从参考版裁回来的第一样）─────────────────────
      ★ 每换一天，消息流里插一条和纸胶带 ✓（`#msgs > .daytape` ✓）。
-       滚动时**自己吸顶** ✓ —— `position:sticky` 是浏览器算的 ✓，不挂 scroll 监听 ✓。
+     ★ 2026-10-29 用户定的：**不吸顶** ✓——它只是聊天记录里的**一个位置** ✓
+       （跟着那条消息一起滚上去 ✓）。原来那版是 `position:sticky; top:0` ✓，
+       用户："不要有悬浮显示了，而是在聊天记录里对应位置穿插就行"✓。
+       ⚠️ 别再加回 `sticky` ✗（加了就是"悬浮"✓，正是他要去掉的 ✓）。
      ⚠️ 判断用**本机时区** ✓（和 `.time` 同一条口径 ✓，见 `04-chat.js` ✓）。
      ⚠️ 胶带是**纸**，不是信息条 ✓：三个主题下是同一个颜色 ✓
         （深色主题里它最显眼 —— 那是故意的 ✓，一天开始的地方就该亮一下 ✓）。 */
   #msgs > .daytape {
-    position:sticky; top:0; z-index:3; align-self:center;
+    align-self:center;
     margin:2px 0 0; padding:3px 14px 4px;
     font-size:11px; letter-spacing:.10em; line-height:1.4;
     color:#6b5233;
