@@ -27,7 +27,9 @@
   //:   ⚠️ 和 `WALL_SLUG` 一样**必须声明在文件最前面** ✗（`show()` 要用它 ✓ ——
   //:      `show()` 在启动那几步就会被调 ✓，写在后面就是 TDZ 当场炸 ✓）。
   const ANIM_CLASSES = ['anim-in', 'anim-out', 'anim-fade',
-                        'anim-drop', 'anim-lift', 'anim-corner', 'anim-corner-out'];
+                        'anim-drop', 'anim-lift', 'anim-corner', 'anim-corner-out',
+                        // ★ 2026-10-29：从左滑入 / 缩回左边 ✓（设置页现在靠右滑进 ✓）
+                        'anim-left', 'anim-left-out'];
 
 
   // ── 给 agent 的扩展点 ──
@@ -602,7 +604,8 @@
   //   两份写法 = 迟早只改一处（这个项目为"同一件事两处实现"栽过好几次 ✓）。
   //   合并之后：进设置页也走 `pushScreen` ✓，只有"退出时把返回键交回原生"
   //   这一句是它特有的 ✓（`tellNative('chat')` ✓）。
-  const openSettings = () => pushScreen('settings');
+  // ★ 2026-10-29：设置页**从左边滑进来** ✓（用户：「右滑从左边进入设置页」✓）。
+  const openSettings = () => pushScreen('settings', 'left');
   const closeSettings = () => {
     // ⚠️ 这里原来还有一句补报 `tellNative('chat')` ✗→✓（2026-10-09）——
     //    `popScreen` 现在是**按"它已经没了"现算**的 ✓（见 `tellTop` ✓），
@@ -733,10 +736,15 @@
   const tellTop = (skipId) => {
     const skip = skipId ? '#' + skipId : '';
     const others = _OTHER_SCREENS.filter(s => s !== skip);
+    // ⚠️ 2026-10-29：`#settings` 从 `_OTHER_SCREENS` 里拿掉了（手势要用它判屏名 ✓）——
+    //    所以这里得**自己认它** ✓。不认的后果：设置页开着还报 'chat' ✗ →
+    //    安卓返回键走"再按一次退出" ✗，而不是 `__goBack` 滑回群聊 ✗。
+    //    抽屉同理：它盖在群聊上，但按返回键要**先收抽屉** ✓（见 02 `__goBack` ✓）。
     const top =
       others.some(s => $(s) && $(s).classList.contains('on')) ? ''
+      : ($('#settings').classList.contains('on') && skip !== '#settings') ? 'settings'
       : ($('#compView').classList.contains('on') && skip !== '#compView') ? 'comp'
-      : ($('#workshop').classList.contains('on') && skip !== '#workshop') ? 'wall'
+      : ($('#drawer').classList.contains('on') && skip !== '#drawer') ? 'drawer'
       : 'chat';
     tellNative(top === 'chat' ? 'chat' : 'settings');
   };
@@ -755,6 +763,7 @@
     s.classList.remove(...ANIM_CLASSES);          // ★ 先全清，见上面那段 ✓
     const cls = from === 'top'    ? 'anim-drop'
               : from === 'corner' ? 'anim-corner'
+              : from === 'left'   ? 'anim-left'
               : 'anim-in';
     if (from) _enterAnim.set(id, from); else _enterAnim.delete(id);
     s.classList.add('on', cls);
@@ -769,6 +778,7 @@
     s.classList.remove(...ANIM_CLASSES);          // ★ 先全清 ✓
     const cls = how === 'top'    ? 'anim-lift'
               : how === 'corner' ? 'anim-corner-out'
+              : how === 'left'   ? 'anim-left-out'
               : 'anim-out';                       // 默认：从右边退回去 ✓
     s.classList.add(cls);
     void s.offsetWidth;                           // 同理，连点两次也要重放 ✓

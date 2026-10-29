@@ -306,16 +306,14 @@
 
   /* ── 聊天 ── */
   header.top { background:var(--panel); border-bottom:1px solid var(--line);
-               /* ★ 左右内边距 **8px** ✓（原来 16px ✗）—— 2026-10-06 用户：
-                  "以 `<` 距离左侧的距离为基准……全都保持一致" ✓。
-                  设置页（`header.sub` ✓）一直是 8px ✓，这里也收成 8px ✓，
-                  两个顶栏的"边距"才是同一个数 ✓。
-                  左右都是 8px ✓ → **中间那块照旧居中** ✓（对称没破 ✓）。 */
-               padding:calc(var(--inset-top) + 12px) 8px 12px;
-               display:flex; align-items:center; gap:10px; flex-shrink:0; }
-  /* 群名居中：左侧汉堡宽度靠一个等宽占位元素抵消，
-     否则 flex:1 会让标题在"剩余空间"里居中，视觉上是偏右的。 */
-  header.top .spacer { width:40px; flex-shrink:0; }
+               /* ★ 2026-10-29：顶栏只剩群名 + 状态 ✓（☰ 和刷新都拿掉了 ✓）→
+                  左右留 16px 呼吸位 ✓。居中靠 `.info` 自己（flex:1 + 居中 ✓），
+                  **不再依赖左右各 40px 的按钮占位** ✓ —— 那两个按钮已经删了 ✓。
+               ⚠️ `position:relative; z-index:2` 是给下拉刷新那颗药丸让位的 ✓：
+                  药丸从顶栏**底下**钻出来 ✓，不能盖在群名上面 ✓。 */
+               padding:calc(var(--inset-top) + 12px) 16px 12px;
+               display:flex; align-items:center; flex-shrink:0;
+               position:relative; z-index:2; }
   header.top .info { flex:1; min-width:0; text-align:center; }
   header.top .gname { font-size:17px; font-weight:600; overflow:hidden;
                       text-overflow:ellipsis; white-space:nowrap; }
@@ -337,44 +335,9 @@
   header.top .status.s-thinking .dot, header.top .status.s-typing .dot { animation:pulse .7s infinite; }
   .icon-btn { width:40px;height:40px;display:flex;align-items:center;justify-content:center;
               color:var(--muted); flex-shrink:0; font-size:20px; }
-  /* ☰ 往左挪一点点 ✓ —— 2026-10-06 用户："距离左边间距略微小一些，
-     **不要影响群昵称和关键状态的位置**" ✓。
-     ⚠️ **用 `transform`，不能用负 margin** ✗→✓ ——
-       负 margin 会**改变这个盒子的布局宽度** ✓ → 中间那块跟着偏 ✗
-       （上一轮那个 `margin-left:-8px` 就是这么把群名顶偏 4px 的 ✓，
-        用户一眼就看出来了 ✓）。
-       `transform` 只挪"画在哪儿"✓，**完全不参与布局** ✓
-       → 群名和状态条一个像素都不动 ✓，而 ☰ 自己往左 ✓。
-     这就是"要动一个东西、又不想动它的邻居"时的标准做法 ✓。 */
-  /* ── 三个图标对齐到同一个"离屏边的距离" ✓ ────────────────────────
-     用户 2026-10-06："以 `<` 距离左侧的距离为基准，刷新按钮距离右侧、
-     设置按钮距离左侧全都保持一致" ✓。
-
-     口径是**墨迹**（眼睛看到的那几笔 ✓），不是盒子 ✗ —— 盒子没人看得见 ✓。
-
-     基准 = 设置页那个 `<`：
-       内边距 8px ✓ + 盒子 40px、里面 SVG 22px 居中 → 里面让出 9px ✓
-       + 那笔 "<" 的墨迹在 24 格里从 8.5 开始（描边圆头再往外 1 ✓ = 7.5 ✓）
-       7.5 ÷ 24 × 22 = 6.875px
-       → **8 + 9 + 6.875 ≈ 23.9px** ✓ ← 这就是基准
-
-     ☰：墨迹从 24 格里的 6 开始（圆头 → 5 ✓）= 5 ÷ 24 × 22 = 4.58px
-       → 8 + 9 + 4.58 = 21.58 ✗ 比基准近 2.3px → **往右推 2.3px** ✓
-
-     ↻：用得是 Feather 那条 ✓，墨迹几乎顶满 24 格（右边 24 ✓），
-       而它画在 19px 的格子里 → 9.5px 的居中让位 + 0 = 9.5px
-       → 离右边 8 + 9.5 = 17.5 ✗ 比基准远 6.4px → **往左推 6.4px** ✓
-
-     ⚠️ **都用 `transform`，不用负 margin** ✗ —— 负 margin 会改布局宽度 ✓
-        → 中间那块跟着偏 ✗（上一轮那个 `-8px` 就是这么把群名顶偏 4px 的 ✓）。
-        `transform` 只挪"画在哪儿"✓，**不参与布局** ✓ → 群名和状态条一动不动 ✓。
-     ⚠️ 换了图标或改了尺寸，这三个数要**重算** ✓（算法就在上面 ✓）。 */
-  #openSettings { transform: translateX(2.3px); }     /* 墨迹 → 离左 23.9px ✓ */
-  /* ★ 2026-10-20：刷新按钮**从设置页搬到了群聊右上角** ✓ —— 这个数**不用重算** ✓：
-     两个顶栏的内边距都是 8px ✓、按钮都是 40px 的方框 ✓、
-     SVG 也还是 19px ✓ → 墨迹离右依旧是 23.9px ✓。
-     （原来右上角那个四格图标 `#openWorkshop` 已随 diy 聊天入口一起拿掉 ✓。） */
-  #reloadBtn    { transform: translateX(-6.4px); }    /* 墨迹 → 离右 23.9px ✓ */
+  /* ★ 2026-10-29：`#openSettings` / `#reloadBtn` 这两个图标**已经从顶栏删掉** ✓
+     —— 设置改成右滑进 ✓、刷新改成下拉 ✓（见 05-settings.js 的手势那两段 ✓）。
+     那一堆"墨迹离屏边 23.9px"的对齐算法**一并作废** ✓ —— 别留着误导人 ✓。 */
 
   /* 返回箭头是 SVG（见 HTML），这里只管对齐和颜色 */
   .icon-btn.back { color:var(--text); }
@@ -410,6 +373,8 @@
   }
   #chat.has-bg > header.top, #chat.has-bg > #msgs,
   #chat.has-bg > #composer { position:relative; z-index:1; }
+  /* ⚠️ 顶栏要压住下拉药丸（药丸 z-index:1 ✓）→ 设了背景图时也要保持 2 ✓。 */
+  #chat.has-bg > header.top { z-index:2; }
   .empty { margin:auto; color:var(--muted); font-size:14px; text-align:center; }
   .row { display:flex; gap:8px; max-width:84%; }
   .row.mine { align-self:flex-end; flex-direction:row-reverse; }
@@ -829,7 +794,9 @@
   .ascreen.anim-in, .ascreen.anim-out,
   .ascreen.anim-drop, .ascreen.anim-lift,
   .ascreen.anim-corner, .ascreen.anim-corner-out,
-  #settings.anim-in, #settings.anim-out { will-change: transform; }
+  .ascreen.anim-left, .ascreen.anim-left-out,
+  #settings.anim-in, #settings.anim-out,
+  #settings.anim-left, #settings.anim-left-out { will-change: transform; }
   /* ★ **下拉进来的那一屏：从上方滑入** ✗→✓（2026-10-09 用户定的：
      「下滑以编辑该界面，然后组件界面**从上面滑入**，动效丝滑」✓）。
      ⚠️ 它是①那一类（推入/推出）的**同族** ✓，不是新的一类 ✓ ——
@@ -851,8 +818,15 @@
                          to   { transform:none; opacity:1; } }
   @keyframes cornerOut { from { transform:none; opacity:1; }
                          to   { transform:translate(58%,-58%) scale(.9); opacity:0; } }
+  /* ★ 2026-10-29：**从左边滑进来 / 缩回左边** ✓ —— 设置页现在靠右滑进 ✓
+     （用户：「右滑从左边进入设置页，设置页右滑或者返回键回到主群聊」✓）。
+     ⚠️ 方向跟着**手势**走 ✓：从左边拉出来的，就从左边推入 ✓、再缩回左边 ✓。 */
+  @keyframes leftIn  { from { transform:translateX(-100%); } to { transform:none; } }
+  @keyframes leftOut { from { transform:none; } to { transform:translateX(-100%); } }
   #settings.anim-in  { animation:pushIn  .24s cubic-bezier(.22,1,.36,1); }
   #settings.anim-out { animation:pushOut .18s cubic-bezier(.4,0,1,1) forwards; }
+  #settings.anim-left     { animation:leftIn  .26s cubic-bezier(.22,1,.36,1); }
+  #settings.anim-left-out { animation:leftOut .2s  cubic-bezier(.4,0,1,1) forwards; }
   /* ④ 首启那几屏（登录/初始化/主群聊）—— `show()` 加 `fade` 用它 ✓ */
   .screen.anim-fade  { animation:fadeIn .22s ease both; }
 
@@ -878,6 +852,9 @@
   /* ★ 右上角来的那一屏 —— 进/出各一条 ✓ */
   .ascreen.anim-corner     { animation:cornerIn  .26s cubic-bezier(.22,1,.36,1); }
   .ascreen.anim-corner-out { animation:cornerOut .2s  cubic-bezier(.4,0,1,1) forwards; }
+  /* 左边来的那一屏（目前只有设置页 ✓，但做成通用的 ✓ —— 以后别的屏要从左进也一样 ✓）*/
+  .ascreen.anim-left     { animation:leftIn  .26s cubic-bezier(.22,1,.36,1); }
+  .ascreen.anim-left-out { animation:leftOut .2s  cubic-bezier(.4,0,1,1) forwards; }
 
   /* ── 空间（群聊左滑进去的那一屏）───────────────────────────────
      两屏：空间（#workshop，**只罗列组件**）+ 组件页（#compView，压在上面）。
@@ -2079,3 +2056,90 @@
   }
   #tray .tray-act .ti svg { width:21px; height:21px; }
   #tray .tray-act .tl { font-size:11px; color:var(--muted); white-space:nowrap; }
+
+  /* ══════════════════════════════════════════════════════════════════
+     ★ 2026-10-29：**下拉刷新**（主群聊顶栏往下拽）✓
+     —— 用户：「刷新按钮改到按住顶部状态栏下拉刷新」✓。
+     ⚠️ 这一颗只是**提示** ✓：真正干活的是松手后的 `_appReload()` ✓（见 JS ✓）。
+     ⚠️ 平时 `opacity:0` + `pointer-events:none` ✓ —— 不挡顶栏、不接点击 ✓。
+     ══════════════════════════════════════════════════════════════════ */
+  #pull {
+    position:absolute; left:50%; top:0; z-index:6;
+    display:flex; align-items:center; gap:7px;
+    padding:7px 13px 7px 10px;
+    border-radius:999px;
+    background:var(--panel); border:1px solid var(--line);
+    box-shadow:var(--shadow-md);
+    color:var(--muted); font-size:12px; letter-spacing:.2px;
+    white-space:nowrap;
+    transform:translate(-50%,-46px); opacity:0;
+    pointer-events:none; will-change:transform,opacity;
+  }
+  #pull .pull-ico { display:grid; place-items:center; color:var(--accent); }
+  #pull .pull-ico svg { display:block; }
+  #pull.ready { color:var(--text); border-color:var(--accent-line); }
+  #pull.spin .pull-ico { animation:pullspin .8s linear infinite; }
+  @keyframes pullspin { to { transform:rotate(360deg); } }
+
+  /* ══════════════════════════════════════════════════════════════════
+     ★ 2026-10-29：**工具抽屉**（群聊左滑）✓
+     —— 用户：「小屋界面不要之后，可以将一些功能区放到左滑出现状态栏，
+        先放个账本」✓。目前只有「账本」一行 ✓，以后加功能就往 `.dr-list` 里加 ✓。
+     ⚠️ z-index 56：压在屏（≤32）上面 ✓、在长按卡片 58 / 弹层 60 下面 ✓ ——
+        抽屉开着的时候还能弹确认框 ✓。
+     ⚠️ 抽屉**不报屏名** ✓：顶栏仍报 chat ✓，返回键先收抽屉（见 __goBack ✓）。
+     ══════════════════════════════════════════════════════════════════ */
+  #drawer { position:fixed; inset:0; z-index:56; display:none; }
+  #drawer.on { display:block; }
+  #drawer .dr-scrim { position:absolute; inset:0; background:rgba(8,10,14,.42);
+                      opacity:0; }
+  #drawer .dr-panel {
+    position:absolute; top:0; right:0; height:100%;
+    width:min(78vw, 320px);
+    display:flex; flex-direction:column;
+    padding:calc(var(--inset-top) + 30px) 14px calc(var(--inset-bottom) + 18px);
+    background:var(--panel);
+    border-left:1px solid var(--line);
+    border-radius:24px 0 0 24px;
+    box-shadow:-20px 0 48px rgba(0,0,0,.32);
+    transform:translateX(100%);
+    overflow:hidden;
+    will-change:transform;
+  }
+  #drawer .dr-panel::before {
+    content:''; position:absolute; right:-90px; top:-110px; width:260px; height:260px;
+    border-radius:50%;
+    background:radial-gradient(circle, var(--accent-a), transparent 68%);
+    pointer-events:none;
+  }
+  #drawer .dr-head { position:relative; padding:2px 10px 0; }
+  #drawer .dr-eyebrow { font-size:11px; color:var(--muted); letter-spacing:.16em; }
+  #drawer .dr-name { margin-top:7px; font-size:21px; font-weight:600; color:var(--text);
+                     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #drawer .dr-list { position:relative; margin-top:22px; display:flex;
+                     flex-direction:column; gap:8px; }
+  #drawer .dr-item {
+    display:flex; align-items:center; gap:12px; width:100%;
+    padding:11px 12px;
+    border-radius:16px;
+    background:var(--panel2);
+    border:1px solid transparent;
+    color:var(--text); text-align:left;
+    transition:background .16s ease, transform .16s cubic-bezier(.22,1,.36,1),
+               border-color .16s ease;
+  }
+  #drawer .dr-item:active { background:var(--hover); border-color:var(--line);
+                            transform:scale(.985); }
+  #drawer .dr-ico { width:40px; height:40px; border-radius:13px;
+                    display:grid; place-items:center; flex-shrink:0;
+                    background:var(--accent-a); color:var(--accent); }
+  #drawer .dr-ico svg { display:block; }
+  #drawer .dr-k { font-size:15.5px; font-weight:600; }
+  #drawer .dr-chev { margin-left:auto; display:grid; place-items:center;
+                     color:var(--muted); opacity:.7; }
+  #drawer .dr-chev svg { display:block; }
+  /* 亮色那套的阴影和黑纱要轻一档 ✓ —— 深色下同样的数值会发灰 ✓。 */
+  [data-theme="cream"] #drawer .dr-scrim,
+  [data-theme="light"] #drawer .dr-scrim { background:rgba(60,48,32,.30); }
+  [data-theme="cream"] #drawer .dr-panel,
+  [data-theme="light"] #drawer .dr-panel { box-shadow:-20px 0 44px rgba(74,58,38,.18); }

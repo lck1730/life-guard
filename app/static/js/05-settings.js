@@ -1941,55 +1941,135 @@
   //   `06-workshop.js` 的 `peekWorkshop` / `endWorkshopPeek` ✓）。
   const SW_EDGE = 24;      // 边缘留给系统 ✓
   const SW_MIN2 = 10;      // 超过它才判方向 ✓
-  //: 横滑（主群聊左滑进空间 ✓）：松手时拉过这么多才算数 ✓。
-  //: ★ **70 → 96**（2026-10-09 用户定的 ✓）—— 2026-10-24 跟手之后它只剩
-  //:   "阈值"这一个身份 ✓（原来还兼着提示条走满格的行程 ✓，提示条已删 ✓）。
+  //: 横滑松手时走过这么多才算数 ✓（左开抽屉 / 右进设置 / 右退屏 ✓）。
   const SW_TRIG = 96;
-  // ⚠️ **右滑引用整套已经拆掉** ✗→✓（2026-10-29 用户：「去掉消息右滑引用的逻辑，
-  //    已经在长按消息中实现了」✓）—— `QUOTE_TRIG` / `qDragRow` / `_endQuoteDrag`
-  //    原样留在参考版里 ✓。这里**只剩左滑**那一套 ✓（进空间 / 退组件页 ✓）。
   let pgSw = null;
-  // ⚠️ `#msgcard` 从这一串里**去掉了** ✗→✓（2026-10-11）—— 那张长按小卡片整个删了 ✓。
-  //    留着它**不会报错** ✓（`$(s)` 是 null ✓、`.some` 直接跳过 ✓），
-  //    但那就是**一个永远为假的判断** ✓ —— 下一个人读到会以为"世上还有这么个东西" ✓。
-  //: ★ 2026-10-29：`#tray`（长按那条消息的动作卡片 ✓）也列进来 ✓ ——
-  //:   它整屏盖着（`z-index:58` ✓），不列的话在卡片上滑动还会把空间推出来 ✓。
+  //: ★ 2026-10-29：灯箱（z 80）也算"盖着" ✓ —— 图开着的时候不该在下面滑动开抽屉 ✓。
   const _overlayOn = () =>
-    ['#sheet', '#modal', '#tray'].some(s => $(s) && $(s).classList.contains('on'));
+    ['#sheet', '#modal', '#tray', '#lightbox'].some(s => $(s) && $(s).classList.contains('on'));
 
-  //: 除了这三屏之外，**其余任何一屏开着就不认手势** ✓（用户 2026-10-09：
-  //: 「[组件沙箱]界面，只有在主群聊时右滑才出现，不能到处出现」✓）。
-  //:
-  //: ⚠️ 原来这里只问"这三屏开没开" ✗ —— 而主群聊是**垫在所有屏底下**的 ✓
-  //:    （打开设置页时它照样 `on` ✓）→ 于是在**设置页、我的、组件对话…**
-  //:    上左滑也会把收纳页推上来 ✗✓（用户看到的就是"到处都能滑出来" ✓）。
-  //:    判据改成"**最上面那一屏**是不是这三屏之一" ✓。
+  //: 除了这几屏之外，**其余任何一屏开着就不认手势** ✓。
+  //: ⚠️ 2026-10-29：`#settings` **从这里拿掉了** ✓ —— 它现在自己吃"右滑返回" ✓，
+  //:    留着的话 `_whichScreen()` 永远返回 '' ✓，设置页上右滑就没反应 ✓。
+  //:    `#meEdit` / `#models` 补进来 ✓（原来漏了 ✓ —— 它们在设置页上面开着时，
+  //:    会被误判成"在设置页" ✓，一右滑把底下那屏关了 ✓）。
   const _OTHER_SCREENS = [
-    '#settings', '#bgSet', '#themeSet', '#bubbleSet', '#me', '#meAccount', '#space',
-    '#peer', '#selfIntro', '#agent', '#agentEdit', '#login', '#init',
+    '#bgSet', '#themeSet', '#bubbleSet', '#models', '#me', '#meAccount', '#meEdit',
+    '#space', '#peer', '#selfIntro', '#agent', '#agentEdit', '#login', '#init',
   ];
 
   const _whichScreen = () => {
     if (_OTHER_SCREENS.some(s => $(s) && $(s).classList.contains('on'))) return '';
     if ($('#compView').classList.contains('on')) return 'comp';
-    if ($('#workshop').classList.contains('on')) return 'wall';
+    if ($('#settings').classList.contains('on')) return 'settings';
+    if ($('#drawer').classList.contains('on')) return 'drawer';
     if ($('#chat').classList.contains('on')) return 'chat';
     return '';
   };
 
+  // ── 工具抽屉（2026-10-29）──────────────────────────────────────────
+  //
+  // 用户：「小屋界面不要之后，可以将一些功能区放到左滑出现状态栏，先放个账本」✓。
+  // 拉法和原来的空间一模一样：**整屏跟手** ✓ —— 滑多少露多少 ✓，
+  // 松手过 `SW_TRIG` 收进来 ✓、没过缩回右边 ✓。
+  //
+  // ⚠️ **不借 `pushScreen`** ✗ —— 它一上来就挂动画类 ✓，和跟手那条 `transform`
+  //    抢同一个属性 ✓（原来空间那一版就是自己管 `.on` + `transition:none` ✓）。
+  // ⚠️ 抽屉**不报给原生** ✓（`tellTop` 看不见它 ✓）：返回键仍然先收它 ✓，
+  //    收完就回到群聊 ✓ —— 不会把 App 退掉 ✓。
+  const DR_W = () => Math.min((window.innerWidth || 360) * 0.78, 320);
+  const _drawer = $('#drawer'), _drPanel = $('#drPanel'), _drScrim = $('#drScrim');
+  let drTok = 0, drDragging = false;
+
+  const _drSpace = () => {
+    const el = $('#drSpace');
+    if (!el) return;
+    const n = (typeof group !== 'undefined' && group && group.name)
+      || (($('#gname') && $('#gname').textContent) || '');
+    el.textContent = n || '—';
+  };
+
+  /** `d` = 抽屉已经从右边露出多少 px ✓。`anim` 是 CSS transition 字符串（空串 = 跟手）。 */
+  const _drShow = (d, anim) => {
+    const w = DR_W();
+    const x = Math.max(0, Math.min(w, d));
+    _drawer.classList.add('on');
+    _drawer.setAttribute('aria-hidden', x > 0 ? 'false' : 'true');
+    _drPanel.style.transition = anim || 'none';
+    _drScrim.style.transition = anim ? 'opacity .24s ease' : 'none';
+    _drPanel.style.transform = 'translateX(' + (w - x) + 'px)';
+    _drScrim.style.opacity = String(x / w);
+  };
+
+  const _drReset = () => {
+    _drawer.classList.remove('on');
+    _drawer.setAttribute('aria-hidden', 'true');
+    _drPanel.style.transition = '';
+    _drPanel.style.transform = '';
+    _drScrim.style.transition = '';
+    _drScrim.style.opacity = '';
+    // 抽屉收完 → 告诉原生"又回群聊了" ✓（开着的时候报的是 'settings' ✓，见 _drShow 那边 ✓）。
+    tellTop();
+  };
+
+  const peekDrawer = (travel) => {
+    if (!drDragging) { drDragging = true; drTok++; _drSpace(); }
+    _drShow(travel, '');
+  };
+
+  const endDrawerPeek = (open) => {
+    if (!drDragging) return;
+    drDragging = false;
+    const tok = ++drTok;
+    // 松手决定**开着** → 立刻报 'settings' ✓ —— 这时按返回键要交给网页收抽屉 ✓，
+    // 而不是让原生当成"在群聊"直接退出 ✓。收回去那条走 `_drReset` 补报 ✓。
+    if (open) tellTop();
+    _drShow(open ? DR_W() : 0,
+            open ? 'transform .26s cubic-bezier(.16,1,.3,1)'
+                 : 'transform .22s cubic-bezier(.4,0,1,1)');
+    setTimeout(() => {
+      if (tok !== drTok) return;                 // 中间又拉了一下 → 这次收尾作废 ✓
+      if (open) {
+        _drPanel.style.transition = '';
+        _drPanel.style.transform = 'translateX(0)';
+        _drScrim.style.transition = '';
+        _drScrim.style.opacity = '1';
+        return;
+      }
+      _drReset();
+    }, 300);
+  };
+
+  const closeDrawer = () => {
+    if (!_drawer.classList.contains('on')) return;
+    drDragging = false;
+    const tok = ++drTok;
+    _drShow(0, 'transform .22s cubic-bezier(.4,0,1,1)');
+    setTimeout(() => { if (tok === drTok) _drReset(); }, 250);
+  };
+
+  if (_drScrim) _drScrim.onclick = () => closeDrawer();
+  const _drLedger = $('#drLedger');
+  if (_drLedger) _drLedger.onclick = () => {
+    // ⚠️ 必须先收抽屉再开组件 ✓ —— 抽屉 56、组件页 26 ✓，
+    //    不收的话组件会被**压在抽屉底下** ✓（"点了没反应"那个老形状 ✓）。
+    closeDrawer();
+    setTimeout(() => { openComp('bookkeeping-panel', '账本'); }, 260);
+  };
+
   document.addEventListener('touchstart', (ev) => {
     // ⚠️ **半路多出一根手指** ✓（语音 / 系统手势…）→ 这一手就不算了 ✓，
-    //    跟手拉开的那一屏得缩回去 ✓ —— 不能把它晾在半路上 ✗。
+    //    跟手拉开的抽屉得缩回去 ✓ —— 不能把它晾在半路上 ✗。
     if (ev.touches.length !== 1) {
       const s = pgSw; pgSw = null;
-      if (s && s.space) endWorkshopPeek(false);
+      if (s && s.space) endDrawerPeek(false);
       return;
     }
     if (_overlayOn()) { pgSw = null; return; }
     const x = ev.touches[0].clientX, y = ev.touches[0].clientY;
     // ① 贴边的滑动归系统 ✓
     if (x < SW_EDGE || x > window.innerWidth - SW_EDGE) { pgSw = null; return; }
-    pgSw = { x0: x, y0: y, dir: '', d: 0 };
+    pgSw = { x0: x, y0: y, dir: '', d: 0, from: '', space: false };
   }, { passive: true });
 
   document.addEventListener('touchmove', (ev) => {
@@ -1997,13 +2077,7 @@
     const p = ev.touches[0];
     const dx = p.clientX - pgSw.x0, dy = p.clientY - pgSw.y0;
     // ⚠️ **正在拖选文字 → 这根本不是滑动手势** ✗→✓（2026-10-11）——
-    //   气泡现在**可以选中**了 ✓（长按出系统那套 ✓，见 app.css 那段 ✓），
-    //   而"按住选完、再拖两头那个手柄"**也是一次横向 move** ✓ →
-    //   不判的话：拖手柄会把右滑点亮 ✓ → 下面 `preventDefault` ✓ →
-    //   **手柄当场拖不动** ✓ —— 一项新功能把另一项弄坏 ✓，
-    //   而且症状离真因极远 ✗（"复制的时候选不中"✓，谁会怀疑到手势引擎头上 ✓）。
-    //   ⚠️ 必须判在**每一次还没定方向的 move** 上 ✗ —— 不能只在 `touchstart` 判 ✓：
-    //      选区是**长按之后**才冒出来的 ✓，那会儿这个手势早就开始了 ✓。
+    //    必须判在**每一次还没定方向的 move** 上（选区是长按之后才冒出来的 ✓）。
     if (!pgSw.dir) {
       const sel = window.getSelection();
       if (sel && !sel.isCollapsed) { pgSw = null; return; }
@@ -2017,73 +2091,143 @@
       // ③ 这一屏上这个方向有没有意义？没有就把手势丢掉 ✓（免得吃掉正常滚动 ✓）
       const s = _whichScreen();
       const ok = (pgSw.dir === 'L' && s === 'chat')
-              || (pgSw.dir === 'R' && s === 'comp');
-      // ★ 2026-10-14：**右滑 `'wall'`（组件界面）不认** ✓ ——
-      //   组件界面现在是**可横滑的卧室场景** ✓，右滑要拿来**平移看别处** ✓。
-      //   认了的话 `preventDefault` 会把原生横滚吃掉 ✗ → 滑不动 ✗。
-      //   退出改走**点猫 → 回主群聊** ✓ + 系统返回 ✓（见 `06-workshop.js:catNode` ✓）。
-      // ⚠️ 2026-10-29：「右滑群聊里一条消息 = 引用」那一支**删了** ✓ ——
-      //   引用搬进长按卡片 ✓（`04-chat.js` 的 `openTray` ✓）。
+              || (pgSw.dir === 'R' && (s === 'chat' || s === 'settings'
+                                       || s === 'comp' || s === 'drawer'));
       if (!ok) { pgSw = null; return; }
+      pgSw.from = s;
       ev.preventDefault();      // ★ 认了之后**才**拦 ✓（早了会把滚动卡死 ✗）
     } else {
       ev.preventDefault();
     }
     pgSw.dx = dx;
     pgSw.dy = dy;
-    // ★ **左滑进空间 = 整屏跟着手指露** ✗→✓（2026-10-24 用户定的）——
-    //   滑多少露多少 ✓，松手再按阈值收进来 / 缩回去 ✓（见 `_endSwipe` ✓）。
-    //   ⚠️ 中途**不报原生、不换状态栏** ✗ —— 那都是"已经进来了"才该发生的事 ✓，
-    //      拖到一半又缩回去的话，报了还得再报回来 ✓（同一件事多一处真相 ✓）。
-    if (pgSw.dir === 'L') {
+    // ★ **跟手**：群聊左滑 → 抽屉露出来 ✓；抽屉上右滑 → 按手指往回收 ✓。
+    //   ⚠️ 设置页不跟手 ✓ —— 松手过阈值直接走 `closeSettings()` 的退场动画 ✓
+    //      （它有自己的推/退两条 ✓，中途接管会和那两条打架 ✓）。
+    if (pgSw.dir === 'L' && pgSw.from === 'chat') {
       pgSw.space = true;
-      peekWorkshop(-dx);
+      peekDrawer(-dx);
+    } else if (pgSw.dir === 'R' && pgSw.from === 'drawer') {
+      pgSw.space = true;
+      peekDrawer(DR_W() - dx);
     }
-    // ⚠️ 这里原来还有一支「右滑 → 那一行跟着手指走一点」✓，
-    //    **2026-10-29 跟着右滑引用一起删了** ✓（群聊里的右滑现在什么都不做 ✓）。
   }, { passive: false });
 
   const _endSwipe = () => {
     const s = pgSw;
     pgSw = null;
     if (!s) return;
-    // ★ **跟手拉开的那一屏要在 `_whichScreen()` 之前处置** ✗→✓ ——
-    //   它现在正 `.on` 着 ✓，按"最上面是谁"现算得到的是 `'wall'` ✓，
-    //   于是下面那条 `s.dir === 'L' && scr === 'chat'` 就永远不成立 ✗。
-    //   所以看**手势自己记下的** `s.space` ✓（不看屏幕 ✓）。
-    // ⚠️ 用**有方向的** `-dx` 判 ✓（不用 `Math.abs` ✗）—— 手指往左拉出去又
-    //    拉回来时 `dx` 会变正 ✓，`abs` 会把"其实已经收回来了"判成过阈值 ✗。
-    if (s.space) { endWorkshopPeek(-(s.dx || 0) >= SW_TRIG); return; }
+    if (s.space) {
+      // ⚠️ 用**有方向的**位移判 ✓（不用 `abs` ✗ —— 手指拉出去又拉回来时，
+      //    `abs` 会把"其实已经收回来了"判成过阈值 ✗）。
+      const open = s.from === 'drawer'
+        ? (DR_W() - (s.dx || 0) >= SW_TRIG)     // 从全开往右拖：拖走不足阈值 → 还开着 ✓
+        : (-(s.dx || 0) >= SW_TRIG);            // 从左往左拖：过阈值 → 开 ✓
+      endDrawerPeek(open);
+      return;
+    }
     if (!s.dir) return;
     const far = Math.abs(s.dx || 0) >= SW_TRIG;
     if (!far) return;
-    if (s.dir === 'R' && _whichScreen() === 'comp') { closeComp(); return; }
+    if (s.dir === 'R' && s.from === 'comp') { closeComp(); return; }
+    if (s.dir === 'R' && s.from === 'settings') { closeSettings(); return; }
+    if (s.dir === 'R' && s.from === 'chat') { openSettings(); return; }
   };
   document.addEventListener('touchend', _endSwipe);
-  // ⚠️ 取消（来电、系统抢手势…）也要**把那行收回原位** ✓ —— 不然它会**永远歪着** ✓
-  //    （`touchend` 不一定会来 ✓，这种"少一个事件"的坑这个项目栽过 ✓）。
+  // ⚠️ 取消（来电、系统抢手势…）也要**把抽屉收回去** ✓ ——
+  //    `touchend` 不一定会来 ✓（这种"少一个事件"的坑这个项目栽过 ✓）。
   document.addEventListener('touchcancel', () => {
     const s = pgSw; pgSw = null;
-    // 跟手拉开的那一屏也要缩回去 ✓（来电 / 系统抢手势的时候 ✓）
-    if (s && s.space) endWorkshopPeek(false);
+    if (s && s.space) endDrawerPeek(false);
   });
 
-  // ★ DIY 助手整套已经撤掉 ✓ —— 工坊只剩组件展示 / 管理 ✓，
-  //   组件和界面外观的修改现在由管理员在服务端做 ✓。
-
-  // ★ 群聊右上角那颗「重新加载」（2026-10-20 从设置页挪过来的 ✓）。
+  // ── 下拉刷新（2026-10-29）──────────────────────────────────────────
   //
-  //   ⚠️ 2026-10-23 换掉了原来的 `location.reload()` ✗ ——
-  //      用户报"点刷新卡在加载页、只能划掉重进" ✓。走 `_appReload`：
-  //      在 App 里重建 WebView（= 划掉重进那条路 ✓），浏览器里才 reload ✓。
-  //      连点两下别开两次 ✓（重建那一两百毫秒里按钮还挂在那儿 ✓）。
-  const _rb = $('#reloadBtn');
-  let _rbBusy = false;
-  if (_rb) _rb.onclick = () => {
-    if (_rbBusy) return;
-    _rbBusy = true;
-    try { _rb.disabled = true; } catch (e) {}
-    _appReload();
+  // 用户：「刷新按钮改到按住顶部状态栏下拉刷新」✓。
+  // 只在**主群聊的顶栏上起手**才认 ✓ —— 在消息区往下拉是翻历史 ✓，抢了会出事 ✗。
+  // 真正干活的是松手后的 `_appReload()` ✓（和原来按钮同一条路 ✓，见 01-core ✓）。
+  const PULL_TRIG = 56;    // 药丸走到这里算"松手就刷" ✓
+  const PULL_MAX = 84;     // 再拉也不走了 ✓（手感像橡皮筋 ✓）
+  const _pullEl = $('#pull'), _pullTxt = $('#pullTxt'), _pullHeader = $('#chat header.top');
+  let pull = null, pullTok = 0, pullBusy = false;
+
+  const _pullReset = () => {
+    _pullEl.classList.remove('ready', 'spin');
+    _pullEl.style.transition = '';
+    _pullEl.style.transform = '';
+    _pullEl.style.opacity = '';
+    _pullEl.style.top = '';
+    const ic = _pullEl.querySelector('.pull-ico');
+    if (ic) ic.style.transform = '';
+    if (_pullTxt) _pullTxt.textContent = '下拉刷新';
   };
+
+  document.addEventListener('touchstart', (ev) => {
+    pull = null;
+    if (pullBusy || ev.touches.length !== 1) return;
+    if (_overlayOn() || _whichScreen() !== 'chat') return;
+    const t = ev.touches[0];
+    const r = _pullHeader.getBoundingClientRect();
+    if (t.clientY > r.bottom + 8) return;      // 起手不在顶栏 → 不是下拉刷新 ✓
+    pull = { x0: t.clientX, y0: t.clientY, active: false, d: 0, top: r.bottom };
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (ev) => {
+    if (!pull) return;
+    if (pullBusy) { pull = null; return; }
+    const t = ev.touches[0];
+    const dy = t.clientY - pull.y0;
+    if (!pull.active) {
+      if (dy < 8) return;
+      // 横向更明显 → 这一手是滑屏，不是下拉 ✓
+      if (Math.abs(t.clientX - pull.x0) > dy * 1.2) { pull = null; return; }
+      pull.active = true;
+      const cr = $('#chat').getBoundingClientRect();
+      _pullEl.style.top = Math.round(pull.top - cr.top + 2) + 'px';
+      _pullEl.style.transition = 'none';
+      _pullEl.style.opacity = '0';
+      _pullEl.style.transform = 'translate(-50%,-46px)';
+    }
+    ev.preventDefault();                       // ★ 认了才拦 ✓
+    const d = Math.min(PULL_MAX, dy * 0.6);
+    pull.d = d;
+    const ready = d >= PULL_TRIG;
+    _pullEl.classList.toggle('ready', ready);
+    if (_pullTxt) _pullTxt.textContent = ready ? '松开刷新' : '下拉刷新';
+    _pullEl.style.opacity = String(Math.min(1, d / 26));
+    _pullEl.style.transform = 'translate(-50%,' + (Math.min(d, 52) - 46) + 'px)';
+    const ic = _pullEl.querySelector('.pull-ico');
+    if (ic) ic.style.transform = ready ? 'rotate(180deg)' : 'rotate(' + Math.round(d * 2.4) + 'deg)';
+  }, { passive: false });
+
+  const _pullEnd = () => {
+    if (!pull) return;
+    const p = pull; pull = null;
+    if (!p.active) return;
+    if (p.d >= PULL_TRIG) {
+      pullBusy = true;
+      _pullEl.classList.remove('ready');
+      _pullEl.classList.add('spin');
+      if (_pullTxt) _pullTxt.textContent = '正在刷新';
+      _pullEl.style.transition = 'transform .2s cubic-bezier(.22,1,.36,1), opacity .16s ease';
+      _pullEl.style.opacity = '1';
+      _pullEl.style.transform = 'translate(-50%,6px)';
+      // 让"正在刷新"露一下再重建 ✓ —— 立刻 reload 的话人只看到闪一下 ✓。
+      setTimeout(() => _appReload(), 280);
+      return;
+    }
+    _pullEl.style.transition = 'transform .22s cubic-bezier(.4,0,1,1), opacity .18s ease';
+    _pullEl.style.transform = 'translate(-50%,-46px)';
+    _pullEl.style.opacity = '0';
+    const tok = ++pullTok;
+    setTimeout(() => { if (tok !== pullTok) return; _pullReset(); }, 240);
+  };
+  document.addEventListener('touchend', _pullEnd);
+  document.addEventListener('touchcancel', () => {
+    if (!pull) return;
+    const active = pull.active;
+    pull = null;
+    if (active) _pullReset();
+  });
 
   // ── 创意工坊（2026-10-07，右上角那个入口）────────────────────────────

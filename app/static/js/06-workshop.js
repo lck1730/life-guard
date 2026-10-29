@@ -87,12 +87,14 @@
   //   小屋是浅奶油底 ✓，深色主题下原来那套浅色状态栏图标会**看不见** ✗。
   //   所以这一摞屏里：停在小屋 → 深色图标 ✓；进组件 / 对话 → 按用户主题还原 ✓。
   //   ⚠️ 壳那边没有这个 API 时（浏览器里）静默跳过 ✓。
+  // ★ 2026-10-29：小屋下线之后**没有"浅色小屋"这一屏了** ✓ ——
+  //   这个函数只剩"按用户主题还原状态栏图标"一件事 ✓。
+  //   ⚠️ 不能再碰 `$('#workshop')` ✗ —— 那个元素已经不在 DOM 里 ✓，
+  //      一碰就是 undefined.classList ✗（而且是异步调用的，整页不会当场报错）。
   const _syncStatusBar = () => {
-    let light = true;
+    let light = false;
     try { light = !!themeById(document.documentElement.dataset.theme).light; } catch (e) {}
-    const onScene = $('#workshop').classList.contains('on')
-      && !$('#compView').classList.contains('on');
-    try { window.LifeGuardNative?.setLightStatusBar?.(onScene ? true : light); } catch (e) {}
+    try { window.LifeGuardNative?.setLightStatusBar?.(light); } catch (e) {}
   };
 
   // ── 进空间：**跟着手指拉** ✗→✓（2026-10-24 用户定的）────────────────────
@@ -1299,7 +1301,8 @@
     setTimeout(_syncStatusBar, 220);
     // ⚠️ **退回工坊要重画一次** ✗→✓ —— 不然刚才改过的东西还挂在旧样子上 ✓，
     //    用户会以为"点了没用" ✓（这就是那种"明明成功了却像失败"的毛病 ✓）。
-    if ($('#workshop').classList.contains('on')) renderWorkshop();
+    // ⚠️ 2026-10-29：小屋下线 ✓ —— 退回的地方现在是**群聊** ✓，没有"工坊"要重画了 ✓。
+    //    原来这句 `renderWorkshop()` 会去碰 `$('#wsBody')`（null）✗ → 关组件页时炸 ✓。
   };
 
   /**
@@ -1351,8 +1354,7 @@
     m.classList.add('on');
   });
 
-  $('#openSettings').onclick = openSettings;
-  $('#backChat').onclick = closeSettings;
+    $('#backChat').onclick = closeSettings;
 
   // ⚠️ **退出登录**那一段的说明留在上面那个 `logout()` 里 ✓（2026-10-08 合并时
   //    并到了一起 ✓）—— 原来这里是第二份 ✗：一份负责调 `/auth/logout` ✓、

@@ -486,6 +486,10 @@
     // ★ 2026-10-29：长按那条消息的**动作卡片**（z 58 ✓）——
     //   排在确认框(60)下面 ✓、弹层(50)上面 ✓（照"z-index 从大到小"那条铁律 ✓）。
     if ($('#tray').classList.contains('on')) { closeTray(); return; }
+    // ★ 2026-10-29：左滑出来的**工具抽屉**（z 56 ✓）——
+    //   在长按卡片(58)下面 ✓、弹层(50)上面 ✓（照"z-index 从大到小"那条铁律 ✓）。
+    //   ⚠️ 它**不报屏名** ✓：收掉它就回到群聊 ✓（顶栏一直是 chat ✓）。
+    if ($('#drawer').classList.contains('on')) { closeDrawer(); return; }
     if ($('#sheet').classList.contains('on')) { closeSheet(); return; }
     // ★ 创意工坊那几屏（2026-10-07）—— **压在管家那三屏上面** ✓：
     //   组件页 > 工坊 > 编状态 > 改资料 > 管家列表 > 群设置 ✓。
@@ -508,7 +512,8 @@
     if ($('#me').classList.contains('on')) { closeMe(); return; }
     if ($('#peer').classList.contains('on')) { closePeer(); return; }
     if ($('#compView').classList.contains('on')) { closeComp(); return; }
-    if ($('#workshop').classList.contains('on')) { closeWorkshop(); return; }
+    // ⚠️ 2026-10-29：`#workshop`（小屋）**整屏下线了** ✓ —— 那一支跟着删 ✓，
+    //    不能再 `$('#workshop').classList` ✗（元素已经不在 DOM 里 ✓ → 返回键直接炸 ✓）。
     if ($('#agentEdit').classList.contains('on')) { closeAgentEdit(); return; }
     if ($('#agent').classList.contains('on')) { closeAgentSettings(); return; }
     // ★ 2026-10-08 新加的两屏（`#meAccount` 13 > `#me` 12 > `#settings` 10 ✓）——
