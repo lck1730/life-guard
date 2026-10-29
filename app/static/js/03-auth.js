@@ -280,7 +280,18 @@
     //    真入口那一趟回来会调它 ✓。少这一下，第一帧更快 ✓。
   };
 
-  const enterApp = async () => {
+  /**
+   * 进 App：取一趟数据 → 画聊天 → **落进屋** ✓。
+   *
+   * ★ 2026-10-29：开屏**停在屋子里** ✓（用户问："登录进来还是直接进主群聊吗"✓）。
+   *   提案那两句是分开的：「打开 App 不是进列表，是进屋」✓、「你坐下，就是聊天」✓
+   *   —— 所以开屏是屋子 ✓，点桌上那本信簿才落座 ✓（见 `06-workshop.js` ✓）。
+   *
+   * ⚠️ `opts.room === false` 只有一处用 ✓：`/me` 那条地址 ✓ ——
+   *    那个地址的意思是"到了就让我看见我的资料" ✓，中间夹一间屋子没有意义 ✗。
+   */
+  const enterApp = async (opts) => {
+    const landInRoom = !(opts && opts.room === false);
     // ★ **先用本机上一次的样子顶上** ✓（只在本页第一次进时用 ✓）
     //   后面的网络那一趟照旧 ✓ —— 它回来会把这些覆盖成最新的 ✓。
     if (!bootCacheUsed) {
@@ -389,6 +400,12 @@
     try {
       if (document.fonts && document.fonts.ready) await _within(document.fonts.ready, 1500);
     } catch (e) {}
+    // ★ 2026-10-29：**幕一揭开，看见的是屋子** ✓（不是先闪一下聊天再盖上去 ✓）。
+    //   屋子那张图不等它就只能看见一块米色底 ✓ → 等（有上限 ✓，见 `_within` ✓）。
+    if (landInRoom) {
+      try { await _within(preloadRoomArt(), 2500); } catch (e) {}
+      try { openWorkshopNow(); } catch (e) {}
+    }
     _bootReady();
     // ★ 2026-10-08：这里原来有一段 `sessionStorage['lg_back_to']` 的还原 ✓ ——
     //   **删掉了** ✗→✓。它当初是为了修"从「我的」回来落到群聊首页" ✓，
