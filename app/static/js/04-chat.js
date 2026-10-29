@@ -1034,6 +1034,8 @@
         clearQuote();
       }
       burstHearts(sendAt);
+      // 猫立刻抬头 ✓ —— 服务端的状态事件回来之前也要有反应 ✓
+      window.__lgCat && window.__lgCat.think && window.__lgCat.think();
     } catch (e) { toast(e.message); ta.value = t; syncSendBtn(t); }
   };
   $('#send').onclick = send;
@@ -1307,6 +1309,8 @@
         }, quoteField())),
       });
       clearQuote();
+      // 猫立刻抬头 ✓ —— 服务端的状态事件回来之前也要有反应 ✓
+      window.__lgCat && window.__lgCat.think && window.__lgCat.think();
       // 正式消息可能已经从 WebSocket 先到了 ✓（和图片那条一样 ✓）
       if (!$('#msgs').querySelector(`[data-id="${msg.id}"]`)) addMsg(msg);
     } catch (e) {
@@ -1490,6 +1494,8 @@
         }, useQuote ? quoteField() : {})),
       });
       if (useQuote) clearQuote();
+      // 猫立刻抬头 ✓ —— 服务端的状态事件回来之前也要有反应 ✓
+      window.__lgCat && window.__lgCat.think && window.__lgCat.think();
       // 正式消息可能已经从 WebSocket 先到了
       if (!$('#msgs').querySelector(`[data-id="${msg.id}"]`)) addMsg(msg);
       return true;
@@ -1552,6 +1558,7 @@
             method: 'POST',
             body: JSON.stringify({ msg_type: 'voice', media_path: up.path, media_meta: { duration: secs } }),
           });
+          window.__lgCat && window.__lgCat.think && window.__lgCat.think();
         } catch (e) { toast(e.message); }
       };
       recorder.start();

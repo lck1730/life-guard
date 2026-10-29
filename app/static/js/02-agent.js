@@ -1,7 +1,3 @@
-  // 三种状态各一枚小图标 ✓（2026-10-24）—— 待机=钟 ✓ / 思考=对话泡里的点 ✓ /
-  // 沉默=静音 ✓。只为了"扫一眼分得开"✓，不解释含义 ✓。
-  const STATE_ICO = { idle: 'clock', thinking: 'talk', silent: 'mute' };
-
   const renderAgent = () => {
     const m = $('#agentBody');
     if (!m) return;
@@ -24,22 +20,11 @@
     prof.onclick = openAgentEdit;
     m.appendChild(prof);
 
-    // ★ 2026-10-24：一组行 = 一张卡 + 组头 ✓（`secG` / `icoBox` 在 05-settings.js ✓）。
-    const rows1 = [];
-    ['idle', 'thinking', 'silent'].forEach((k) => {
-      const b = mkel('button', 'row');
-      b.appendChild(icoBox(STATE_ICO[k]));
-      b.appendChild(mkel('span', 'rl', KIND_LABEL[k]));
-      // ⚠️ 右边原来写的是**四个字**「点击编辑」✗→✓（2026-10-09 用户定的：
-      //   「管家那里的三个状态的点击编辑替换为 `>` 吧」✓）——
-      //   换成那个 `›` ✓，和这一页的资料卡、我的那三行、设置页那几行**同一个记号** ✓
-      //   （`›` 在整个 App 里就是"点得进去"✓；写成四个字反而是这里独有的形状 ✓）。
-      const go = mkel('span', 'go'); go.appendChild(ico('chev'));
-      b.appendChild(go);
-      b.onclick = () => openStateScreen(k);
-      rows1.push(b);
-    });
-    m.appendChild(secG(null, rows1));
+    // ★ 2026-10-30：**那三行状态文案设置撤掉了** ✓。
+    //   用户当天定了「管家状态条不要了」→ 顶栏换成猫猫仔 ✓。
+    //   那三行（待机 / 思考中 / 保持沉默）改的是**那条文字条**的措辞 ✓，
+    //   文字条已经没人显示 ✗ → 留着就是三个点了没反应的入口 ✗（见 memory：
+    //   「没有入口的那几屏」同一个毛病 ✓）。下面的 `openStateScreen` 先留着不接 ✓。
 
     // ★ 管家的气泡（2026-10-27）✓ —— 入口在**这一屏** ✓（用户：「我的」和「管家」✓）。
     //   ⚠️ 它是**群级**的 ✓：管家没有账号 ✓，所以挂在群上 ✓；

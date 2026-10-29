@@ -366,11 +366,6 @@
   };
 
   const agentName = () => group?.agent_name || '管家';
-  // ⚠️ 这份**只是兜底** ✓ —— 正常情况下文案全来自服务端的配置 ✓
-  //   （`group.agent_status` ✓，形状与默认值定义在 `app/agent_status.py` ✓）。
-  //   留着它是因为两种边角：老服务端、以及 `typing` 这一档不在新配置里 ✓
-  //   —— 少了它，"正在输入"会变成一个**空的状态条** ✗。
-  const STATUS_TEXT = { idle:'正在窥屏…', thinking:'正在思考…', typing:'正在输入…', lurking:'打算继续窥屏…' };
 
   // ★ 背景图的**本机缓存** ✓ —— 2026-10-20。
   //   服务端那条 `/api/groups/{id}/background/file` 已经带 `?v=` + `immutable` ✓，
@@ -638,85 +633,30 @@
     ensureChatBackground();
   };
 
-  // ★ 三档文案的分工（2026-10-06，见 app/agent_status.py 那段）：
-  //   · 思考中 / 不打算说话 → 服务端在**事件**里挑好一句发下来 ✓
-  //   · 待机 → **客户端按时钟轮换** ✓ —— 它是个钟，不是事件 ✓，
-  //     服务端不必每十分钟推一次消息 ✓
+  // 管家状态 → **顶栏那只猫猫仔**（2026-10-30，用户定的）：
+  //   状态条不要了 ✓，换成一只会打盹 / 伸懒腰 / 走两步的猫 ✓。
+  //   `group.agent_status` 那份配置**留着** ✓ —— 01-core 的 `agentCfg()` 还在用它 ✓，
+  //   但**那三行"状态文案"设置已经撤了** ✓（没人显示那些字了 ✓，见 02-agent.js）。
+  //   `agentCfg()` 认得里面的 thinking/idle 之类，照旧 ✓。
+  //   事件 → 心情的翻译在 08-cat.js 里 ✓；这里只负责把事件递过去 ✓。
   let statusCfg = null;
-  let idleTimer = null;
 
   const normalizeStatus = () => {
     // 服务端存的是 JSON **字符串** ✓（列是 TEXT ✓）。
     try { statusCfg = group && group.agent_status ? JSON.parse(group.agent_status) : null; }
-    catch (e) { statusCfg = null; }         // 坏字符串 → 当没配置 ✓，别把状态条弄没 ✗
-    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
-    if (curStatus === 'idle') setStatus('idle');
+    catch (e) { statusCfg = null; }         // 坏字符串 → 当没配置 ✓
+    // 配置只影响文字 ✓；猫脸由事件驱动 ✓，这里不重画 ✓。
   };
 
-  /** 待机那一句 —— **从时钟直接算** ✓。 */
-  //
-  // ⚠️ 这么算的**好处**：重启 App **天然不重置** ✓ ——
-  //    它不是"从打开那一刻开始数"✗，它根本不数 ✓，它看钟 ✓。
-  //    `+ group.id` 是让不同群的换气点**错开** ✓
-  //    （不然所有群会在同一秒一起变 ✗，看着像系统在刷新 ✓）。
-  const idleLine = () => {
-    const it = (statusCfg && statusCfg.idle) || {};
-    const lines = it.lines || [];
-    if (!it.on || !lines.length) return null;
-    const every = Math.max(60, Number(it.every) || 600) * 1000;
-    // 相位 = 群号 + **rev** ✓。rev 每存一次 +1（服务端加的 ✓）
-    // → **改完点保存，屏幕上立刻换一条** ✓。
-    // 少了 rev 这一项，用户改完可能十分钟里看不到任何变化 ✗，
-    // 于是他会得出"保存没生效" ✓，然后反复点保存 ✓。
-    const phase = ((group && group.id) || 0) + (Number(statusCfg.rev) || 0);
-    const i = Math.floor(Date.now() / every + phase) % lines.length;
-    return lines[i];
-  };
-
-  /** 排下一次换气 ✓ —— 用完就重排 ✓（不是每秒轮询 ✗，空转是白烧电）。 */
-  const scheduleIdle = () => {
-    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
-    const it = (statusCfg && statusCfg.idle) || {};
-    if (!it.on || !(it.lines || []).length) return;
-    const every = Math.max(60, Number(it.every) || 600) * 1000;
-    const now = Date.now();
-    const wait = (Math.floor(now / every) + 1) * every - now;
-    idleTimer = setTimeout(() => {
-      if (curStatus === 'idle') setStatus('idle');
-      scheduleIdle();
-    }, wait + 50);
-  };
-
-  // 状态**只出现在顶栏**。早期版本还在消息列表里插一条"正在输入"，
-  // 结果和顶栏重复，还占消息流的位置。
-  const setStatus = (s, text) => {
+  // 状态**只在顶栏表达** ✓ —— 2026-10-30 起它不是字，是猫 ✓。
+  const setStatus = (s) => {
     curStatus = s;
-    const el = $('#status'), tx = $('#statusText');
-    let line = text;
-    if (!line) {
-      if (s === 'idle') line = idleLine();
-      else {
-        // 服务端没带文字（重连后补状态那条 ✓、老服务端 ✓）→ 自己从配置里随机挑 ✓
-        const k = s === 'lurking' ? 'silent' : s;
-        const it = (statusCfg && statusCfg[k]) || {};
-        const lines = (it.on && it.lines) || [];
-        line = lines.length ? lines[Math.floor(Math.random() * lines.length)]
-                            : (STATUS_TEXT[s] || null);
-      }
-    }
-    // ★ **这一档关掉 → 整条收起来** ✓（用户 2026-10-06 定的 ✓）：
-    //   待机显示关掉之后，屏幕上就只剩群名 ✓，而不是留一条空的 ✗。
-    if (!line) { el.hidden = true; return; }
-    el.hidden = false;
-    el.className = 'status s-' + s;
-    tx.textContent = agentName() + line;
-    if (s === 'idle') scheduleIdle();
+    try { if (window.__lgCat) window.__lgCat.set(s); } catch (e) {}
   };
-  let revertTimer = null;
-  const setStatusTimed = (s, text) => {
-    clearTimeout(revertTimer);
-    setStatus(s, text);
-    if (s === 'lurking') revertTimer = setTimeout(() => setStatus('idle'), 4000);
-  };
+
+  // ⚠️ **不再有"4 秒后还原"** ✗ —— 以前那是对着文字条的 ✓；
+  //    现在猫自己会从 think 落回 sleep ✓（08-cat.js 里带兜底 ✓）。
+  //    留着那个定时器反而会**打断**下一轮思考 ✗（lurking 的 4 秒能砍掉刚发的 think ✓）。
+  const setStatusTimed = (s) => setStatus(s);
 
   // ── 消息 ──
