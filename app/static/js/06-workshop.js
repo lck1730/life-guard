@@ -181,40 +181,6 @@
     }, 300);
   };
 
-  /** 开 App **落进屋** ✓（2026-10-29 用户问"登录进来还是直接进主群聊吗"✓）。
-   *
-   *  他要的第一眼是**屋子** ✓（提案：「打开 App 不是进列表，是进屋」✓），
-   *  坐下才是聊天 ✓ —— 所以开屏停在屋里 ✓，点桌上那本信簿 = 落座 ✓。
-   *
-   *  ⚠️ **不走 `show('workshop')`** ✗ —— `show` 会把别的屏的 `.on` 全摘掉 ✓，
-   *     而小屋是**压在聊天上面**的一屏 ✓（z22 ✓，聊天在底下一直 `.on` 着 ✓）；
-   *     摘了它，退屋（`closeWorkshop` → `popScreen`）之后底下就**没人了** ✗。
-   *     所以照 `peekWorkshop` 那个走法：只给这一屏加 `.on` ✓。
-   *
-   *  ⚠️ **不做位移动画** ✗ —— 开机那一下没有手指 ✓，"从右边滑进来"会暗示
-   *     一次不存在的手势 ✓；`anim-fade` 才是"本来就在这儿" ✓。
-   */
-  const openWorkshopNow = () => {
-    const scr = $('#workshop');
-    if (!scr || scr.classList.contains('on')) return;
-    applyWallCss();        // 外观先备好 ✓（同 `peekWorkshop` ✓）
-    renderWorkshop();      // ★ 不 await ✓ —— 屋子本体不等组件那一趟 ✓
-    scr.classList.remove(...ANIM_CLASSES);
-    scr.classList.add('on');
-    void scr.offsetWidth;  // 让 `on` 先落地再挂动画 ✓（不然淡入不跑 ✓）
-    scr.classList.add('anim-fade');
-    tellTop();
-    _syncStatusBar();
-  };
-
-  /** 等屋子那张图**解码完** ✓ —— 加载页要等它 ✓，不然幕一揭开是块空白 ✓。
-   *  ⚠️ 出错也 resolve ✓（图挂了就别卡开屏了 ✓，屋子照样进得去 ✓）。 */
-  const preloadRoomArt = () => new Promise((res) => {
-    const im = new Image();
-    im.onload = im.onerror = () => res();
-    im.src = '/static/flat-room.svg';
-  });
-
   const closeWorkshop = () => {
     // ⚠️ 原来这里要"退出调整模式" ✓（模式是隐藏状态 ✓，最容易被忘 ✓）——
     //    **那个模式没有了** ✓（2026-10-08 ✓），所以这一段也空了 ✓：
@@ -3374,9 +3340,7 @@
     // ★ **`/me` 现在也是"进 App + 弹出我的"** ✗→✓（2026-10-09）——
     //   「我的」变成弹层之后它不再是"一屏" ✓，而这个地址的意义**没变** ✓：
     //   **到了就让你看见你的资料** ✓（"去向由地址决定"那条记忆里的规矩 ✓）。
-    // ⚠️ `{ room: false }` ✓ —— `/me` 是"到了就让我看见我的资料" ✓，
-    //    中间夹一间屋子、再被「我的」压上去，等于白跑一趟 ✓（见 `enterApp` ✓）。
-    try { await enterApp({ room: false }); } catch (e) {
+    try { await enterApp(); } catch (e) {
       if (e && e.status === 401) { location.href = '/login'; return; }
       show('login'); tellNative('chat');
       if (e) $('#loginErr').textContent = e.message;
