@@ -136,6 +136,9 @@ def serialize(row: dict[str, Any]) -> dict[str, Any]:
         "mentions": [] if deleted else (_load_json(row.get("mentions")) or []),
         "reply_to": row["reply_to"],
         "quote": _quote(row),
+        # ★ 盖章（2026-10-29）：默认空 ✓ —— 真正的印章由 `attach_stamps` 批量补 ✓
+        #   （一条一条查会变成 N+1 ✓，见下 ✓）。擦掉的那行**不带章** ✓。
+        "stamps": [],
         "created_at": row["created_at"],
         "deleted": deleted,
     }
@@ -156,9 +159,78 @@ async def group_member_ids(group_id: int) -> set[int]:
     return {r["user_id"] for r in rows}
 
 
+# ── 盖章（2026-10-29 · P4「盖章反应」）──────────────────────────────────
+#
+# ★ 一枚章 = (消息, 谁, 哪种) ✓。**同一个人同一种章只盖一次** ✓
+#   （库里有唯一索引兜底 ✓）—— 再盖一次就是**拿下来** ✓。
+# ⚠️ 章**不进提示词、不进记忆** ✓（和配饰 / 气泡同一档 ✓）：
+#   它是屋子里的东西 ✓，管家不需要知道你们给哪句话盖了爪印 ✓。
+STAMPS = ("like", "paw", "star")
+
+
+async def _stamps_for(message_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+    """一次查完整屏的章 ✓（别一条一条查 ✗ —— N+1）。"""
+    if not message_ids:
+        return {}
+    marks = ",".join("?" * len(message_ids))
+    rows = await fetch_all(
+        f"""SELECT message_id, user_id, stamp FROM message_stamps
+             WHERE message_id IN ({marks}) ORDER BY id""",
+        tuple(message_ids),
+    )
+    out: dict[int, list[dict[str, Any]]] = {}
+    for r in rows:
+        out.setdefault(r["message_id"], []).append(
+            {"user_id": r["user_id"], "stamp": r["stamp"]})
+    return out
+
+
+async def attach_stamps(msgs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """给一批序列化好的消息补上 `stamps` ✓（擦掉的不补 ✓ —— 它们不画章 ✓）。"""
+    ids = [m["id"] for m in msgs if not m.get("deleted")]
+    got = await _stamps_for(ids)
+    for m in msgs:
+        m["stamps"] = [] if m.get("deleted") else got.get(m["id"], [])
+    return msgs
+
+
+async def toggle_stamp(group_id: int, message_id: int, user_id: int,
+                      stamp: str) -> dict[str, Any]:
+    """盖一下 / 拿下来 ✓（同一个人同一个章再盖一次就取消 ✓）。
+
+    ⚠️ **只广播这一条消息的章** ✓（发 `message_stamp` ✓，不重发整条消息 ✓）——
+       两个人都在看着这条时，那一小排章当场多一个 / 少一个 ✓。
+    ⚠️ 权限和"这行还在不在"由路由层先判 ✓（这里只管落库和广播 ✓）。
+    """
+    row = await fetch_one(
+        "SELECT id FROM message_stamps WHERE message_id = ? AND user_id = ? AND stamp = ?",
+        (message_id, user_id, stamp),
+    )
+    if row:
+        await execute("DELETE FROM message_stamps WHERE id = ?", (row["id"],))
+        mine = False
+    else:
+        await execute(
+            """INSERT OR IGNORE INTO message_stamps
+                   (group_id, message_id, user_id, stamp, created_at)
+               VALUES (?, ?, ?, ?, ?)""",
+            (group_id, message_id, user_id, stamp, now()),
+        )
+        mine = True
+    stamps = (await _stamps_for([message_id])).get(message_id, [])
+    await hub.broadcast(
+        await group_member_ids(group_id),
+        {"type": "message_stamp",
+         "data": {"group_id": group_id, "message_id": message_id, "stamps": stamps}},
+    )
+    return {"message_id": message_id, "stamps": stamps, "mine": mine}
+
+
 async def get_message(message_id: int) -> dict[str, Any] | None:
     row = await fetch_one(_SELECT + " WHERE m.id = ?", (message_id,))
-    return serialize(row) if row else None
+    if not row:
+        return None
+    return (await attach_stamps([serialize(row)]))[0]
 
 
 async def list_messages(group_id: int, after: int = 0, limit: int = 50,
@@ -186,7 +258,7 @@ async def list_messages(group_id: int, after: int = 0, limit: int = 50,
             _SELECT + " WHERE m.group_id = ? AND m.id < ? ORDER BY m.id DESC LIMIT ?",
             (group_id, before, limit),
         )
-        return [serialize(r) for r in reversed(rows)]
+        return await attach_stamps([serialize(r) for r in reversed(rows)])
 
     if after == 0:
         # 首屏：要**最新**的一批。SQL 里没法"从末尾取 N 条再正序"，
@@ -195,13 +267,13 @@ async def list_messages(group_id: int, after: int = 0, limit: int = 50,
             _SELECT + " WHERE m.group_id = ? ORDER BY m.id DESC LIMIT ?",
             (group_id, limit),
         )
-        return [serialize(r) for r in reversed(rows)]
+        return await attach_stamps([serialize(r) for r in reversed(rows)])
 
     rows = await fetch_all(
         _SELECT + " WHERE m.group_id = ? AND m.id > ? ORDER BY m.id ASC LIMIT ?",
         (group_id, after, limit),
     )
-    return [serialize(r) for r in rows]
+    return await attach_stamps([serialize(r) for r in rows])
 
 
 def _clean_agent_text(text: str) -> str:
@@ -280,6 +352,8 @@ async def erase_message(group_id: int, message_id: int, by_user_id: int) -> dict
             WHERE id = ? AND group_id = ?""",
         (now(), by_user_id, message_id, group_id),
     )
+    # ★ 那条上的章一起收掉 ✓ —— 一行没了，章留在纸上就成了"盖在空气里" ✗。
+    await execute("DELETE FROM message_stamps WHERE message_id = ?", (message_id,))
     msg = await get_message(message_id)
     assert msg is not None
 

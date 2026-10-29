@@ -25,12 +25,14 @@ from ..auth import current_user, require_member
 from ..config import settings
 from ..db import execute, fetch_all, fetch_one, now
 from ..core.messages import (
+    STAMPS,
     agent_name_for,
     broadcast_group_update,
     create_message,
     erase_message,
     get_message,
     list_messages,
+    toggle_stamp,
 )
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
@@ -836,3 +838,40 @@ async def erase(
     if row["deleted_at"]:
         return await get_message(message_id) or {}
     return await erase_message(group_id, message_id, user["id"])
+
+
+class StampIn(BaseModel):
+    stamp: str
+
+
+@router.post("/{group_id}/messages/{message_id}/stamps")
+async def stamp_message(
+    group_id: int,
+    message_id: int,
+    body: StampIn,
+    user: dict = Depends(current_user),
+) -> dict:
+    """给一条消息**盖个章** ✓（2026-10-29 · 纸上小屋 P4「盖章反应」）。
+
+    ★ 一开一关 ✓：同一个人、同一种章再盖一次就是**拿下来** ✓
+      （"再点一下取消"，比"只能往上加"更符合盖章的手感 ✓）。
+    ★ 章是**两个人的** ✓ —— 自己盖的是朱红、对方盖的是靛蓝 ✓，
+      同一条上叠着，就像真的在同一张纸上盖了两下 ✓。
+    ★ **只广播这一条消息的章** ✓（`message_stamp` ✓）——
+      两个人都在看着时，那一小排章当场多一个 / 少一个 ✓，不重发整条消息 ✓。
+
+    ⚠️ 擦掉的那行**不能盖** ✓（422 ✓）—— 纸上已经没这行了 ✓。
+    ⚠️ 只有群里的人能盖 ✓（`require_member` ✓）。
+    """
+    await require_member(group_id, user["id"])
+    if body.stamp not in STAMPS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "没有这种章")
+    row = await fetch_one(
+        "SELECT id, deleted_at FROM messages WHERE id = ? AND group_id = ?",
+        (message_id, group_id),
+    )
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "没有这条消息")
+    if row["deleted_at"]:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "这行已经被擦掉了")
+    return await toggle_stamp(group_id, message_id, user["id"], body.stamp)

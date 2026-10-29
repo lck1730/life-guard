@@ -109,6 +109,26 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, id);
 
+-- ── 盖章（2026-10-29 · 纸上小屋 P4「盖章反应」）──────────────────────────
+--
+--   消息上的一枚小印章 ✓ —— 不是"点赞" ✗，是**真的在纸上盖一下** ✓：
+--   两个人的章是两种墨色 ✓（自己朱红、对方靛蓝 ✓），同一条上盖着就是叠在一起 ✓。
+--   ⚠️ **同一个人、同一种章、同一条消息只盖一次** ✓（`idx_stamp_once` 兜底 ✓）——
+--      再点一次是**拿下来** ✓（接口做成一开一关 ✓，见 `core/messages.toggle_stamp` ✓）。
+--   ⚠️ **不进提示词、不进记忆** ✓ —— 和配饰 / 气泡 / 便签同一档 ✓：
+--      这是屋子里的东西 ✓，管家不听不看 ✓。
+CREATE TABLE IF NOT EXISTS message_stamps (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL,
+    stamp      TEXT    NOT NULL,
+    created_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stamp_once
+    ON message_stamps(message_id, user_id, stamp);
+CREATE INDEX IF NOT EXISTS idx_stamps_msg ON message_stamps(message_id);
+
 
 -- ⚠️ 2026-10-11：`group_memory` 和 `ledger_entries` 的**建表语句删了** ✓
 --   （数据还在库里 —— 只删 DDL、不 DROP ✓；它们早就没人读写 ✓）。

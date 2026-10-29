@@ -492,7 +492,12 @@
     // ★ **正文画完了才挂引用条** ✓（见上面那段 ✓）—— 插到最前面 ✓。
     if (m.quote) b.insertBefore(buildQuoteEl(m.quote), b.firstChild);
     const t = document.createElement('div'); t.className = 'time'; t.textContent = fmtTime(m.created_at);
-    w.append(who, b, t); row.append(av, w);
+    // ★ 盖章（2026-10-29）：章挂在气泡**下面** ✓（不是气泡里面 ✗ ——
+    //   塞进气泡会改字距、还会被气泡尾巴切掉 ✓）。
+    const st = document.createElement('div');
+    st.className = 'stamps';
+    paintStampChips(st, m.stamps || [], false);
+    w.append(who, b, st, t); row.append(av, w);
     // ★ 气泡（2026-10-27）：**这一行是谁的，就用谁现在选的那款** ✓
     //   （按成员表查 ✓，消息里那份只是成员表还没到时的兜底 ✓，见 `bubbleForMsg` ✓）。
     setRowBubble(row, m);
@@ -538,6 +543,63 @@
       const tx = q.querySelector('.qtext');
       if (tx) tx.textContent = '（这行被擦掉了）';
     });
+  };
+
+  // ── 盖章（2026-10-29 · 纸上小屋 P4「盖章反应」）─────────────────────
+  //
+  // ★ 一枚章 = (这条消息, 谁, 哪一种) ✓。**自己朱红、对方靛蓝** ✓ ——
+  //   同一条上叠着，就像两个人真的在同一张纸上各盖了一下 ✓。
+  // ⚠️ 不是"点赞" ✗：这里没有计数、没有排行榜 ✓，只看得见**谁盖的** ✓
+  //   （颜色分人 ✓，点一下发下去再点一下拿下来 ✓）。
+  // ⚠️ 章**不进提示词、不进记忆** ✓（和配饰 / 气泡 / 便签同一档 ✓）——
+  //   这是屋子里的东西 ✓，管家不听不看 ✓。
+  const STAMP_ICON = { like: 'heart', paw: 'paw', star: 'star' };
+  const STAMP_NAME = { like: '喜欢', paw: '爪印', star: '厉害' };
+
+  /** 画一小排章 ✓。`animate` 只给**刚落下的那一枚**用 ✓（开页时不放动画 ✗）。 */
+  const paintStampChips = (host, stamps, animate) => {
+    if (!host) return;
+    const before = new Set([...host.querySelectorAll('.stamp-chip')].map(c => c.dataset.k));
+    host.textContent = '';
+    const list = stamps || [];
+    list.forEach((s, i) => {
+      if (!STAMP_NAME[s.stamp]) return;          // 老数据 / 不认识的章：不画 ✓
+      const key = s.user_id + ':' + s.stamp;
+      const mine = !!(me && s.user_id === me.id);
+      const c = mkel('span', 'stamp-chip' + (mine ? ' mine' : '') + ' s-' + s.stamp);
+      c.dataset.k = key;
+      c.title = (mine ? '我' : 'TA') + '盖的「' + STAMP_NAME[s.stamp] + '」';
+      c.appendChild(ico(STAMP_ICON[s.stamp]));
+      // 轻微歪一点 ✓ —— 手盖的章不会笔直 ✓（同一排里角度各不相同 ✓）。
+      c.style.setProperty('--tilt', ((-7 + (i * 5) % 13) + 'deg'));
+      if (animate && !before.has(key)) c.classList.add('drop');
+      host.appendChild(c);
+    });
+    host.classList.toggle('on', list.length > 0);
+  };
+
+  /** 一条消息的章变了（自己盖的 / WS 推来的 ✓）—— 原地换那一小排 ✓。 */
+  const updateStamps = (mid, stamps, animate) => {
+    const row = $('#msgs').querySelector(`[data-id="${mid}"]`);
+    if (!row) return;
+    const host = row.querySelector('.stamps');
+    if (host) paintStampChips(host, stamps, animate);
+  };
+
+  /** 盖一下 / 拿下来 ✓（服务端一开一关 ✓，见 `api/groups.py` 的 `stamp_message` ✓）。 */
+  const applyStamp = async (m, stamp) => {
+    if (!m || !group) return;
+    try {
+      const d = await api(`/groups/${group.id}/messages/${m.id}/stamps`, {
+        method: 'POST',
+        body: JSON.stringify({ stamp: stamp }),
+      });
+      m.stamps = (d && d.stamps) || [];
+      _msgs.set(m.id, m);
+      updateStamps(m.id, m.stamps, true);
+      if (d && d.mine) { sfx('paper'); haptic('soft'); toast('盖上了「' + (STAMP_NAME[stamp] || '') + '」'); }
+      else { haptic('soft'); toast('拿下来了'); }
+    } catch (e) { toast(e.message || '没盖上'); }
   };
 
   // ── 往回翻历史 ─────────────────────────────────────────────────────
@@ -850,6 +912,14 @@
         if (d.group_id !== group.id) return;
         const row = $('#msgs').querySelector(`[data-id="${d.id}"]`);
         if (!row || !row.classList.contains('gone')) eraseRowLocal(d);
+      }
+      // ★ 2026-10-29：有人盖章 / 拿下来 ✓ —— 原地换那一小排 ✓。
+      //   ⚠️ 自己盖的那一下 HTTP 已经画过了 ✓，这条广播随后会再到一次 ✓（幂等 ✓）。
+      else if (pkt.type === 'message_stamp') {
+        if (d.group_id !== group.id) return;
+        const m = _msgs.get(d.message_id);
+        if (m) { m.stamps = d.stamps || []; _msgs.set(d.message_id, m); }
+        updateStamps(d.message_id, d.stamps || [], true);
       }
       // ★ `d.text` 要带上 ✗→✓ —— 服务端**已经挑好了**那一句 ✓
       //   （思考中/不打算说话是随机挑的 ✓）。丢了它就等于白挑 ✓。

@@ -2210,6 +2210,7 @@
   // ⚠️ 「擦掉」是**软删除** ✓：行留着、正文清空 ✓，两个人都看得见一道擦痕 ✓
   //    （见 `core/messages.py` 的 `erase_message` ✓）。**不是**"无声消失" ✗。
   let trayMsg = null;
+  let trayRow = null;          // 「盖章」选完想返回动作条时，要拿它重开一次 ✓
 
   const trayPreview = (m) => {
     if (!m) return '［消息］';
@@ -2235,6 +2236,7 @@
     // 擦痕上没有托盘 ✓（长按那层已经拦了 ✓，这儿再拦一道 ✓ —— 别处也可能调进来 ✓）。
     if (!m || m.deleted) return;
     trayMsg = m;
+    trayRow = row;
     const who = $('#trayWho');
     if (who) who.textContent = m.sender_type === 'agent' ? agentName() : (m.sender_nickname || '我');
     const txt = $('#trayTxt');
@@ -2272,6 +2274,42 @@
     haptic('soft');
     const t = $('#tray');
     if (t) t.classList.add('on');
+  };
+
+  /** ★ 2026-10-29：「盖章」✓ —— 托盘右上角那枚小圆章点开的就是这一条 ✓。
+   *
+   *  ⚠️ **不是往动作条里再加一格** ✗ —— 动作已经六格了（自己那条七格 ✓），
+   *     再加就挤成一排指甲盖 ✓。章另起一排、只在这一下出现 ✓，选完就收 ✓。
+   *  ⚠️ 「返回」回到原来那排动作 ✓（不关托盘 ✓）—— 人只是想看看章长什么样 ✓。
+   */
+  const renderStampPicker = function () {
+    if (!trayMsg) return;
+    const acts = $('#trayActs');
+    if (!acts) return;
+    acts.innerHTML = '';
+    Object.keys(STAMP_NAME).forEach(function (k) {
+      const b = mkel('button', 'tray-act stamp-act');
+      b.type = 'button';
+      const ic = mkel('span', 'ti');
+      ic.appendChild(ico(STAMP_ICON[k]));
+      b.append(ic, mkel('span', 'tl', STAMP_NAME[k]));
+      b.onclick = function () { pickStamp(k); };
+      acts.appendChild(b);
+    });
+    const back = mkel('button', 'tray-act back');
+    back.type = 'button';
+    const ic = mkel('span', 'ti');
+    ic.appendChild(ico('chev'));
+    back.append(ic, mkel('span', 'tl', '返回'));
+    back.onclick = function () { if (trayMsg) openTray(trayRow); };
+    acts.appendChild(back);
+    haptic('soft');
+  };
+
+  const pickStamp = function (k) {
+    const m = trayMsg;
+    closeTray();                       // 先收托盘 ✓ —— 章落在气泡上才看得见 ✓
+    if (m) applyStamp(m, k);
   };
 
   /** ★ 2026-10-29：**擦掉**自己写的一条 ✓。
@@ -2312,6 +2350,7 @@
   };
 
   if ($('#trayScrim')) $('#trayScrim').onclick = closeTray;
+  if ($('#trayStampBtn')) $('#trayStampBtn').onclick = renderStampPicker;
 
   // ── 工具扇（点 +）───────────────────────────────────────────────────
   //
