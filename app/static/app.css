@@ -2562,3 +2562,137 @@
     /* ★ 2026-10-29：飞轮的刻度自转、轴心弹一下 —— 开了减弱动态就都别动 ✓。 */
     #drawer .dr-ticks, #drawer.open .dr-hub { animation:none !important; }
   }
+
+  /* ══════════════════════════════════════════════════════════════════
+     ★ 2026-10-29 第十版：**工具飞轮 · 柔光**
+     用户：「中心那里不要有群名称和工具的字，用生活管家的logo替代，然后其他的，
+     除了账本不要其他，因为设置里都有，然后改成：账本，纪念日，相册，成就。
+     除了记账，其他点击后是开发中敬请期待。整体风格目前偏机械科幻，
+     还是要柔和温馨一些」✓。
+     做法：
+       · 刻度 / 辐条 / 两道轮圈**全拆** ✗（机械科幻感都长在那几样上 ✓）→
+         只留一圈很淡的光环 + 一团暖光 ✓
+       · 轴心换成开屏那枚 logo（屋檐 + 门 + 星光 ✓），不再写空间名 / "工具" ✓
+       · 四个键软软地绽开 ✓（错峰 0.07s ✓），珠子加暖晕、标签去掉硬边 ✓
+       · 青灰遮罩 → 暖棕雾 ✓（奶霜那套再浅一档 ✓）
+     ⚠️ 只动长相 ✓ —— 手势 / 跟手 / 收放 / 防误触**一行没碰** ✓。
+     ⚠️ 本文件是 CRLF（按字节追加，别整文件重写）。
+     ══════════════════════════════════════════════════════════════════ */
+
+  /* ── 遮罩：暖棕雾，不再是一块冷黑纱 ─────────────────────────────── */
+  #drawer .dr-scrim {
+    background:radial-gradient(circle at 50% 44%,
+               rgba(63,36,30,.28) 0, rgba(43,26,24,.48) 58%, rgba(27,18,19,.66) 100%);
+    -webkit-backdrop-filter:blur(6px) saturate(1.04);
+    backdrop-filter:blur(6px) saturate(1.04);
+  }
+  [data-theme="cream"] #drawer .dr-scrim,
+  [data-theme="light"] #drawer .dr-scrim {
+    background:radial-gradient(circle at 50% 44%,
+               rgba(122,88,58,.10) 0, rgba(96,68,44,.28) 58%, rgba(72,50,32,.42) 100%);
+  }
+
+  /* ── 光：一团暖光 + 一圈很淡的光环（替掉刻度/辐条/轮圈）────────── */
+  #drawer .dr-glow {
+    inset:-46px;
+    background:
+      radial-gradient(circle at 50% 50%, var(--accent-a), transparent 62%),
+      radial-gradient(circle at 50% 44%, rgba(255,190,150,.10), transparent 70%);
+    filter:blur(2px);
+  }
+  #drawer .dr-halo {
+    position:absolute; inset:10px; border-radius:50%;
+    border:1px solid var(--accent-line); opacity:.26;
+    box-shadow:0 0 44px var(--accent-a), inset 0 0 40px rgba(255,159,125,.05);
+    pointer-events:none;
+  }
+  [data-theme="cream"] #drawer .dr-halo,
+  [data-theme="light"] #drawer .dr-halo { opacity:.34; }
+
+  /* ── 四个键：珠子更大一点、暖一点，标签去掉硬边 ─────────────────── */
+  #drawer .dr-key { width:92px; height:66px; margin:-33px 0 0 -46px; }
+  #drawer .dk-in { gap:7px; }
+  #drawer .dk-bead {
+    width:62px; height:62px;
+    background:
+      radial-gradient(circle at 34% 26%, rgba(255,255,255,.14), transparent 62%),
+      linear-gradient(160deg, var(--panel2), var(--panel) 80%);
+    border:1px solid var(--line);
+    box-shadow:0 11px 26px rgba(20,8,10,.26),
+               0 0 0 6px rgba(255,159,125,.045),
+               inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  #drawer .dk-k {
+    font-size:12.5px; font-weight:600; letter-spacing:.05em;
+    padding:5px 12px; border-radius:99px;
+    background:var(--chip-bg); border:1px solid transparent;
+    box-shadow:0 5px 14px rgba(20,8,10,.14);
+  }
+  [data-theme="cream"] #drawer .dk-bead,
+  [data-theme="light"] #drawer .dk-bead {
+    box-shadow:0 10px 22px rgba(120,78,48,.13),
+               0 0 0 6px rgba(255,190,150,.12),
+               inset 0 1px 0 rgba(255,255,255,.75);
+  }
+  [data-theme="cream"] #drawer .dk-k,
+  [data-theme="light"] #drawer .dk-k { box-shadow:0 5px 12px rgba(120,78,48,.10); }
+
+  /* 错峰绽开 ✓ —— 轮子到位后四颗珠子轻轻冒出来（不是机械地"啪"一下 ✓）。 */
+  #drawer.open .dr-key .dk-bead {
+    animation:dkBloom .5s cubic-bezier(.2,1.25,.4,1) backwards;
+  }
+  #drawer.open .dk-1 .dk-bead { animation-delay:.07s; }
+  #drawer.open .dk-2 .dk-bead { animation-delay:.13s; }
+  #drawer.open .dk-3 .dk-bead { animation-delay:.19s; }
+  @keyframes dkBloom {
+    from { transform:scale(.5); opacity:.25; }
+  }
+
+  /* ── 轴心：只放 logo ✓（不再有"工具"和空间名 ✓）────────────────── */
+  #drawer .dr-hub {
+    width:118px; height:118px; margin:-59px 0 0 -59px;
+    background:radial-gradient(circle at 36% 28%, var(--panel2), var(--panel) 70%);
+    border:1px solid var(--accent-line);
+    box-shadow:0 20px 46px rgba(20,8,10,.32),
+               0 0 0 1px var(--accent-a),
+               0 0 36px var(--accent-a),
+               inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  #drawer .dr-hub-logo { display:grid; place-items:center; color:var(--accent); }
+  #drawer .dr-hub-logo svg {
+    width:46px; height:46px; display:block;
+    filter:drop-shadow(0 3px 10px var(--accent-a));
+  }
+  [data-theme="cream"] #drawer .dr-hub,
+  [data-theme="light"] #drawer .dr-hub {
+    box-shadow:0 18px 40px rgba(120,78,48,.16),
+               0 0 0 1px var(--accent-a),
+               0 0 30px var(--accent-a),
+               inset 0 1px 0 rgba(255,255,255,.8);
+  }
+  /* 奶霜那套：珠子和轴心原本白得和背景糊成一片 ✗ → 加一点暖桃底色 ✓ */
+  [data-theme="cream"] #drawer .dk-bead,
+  [data-theme="light"] #drawer .dk-bead {
+    background:
+      radial-gradient(circle at 34% 26%, rgba(255,255,255,.9), transparent 62%),
+      linear-gradient(160deg, #fffaf3, #ffeadb 82%);
+    border-color:rgba(190,120,80,.20);
+  }
+  [data-theme="cream"] #drawer .dk-k,
+  [data-theme="light"] #drawer .dk-k {
+    background:#fff8f0; border-color:rgba(190,120,80,.16);
+  }
+  [data-theme="cream"] #drawer .dr-hub,
+  [data-theme="light"] #drawer .dr-hub {
+    background:radial-gradient(circle at 36% 28%, #fffdf9, #ffe9d9 74%);
+    border-color:rgba(190,120,80,.24);
+  }
+  #drawer.open .dr-hub-logo { animation:drLogoBreath 3.8s ease-in-out infinite; }
+  @keyframes drLogoBreath {
+    50% { transform:scale(1.05); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #drawer.open .dr-key .dk-bead,
+    #drawer.open .dr-hub-logo { animation:none !important; }
+  }

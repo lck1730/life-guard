@@ -467,30 +467,28 @@
         所以这里一律写成 `div.screen#chat` 这种**不带尖括号**的写法 ✓。 -->
 <!-- ★ 2026-10-29：**工具飞轮** ✓ —— 群聊左滑跟手滚出来的一圈工具 ✓
      （第一版是抽屉清单：「将一些功能区放到左滑出现状态栏，先放个账本」✓；
-      第二版用户：「不是一页而是唤出飞轮的感觉」✓ → 改成绕着空间名的一圈 ✓）。
+      第二版：「不是一页而是唤出飞轮的感觉」✓ → 改成一圈工具 ✓；
+      第三版：「中心那里不要有群名称和工具的字，用生活管家的logo替代…
+      改成：账本，纪念日，相册，成就…整体风格目前偏机械科幻，还是要柔和温馨一些」✓）。
      ⚠️ 挂在 body 底下、不进 `#chat` ✗ —— 和灯箱同一个道理 ✓：
         塞进某一屏里，它的 z-index 就只在那屏内部算数 ✓。
      ⚠️ 这一层**不报给原生** ✓（`__goBack` 里有一支先收它 ✓，
         顶栏仍然按主群聊报 ✓ —— 原生的返回键回的是 App，不是飞轮 ✓）。
-     ⚠️ `.dr-key` 上按哪个键，轴心就临时念哪个名字 ✓；
-        点完**必须先收飞轮、350ms 后再开目标页** ✓（见 05-settings.js 注释 ✓）。 -->
+     ⚠️ 轴心只放 logo ✓（没有文字 ✓）；按哪个键不再改轴心 ✓。
+        点完**必须先收飞轮、350ms 后再开目标页** ✓（见 05-settings.js 注释 ✓）。
+     ⚠️ 刻度 / 辐条 / 两道轮圈**全拆了** ✓（机械科幻感都长在那几样上 ✓）——
+        现在只剩一圈柔光和一枚光环 ✓。 -->
 <div id="drawer" aria-hidden="true">
   <div class="dr-scrim" id="drScrim"></div>
   <div class="dr-wheel" id="drPanel" role="menu" aria-label="工具">
     <span class="dr-glow" aria-hidden="true"></span>
+    <span class="dr-halo" aria-hidden="true"></span>
     <div class="dr-rotor" id="drRotor">
-      <span class="dr-ticks" aria-hidden="true"></span>
-      <span class="dr-orbit" aria-hidden="true"></span>
-      <span class="dr-track" aria-hidden="true"></span>
-      <span class="dr-spoke sp-0" aria-hidden="true"></span>
-      <span class="dr-spoke sp-1" aria-hidden="true"></span>
-      <span class="dr-spoke sp-2" aria-hidden="true"></span>
-      <span class="dr-spoke sp-3" aria-hidden="true"></span>
       <button class="dr-key dk-0" id="drLedger" type="button" role="menuitem" data-act="ledger">
         <span class="dk-in">
           <span class="dk-bead" style="--wi:var(--hue1)">
-            <svg viewBox="0 0 24 24" width="23" height="23" fill="none"
-                 stroke="currentColor" stroke-width="1.8"
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+                 stroke="currentColor" stroke-width="1.7"
                  stroke-linecap="round" stroke-linejoin="round">
               <path d="M6.5 3.5h9A2.5 2.5 0 0 1 18 6v14.5H9A2.5 2.5 0 0 1 6.5 18z"/>
               <path d="M6.5 18A2.5 2.5 0 0 1 9 15.5h9"/>
@@ -500,51 +498,59 @@
           <span class="dk-k">账本</span>
         </span>
       </button>
-      <button class="dr-key dk-1" type="button" role="menuitem" data-act="theme">
+      <button class="dr-key dk-1" type="button" role="menuitem" data-act="anniv">
         <span class="dk-in">
           <span class="dk-bead" style="--wi:var(--hue5)">
-            <svg viewBox="0 0 24 24" width="23" height="23" fill="none"
-                 stroke="currentColor" stroke-width="1.8"
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+                 stroke="currentColor" stroke-width="1.7"
                  stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 3a9 9 0 0 0 0 18c1.5 0 2-1 1.4-1.9-.7-1 .1-2.1 1.4-2.1H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z"/>
-              <circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/>
-              <circle cx="15" cy="7.5" r="1"/>
+              <path d="M12 20s-7.1-4.3-8.5-8.1C2.4 8.7 4.4 5.6 7.7 5.6c1.9 0 3.3 1.1 4.3 2.6
+                       1-1.5 2.4-2.6 4.3-2.6 3.3 0 5.3 3.1 4.2 6.3C19.1 15.7 12 20 12 20z"/>
             </svg>
           </span>
-          <span class="dk-k">主题</span>
+          <span class="dk-k">纪念日</span>
         </span>
       </button>
-      <button class="dr-key dk-2" type="button" role="menuitem" data-act="bg">
+      <button class="dr-key dk-2" type="button" role="menuitem" data-act="album">
         <span class="dk-in">
           <span class="dk-bead" style="--wi:var(--hue4)">
-            <svg viewBox="0 0 24 24" width="23" height="23" fill="none"
-                 stroke="currentColor" stroke-width="1.8"
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+                 stroke="currentColor" stroke-width="1.7"
                  stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/>
+              <rect x="3.5" y="4.5" width="17" height="15" rx="3"/>
               <circle cx="9" cy="10" r="1.6"/>
               <path d="M20.5 15.5l-4.5-4-6 7"/>
             </svg>
           </span>
-          <span class="dk-k">背景</span>
+          <span class="dk-k">相册</span>
         </span>
       </button>
-      <button class="dr-key dk-3" type="button" role="menuitem" data-act="settings">
+      <button class="dr-key dk-3" type="button" role="menuitem" data-act="award">
         <span class="dk-in">
           <span class="dk-bead" style="--wi:var(--hue2)">
-            <svg viewBox="0 0 24 24" width="23" height="23" fill="none"
-                 stroke="currentColor" stroke-width="1.8"
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+                 stroke="currentColor" stroke-width="1.7"
                  stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 7.5h9.6"/><circle cx="17" cy="7.5" r="2.4"/>
-              <path d="M20 16.5h-9.6"/><circle cx="7" cy="16.5" r="2.4"/>
+              <path d="M12 3.8l2.45 4.96 5.48.8-3.97 3.86.94 5.46L12 16.3l-4.9 2.58.94-5.46-3.97-3.86
+                       5.48-.8z"/>
             </svg>
           </span>
-          <span class="dk-k">设置</span>
+          <span class="dk-k">成就</span>
         </span>
       </button>
     </div>
     <div class="dr-hub" aria-hidden="true">
-      <span class="dr-hub-eyebrow">工具</span>
-      <span class="dr-hub-name" id="drSpace">—</span>
+      <span class="dr-hub-logo">
+        <!-- 开屏那枚 logo ✓：屋檐 + 门 + 一颗小星光 ✓（和启动页同一套画法 ✓） -->
+        <svg viewBox="0 0 48 48" width="46" height="46" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.5 23.5 24 11.5l13.5 12"/>
+          <path d="M14 23v12.5h20V23"/>
+          <path d="M20 35.5v-7.5h8v7.5"/>
+          <path d="M35.6 9.2l1.05 2.75 2.75 1.05-2.75 1.05-1.05 2.75-1.05-2.75-2.75-1.05 2.75-1.05z"
+                fill="currentColor" stroke="none"/>
+        </svg>
+      </span>
     </div>
   </div>
 </div>

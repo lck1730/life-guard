@@ -1973,7 +1973,8 @@
   // 用户第二版：「那个抽屉还可以更加优化，不是一页而是唤出飞轮的感觉」✓。
   //
   // 所以手势没变 ✓（群聊左滑唤出 / 轮上右滑收起 / 返回键先收它 ✓），
-  // 变的是**出现的东西** ✓：不再是抽屉里一页清单 ✓，是一圈工具绕着空间名 ✓。
+  // 变的是**出现的东西** ✓：不再是抽屉里一页清单 ✓，是一圈工具绕着生活管家 logo ✓
+  // （2026-10-29 第十版：轴心只留 logo ✓，四个键是账本 / 纪念日 / 相册 / 成就 ✓）。
   //
   // 手感（"滚进来"就靠这三行 ✓）：
   //   · 位移：跟着手指，但映射**前快后慢** ✓（`v / 0.62`）——
@@ -1989,21 +1990,15 @@
   const DR_W = () => Math.min((window.innerWidth || 360) * 0.78, 320);
   /** 拉这么多 = 轮子完全出来 ✓ —— 轮子不用拖一整屏 ✓（原来的 `DR_W` 是给整页抽屉的 ✓）。 */
   const DR_FULL = () => Math.min(DR_W(), 190);
-  /** 收着的时候整圈倒转多少度 ✓ —— "滚进来"的那半圈 ✓。 */
-  const DR_SPIN = 260;
+  /** 收着的时候整圈轻轻偏多少度 ✓ —— 第十版柔和之后从 260° 收到 34° ✓
+   *  （不再像机械轮 ✓，只剩"滚进来"的那一点点劲 ✓）。 */
+  const DR_SPIN = 34;
   const _drRM = !!(window.matchMedia
                    && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   const _drawer = $('#drawer'), _drPanel = $('#drPanel'), _drScrim = $('#drScrim'),
-        _drRotor = $('#drRotor'), _drHubName = $('#drSpace');
+        _drRotor = $('#drRotor');
   let drTok = 0, drDragging = false, drPickTok = 0;
-
-  const _drSpace = () => {
-    if (!_drHubName) return;
-    const n = (typeof group !== 'undefined' && group && group.name)
-      || (($('#gname') && $('#gname').textContent) || '');
-    _drHubName.textContent = n || '—';
-  };
 
   /**
    * `v` = 0（完全收在右边）→ 1（完全出来）✓。
@@ -2043,13 +2038,12 @@
     _drRotor.style.removeProperty('--dr-spin');
     _drScrim.style.transition = '';
     _drScrim.style.opacity = '';
-    _drSpace();                      // 轴心那一行回到空间名 ✓（按过键会暂时变成键名 ✓）
     // 飞轮收完 → 告诉原生"又回群聊了" ✓（开着的时候报的是 'settings' ✓，见 `tellTop` ✓）。
     tellTop();
   };
 
   const peekDrawer = (v) => {
-    if (!drDragging) { drDragging = true; drTok++; _drSpace(); }
+    if (!drDragging) { drDragging = true; drTok++; }
     _drShow(v);
   };
 
@@ -2095,20 +2089,17 @@
 
   if (_drScrim) _drScrim.onclick = () => closeDrawer();
 
-  // ★ 四个键 = 四个**已经存在**的去处 ✓（没有新功能 ✓，只是把它们摆到轮子上 ✓）：
-  //   账本（组件）/ 主题 / 背景 / 设置 ✓。以后要加，往 HTML 里补一个 `.dr-key` ✓。
+  // ★ 四个键（2026-10-29 第十版）：**只有账本是真的** ✓，其余三个先占位 ✓。
+  //   用户原话：「除了账本不要其他，因为设置里都有…改成：账本，纪念日，相册，成就。
+  //  除了记账，其他点击后是开发中敬请期待」✓ —— 主题 / 背景 / 设置都在设置页里 ✓，
+  //  不再摆到轮子上 ✗。以后要接真的，把 `_drAct` 里那一行换成目标页就行 ✓。
   const _drAct = {
-    ledger:   () => openComp('bookkeeping-panel', '账本'),
-    theme:    () => openThemeSet(),
-    bg:       () => openBgSet(),
-    settings: () => openSettings(),
+    ledger: () => openComp('bookkeeping-panel', '账本'),
+    anniv:  () => toast('纪念日 · 开发中，敬请期待'),
+    album:  () => toast('相册 · 开发中，敬请期待'),
+    award:  () => toast('成就 · 开发中，敬请期待'),
   };
   $$('#drawer .dr-key').forEach(btn => {
-    // 按住哪个键，轴心就先念哪个名字 ✓ —— 松手前就知道自己点的是谁 ✓。
-    btn.addEventListener('pointerdown', () => {
-      const k = btn.querySelector('.dk-k');
-      if (_drHubName && k) _drHubName.textContent = k.textContent;
-    });
     btn.onclick = () => {
       const act = _drAct[btn.dataset.act];
       if (!act) return;
