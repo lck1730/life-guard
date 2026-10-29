@@ -1949,10 +1949,10 @@
     ['#sheet', '#modal', '#tray', '#lightbox'].some(s => $(s) && $(s).classList.contains('on'));
 
   //: 除了这几屏之外，**其余任何一屏开着就不认手势** ✓。
-  //: ⚠️ 2026-10-29：`#settings` **从这里拿掉了** ✓ —— 它现在自己吃"右滑返回" ✓，
-  //:    留着的话 `_whichScreen()` 永远返回 '' ✓，设置页上右滑就没反应 ✓。
+  //: ⚠️ 2026-10-29：`#settings` **从这里拿掉了** ✓ —— 它现在自己吃"左滑返回" ✓，
+  //:    留着的话 `_whichScreen()` 永远返回 '' ✓，设置页上左滑就没反应 ✓。
   //:    `#meEdit` / `#models` 补进来 ✓（原来漏了 ✓ —— 它们在设置页上面开着时，
-  //:    会被误判成"在设置页" ✓，一右滑把底下那屏关了 ✓）。
+  //:    会被误判成"在设置页" ✓，一滑把底下那屏关了 ✓）。
   const _OTHER_SCREENS = [
     '#bgSet', '#themeSet', '#bubbleSet', '#models', '#me', '#meAccount', '#meEdit',
     '#space', '#peer', '#selfIntro', '#agent', '#agentEdit', '#login', '#init',
@@ -2090,8 +2090,11 @@
       else { pgSw = null; return; }
       // ③ 这一屏上这个方向有没有意义？没有就把手势丢掉 ✓（免得吃掉正常滚动 ✓）
       const s = _whichScreen();
-      const ok = (pgSw.dir === 'L' && s === 'chat')
-              || (pgSw.dir === 'R' && (s === 'chat' || s === 'settings'
+      // ★ 2026-10-29（用户纠正）：设置页是**左滑**回去 ✓（原来写的右滑 ✗）——
+      //   和它进场的动效同一边 ✓：设置页从左边推进来 ✓，所以把它往左推回去 ✓
+      //   （手指往左，页面跟着往左退出 ✓，不跟手、松手过阈值才走 ✓）。
+      const ok = (pgSw.dir === 'L' && (s === 'chat' || s === 'settings'))
+              || (pgSw.dir === 'R' && (s === 'chat'
                                        || s === 'comp' || s === 'drawer'));
       if (!ok) { pgSw = null; return; }
       pgSw.from = s;
@@ -2130,7 +2133,7 @@
     const far = Math.abs(s.dx || 0) >= SW_TRIG;
     if (!far) return;
     if (s.dir === 'R' && s.from === 'comp') { closeComp(); return; }
-    if (s.dir === 'R' && s.from === 'settings') { closeSettings(); return; }
+    if (s.dir === 'L' && s.from === 'settings') { closeSettings(); return; }
     if (s.dir === 'R' && s.from === 'chat') { openSettings(); return; }
   };
   document.addEventListener('touchend', _endSwipe);

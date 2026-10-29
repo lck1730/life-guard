@@ -819,8 +819,10 @@
   @keyframes cornerOut { from { transform:none; opacity:1; }
                          to   { transform:translate(58%,-58%) scale(.9); opacity:0; } }
   /* ★ 2026-10-29：**从左边滑进来 / 缩回左边** ✓ —— 设置页现在靠右滑进 ✓
-     （用户：「右滑从左边进入设置页，设置页右滑或者返回键回到主群聊」✓）。
-     ⚠️ 方向跟着**手势**走 ✓：从左边拉出来的，就从左边推入 ✓、再缩回左边 ✓。 */
+     （用户：「右滑从左边进入设置页」✓）。
+     ⚠️ 方向跟着**手势**走 ✓：从左边拉出来的，就从左边推入 ✓、再缩回左边 ✓。
+     ★ 同日后半：回去是**左滑** ✓（用户纠正过一次 ✓）—— 手指往左、页面往左退出 ✓，
+       正好就是这条 `leftOut` ✓。 */
   @keyframes leftIn  { from { transform:translateX(-100%); } to { transform:none; } }
   @keyframes leftOut { from { transform:none; } to { transform:translateX(-100%); } }
   #settings.anim-in  { animation:pushIn  .24s cubic-bezier(.22,1,.36,1); }
