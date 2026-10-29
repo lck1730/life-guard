@@ -906,6 +906,11 @@
       const s = $('#' + id);
       if (s) { void s.offsetWidth; s.classList.add('anim-fade'); }
     }
+    // ★ 2026-10-29：**每次摆到登录屏，门都重新关好** ✓（逻辑在 03-auth.js ✓）。
+    //   门是可选的 ✓ —— `__armDoor` 没定义就什么也不做 ✓，表单照常能用 ✓。
+    if (id === 'login' && typeof window.__armDoor === 'function') {
+      try { window.__armDoor(); } catch (e) {}
+    }
   };
 
   // 告诉原生"我现在在哪个界面"，它据此决定返回键是"退回聊天"还是"退出应用"。

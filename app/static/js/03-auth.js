@@ -84,6 +84,36 @@
   $('#p').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   $('#p2').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
+  // ── 入户的门（2026-10-29，proposal §5.1）────────────────────────────
+  //
+  // ⚠️ **门是可选的** ✓：`.door-closed` 是我们自己加的 ✓ —— 这段没跑到，
+  //    登录表单本来就是能用的 ✓（`show('login')` 里那句钩子会兜住 ✓）。
+  // 由 `show('login')` 调用 ✓ —— 开机、掉登录、登出，每次摆到这一屏都重新关上 ✓。
+  let _doorTimer = null;
+  const _armDoor = () => {
+    const lg = $('#login');
+    if (!lg || !$('#doorScene')) return;
+    clearTimeout(_doorTimer);
+    lg.classList.remove('door-open');
+    lg.classList.add('door-closed');
+    _setAuthMode(false);   // 掉登录回来时回到「登录」那一档 ✓
+  };
+  const _openDoor = () => {
+    const lg = $('#login');
+    if (!lg || !lg.classList.contains('door-closed')) return;
+    try { sfx('paper'); haptic('soft'); } catch (e) {}
+    lg.classList.remove('door-closed');
+    lg.classList.add('door-open');
+    clearTimeout(_doorTimer);
+    // 动画跑完就把幕收掉 ✓（门已经 `display:none`，DOM 不留在合成层上 ✓）
+    _doorTimer = setTimeout(() => lg.classList.remove('door-open'), 900);
+  };
+  const _doorPushEl = $('#doorPush');
+  if (_doorPushEl) _doorPushEl.onclick = _openDoor;
+  window.__armDoor = _armDoor;
+  // 边角：页面一上来就已经停在登录屏、没走 `show('login')` 的话 ✓
+  if ($('#login').classList.contains('on')) _armDoor();
+
   // ── 初始化：还没有生活空间的人停在这一屏 ────────────────────────────
   //
   // 形状是用户 2026-10-08 定的 ✓：居中一句欢迎 + 一个蓝按钮 ✓；

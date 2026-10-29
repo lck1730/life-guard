@@ -71,6 +71,152 @@
          · 注册时**内测码排第一** ✓（它是进门凭证 ✓）
          · 错误**在按钮下面** ✓，切换那行在最后 ✓
          · 文案也照抄：「还没有账号？创建一个」/「已有账号，去登录」✓ -->
+  <!-- ★ 2026-10-29：**入户的门** ✓（proposal §5.1，只做门 ✓）
+       · 平时是**关着的**：一扇木门、门缝底下漏出一条暖光 ✓
+       · 门把手上挂着一张纸牌，写着「推门」✓ —— 整屏都能点 ✓
+       · 推开之后门往铰链那边收进去，底下的登录卡片才浮上来 ✓
+       ⚠️ **渐进增强** ✗→✓：门一开始是**不显示**的 ✓（`.door-scene` 默认
+          `display:none` ✓），表单照常可点 ✓；只有 JS 跑起来、并且
+          `show('login')` 走了 `__armDoor()`，才给 `#login` 加 `.door-closed`
+          把门挡在前面 ✓ —— **JS 挂了也不至于进不了门** ✓。
+       ⚠️ 门里**不写自述文案** ✓ —— hero 那句「一个越用越懂你的管家」是原来
+          就有的 ✓，说的是这个 App 是什么，不是功能说明 ✓。 -->
+  <div class="door-scene" id="doorScene" aria-hidden="true">
+    <svg class="door-art" viewBox="0 0 420 760" preserveAspectRatio="xMidYMax slice"
+         focusable="false">
+      <defs>
+        <linearGradient id="dFloor" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#cfa878"/>
+          <stop offset="1" stop-color="#a67c50"/>
+        </linearGradient>
+        <linearGradient id="dWood" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#cf9763"/>
+          <stop offset=".18" stop-color="#c68853"/>
+          <stop offset=".55" stop-color="#b97a46"/>
+          <stop offset="1" stop-color="#9d6236"/>
+        </linearGradient>
+        <linearGradient id="dFrame" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#9b6c42"/>
+          <stop offset=".5" stop-color="#865a31"/>
+          <stop offset="1" stop-color="#6d4623"/>
+        </linearGradient>
+        <linearGradient id="dGap" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffe2a6" stop-opacity=".40"/>
+          <stop offset=".55" stop-color="#ffd58c" stop-opacity=".62"/>
+          <stop offset="1" stop-color="#ffc877" stop-opacity=".98"/>
+        </linearGradient>
+        <linearGradient id="dSpill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffd489" stop-opacity=".70"/>
+          <stop offset="1" stop-color="#ffd489" stop-opacity="0"/>
+        </linearGradient>
+        <radialGradient id="dHalo" cx="50%" cy="45%" r="55%">
+          <stop offset="0" stop-color="#ffcf87" stop-opacity=".42"/>
+          <stop offset="1" stop-color="#ffcf87" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="dUnderGlow" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffcf87" stop-opacity="0"/>
+          <stop offset="1" stop-color="#ffcf87" stop-opacity=".45"/>
+        </linearGradient>
+        <radialGradient id="dPool" cx="50%" cy="35%" r="60%">
+          <stop offset="0" stop-color="#ffd58c" stop-opacity=".55"/>
+          <stop offset="1" stop-color="#ffd58c" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="dFloorDark" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#5a4229"/>
+          <stop offset="1" stop-color="#3f2e1d"/>
+        </linearGradient>
+      </defs>
+
+      <!-- 墙上那团暖晕：光是从门缝里漏出来的 ✓ -->
+      <ellipse cx="210" cy="430" rx="215" ry="320" fill="url(#dHalo)"/>
+
+      <!-- 踢脚线 + 地板（地板压在门底下 ✓） -->
+      <rect class="door-base" x="0" y="686" width="420" height="14" fill="#e4cfad"/>
+      <rect class="door-base-line" x="0" y="686" width="420" height="2"
+            fill="#cdb28a" opacity=".7"/>
+      <rect class="door-floor" x="0" y="700" width="420" height="60"
+            fill="url(#dFloor)"/>
+      <g class="door-planks" stroke="#946a41" stroke-opacity=".45"
+         stroke-width="1.2">
+        <line x1="0" y1="716" x2="420" y2="716"/>
+        <line x1="0" y1="733" x2="420" y2="733"/>
+        <line x1="0" y1="751" x2="420" y2="751"/>
+      </g>
+      <line class="door-floorline" x1="0" y1="700" x2="420" y2="700"
+            stroke="#7d5836" stroke-opacity=".35"/>
+
+      <!-- 门槛下那条光，落到地板上 ✓ -->
+      <path class="door-spill" d="M98 700 L322 700 L372 748 L48 748 Z" fill="url(#dSpill)"/>
+
+      <!-- 门框 -->
+      <rect x="84" y="110" width="252" height="596" rx="5" fill="url(#dFrame)"/>
+      <rect x="94" y="120" width="232" height="584" fill="#3b2818"/>
+      <!-- 门洞里的光：门扇一收进去就亮出来 ✓ -->
+      <rect class="door-light" x="94" y="120" width="232" height="584" fill="url(#dGap)"/>
+
+      <!-- 门扇：铰链在左边，推开时往左收 ✓ -->
+      <g class="door-leaf">
+        <rect x="98" y="124" width="224" height="576" fill="url(#dWood)"/>
+        <rect x="98" y="124" width="224" height="576" fill="none"
+              stroke="#7e4c28" stroke-width="2"/>
+        <!-- 木纹：几道很淡的竖线，别太花 ✓ -->
+        <g fill="none" stroke="#8a5330" stroke-opacity=".16" stroke-width="1.3">
+          <path d="M112 130 C110 300 114 470 111 694"/>
+          <path d="M128 130 C132 260 122 430 127 694"/>
+          <path d="M292 130 C290 300 294 470 291 694"/>
+          <path d="M308 130 C312 260 302 430 307 694"/>
+          <path d="M168 130 C176 220 160 290 170 366"/>
+          <path d="M250 470 C242 540 252 610 246 694"/>
+        </g>
+        <!-- 上下两块凹板 -->
+        <rect x="122" y="150" width="176" height="220" rx="2" fill="#b87845"/>
+        <rect x="122" y="150" width="176" height="220" rx="2" fill="none"
+              stroke="#8c5731" stroke-width="2"/>
+        <path d="M124 368 V152 H296" fill="none" stroke="#dca97a"
+              stroke-width="1.5" opacity=".5"/>
+        <path d="M296 152 V368 H124" fill="none" stroke="#7a4a28"
+              stroke-width="1.1" opacity=".3"/>
+        <rect x="122" y="398" width="176" height="264" rx="2" fill="#b87845"/>
+        <rect x="122" y="398" width="176" height="264" rx="2" fill="none"
+              stroke="#8c5731" stroke-width="2"/>
+        <path d="M124 660 V400 H296" fill="none" stroke="#dca97a"
+              stroke-width="1.5" opacity=".5"/>
+        <path d="M296 400 V660 H124" fill="none" stroke="#7a4a28"
+              stroke-width="1.1" opacity=".3"/>
+        <!-- 黄铜把手 + 挂在它上面的那张纸牌 ✓ -->
+        <rect x="289" y="388" width="18" height="32" rx="8"
+              fill="#8a5a2c" opacity=".5"/>
+        <circle cx="298" cy="404" r="6.5" fill="#e9c47c"
+                stroke="#8f5f2f" stroke-width="1.4"/>
+        <circle cx="296" cy="402" r="1.8" fill="#fff3cf" opacity=".85"/>
+        <g class="door-tag" transform="rotate(4 296 455)">
+          <line x1="298" y1="410" x2="298" y2="427"
+                stroke="#b25a4c" stroke-width="1.5"/>
+          <rect x="274" y="424" width="44" height="62" rx="5"
+                fill="#fcf3e0" stroke="#ddc8a2"/>
+          <circle cx="296" cy="430" r="2.1" fill="#b25a4c"/>
+          <text x="296" y="454">推</text>
+          <text x="296" y="474">门</text>
+        </g>
+      </g>
+
+      <!-- 铰链：长在门框上，门开了也不动 ✓ -->
+      <rect x="86" y="236" width="18" height="30" rx="3"
+            fill="#8f5f2f" opacity=".5"/>
+      <rect x="86" y="566" width="18" height="30" rx="3"
+            fill="#8f5f2f" opacity=".5"/>
+
+      <!-- 门下漏出来的光：先在门脚上洗一层 ✓，再在地板上落一摊 ✓ -->
+      <rect class="door-under-glow" x="94" y="664" width="232" height="40"
+            fill="url(#dUnderGlow)"/>
+      <ellipse class="door-spill" cx="210" cy="712" rx="150" ry="24"
+               fill="url(#dPool)"/>
+      <rect class="door-under" x="94" y="698" width="232" height="6" rx="3"
+            fill="#ffe7b0"/>
+    </svg>
+  </div>
+  <button type="button" class="door-push" id="doorPush" aria-label="推门"></button>
+
   <div class="wrap">
     <div class="hero">
       <div class="t">生活管家</div>

@@ -200,6 +200,103 @@
      灰字、居中、不是按钮 ✓。 */
   #login .swap { margin-top:14px; }
   #login .swap b { color:var(--muted); font-size:13px; font-weight:400; }
+  /* ── 入户的门（2026-10-29，proposal §5.1）────────────────────────────
+     ★ 只有 `#login` 有这扇门 ✓；`#init`（登录后建空间）不套 ✓。
+     ⚠️ 门默认**不显示** ✓（渐进增强：JS 没跑起来，登录表单照常能用 ✓）——
+        只有 `.door-closed` / `.door-open` 在的时候才画 ✓。
+     ⚠️ 门上的字（「推门」）在 SVG 里 ✓ —— 它跟着门一起缩放 ✓，
+        不会在窄屏上跑到屏幕外面去 ✓。 */
+  #login .door-scene {
+    position:absolute; inset:0; z-index:1; display:none; overflow:hidden;
+    pointer-events:none;
+    background:
+      radial-gradient(120% 70% at 50% 12%, rgba(255,247,226,.85), rgba(255,247,226,0) 62%),
+      radial-gradient(circle at 50% 50%, rgba(120,88,52,.05) 0 1.2px, transparent 1.6px) 0 0 / 20px 20px,
+      linear-gradient(180deg, #f7ecd7 0%, #f0e0c3 58%, #e8d3ae 100%);
+  }
+  /* 深色两套：墙也暗下来 ✓，门下的暖光反而更显眼 ✓ */
+  [data-theme="dark"] #login .door-scene {
+    background:
+      radial-gradient(110% 65% at 50% 14%, rgba(255,205,140,.10), rgba(255,205,140,0) 62%),
+      radial-gradient(circle at 50% 50%, rgba(255,236,200,.028) 0 1.2px, transparent 1.6px) 0 0 / 20px 20px,
+      linear-gradient(180deg, #241d16 0%, #1e1812 58%, #18130f 100%);
+  }
+  /* 林深：墙带一点苔绿 ✓（灯还是那盏暖灯 ✓） */
+  [data-theme="forest"] #login .door-scene {
+    background:
+      radial-gradient(110% 65% at 50% 14%, rgba(214,232,180,.10), rgba(214,232,180,0) 62%),
+      radial-gradient(circle at 50% 50%, rgba(255,236,200,.028) 0 1.2px, transparent 1.6px) 0 0 / 20px 20px,
+      linear-gradient(180deg, #1d261c 0%, #182016 58%, #141a13 100%);
+  }
+  /* 深色下地板/踢脚线也要跟着暗 ✓ —— 门脚那一摊光留着 ✓ */
+  [data-theme="dark"] #login .door-floor,
+  [data-theme="forest"] #login .door-floor { fill:url(#dFloorDark); }
+  [data-theme="dark"] #login .door-base,
+  [data-theme="forest"] #login .door-base { fill:#2c2217; }
+  [data-theme="dark"] #login .door-base-line,
+  [data-theme="forest"] #login .door-base-line { fill:#3c3023; }
+  [data-theme="dark"] #login .door-planks,
+  [data-theme="forest"] #login .door-planks { stroke:#2f2418; }
+  [data-theme="dark"] #login .door-floorline,
+  [data-theme="forest"] #login .door-floorline { stroke:#281f15; }
+  #login .door-art {
+    position:absolute; left:50%; bottom:0; display:block;
+    width:100%; height:100%; transform:translateX(-50%);
+  }
+  #login .door-tag text {
+    font-family:"Kaiti SC","STKaiti","KaiTi","AR PL UKai CN",
+                "Noto Serif CJK SC","Songti SC",serif;
+    font-size:14px; font-weight:600; letter-spacing:.04em;
+    text-anchor:middle; fill:#7c4a2a;
+  }
+  /* 灯在呼吸 ✓ —— 很轻，别抢戏 ✓ */
+  #login .door-under, #login .door-spill,
+  #login .door-under-glow { animation:doorBreathe 4.6s ease-in-out infinite; }
+  @keyframes doorBreathe {
+    0%,100% { opacity:.72; }
+    50%     { opacity:1; }
+  }
+  /* 整屏都能点 ✓（按钮本身不带字：字在 SVG 的纸牌上 ✓） */
+  #login .door-push {
+    position:absolute; inset:0; z-index:3; display:none;
+    width:100%; padding:0; border-radius:0; background:none; color:inherit;
+  }
+  #login .door-push:focus-visible { outline:2px solid var(--accent); outline-offset:-10px; }
+  /* 关门时：门挡住；表单藏起来但**还在 DOM 里** ✓（读屏顺序不变 ✓） */
+  #login.door-closed .door-scene,
+  #login.door-open .door-scene { display:block; }
+  #login.door-closed .wrap,
+  #login.door-open .wrap { position:relative; z-index:2; }
+  #login.door-closed .wrap { opacity:0; transform:translateY(14px);
+                             pointer-events:none; visibility:hidden; }
+  #login.door-closed .door-push,
+  #login.door-open .door-push { display:block; }
+  /* 门开了就把那颗整屏按钮收掉 ✓ —— 不然 Tab 会停在一块看不见的东西上 ✓ */
+  #login.door-open .door-push { display:none; }
+  /* 推门：门扇往左（铰链）收 ✓、门洞亮出来 ✓、整幕淡出 ✓、卡片浮上来 ✓ */
+  #login.door-open .door-leaf {
+    transform-box:fill-box; transform-origin:left center;
+    transform:scaleX(.035);
+    transition:transform .58s cubic-bezier(.45,.05,.2,1);
+  }
+  #login.door-open .door-light { opacity:1; transition:opacity .3s ease .12s; }
+  #login.door-open .door-scene { animation:doorSceneOut .42s ease .34s both; }
+  #login.door-open .wrap { animation:doorFormIn .5s cubic-bezier(.2,.7,.3,1) .18s both; }
+  @keyframes doorSceneOut { to { opacity:0; } }
+  @keyframes doorFormIn {
+    from { opacity:0; transform:translateY(16px); }
+    to   { opacity:1; transform:none; }
+  }
+  /* 减弱动态效果：门直接让开 ✓，卡片不做位移动画 ✓ */
+  @media (prefers-reduced-motion: reduce) {
+    #login .door-under, #login .door-spill, #login .door-under-glow,
+    #login.door-open .door-leaf,
+    #login.door-open .door-light,
+    #login.door-open .door-scene,
+    #login.door-open .wrap { animation:none; transition:none; }
+    #login.door-open .door-scene { opacity:0; }
+    #login.door-open .wrap { opacity:1; }
+  }
 
   /* ── 初始化：还没有生活空间的时候停在这一屏 ──────────────────────────
      ★ 用户 2026-10-08 定的形状：
