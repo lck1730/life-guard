@@ -512,6 +512,12 @@
     if ($('#me').classList.contains('on')) { closeMe(); return; }
     if ($('#peer').classList.contains('on')) { closePeer(); return; }
     if ($('#compView').classList.contains('on')) { closeComp(); return; }
+    // ★ 2026-10-29：阁楼（z 25 ✓）—— 从屋里那扇小门 / 设置页那一行推进来的 ✓，
+    //   压在提醒账本回忆墙(24)上面 ✓、在组件页(26)下面 ✓ → 照铁律插在这两行之间 ✓。
+    //   ⚠️ 它里面还有一层（ARCH 的详情页 ✓）—— 后退的**第一下**要先退那一层 ✓，
+    //     所以走 `atticBack()` ✓：它会先问 `contentWindow.__goBack()` ✓，
+    //     里面说"我这儿还有一层"就停住 ✓（见 06-workshop.js 那个函数 ✓）。
+    if ($('#attic').classList.contains('on')) { atticBack(); return; }
     // ★ 2026-10-28（P2）：提醒 / 账本 / 回忆墙（z 24 ✓）—— 从屋里点物件推进来的 ✓，
     //   压在今日(23)/工坊(22)上面 ✓、在组件页(26)下面 ✓ → 照铁律插在这两行之间 ✓。
     //   ⚠️ 三屏互不同时开 ✓（都从屋里推 ✓），谁开着关谁 ✓。

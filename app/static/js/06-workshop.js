@@ -94,13 +94,18 @@
   const _syncStatusBar = () => {
     let light = true;
     try { light = !!themeById(document.documentElement.dataset.theme).light; } catch (e) {}
+    // ★ 2026-10-29：阁楼是**深底** ✓（ARCH 本来就是深色 ✓）—— 它压在最上面时
+    //   不算"停在纸上" ✓，而且要**反过来**：深色图标落在深底上 = 看不见 ✗。
+    const onAttic = $('#attic').classList.contains('on');
     const onPaper = ['#workshop', '#today', '#clock', '#ledgerBook', '#memoryWall']
       .some((s) => { const el = $(s); return !!el && el.classList.contains('on'); })
-      && !$('#compView').classList.contains('on');
+      && !$('#compView').classList.contains('on')
+      && !onAttic;
     let lamp = false;
     try { lamp = localStorage.getItem('lg_lamp') === '1'; } catch (e) {}
     try {
-      window.LifeGuardNative?.setLightStatusBar?.(onPaper ? true : (lamp ? false : light));
+      window.LifeGuardNative?.setLightStatusBar?.(
+        onAttic ? false : (onPaper ? true : (lamp ? false : light)));
     } catch (e) {}
   };
   // 新三屏在 **04 / 05 / 02** 那边也要能用这一下 ✓（它们都在同一个 IIFE 里 ✓，
@@ -919,6 +924,69 @@
     return s;
   };
 
+  // ── 阁楼的小门 + 绳梯（2026-10-29）✓ ───────────────────────────────
+  //
+  // 位置是**算过的** ✓：窗框右缘 552 ✓、闹钟左缘 652 ✓、书架顶 360 ✓ ——
+  //   中间这条 x 552..652 的墙是空的 ✓（拍立得 / 便签 / 挂画都不在这一块 ✓）。
+  //   梯子下端收在 **354** ✓ —— 刚好搭在书架顶上 ✓（"踩着书架爬上去" ✓），
+  //   也不压书架那块热区（y ≥ 360 ✓）。
+  // ⚠️ 整组 `pointer-events:none` ✓ —— 点的是盖在上面的那块透明 rect ✓
+  //   （`.ws-attic` ✓，见 `buildFlatScene` ✓），别让画的东西把点击吃掉 ✗。
+  // ⚠️ 绳子**轻轻晃** ✓（±1.4° ✓）—— 屋子是活的 ✓；晃的是**整组** ✓
+  //   （两根绳 + 横档一起 ✓），上端钉在门口 ✓（rotate 的圆心在门框下沿 ✓）。
+  const houseAtticSvg = function () {
+    // 横档一根一根拼 ✓（174 → 349 ✓，间距一样 ✓）
+    let rungD = '';
+    for (let y = 174; y <= 349; y += 25) rungD += 'M587 ' + y + ' H621 ';
+    return '<g class="ws-attic-door" pointer-events="none">' +
+      // 门缝里漏下来的光 ✓ —— 最先画 ✓，垫在门框和梯子底下 ✓
+      '<ellipse cx="604" cy="196" rx="74" ry="52" fill="url(#wsWarm)" opacity=".42"/>' +
+      // 小房子顶 ✓ —— 这一间在**屋顶上** ✓（屋里那扇门就是它的小门 ✓）
+      '<path d="M544 54 L604 12 L664 54 Z" fill="#cf8a5b" stroke="#a9683f" ' +
+        'stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<path d="M604 20 V18" stroke="#a9683f" stroke-width="2.5" stroke-linecap="round"/>' +
+      '<rect x="540" y="49" width="128" height="11" rx="5.5" fill="#b06a40"/>' +
+      // 门框 ✓
+      '<rect x="554" y="55" width="100" height="93" rx="8" fill="#b57b47"/>' +
+      '<rect x="554" y="55" width="100" height="93" rx="8" fill="none" ' +
+        'stroke="#8f5c33" stroke-width="2"/>' +
+      // 门洞 ✓ —— 往上越来越暗 ✓（里面是往上走的楼梯 ✓）
+      '<rect x="562" y="63" width="84" height="78" rx="6" fill="url(#wsAtticIn)"/>' +
+      // 门洞里那几级**往上走的台阶** ✓（越往上越窄 ✓ = 透视 ✓）
+      '<g fill="#f6d6a2">' +
+        '<rect x="568" y="132" width="72" height="6" rx="3" opacity=".95"/>' +
+        '<rect x="572" y="118" width="64" height="6" rx="3" opacity=".82"/>' +
+        '<rect x="576" y="104" width="56" height="6" rx="3" opacity=".68"/>' +
+        '<rect x="580" y="90" width="48" height="6" rx="3" opacity=".52"/>' +
+      '</g>' +
+      // 楼上一盏小灯 ✓（那一点暖光就是它 ✓）
+      '<circle cx="604" cy="78" r="17" fill="url(#wsWarm)" opacity=".55"/>' +
+      '<path d="M604 66 V73" stroke="#6b4226" stroke-width="1.6" stroke-linecap="round"/>' +
+      '<circle cx="604" cy="77" r="4" fill="#ffe6b6" stroke="#a87943" stroke-width="1"/>' +
+      // 门槛 ✓ —— 梯子就挂在这道边上 ✓
+      '<rect x="552" y="146" width="104" height="9" rx="4.5" fill="#8f5c33"/>' +
+      // 绳梯 ✓ —— 两根麻绳 + 八根横档 ✓，整体会晃 ✓
+      '<g class="ws-rope">' +
+        '<animateTransform attributeName="transform" type="rotate" ' +
+          'values="-1.2 604 151;1.2 604 151;-1.2 604 151" ' +
+          'dur="7s" repeatCount="indefinite" calcMode="spline" ' +
+          'keyTimes="0;.5;1" keySplines=".45 0 .55 1;.45 0 .55 1"/>' +
+        // 先压一层深色 ✓（绳子有厚度 ✓），再提一道高光 ✓
+        '<g fill="none" stroke="#a87943" stroke-width="5.2" stroke-linecap="round">' +
+          '<path d="M586 153 V354"/><path d="M622 153 V354"/>' +
+          '<path d="' + rungD + '" stroke-width="4.6"/>' +
+        '</g>' +
+        '<g fill="none" stroke="#e9cf9d" stroke-width="1.6" stroke-linecap="round" opacity=".85">' +
+          '<path d="M586 153 V354"/><path d="M622 153 V354"/>' +
+          '<path d="' + rungD + '" stroke-width="1.3"/>' +
+        '</g>' +
+      '</g>' +
+      // 两个绳结 ✓（挂在门槛下沿 ✓）
+      '<circle cx="586" cy="153" r="3.8" fill="#a87943"/>' +
+      '<circle cx="622" cy="153" r="3.8" fill="#a87943"/>' +
+    '</g>';
+  };
+
   const loadNotes = async function () {
     try {
       const d = await api('/groups/' + group.id + '/notes');
@@ -1054,6 +1122,9 @@
       ['提醒',   715, 206,  715, 220,  715, 240],
       ['回忆',   572, 632,  596, 632,  628, 632],
       ['我们的家', 552, 1172, 560, 1158, 594, 1146],
+      // ★ 2026-10-29：阁楼 ✓ —— 挂在门右边一点 ✓（那儿的墙是空的 ✓，
+      //   闹钟在 y ≥ 240 ✓，字在 86 这一行压不着它 ✓）。
+      ['阁楼',   704, 86,   690, 106,  656, 96],
     ];
     let s = '<g class="ws-labels" pointer-events="none">';
     for (let i = 0; i < L.length; i++) {
@@ -1125,6 +1196,12 @@
           '<stop offset="0" stop-color="#fff6e0" stop-opacity="0"/>' +
           '<stop offset=".72" stop-color="#f6dfba" stop-opacity="0"/>' +
           '<stop offset="1" stop-color="#7a4a2e" stop-opacity=".1"/></radialGradient>' +
+        // ★ 2026-10-29：阁楼门洞里那道光 ✓（下亮上暗 ✓ —— 看着像**往上**去 ✓）
+        '<linearGradient id="wsAtticIn" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#7d4e2a"/>' +
+          '<stop offset=".55" stop-color="#c08a4e"/>' +
+          '<stop offset="1" stop-color="#f3cd93"/>' +
+        '</linearGradient>' +
       '</defs>' +
       // ★ 内层 <image> 用 **meet**（不是 slice！）✓ —— 图本身 900×1600，
       //   放进同尺寸盒子是 1:1 精确贴合，meet 即满、slice 在某些 WebView 上
@@ -1134,6 +1211,9 @@
         'preserveAspectRatio="xMidYMid meet"/>' +
       // ★ 屋子会长（2026-10-29）✓ —— 用过才长出来的三样 ✓（压在屋子图上、环境光下面 ✓）
       '<g pointer-events="none">' + houseGrowSvg() + '</g>' +
+      // ★ 阁楼的小门 + 绳梯（2026-10-29）✓ —— 压在屋子图上 ✓、光/尘下面 ✓
+      //   （尘和暗角盖过去一点才像屋里的一件东西 ✓，不像贴上去的 ✗）。
+      houseAtticSvg() +
       // ★ 便签（2026-10-29）✓ —— 贴在窗下那面空墙上 ✓；**能点** ✓（不裹在
       //   pointer-events:none 里 ✓），点一下 = 看全部 / 写一张 / 撕掉 ✓。
       houseNotesSvg() +
@@ -1166,6 +1246,12 @@
         'fill="transparent" style="cursor:pointer" role="button" aria-label="回忆"/>' +
       '<rect class="ws-mail" x="590" y="1090" width="84" height="64" ' +
         'fill="transparent" style="cursor:pointer" role="button" aria-label="我们的家"/>' +
+      // ★ 2026-10-29：阁楼 ✓ —— 热区**包住小门和整架梯子** ✓
+      //   （小门只有 94×136 ✓、梯子更细 ✓，照原样点不准 ✓）。
+      //   ⚠️ 右缘 656 不能过 652 ✗（闹钟热区从 652 起 ✓）；下沿到 360 为止 ✓
+      //      （书架热区从 360 起 ✓）—— 两边都只是**贴着**，不重叠 ✓。
+      '<rect class="ws-attic" x="544" y="6" width="112" height="354" ' +
+        'fill="transparent" style="cursor:pointer" role="button" aria-label="阁楼"/>' +
       // 二狗 ✓ —— 点它回主群聊 ✓
       flatCatSvg() +
       // 来找它玩的小蝴蝶 ✓ —— 画在猫上面 ✓，停在鼻尖时不会被挡住 ✓
@@ -1203,6 +1289,9 @@
       closeWorkshop();
       setTimeout(function () { openSettings(); }, 260);
     });
+    // ★ 阁楼 ✓（2026-10-29）—— 推在屋子**上面** ✓（z 25 ✓），退回来还是这间屋 ✓
+    //   （和账本 / 提醒 / 回忆墙一个走法 ✓，所以**不用**先退屋 ✓）。
+    wire('.ws-attic', function () { openAttic(); });
 
     // ★ 点桌上的信簿 → **落座** ✓（3.1）—— 镜头俯冲进书页，收尾就是聊天 ✓。
     //   · `transform-origin` 打在**书心**上 ✓ → 缩放时书心不动 ✓；
@@ -1995,6 +2084,124 @@
   if ($('#clockClose')) $('#clockClose').onclick = function () { hLeave('clock'); };
   if ($('#ledgerClose')) $('#ledgerClose').onclick = function () { hLeave('ledgerBook'); };
   if ($('#memoryClose')) $('#memoryClose').onclick = function () { hLeave('memoryWall'); };
+
+  // ── 阁楼（2026-10-29）──────────────────────────────────────────────
+  //
+  // 屋里墙上那扇**小门** ✓（和设置页「阁楼 · 架构」那一行 ✓，同一处入口 ✓）——
+  //   爬上去就是 ARCH（架构）✓。
+  //
+  // ★ **ARCH 的内容一份都不搬进来** ✓（用户 2026-10-27 定的「原样保留」✓）：
+  //   五个 tab、笔记 `cc_arch_v3`、配机 `cc_arch_build_v1` 全在 8750 那个服务里 ✓。
+  //   这一屏只是一块**同源的地** ✓，里头那张 `static/attic.html`
+  //   现场去 8750 取 `app.css` / `arch-data.js` / `arch-diagrams.js` / `arch.js` ✓
+  //   —— 那边改了，这儿跟着改 ✓，不用两边同步 ✓（也就不存在"两份会长歪"✗）。
+  //
+  // ⚠️ 为什么是 iframe 而不是把三支脚本直接引进来 ✗：
+  //   · `arch.js` 自己会 `tellNative('chat')` ✓、还会抢 `window.__goBack` ✓ ——
+  //     直接引进来就是**两个返回键** ✓，谁先谁后没个准 ✗；
+  //   · 在 iframe 里它碰不到壳 ✓（`?'` 空转 ✓），返回键由**我们这一层**转给它 ✓
+  //     （`atticBack` ✓），它自己的"详情 → 列表"那一层也还归它 ✓；
+  //   · localStorage 仍然挂在**我们这台** ✓ —— 笔记和配机照旧存在这个 App 里 ✓。
+  //
+  // ⚠️ 8750 没在跑的时候，里头那页会写「阁楼的门没打开」✓ ——
+  //   **不假装成功** ✓（这条也写进了 `attic.html` 里 ✓）。
+  const ATTIC_SRC = '/static/attic.html';
+  let atticReady = false;      // iframe 的 src 给过没有 ✓（给过就复用 ✓，不再重载 ✓）
+
+  /** 原生给的安全区 —— iframe 里读不到，只能现量了拼在 query 上 ✓。 */
+  const atticInsets = () => {
+    let top = 0, bot = 0;
+    try {
+      const cs = getComputedStyle(document.documentElement);
+      top = Math.round(parseFloat(cs.getPropertyValue('--inset-top')) || 0);
+      bot = Math.round(parseFloat(cs.getPropertyValue('--inset-bottom')) || 0);
+    } catch (e) {}
+    return { top, bot };
+  };
+
+  const openAttic = () => {
+    const scr = $('#attic');
+    const fr = $('#atticFrame');
+    if (!scr || !fr) return;
+    // 已经开着就别重推 ✓ —— `pushScreen` 会把进场动画**从头再放一遍** ✗。
+    if (scr.classList.contains('on')) return;
+    // ⚠️ 安全区变了（转屏 / 状态栏高度变了 ✓）→ 重新给一次 src ✓；
+    //   没变就复用那一张 ✓（头一回进去要等它现场取脚本 ✓，之后是现成的 ✓）。
+    const ins = atticInsets();
+    const key = ins.top + 'x' + ins.bottom;
+    if (!atticReady || fr.dataset.insets !== key) {
+      fr.dataset.insets = key;
+      fr.src = ATTIC_SRC + '?top=' + ins.top + '&bottom=' + ins.bottom;
+      atticReady = true;
+    } else {
+      // 上一次是**从里面退出来**的 ✓（ARCH 自己 `closeArch` 过了 ✓）→ 重新开它 ✓。
+      //   没装好就算了 ✓ —— 它自己 boot 时会开 ✓。
+      try {
+        const w = fr.contentWindow;
+        if (w && w.__archAlive && typeof w.__openArch === 'function') w.__openArch();
+      } catch (e) {}
+    }
+    sfx('paper'); haptic('soft');
+    pushScreen('attic');
+    _syncStatusBar();
+  };
+
+  /** 收阁楼。`instant` = 立刻摘 ✓（讲完话要**马上**看见聊天框 ✓）。
+   *  正常退出走 `popScreen` ✓ —— 和别的纸屏一个节奏 ✓。 */
+  const closeAttic = (instant) => {
+    const scr = $('#attic');
+    if (!scr || !scr.classList.contains('on')) return;
+    if (instant) {
+      // ⚠️ 取号 + 摘类 ✓ —— 不能 `popScreen` 再自己摘 ✗：
+      //   两套收尾撞在一起 ✓，退场动画会跟下面的屏打架 ✓（见 `pushScreen` 那段 ✓）。
+      scr._popToken = (scr._popToken || 0) + 1;
+      scr.classList.remove(...ANIM_CLASSES, 'on');
+      _enterAnim.delete('attic');
+      tellTop('attic');
+      _syncStatusBar();
+      return;
+    }
+    popScreen('attic');
+    setTimeout(_syncStatusBar, 220);
+  };
+
+  /** 返回键 / 右滑：**先问里面还有没有一层** ✓（ARCH 的详情页 ✓）。
+   *  ⚠️ 这是**同步**调用 ✓ —— 它说 `true` 就是"我这儿退了" ✓：
+   *     详情 → 列表 ✓ / 列表 → 它自己关 ✓（关完它会 `postMessage` 回来 ✓）。 */
+  const atticBack = () => {
+    const fr = $('#atticFrame');
+    let took = false;
+    try {
+      const w = fr && fr.contentWindow;
+      if (w && typeof w.__goBack === 'function') took = w.__goBack() === true;
+    } catch (e) { took = false; }
+    if (took) return;
+    closeAttic();
+  };
+
+  /** 从阁楼带回一句话 → 填进聊天框 ✓（ARCH 那个「在对话里深挖」✓）。
+   *  ⚠️ 三层都要收 ✓（阁楼 → 屋 / 设置 ✓），而且**立刻**收 ✓：
+   *     让人马上看见那句话就在输入框里 ✓，不是先看 200ms 动画再猜字去哪儿了 ✗。 */
+  const atticHandoff = (text) => {
+    const v = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!v) return;
+    closeAttic(true);
+    if ($('#workshop').classList.contains('on')) closeWorkshop();
+    if ($('#settings').classList.contains('on')) closeSettings();
+    // 等这一帧的布局落地再插字 ✓（输入框还没量出高度时 `autoGrow` 会算错 ✓）。
+    setTimeout(() => { insertText(v); }, 60);
+  };
+
+  // 里头递出来的口信 ✓ —— 只认**我们那张 iframe**发来的 ✓（`ev.source` ✓），
+  //   `ev.origin` 再挡一道 ✓。网页别的地方发什么都不理 ✗。
+  window.addEventListener('message', (ev) => {
+    if (ev.origin !== location.origin) return;
+    const fr = $('#atticFrame');
+    if (!fr || ev.source !== fr.contentWindow) return;
+    const d = ev.data || {};
+    if (d.type === 'lg-attic-close') closeAttic();
+    else if (d.type === 'lg-attic-handoff') atticHandoff(d.text);
+  });
 
   // ── 文具托盘（长按一条消息）─────────────────────────────────────────
   //

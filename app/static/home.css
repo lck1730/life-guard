@@ -288,6 +288,27 @@
       （见 `android-back-key-only-knows-settings` ✓）。 */
 #clock, #ledgerBook, #memoryWall { z-index: 24; }
 
+/* ═══ ⑤ 阁楼（2026-10-29）══════════════════════════════════════════
+   屋里墙上那扇小门 / 设置页「阁楼 · 架构」那一行推进来 ✓。
+   z 25 ✓（> 提醒三屏 24 ✓ / < 组件页 26 ✓，见 02-agent.js 那段 ✓）。
+   ⚠️ 里头**整页是一个 iframe** ✓（`static/attic.html` ✓）——
+      ARCH 的样式 / 内容仍然住在 8750 ✓，这里只给它一块地 ✓。
+   ⚠️ ARCH 自己是深底 ✓ → 这一屏也是深的 ✓，别跟着小屋的纸色走 ✗。 */
+#attic {
+  z-index: 25;
+  background: #0a0c10;
+  /* 状态栏由 `_syncStatusBar` 强制成深色图标 ✓（见 06-workshop.js ✓），
+     这里不再画什么安全区垫片 ✓ —— ARCH 自己按传进去的 inset 排 ✓。 */
+}
+#attic .attic-frame {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  border: 0; display: block;
+  background: #0a0c10;
+  /* 页面本身不该被拖动 ✓（ARCH 里面自己滚 ✓）。 */
+  overscroll-behavior: none;
+}
+
 .hx {
   width: 40px; height: 40px;
   display: grid; place-items: center;

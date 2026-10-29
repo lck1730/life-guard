@@ -480,6 +480,15 @@
   <div class="abody" id="memoryBody"></div>
 </div>
 
+<!-- ★ 2026-10-29：阁楼 ✓ —— 屋里墙上的那扇小门通向这儿 ✓。
+     ARCH（架构那五页）的**内容不搬进来** ✓，这一屏只是一个同源 iframe ✓，
+     里头的 `attic.html` 从 8750 现场取 `arch.js` / `arch-data.js` 等 ✓
+     （见 `static/attic.html` 顶部那段说明 ✓）。
+     z 25 = 压在今日(23)/提醒账本回忆墙(24)上面 ✓、在组件页(26)下面 ✓。 -->
+<div class="screen ascreen" id="attic">
+  <iframe id="atticFrame" class="attic-frame" title="阁楼" allow="clipboard-write"></iframe>
+</div>
+
 <!-- 设置 -->
 <div class="screen" id="settings">
   <header class="sub">
@@ -584,6 +593,18 @@
     <!-- ★ 「模型」**只有管理员看得见** ✓（`renderSettings` 按 `me.is_admin` 显示 ✓）——
          藏起来只是**体验** ✓，闸门在 `/api/models/*` 的 `require_admin` ✓。 -->
     <div class="item" data-act="models" id="rowModels" style="display:none"><span class="ico" data-ico="layers"></span><span class="k">模型</span><span class="v" id="vModels"></span><span class="chev" data-chev></span></div>
+
+      </div>
+    </div>
+
+    <!-- ★ 2026-10-29：阁楼 ✓ —— 就是屋里墙上那扇小门 ✓（同一个 `openAttic()` ✓）。
+         内容照旧全在 8750 的 ARCH 里 ✓：五个 tab、笔记 `cc_arch_v3`、
+         配机 `cc_arch_build_v1` 都**没动** ✓；这里只多一个入口 ✓。
+         ⚠️ 8750 没在跑的时候进去会看到"门没打开" ✓（不假装成功 ✓）。 -->
+    <div class="house-sec">阁楼</div>
+    <div class="sec-g">
+      <div class="grp gcard">
+    <div class="item" data-act="attic"><span class="ico" data-ico="ladder"></span><span class="k">架构</span><span class="chev" data-chev></span></div>
 
       </div>
     </div>

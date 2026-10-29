@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>阁楼</title>
+<style>
+  /* 这一页只负责把 ARCH 装进一个 iframe 里 ✓。
+     真正的样式 / 内容仍然是 8750 上那一套（`app.css` / `arch-data.js` /
+     `arch-diagrams.js` / `arch.js` ✓）—— **一份都不复制** ✓。
+     在 ARCH 自己的 app.css 到来之前，先把黑底铺上（避免白闪 ✓）。 */
+  html, body { margin:0; height:100%; background:#0a0c10; overflow:hidden; }
+  #boot, #fail {
+    position:fixed; inset:0; display:grid; place-items:center;
+    background:#0a0c10; color:#7c8698;
+    font:13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+    text-align:center; padding:24px;
+  }
+  #boot .spin {
+    width:22px; height:22px; border:2px solid #222834;
+    border-top-color:#4ade9f; border-radius:50%;
+    animation:sp .7s linear infinite;
+  }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  #fail { display:none; }
+  #fail b { display:block; color:#dfe4ec; font-size:15px; margin-bottom:8px; }
+  /* 进场 / 退场交给外面那一屏 ✓ —— 这里面只要不左右滑就行 ✓
+     （两层动画叠在一起会看着像"滑了两次" ✗）。 */
+  #arch.anim-in { animation:none; }
+  #arch.anim-out { animation:atticOut .16s ease both; }
+  @keyframes atticOut { from { opacity:1; } to { opacity:.35; } }
+  /* handoff 用的小盒子 ✓ —— 只为了接住 ARCH 塞进来的那句话 ✓，
+     不显示、也不该抢焦点（display:none 的元素 `focus()` 不会弹键盘 ✓）。 */
+  #text { display:none; }
+</style>
+<script>
+  /* 原生的安全区 / 状态栏高度由外壳传进来 ✓ —— iframe 里读不到
+     `LifeGuardNative`，`env(safe-area-inset-*)` 在 WebView 的 iframe 里也不可靠。
+     外面按 `--inset-top` / `--inset-bottom` 的现值拼在 query 上 ✓。 */
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var top = parseFloat(q.get('top')), bot = parseFloat(q.get('bottom'));
+    if (isFinite(top)) document.documentElement.style.setProperty('--inset-top', top + 'px');
+    if (isFinite(bot)) document.documentElement.style.setProperty('--inset-bottom', bot + 'px');
+  })();
+</script>
+</head>
+<body>
+<!-- ARCH 的壳 ✓ —— 和 8750 那页里那一块**长得一样** ✓。
+     只搬了壳（返回箭头 + 标题 + 内容容器 ✓），内容还是那边实时给的 ✓。 -->
+<section class="screen" id="arch">
+  <header class="abar archHead">
+    <button id="archBack" class="iconbtn" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 4.5 8.5 12 15 19.5" />
+      </svg>
+    </button>
+    <b>ARCH / 架构</b>
+    <span class="sp"></span>
+  </header>
+  <div class="archBody" id="archBody"></div>
+</section>
+
+<textarea id="text" aria-hidden="true" tabindex="-1"></textarea>
+
+<div id="boot"><div class="spin"></div></div>
+<div id="fail">
+  <div>
+    <b>阁楼的门没打开</b>
+    <span id="failWhy">8750 上的那个服务没在跑</span>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // 8750 = 远程 CC（也就是 ARCH 住的那台机器）✓。
+  //   ⚠️ 用 `location.hostname` 现拼 ✓ —— 换隧道地址 / 本机预览都不用改 ✓。
+  var BASE = 'http://' + (location.hostname || '127.0.0.1') + ':8750';
+  var boot = document.getElementById('boot');
+  var fail = document.getElementById('fail');
+  var arch = document.getElementById('arch');
+  var done = false;
+
+  function showFail(why) {
+    if (done) return;
+    done = true;
+    if (boot) boot.style.display = 'none';
+    if (fail) {
+      fail.style.display = 'grid';
+      var w = document.getElementById('failWhy');
+      if (w && why) w.textContent = why;
+    }
+  }
+
+  // 8750 没醒的时候，脚本请求可能一直挂着 ✓ → 给个上限 ✓，
+  // 别让这一页永远停在转圈上 ✗（用户看到的就是"点了没反应"✓）。
+  var timer = setTimeout(function () {
+    showFail('8750 上的那个服务没应声');
+  }, 6000);
+
+  function bootArch() {
+    if (done) return;
+    clearTimeout(timer);
+    try {
+      if (!window.ARCH_DATA || !window.__openArch) throw new Error('ARCH 没装好');
+      window.__archAlive = true;
+      window.__openArch();
+      // 外面那一屏已经有自己的进场动画了 ✓（见上面 CSS 那段 ✓）。
+      arch.classList.remove('anim-in');
+      if (boot) boot.remove();
+      done = true;
+
+      // 里面关掉（点返回 / 左滑 / 返回键）→ 告诉外面把这一屏收起来 ✓。
+      //   ⚠️ 只认"`.on` 真被摘掉"那一下 ✓（`anim-out` 期间还 `.on` 着呢 ✓）。
+      new MutationObserver(function () {
+        if (!arch.classList.contains('on') && !arch.classList.contains('anim-out')) {
+          parent.postMessage({ type: 'lg-attic-close' }, location.origin);
+        }
+      }).observe(arch, { attributes: true, attributeFilter: ['class'] });
+
+      // 「在对话里深挖」✓ —— ARCH 把它写进这个隐藏盒子 ✓；
+      // 我们原样交给外面，由外面填进真正的输入框 ✓（焦点 / 键盘也归外面管 ✓）。
+      var ta = document.getElementById('text');
+      ta.addEventListener('input', function () {
+        parent.postMessage({ type: 'lg-attic-handoff', text: ta.value }, location.origin);
+      });
+    } catch (e) {
+      showFail((e && e.message) || 'ARCH 没装好');
+    }
+  }
+
+  // app.css **先到** ✓（不然 ARCH 的 `.screen` 还是隐藏的 ✓，会闪一下没样式的内容 ✗），
+  // 样式落定了再按顺序装三支脚本 ✓ —— arch.js 依赖前两支的全局变量 ✓。
+  var css = document.createElement('link');
+  css.rel = 'stylesheet';
+  css.href = BASE + '/static/app.css';
+  css.onerror = function () { showFail('拿不到 8750 上的 app.css'); };
+  css.onload = startScripts;
+  document.head.appendChild(css);
+
+  function startScripts() {
+    var files = ['arch-data.js', 'arch-diagrams.js', 'arch.js'];
+    var i = 0;
+    function next() {
+      if (done) return;
+      if (i >= files.length) { bootArch(); return; }
+      var name = files[i++];
+      var s = document.createElement('script');
+      s.src = BASE + '/static/' + name;
+      s.onload = next;
+      s.onerror = function () { showFail('拿不到 8750 上的 ' + name); };
+      document.body.appendChild(s);
+    }
+    next();
+  }
+})();
+</script>
+</body>
+</html>
