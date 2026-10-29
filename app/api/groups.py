@@ -19,6 +19,7 @@ log = logging.getLogger("lifeguard.groups")
 
 from ..core.agent_status import clean_prompt, dumps
 from ..core.bubbles import BUBBLES as BUBBLE_IDS, normalize_bubble, store_bubble
+from ..core.outfits import OUTFITS, store_outfit
 from ..auth import current_user, require_member
 from ..config import settings
 from ..db import execute, fetch_all, fetch_one, now
@@ -56,6 +57,7 @@ async def _groups_for(user_id: int) -> list[dict]:
     return await fetch_all(
         """SELECT g.id, g.name, g.owner_id, g.invite_code, g.created_at, g.profile, g.agent_name,
                   g.agent_status, g.agent_user_prompt, g.agent_avatar, g.agent_bubble,
+                  g.agent_outfit,
                   (SELECT COUNT(*) FROM group_members gm2 WHERE gm2.group_id = g.id) AS member_count
            FROM groups g
            JOIN group_members gm ON gm.group_id = g.id
@@ -375,6 +377,10 @@ class UpdateGroupIn(BaseModel):
     #   `update_group` 只要 `require_member` ✓，不是 owner 专属 ✓。
     #   空字符串 / 'plain' = 回默认 ✓（落库存 NULL ✓）。
     agent_bubble: str | None = None
+    # ★ 2026-10-28：**管家的配饰** ✓（群级 ✓、谁都能改 ✓，和气泡同一套规矩 ✓）。
+    #   ⚠️ 只有长相 ✓：不进提示词 ✓（见 `core/outfits.py` 那段 ✓）。
+    #   空字符串 / 'bell' = 回默认 ✓（落库存 NULL ✓）。
+    agent_outfit: str | None = None
 
 
 async def _sync_name_to_shell(request: Request, group_id: int, name: str) -> None:
@@ -468,6 +474,12 @@ async def update_group(
         if v and v not in BUBBLE_IDS:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "没有这个气泡")
         fields.append("agent_bubble = ?"); params.append(store_bubble(v))
+    if body.agent_outfit is not None:
+        # 和气泡同一条规矩 ✓：不认识的就拒 ✓（不悄悄回默认 ✓）。
+        v = body.agent_outfit.strip()
+        if v and v not in OUTFITS:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "没有这个配饰")
+        fields.append("agent_outfit = ?"); params.append(store_outfit(v))
     if not fields:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "没有要修改的内容")
     params.append(group_id)

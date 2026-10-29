@@ -249,11 +249,24 @@
 /* 扇子展开那一下：**从 + 那儿弹出来** ✓（位置由 JS 现算 ✓，这里只管缩放/透明度 ✓） */
 #toolFan.on .tf-item { transform: translate(0, 0) scale(1); opacity: 1; }
 #toolFan .tf-item .tf-obj svg { width: 29px; height: 29px; }
+/* ★ 拖拽时指尖落到哪件 ✓：那件套一圈琥珀色 ✓（2026-10-28 ✓）。
+   ⚠️ 只动 box-shadow / 边框 ✓ **不动 transform** ✓ ——
+   `.tf-obj` 上有一份**内联的 rotate** ✓，样式表里再写 transform 会被内联压掉 ✓，
+   而 `.tf-item` 的 transform 又是展开动画用的 ✓ —— 别抢 ✓。 */
+#toolFan .tf-item.hover .tf-obj {
+  border-color: var(--honey);
+  box-shadow: 0 0 0 2.5px var(--honey), var(--h-shadow);
+}
+#toolFan .tf-item.hover .tf-lbl {
+  background: var(--honey);
+  color: #fff;
+}
 
 /* 图标尺寸：`ico()` 给的是**没有宽高的 svg** ✓ —— 不给尺寸就是浏览器默认的
    300×150 ✗（第一次就是这么炸的 ✓）。新加的三处各自钉死 ✓。 */
 #tray .tray-act .ti svg { width: 21px; height: 21px; }
-#tfItems { position: absolute; inset: 0; z-index: 2; }
+/* touch-action: none ✓ —— 拖拽选时别让 WebView 把这段当成滚/拉 ✓ */
+#tfItems { position: absolute; inset: 0; z-index: 2; touch-action: none; }
 
 /* ═══ ④ 三屏新界面：提醒 / 账本 / 回忆墙 ══════════════════════════════
    ★ 三屏都是 `.screen.ascreen` ✓ —— 从**屋里**推上来 ✓，
@@ -501,6 +514,28 @@
   gap: 16px 14px;
   align-items: start;   /* 卡片**按自己的内容长** ✓；不然同一行会被最高的那张抻齐、留一大片白 ✗ */
 }
+/* ★ 2026-10-28：按月分段 ✓ —— 整行跨两列 ✓，像墙上贴的一条标签 ✓。 */
+.mw-month {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 10px;
+  margin: 6px 2px -2px;
+  font-family: var(--hand);
+  font-size: 14px;
+  letter-spacing: .14em;
+  color: #6b4f33;
+}
+.mw-month::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(150, 110, 65, .38), rgba(150, 110, 65, 0));
+}
+[data-theme="dark"] .mw-month,
+[data-theme="forest"] .mw-month { color: #e6d3b2; }
+[data-theme="dark"] .mw-month::after,
+[data-theme="forest"] .mw-month::after {
+  background: linear-gradient(90deg, rgba(255, 220, 170, .26), rgba(255, 220, 170, 0));
+}
 .mw-card {
   position: relative;
   background: #fffdf6;
@@ -628,6 +663,78 @@
 .bs-fact + .bs-fact { border-top: 1px solid var(--paper-edge, var(--line)); }
 .bs-fact .fk { flex: 1; min-width: 0; color: var(--muted); }
 .bs-fact .fv { color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ★ 2026-10-28：管家面板的三段（它记得 / 它的性子 / 它的身体）✓
+   ⚠️ 小标题是**分段名** ✓，不是"这个页面能干什么"那句说明 ✗
+      （用户定的「不要介绍性文字」说的正是后一种 ✓）。 */
+.bs-sec { margin-top: 20px; }
+.bs-sec-h {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 12px; letter-spacing: .16em;
+  color: var(--muted);
+  font-family: var(--hand);
+  margin: 0 2px 8px;
+}
+.bs-sec-h span { flex: 1; min-width: 0; }
+.bs-sec-a {
+  appearance: none; border: 0; background: none;
+  color: var(--honey-ink); font: inherit;
+  padding: 2px 4px;
+  border-bottom: 1px dashed var(--tape-edge);
+}
+/* 它记得：几句手写的话 ✓（一条一行，左边一个小点 ✓） */
+.bs-rem {
+  background: var(--paper-slip, var(--panel));
+  border: 1px solid var(--paper-edge, var(--line));
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.bs-rem-line {
+  position: relative;
+  padding-left: 14px;
+  font-family: var(--hand);
+  font-size: 14.5px;
+  line-height: 1.9;
+  color: var(--text);
+  word-break: break-word;
+}
+.bs-rem-line::before {
+  content: "";
+  position: absolute; left: 2px; top: .78em;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--tape-edge);
+}
+.bs-rem-line + .bs-rem-line { margin-top: 4px; }
+/* 它的性子：引一段「给管家的话」✓（只读 ✓，改走上面那个「改」✓） */
+.bs-temper {
+  background: var(--paper-slip, var(--panel));
+  border: 1px solid var(--paper-edge, var(--line));
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 13.5px;
+  line-height: 1.8;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.bs-temper.empty { color: var(--muted); font-family: var(--hand); font-size: 14px; }
+/* 它的身体：四枚配饰 ✓（选中的那枚按蜂蜜色 ✓） */
+.bs-wear { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.bs-chip {
+  padding: 11px 2px;
+  border-radius: 12px;
+  background: var(--paper-slip, var(--panel));
+  border: 1px solid var(--paper-edge, var(--line));
+  color: var(--text);
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+.bs-chip.on {
+  background: var(--honey-soft);
+  border-color: var(--tape-edge);
+  color: var(--honey-ink);
+}
+.bs-chip:active { transform: scale(.96); }
 .bs-note {
   margin-top: 12px;
   display: flex; gap: 8px;

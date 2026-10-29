@@ -310,6 +310,7 @@
     }
     group = b.group;
     members = b.members || [];
+    refreshWear();          // 管家配饰（2026-10-28 ✓：跟着群走 ✓，不存本机 ✓）
     renderHeader();
     $('#msgs').innerHTML = '';
     // ★ **先让界面出来，再灌历史消息。**

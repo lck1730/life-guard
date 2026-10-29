@@ -485,6 +485,67 @@
     if (_hapOn) haptic('soft');
   };
 
+  // ── 管家的配饰（2026-10-28，管家面板「它的身体」）──────────────────
+  //
+  // ★ 四样，画在**二狗自己那一份 SVG** 上 ✓（`erdog.svg` ✓，不另画一只 ✗）：
+  //   `bell`（默认，就是原来的红项圈 + 铃铛 ✓）/ `bow` / `scarf` / `wreath`。
+  // ⚠️ 只改**长相** ✓ —— 不进提示词、不落第二份性格 ✓
+  //   （见 `app/core/outfits.py` 那段 ✓）。
+  // ⚠️ 必须作用在**内联进来**的 `<svg>` 上 ✓ —— `<img src=erdog.svg>` 里的
+  //   节点 CSS/DOM 都够不着 ✗（和眼睛那段同一条理由 ✓）。
+  const WEAR_IDS = ['bell', 'bow', 'scarf', 'wreath'];
+  const WEAR_DRAW = {
+    bow: '<g class="eg-wear">' +
+      '<path d="M70 97 L53 88 Q46 97 53 106 Z" fill="#d84a5a" stroke="#b03040" stroke-width="1.6" stroke-linejoin="round"/>' +
+      '<path d="M70 97 L87 88 Q94 97 87 106 Z" fill="#d84a5a" stroke="#b03040" stroke-width="1.6" stroke-linejoin="round"/>' +
+      '<circle cx="70" cy="97" r="5.2" fill="#b8323f"/>' +
+      '<circle cx="70" cy="97" r="2" fill="#e8737f"/>' +
+      '</g>',
+    scarf: '<g class="eg-wear">' +
+      '<path d="M48 90 Q70 104 92 90 L93 100 Q70 113 47 100 Z" fill="#6f8fb5" stroke="#4d6b8f" stroke-width="1.6" stroke-linejoin="round"/>' +
+      '<path d="M56 104 q-5 13 1 23 q7-9 6-21" fill="#7d9dc2" stroke="#4d6b8f" stroke-width="1.6" stroke-linejoin="round"/>' +
+      '<path d="M57 110 q6 2 6 6 M57 118 q6 2 6 6" fill="none" stroke="#4d6b8f" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>' +
+      '</g>',
+    wreath: '<g class="eg-wear">' +
+      '<path d="M49 94 q21 10 42 0" fill="none" stroke="#4f7f4a" stroke-width="6" stroke-linecap="round"/>' +
+      '<g fill="#f6c95c" stroke="#c9931f" stroke-width=".8">' +
+      '<circle cx="54" cy="93" r="3.4"/><circle cx="70" cy="99" r="3.6"/><circle cx="86" cy="93" r="3.4"/>' +
+      '</g>' +
+      '<g fill="#e8737f"><circle cx="54" cy="93" r="1.4"/><circle cx="70" cy="99" r="1.5"/><circle cx="86" cy="93" r="1.4"/></g>' +
+      '<g fill="#6fa05f"><ellipse cx="61" cy="96" rx="3.4" ry="1.7" transform="rotate(-24 61 96)"/>' +
+      '<ellipse cx="79" cy="96" rx="3.4" ry="1.7" transform="rotate(24 79 96)"/></g>' +
+      '</g>',
+  };
+
+  /** 把 `outfit` 戴到某只内联二狗上 ✓（幂等 ✓：先摘掉上一套 ✓）。 */
+  const applyWear = (root, outfit) => {
+    if (!root) return;
+    const svg = root.querySelector ? (root.tagName === 'svg' ? root : root.querySelector('svg')) : null;
+    if (!svg) return;
+    const id = WEAR_IDS.indexOf(outfit) >= 0 ? outfit : 'bell';
+    root.dataset.wear = id;
+    const old = svg.querySelector('.eg-wear');
+    if (old) old.remove();
+    // ⚠️ 项圈+铃铛是**画在底图里**的 ✓ —— 戴别的配饰时要藏起来 ✗，
+    //   不然围巾底下会露出半个金铃铛 ✓（2026-10-28 截图里就是这样 ✓）。
+    const bell = svg.querySelector('.eg-bell');
+    if (bell) bell.style.display = id === 'bell' ? '' : 'none';
+    if (id === 'bell') return;            // 默认那套本来就在 SVG 里 ✓
+    const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    tmp.innerHTML = WEAR_DRAW[id] || '';
+    const g = tmp.firstChild;
+    if (g) svg.appendChild(g);            // 挂最后 = 压在最上面 ✓
+  };
+
+  const wearNow = () => (group && group.agent_outfit) || 'bell';
+  /** 群配置变了（本机保存 / 别人改了广播回来）→ 纸角那只跟着换 ✓。 */
+  const refreshWear = () => {
+    applyWear(ergouEl, wearNow());
+    // 管家面板开着的时候，里面那只也一起换 ✓（它也是内联的 ✓）
+    const bv = document.querySelector('#butlerPanel .bs-av');
+    if (bv && bv.querySelector('svg')) applyWear(bv, wearNow());
+  };
+
   // ── 二狗在纸角（P0 蹦一下 → 2026-10-28 P1 有表情了）────────────────
   //   ★ 眼睛画在 `erdog.svg` 里 ✓ —— `<img>` 里的元素 CSS 够不着 ✗ →
   //     启动时把这个文件**内联**进来 ✓（画只留一份 ✓，不抄第二份 ✗）。
@@ -497,7 +558,10 @@
   if (ergouEl) {
     fetch('/static/erdog.svg').then(r => r.ok ? r.text() : '').then(txt => {
       const i = txt ? txt.indexOf('<svg') : -1;
-      if (i >= 0 && ergouEl.isConnected) ergouEl.innerHTML = txt.slice(i);
+      if (i >= 0 && ergouEl.isConnected) {
+        ergouEl.innerHTML = txt.slice(i);
+        applyWear(ergouEl, wearNow());   // 配饰（`group` 还没下来时就是默认铃铛 ✓）
+      }
     }).catch(() => {});
 
     let moodTimer = 0, blinkTimer = 0, idleTimer = 0;
@@ -989,6 +1053,7 @@
       const g = await api(`/groups/${group.id}`, { method: 'PATCH', body: JSON.stringify(patch) });
       if (g) group = g;                       // 服务端回的就是那一行 ✓，直接用 ✓
       normalizeStatus();
+      refreshWear();                          // 配饰（2026-10-28 ✓：存完纸角那只立刻换 ✓）
       renderHeader(); renderSettings();
       if ($('#agent').classList.contains('on') && !promptEditing) renderAgent();
       if (!quiet) toast('已保存');

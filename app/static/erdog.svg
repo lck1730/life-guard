@@ -82,9 +82,15 @@
   <path d="M 44 78 q -8 -1 -12 -3 M 44 82 q -8 1 -12 4" fill="none" stroke="#9a6a3a" stroke-width="1.2" stroke-linecap="round"/>
   <path d="M 96 78 q 8 -1 12 -3 M 96 82 q 8 1 12 4" fill="none" stroke="#9a6a3a" stroke-width="1.2" stroke-linecap="round"/>
 
-  <!-- 铃铛项圈 -->
-  <path d="M 50 96 q 20 8 40 0" fill="none" stroke="#d83a3a" stroke-width="6" stroke-linecap="round"/>
-  <circle cx="70" cy="100" r="6.5" fill="#ffd34d" stroke="#c9931f" stroke-width="1.6"/>
-  <circle cx="70" cy="98.4" r="1.4" fill="#c9931f"/>
-  <path d="M 70 101 l 0 3.5" stroke="#c9931f" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- 铃铛项圈 ✓
+       ★ 2026-10-28：加了 `class` ✓ —— 管家面板里能换配饰 ✓
+         （蝴蝶结 / 围巾 / 花环 ✓，见 `01-core.js` 的 `applyWear()` ✓）。
+         ⚠️ 换掉的那几样靠 CSS `display:none` 藏 ✓（`<img>` 里的够不着 ✗
+            → 所以聊天里和面板里都是**内联**的 ✓）。 -->
+  <g class="eg-bell">
+    <path class="eg-collar" d="M 50 96 q 20 8 40 0" fill="none" stroke="#d83a3a" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="70" cy="100" r="6.5" fill="#ffd34d" stroke="#c9931f" stroke-width="1.6"/>
+    <circle cx="70" cy="98.4" r="1.4" fill="#c9931f"/>
+    <path d="M 70 101 l 0 3.5" stroke="#c9931f" stroke-width="1.2" stroke-linecap="round"/>
+  </g>
 </svg>

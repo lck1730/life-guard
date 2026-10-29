@@ -773,6 +773,7 @@
         const mineRow = (members || []).find(x => x.id != null && Number(x.id) === Number(me && me.id));
         if (mineRow) me.bubble = normBubble(mineRow.bubble);
         repaintBubbles();
+        refreshWear();      // 配饰（2026-10-28 ✓：别人改了 → 广播 → 纸角那只也换 ✓）
         // ★ 群一刷新就**重算状态配置** ✓ —— 唯一的入口 ✓。
         //   少这一句的后果：在「管家」里存完，状态条要等下次进 App 才变 ✗。
         if (typeof normalizeStatus === 'function') normalizeStatus();

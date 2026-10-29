@@ -13,6 +13,8 @@
 
 from __future__ import annotations
 
+import datetime as _dt
+import json
 import logging
 import time
 
@@ -116,6 +118,20 @@ class ReminderIn(BaseModel):
 async def list_reminders(group_id: int, user: dict = Depends(current_user)) -> dict:
     await require_member(group_id, user["id"])
     rows = await rem.list_for(group_id)
+    # ★ 2026-10-28：补上 `created_at` ✓ —— 今日卡的"今天的小事"要按**今天建的**
+    #   挑出来 ✓，而 `core.reminders.list_for()` 是 agent 也在用的口径 ✓。
+    #   ⚠️ 在这里补、不动那个查询 ✓（和上面 records 那段同一条理由 ✓）。
+    ids = [int(r["id"]) for r in rows if r.get("id") is not None]
+    if ids:
+        born = {
+            int(x["id"]): x["created_at"]
+            for x in await fetch_all(
+                "SELECT id, created_at FROM reminders WHERE id IN ("
+                + ",".join("?" * len(ids)) + ")", tuple(ids))
+        }
+        for r in rows:
+            if r.get("id") is not None:
+                r["created_at"] = born.get(int(r["id"]))
     for r in rows:
         r["when"] = _when(r["fire_at"])
     return {"items": rows}
@@ -144,7 +160,7 @@ async def add_reminder(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "选个时间")
     rid = await rem.add(group_id, text, int(fire_at), repeat_daily=body.repeat_daily)
     row = await fetch_one(
-        "SELECT id, text, fire_at, repeat_daily, enabled, last_fired_at "
+        "SELECT id, text, fire_at, repeat_daily, enabled, last_fired_at, created_at "
         "FROM reminders WHERE id = ?", (rid,))
     if row:
         row["when"] = _when(row["fire_at"])
@@ -253,3 +269,94 @@ async def delete_memory(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "没有这条回忆")
     await execute("DELETE FROM memories WHERE id = ?", (memory_id,))
     return {"ok": True}
+
+
+# ── 管家面板的「它记得」 ──────────────────────────────────────────────
+
+
+@router.get("/{group_id}/digest")
+async def group_digest(group_id: int, user: dict = Depends(current_user)) -> dict:
+    """管家面板「它记得」用的一份摘要 ✓（2026-10-28）。
+
+    ⚠️ **这不是第二套记忆** ✗→✓ —— 一条都不存 ✓，全是**当场数**出来的 ✓：
+      哪天住进来的、收了多少张字条、最后一次记账 / 钉墙是什么 ✓。
+      真正的记忆在 Hermes 的 profile 里 ✓（见 `db.py` 里 `group_memory` 那段 ✓），
+      网页既看不到也不该去读 ✓。这里只把**本 App 自己的数**摆出来 ✓。
+
+    ⚠️ 用户要的「它记得 / 它的性子 / 它的身体」= 数 / 已有的人格那段 / 配饰 ✓。
+      **不另存一份人格** ✗（那是 `groups.agent_user_prompt` 的活儿 ✓）。
+    """
+    await require_member(group_id, user["id"])
+    g = await fetch_one("SELECT id, created_at FROM groups WHERE id = ?", (group_id,))
+    if not g:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "没有这个空间")
+
+    since = int(g["created_at"] or now())
+    # "一起住了几天"按**本地日期**算 ✓ —— 用 86400 整除会让 23:50 和 00:10
+    # 变成"两天" ✓（人不是那么数的 ✓）。
+    d0 = _dt.date.fromtimestamp(since)
+    days = max(1, (_dt.date.today() - d0).days + 1)
+
+    msg = await fetch_one(
+        "SELECT COUNT(*) AS n, MIN(created_at) AS first_at, MAX(created_at) AS last_at "
+        "FROM messages WHERE group_id = ? AND sender_type <> 'system'",
+        (group_id,),
+    )
+    people = await fetch_all(
+        """SELECT u.id, u.nickname AS account_nick, gm.nickname AS group_nick,
+                  gm.role, gm.joined_at
+           FROM group_members gm JOIN users u ON u.id = gm.user_id
+           WHERE gm.group_id = ? ORDER BY gm.joined_at ASC""",
+        (group_id,),
+    )
+    members_out = [{
+        "id": p["id"],
+        "nickname": p["group_nick"] or p["account_nick"] or "",
+        "role": p["role"],
+        "joined_at": p["joined_at"],
+    } for p in people]
+
+    rec = await fetch_one(
+        "SELECT COUNT(*) AS n FROM records "
+        "WHERE group_id = ? AND kind = 'bookkeeping' AND deleted_at IS NULL",
+        (group_id,))
+    rem = await fetch_one(
+        "SELECT COUNT(*) AS n FROM reminders WHERE group_id = ? AND enabled = 1",
+        (group_id,))
+    mem = await fetch_one("SELECT COUNT(*) AS n FROM memories WHERE group_id = ?", (group_id,))
+
+    last_rec = await fetch_one(
+        "SELECT fields, created_at FROM records "
+        "WHERE group_id = ? AND kind = 'bookkeeping' AND deleted_at IS NULL "
+        "ORDER BY id DESC LIMIT 1", (group_id,))
+    if last_rec:
+        try:
+            last_rec["fields"] = json.loads(last_rec["fields"] or "{}")
+        except (ValueError, TypeError):
+            last_rec["fields"] = {}
+    last_mem = await fetch_one(
+        "SELECT text, media_path, msg_type, created_at FROM memories "
+        "WHERE group_id = ? ORDER BY id DESC LIMIT 1", (group_id,))
+    last_msg = await fetch_one(
+        """SELECT m.content, m.msg_type, m.sender_type, m.created_at,
+                  u.nickname AS account_nick
+           FROM messages m LEFT JOIN users u ON u.id = m.sender_id
+           WHERE m.group_id = ? AND m.sender_type <> 'system'
+           ORDER BY m.id DESC LIMIT 1""", (group_id,))
+
+    return {
+        "since": since,
+        "days": days,
+        "messages": int((msg or {}).get("n") or 0),
+        "first_message_at": (msg or {}).get("first_at"),
+        "last_message_at": (msg or {}).get("last_at"),
+        "members": members_out,
+        "counts": {
+            "records": int((rec or {}).get("n") or 0),
+            "reminders": int((rem or {}).get("n") or 0),
+            "memories": int((mem or {}).get("n") or 0),
+        },
+        "last_record": last_rec,
+        "last_memory": last_mem,
+        "last_message": last_msg,
+    }

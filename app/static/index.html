@@ -350,6 +350,13 @@
   <div class="pc-scene" aria-hidden="true"></div>
   <div class="pc-stage">
     <article class="pc-card" id="pcCard" aria-label="今日明信片">
+      <!-- ★ 2026-10-28：**翻面** ✓ —— 正面是管家写的明信片 ✓，
+           背面是"今天的小事"（今天真发生了哪些 ✓）。
+           ⚠️ 两面都摆在 DOM 里 ✓、`.on` 切 `display` ✓；
+              翻的那一下是 `.pc-flip` 的 **2D 横向挤一下** ✓ ——
+              不用 3D `rotateY` ✓（WebView 里和 `drop-shadow` 一起会发虚 ✓）。 -->
+      <div class="pc-flip" id="pcFlipBox">
+      <div class="pc-face on" id="pcFaceFront">
       <div class="pc-sheet">
         <!-- 邮票：撕齿边 + 猫爪 ✓（纯装饰 ✓） -->
         <div class="pc-stamp" aria-hidden="true">
@@ -397,7 +404,24 @@
         <div class="pc-acts">
           <button type="button" class="pc-act" id="pcWrite">写一句</button>
           <button type="button" class="pc-act" id="pcBook">记一笔</button>
+          <button type="button" class="pc-act" id="pcFlip">今天的小事</button>
         </div>
+      </div>
+      </div>
+
+      <!-- 背面：「今天的小事」✓（时间线由 JS 填进 #pcList ✓） -->
+      <div class="pc-face" id="pcFaceBack" aria-hidden="true">
+        <div class="pc-sheet pc-sheet-back">
+          <div class="pc-bhead">
+            <span class="pc-bt">今天的小事</span>
+            <span class="pc-bd" id="pcBackDate"></span>
+          </div>
+          <ul class="pc-list" id="pcList"></ul>
+          <div class="pc-acts">
+            <button type="button" class="pc-act" id="pcFlipBack">翻回正面</button>
+          </div>
+        </div>
+      </div>
       </div>
     </article>
   </div>

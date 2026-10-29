@@ -1054,8 +1054,135 @@
     }
   };
 
+  // ── 今日卡翻面（2026-10-28）：背面 =「今天的小事」────────────────────
+  //
+  // ★ 三路数据：眼前这屏的字条（DOM ✓）+ 今天记的账 / 今天的提醒 / 今天钉的墙
+  //   （公开接口 ✓，就在这个文件下面 ✓）。
+  // ⚠️ 字条只数**这一屏载着的** ✓（往上翻更早的历史不在 DOM 里 ✓）——
+  //   所以一条都没有时说的是"这屏里还没有" ✓，**不是**"今天没有" ✗。
+  // ⚠️ 账的时间用 `created_at` ✓ —— `spent_at` 是管家写账那天 0 点（UTC）
+  //   = 北京 08:00 ✓，拿它排时间线每笔都是 08:00 ✓（账本那段踩过 ✓）。
+  const pcCut = (s, n) => (s.length > n ? s.slice(0, n) + '…' : s);
+
+  const pcMsgEvents = () => {
+    const start = pcDayStart();
+    const out = [];
+    document.querySelectorAll('#msgs .row[data-ts]').forEach(function (r) {
+      const ts = (Number(r.dataset.ts) || 0) * 1000;
+      if (!ts || ts < start) return;
+      const whoEl = r.querySelector('.who');
+      const who = whoEl ? (whoEl.textContent || '').trim() : '';
+      const b = r.querySelector('.bubble');
+      let what = '';
+      if (b) {
+        if (b.classList.contains('photo')) what = '发了一张照片';
+        else if (b.classList.contains('sticker')) what = '发了一个表情';
+        else if (b.classList.contains('voice-note')) what = '发了一条语音';
+        else if (b.classList.contains('file-note')) what = '发了一份文件';
+        else if (b.classList.contains('media')) what = '发了一份附件';
+        else what = (b.textContent || '').replace(/\s+/g, ' ').trim();
+      }
+      out.push({ ts: ts, text: (who ? who + '：' : '') + (what || '…') });
+    });
+    return out;
+  };
+
+  const renderTodayBack = async () => {
+    const list = $('#pcList');
+    if (!list) return;
+    const d = new Date();
+    const bd = $('#pcBackDate');
+    if (bd) bd.textContent = (d.getMonth() + 1) + '月' + d.getDate() + '日 · 周' +
+      '日一二三四五六'[d.getDay()];
+    list.innerHTML = '';
+    list.appendChild(mkel('li', 'pc-li pc-li-empty', '…'));
+
+    const events = pcMsgEvents();
+    const today0 = h0();
+    try {
+      const r = await Promise.all([
+        api(`/groups/${group.id}/records?kind=bookkeeping&limit=300`)
+          .catch(function () { return null; }),
+        api(`/groups/${group.id}/reminders`)
+          .catch(function () { return null; }),
+        api(`/groups/${group.id}/memories?limit=200`)
+          .catch(function () { return null; }),
+      ]);
+      const recs = r[0], rems = r[1], mems = r[2];
+      ((recs && recs.items) || []).forEach(function (it) {
+        if (!it.created_at || hDay(it.created_at) !== today0) return;
+        const f = it.fields || {};
+        const note = String(f.note || f.category || '一笔账');
+        const amt = (Number(f.amount) < 0 ? '+' : '') + hMoney(f.amount);
+        events.push({ ts: it.created_at * 1000,
+                      text: '记了一笔 · ' + pcCut(note, 18) + ' ' + amt });
+      });
+      ((rems && rems.items) || []).forEach(function (it) {
+        if (!it.fire_at || hDay(it.fire_at) !== today0) return;
+        const when = hHM(it.fire_at);
+        events.push({ ts: it.fire_at * 1000,
+                      text: '提醒 · ' + when + ' ' + pcCut(String(it.text || ''), 22) });
+      });
+      ((mems && mems.items) || []).forEach(function (it) {
+        if (!it.created_at || hDay(it.created_at) !== today0) return;
+        const t = String(it.text || '').trim();
+        events.push({ ts: it.created_at * 1000,
+                      text: '钉上墙 · ' + (t ? '「' + pcCut(t, 18) + '」' : '一张照片') });
+      });
+    } catch (e) { /* 接口没回来就只列字条 ✓ —— 别让整面翻不过来 ✗ */ }
+
+    events.sort(function (a, b) { return a.ts - b.ts; });
+    list.innerHTML = '';
+    if (!events.length) {
+      list.appendChild(mkel('li', 'pc-li pc-li-empty', '这屏里还没有小事。窗台上的光很好。'));
+      return;
+    }
+    events.forEach(function (e) {
+      const li = mkel('li', 'pc-li');
+      li.appendChild(mkel('span', 'pc-lt', pcHHMM(e.ts)));
+      li.appendChild(mkel('span', 'pc-lx', e.text));
+      list.appendChild(li);
+    });
+  };
+
+  let pcFlipT = 0;
+  const pcShowFace = (back) => {
+    const front = $('#pcFaceFront'), b = $('#pcFaceBack');
+    if (!front || !b) return;
+    front.classList.toggle('on', !back);
+    b.classList.toggle('on', back);
+    front.setAttribute('aria-hidden', back ? 'true' : 'false');
+    b.setAttribute('aria-hidden', back ? 'false' : 'true');
+  };
+  /** 翻面 ✓ —— 中点换那面 ✓（2D 横向挤一下 ✓，不用 3D ✓）。 */
+  const pcFlipTo = (back) => {
+    const box = $('#pcFlipBox');
+    if (!box) return;
+    const nowBack = box.dataset.face === 'back';
+    if (nowBack === !!back) return;
+    box.dataset.face = back ? 'back' : 'front';
+    if (back) renderTodayBack();
+    const reduce = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { pcShowFace(back); return; }
+    clearTimeout(pcFlipT);
+    box.classList.add('flipping');
+    pcFlipT = setTimeout(function () { pcShowFace(back); }, 190);
+    setTimeout(function () { box.classList.remove('flipping'); }, 460);
+  };
+
   const openToday = () => {
     renderToday();            // ⚠️ 每次开都现数 ✓ —— 字条是刚才才落的 ✓
+    // 每次开都是**正面** ✓（留着上次翻到背面的状态会让人以为纸没换 ✓）
+    // ⚠️ 先掐掉可能还挂着的换面定时器 ✓ —— 翻到一半就退出去的话 ✓，
+    //   它会晚 190ms 把背面推出来 ✓（下一次打开就成了背面 ✓）。
+    clearTimeout(pcFlipT);
+    const box = $('#pcFlipBox');
+    if (box && box.dataset.face === 'back') {
+      box.dataset.face = 'front';
+      box.classList.remove('flipping');
+      pcShowFace(false);
+    }
     pushScreen('today');
     _syncStatusBar();         // 纸也是浅色 ✓ → 深色状态栏图标 ✓
   };
@@ -1087,6 +1214,8 @@
 
   if ($('#pcWrite')) $('#pcWrite').addEventListener('click', pcWrite);
   if ($('#pcBook')) $('#pcBook').addEventListener('click', pcBook);
+  if ($('#pcFlip')) $('#pcFlip').addEventListener('click', function () { pcFlipTo(true); });
+  if ($('#pcFlipBack')) $('#pcFlipBack').addEventListener('click', function () { pcFlipTo(false); });
 
   // ══ 纸上小屋 · P2：提醒 / 账本 / 回忆墙 / 文具托盘 / 工具扇 / 管家面板 ══
   //
@@ -1415,7 +1544,23 @@
       return;
     }
     const grid = mkel('div', 'mw-grid');
+    // ★ 2026-10-28：**按月分段** ✓ —— 接口是 id 倒序 ✓（= 时间倒序 ✓），
+    //   所以月份只会往下走 ✓；一跨月就插一行月份 ✓（整行跨两列 ✓）。
+    //   ⚠️ 不在这一层排序 ✗ —— 存的行本来就是钉墙的先后 ✓，重排只会打乱同月里
+    //      "最近钉的在最上面" ✓。
+    let lastMonth = '';
+    const curYear = new Date().getFullYear();
     memoryRows.forEach(function (m, i) {
+      if (m.created_at) {
+        const d = new Date(m.created_at * 1000);
+        const key = d.getFullYear() + '-' + d.getMonth();
+        if (key !== lastMonth) {
+          lastMonth = key;
+          const label = (d.getFullYear() === curYear ? '' : d.getFullYear() + ' 年 ') +
+            (d.getMonth() + 1) + ' 月';
+          grid.appendChild(mkel('div', 'mw-month', label));
+        }
+      }
       const card = mkel('div', 'mw-card');
       card.style.setProperty('--tilt', MW_TILTS[i % MW_TILTS.length]);
       card.style.setProperty('--tape-tilt', (i % 2 ? '2deg' : '-2deg'));
@@ -1557,7 +1702,89 @@
   const closeToolFan = function () {
     const f = $('#toolFan');
     if (f) f.classList.remove('on');
+    fanMark(null);
   };
+
+  // ★ 2026-10-28：**拖拽选** ✓（原来只能点 ✓）——
+  //   按住一件往外拖 ✓，指尖落在哪件就近高亮哪件 ✓，松手就选它 ✓。
+  //   ⚠️ 点一下照旧能用 ✓：pointerup 时没动过 = 点了原来那件 ✓；
+  //      之后那个 click 事件用 `fanGuard` 吞掉 ✓（不然会选两次 ✓）。
+  //   ⚠️ 位置一律现算 ✓（每件的 rect ✓）—— 扇面是整体平移过的 ✓，
+  //      不能用公式里的圆心反推 ✓。
+  let fanItems = [];
+  let fanDrag = null;
+  let fanGuard = 0;
+
+  const fanHit = function (x, y) {
+    const box = $('#tfItems');
+    if (!box) return null;
+    let best = null, bestD = 0;
+    box.querySelectorAll('.tf-item').forEach(function (el) {
+      const r = el.getBoundingClientRect();
+      const dx = x - (r.left + r.width / 2);
+      const dy = y - (r.top + r.height / 2);
+      const d = dx * dx + dy * dy;
+      if (!best || d < bestD) { best = el; bestD = d; }
+    });
+    // 半径 80px 以内才算"指着它" ✓（一件是 76×94 ✓）—— 再远就是松手取消 ✓
+    return bestD <= 80 * 80 ? best : null;
+  };
+
+  const fanMark = function (el) {
+    const box = $('#tfItems');
+    if (!box) return;
+    box.querySelectorAll('.tf-item.hover').forEach(function (n) {
+      if (n !== el) n.classList.remove('hover');
+    });
+    if (el && !el.classList.contains('hover')) el.classList.add('hover');
+  };
+
+  const fanFire = function (el) {
+    if (!el) return;
+    const t = fanItems[Number(el.dataset.i)];
+    if (!t) return;
+    fanMark(null);
+    fanGuard = Date.now() + 350;
+    t.fn();
+  };
+
+  // 拖拽的手势只挂一次 ✓（每次开扇面只换里面的卡片 ✓）
+  if ($('#tfItems') && !$('#tfItems').dataset.drag) {
+    const fbox = $('#tfItems');
+    fbox.dataset.drag = '1';
+    fbox.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const el = e.target.closest ? e.target.closest('.tf-item') : null;
+      if (!el) return;
+      fanDrag = { id: e.pointerId, el: el, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, moved: false };
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    fbox.addEventListener('pointermove', function (e) {
+      const d = fanDrag;
+      if (!d || d.id !== e.pointerId) return;
+      d.x = e.clientX;
+      d.y = e.clientY;
+      if (!d.moved) {
+        const dx = d.x - d.x0, dy = d.y - d.y0;
+        if (dx * dx + dy * dy < 64) return;   // 8px 以内还算"点" ✓
+        d.moved = true;
+      }
+      fanMark(fanHit(d.x, d.y));
+      if (e.cancelable) e.preventDefault();
+    });
+    const fanEnd = function (e) {
+      const d = fanDrag;
+      if (!d || d.id !== e.pointerId) return;
+      fanDrag = null;
+      const target = d.moved ? fanHit(e.clientX, e.clientY) : d.el;
+      if (!target) { fanMark(null); return; }   // 拖出去松手 = 不选 ✓
+      fanFire(target);
+    };
+    fbox.addEventListener('pointerup', fanEnd);
+    fbox.addEventListener('pointercancel', function (e) {
+      if (fanDrag && fanDrag.id === e.pointerId) { fanDrag = null; fanMark(null); }
+    });
+  }
 
   const openToolFan = function () {
     const btn = $('#pickMedia');
@@ -1605,6 +1832,7 @@
     const dx2 = Math.max(0, 44 - Math.min.apply(null, P.map(p => p.x)));
     const dy = Math.min(0, (vh - 108) - Math.max.apply(null, P.map(p => p.y)));
     P = P.map(function (p) { return { x: p.x + dx + dx2, y: p.y + dy }; });
+    fanItems = T;
     T.forEach(function (t, i) {
       const { x, y } = P[i];
       const el = mkel('button', 'tf-item');
@@ -1617,7 +1845,13 @@
       obj.appendChild(ico(t.ico));
       obj.style.transform = 'rotate(' + t.tilt + 'deg)';
       el.append(obj, mkel('span', 'tf-lbl', t.lbl));
-      el.onclick = t.fn;
+      el.dataset.i = String(i);
+      // 键盘（回车/空格）也会走这里 ✓；手指/鼠标那一路由 pointerup 负责 ✓，
+      // 随后合成出来的 click 用 fanGuard 吞掉 ✓
+      el.onclick = function () {
+        if (Date.now() < fanGuard) return;
+        t.fn();
+      };
       box.appendChild(el);
     });
     haptic('soft');
@@ -1638,23 +1872,55 @@
     if (b) b.classList.remove('on');
   };
 
-  const loadButlerFacts = async function () {
-    const box = $('#bsFacts');
+  // ★ 2026-10-28：三段（它记得 / 它的性子 / 它的身体）之后，数也改成
+  //   **一趟 `/digest`** 拿齐 ✓ —— 原来是三趟列表接口 ✓（还各要限 1000 条 ✓）。
+  //   ⚠️ 它记得**不是第二套记忆** ✓：一条都不存 ✓，全是当场数出来的 ✓
+  //      （真记忆在 Hermes 的 profile 里 ✓，网页看不到也不该看 ✓）。
+  const setFact = function (k, v) {
+    const el = document.querySelector('#bsFacts [data-fk="' + k + '"]');
+    if (el) el.textContent = v;
+  };
+
+  const renderRemember = function (g) {
+    const box = $('#bsRemember');
     if (!box) return;
-    const set = function (k, v) {
-      const el = box.querySelector('[data-fk="' + k + '"]');
-      if (el) el.textContent = v;
-    };
-    set('mb', (members || []).length + ' 人');
-    const d = await Promise.all([
-      api(`/groups/${group.id}/records?kind=bookkeeping&limit=1000`).catch(function () { return null; }),
-      api(`/groups/${group.id}/reminders`).catch(function () { return null; }),
-      api(`/groups/${group.id}/memories?limit=500`).catch(function () { return null; }),
-    ]);
-    const recs = d[0], rems = d[1], mems = d[2];
-    set('rec', recs ? (String(recs.count != null ? recs.count : (recs.items || []).length) + ' 笔') : '—');
-    set('rem', rems ? (String(((rems.items || []).filter(function (x) { return x.enabled; })).length) + ' 条') : '—');
-    set('mem', mems ? (String((mems.items || []).length) + ' 张') : '—');
+    box.innerHTML = '';
+    if (!g) { box.appendChild(mkel('div', 'bs-rem-line', '没数上来。')); return; }
+    const L = ['一起住了 ' + g.days + ' 天'];
+    const c = g.counts || {};
+    if (g.messages) L.push('收着 ' + g.messages + ' 张字条');
+    if (g.first_message_at)
+      L.push('第一句在 ' + hDayLabel(g.first_message_at) + ' ' + hHM(g.first_message_at));
+    const lr = g.last_record;
+    if (lr && lr.fields) {
+      const f = lr.fields;
+      const note = String(f.note || f.category || '一笔账');
+      const head = note.length > 16 ? note.slice(0, 16) + '…' : note;
+      L.push('最近记了「' + head + '」' + (Number(f.amount) < 0 ? '+' : '') + hMoney(f.amount));
+    }
+    const lm = g.last_memory;
+    if (lm) {
+      const t = String(lm.text || '').trim();
+      L.push(t
+        ? '墙上最新一句：「' + (t.length > 16 ? t.slice(0, 16) + '…' : t) + '」'
+        : '墙上最新一张是照片');
+    }
+    if (!g.messages && !(c.memories || 0)) L.push('还什么都没收着呢。');
+    L.forEach(function (t) { box.appendChild(mkel('div', 'bs-rem-line', t)); });
+  };
+
+  const loadButlerFacts = async function () {
+    setFact('mb', (members || []).length + ' 人');
+    const g = await api(`/groups/${group.id}/digest`).catch(function () { return null; });
+    if (g) {
+      const c = g.counts || {};
+      setFact('rec', String(c.records || 0) + ' 笔');
+      setFact('rem', String(c.reminders || 0) + ' 条');
+      setFact('mem', String(c.memories || 0) + ' 张');
+    } else {
+      setFact('rec', '—'); setFact('rem', '—'); setFact('mem', '—');
+    }
+    renderRemember(g);
   };
 
   const openButler = function () {
@@ -1668,6 +1934,15 @@
     im.src = '/static/erdog.svg';
     im.alt = '';
     av.appendChild(im);
+    // 内联一份 → 戴得上配饰 ✓（`<img>` 里的节点够不着 ✓，和纸角那只同一个道理 ✓）
+    fetch('/static/erdog.svg').then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (txt) {
+        const i = txt ? txt.indexOf('<svg') : -1;
+        if (i >= 0 && av.isConnected) {
+          av.innerHTML = txt.slice(i);
+          applyWear(av, wearNow());
+        }
+      }).catch(function () {});
     const who = mkel('div', 'bs-who');
     who.appendChild(mkel('div', 'n', agentName()));
     who.appendChild(mkel('div', 's', (group && group.name) || ''));
@@ -1714,6 +1989,70 @@
       facts.appendChild(r);
     });
     p.appendChild(facts);
+
+    // ── 它记得（2026-10-28）─────────────────────────────────────────────
+    // ⚠️ **不是第二套记忆** ✓ —— 一条都不存 ✓，全是 `/digest` 当场数出来的 ✓
+    //    （真记忆在 Hermes 的 profile 里 ✓，网页看不到也不该看 ✓）。
+    const remember = mkel('div', 'bs-sec');
+    remember.appendChild(mkel('div', 'bs-sec-h', '它记得'));
+    const rem = mkel('div', 'bs-rem');
+    rem.id = 'bsRemember';
+    rem.appendChild(mkel('div', 'bs-rem-line', '…'));
+    remember.appendChild(rem);
+    p.appendChild(remember);
+
+    // ── 它的性子（2026-10-28）──────────────────────────────────────────
+    // ⚠️ **只读一份** ✓ —— 就是「管家设置 → 给管家的话」那段 ✓
+    //    （`groups.agent_user_prompt` ✓）。**不另存一份、不加三档转盘** ✗：
+    //    那是同一个信息两处 ✓（这个项目栽过好几次 ✓）。
+    const temper = mkel('div', 'bs-sec');
+    const th = mkel('div', 'bs-sec-h');
+    th.appendChild(mkel('span', null, '它的性子'));
+    const tedit = mkel('button', 'bs-sec-a', '改');
+    tedit.type = 'button';
+    tedit.onclick = function () { closeButler(); openAgentSettings(); };
+    th.appendChild(tedit);
+    temper.appendChild(th);
+    const tp = String((group && group.agent_user_prompt) || '').trim();
+    const tq = mkel('div', 'bs-temper',
+      tp ? (tp.length > 96 ? tp.slice(0, 96) + '…' : tp) : '还没设过 —— 按默认的来。');
+    if (!tp) tq.classList.add('empty');
+    temper.appendChild(tq);
+    p.appendChild(temper);
+
+    // ── 它的身体（2026-10-28）──────────────────────────────────────────
+    // ⚠️ 配饰**只管长相** ✓：不进提示词、不进记忆 ✓（见 `core/outfits.py` ✓）。
+    //    群里谁都能改 ✓（和管家气泡同一套规矩 ✓）。
+    const bodySec = mkel('div', 'bs-sec');
+    bodySec.appendChild(mkel('div', 'bs-sec-h', '它的身体'));
+    const chips = mkel('div', 'bs-wear');
+    bodySec.appendChild(chips);
+    const WEAR = [
+      { id: 'bell', lbl: '铃铛' },
+      { id: 'bow', lbl: '蝴蝶结' },
+      { id: 'scarf', lbl: '围巾' },
+      { id: 'wreath', lbl: '花环' },
+    ];
+    const renderWear = function () {
+      chips.innerHTML = '';
+      WEAR.forEach(function (w) {
+        const b = mkel('button', 'bs-chip' + (wearNow() === w.id ? ' on' : ''), w.lbl);
+        b.type = 'button';
+        b.onclick = async function () {
+          if (wearNow() === w.id) return;
+          // 先换上让人看见 ✓（服务端回来再按那份校正 ✓ —— 被拒了就自己退回去 ✓）
+          applyWear($('#ergou'), w.id);
+          applyWear(document.querySelector('#butlerPanel .bs-av'), w.id);
+          await patchGroup({ agent_outfit: w.id }, true);
+          refreshWear();
+          renderWear();
+          haptic('soft');
+        };
+        chips.appendChild(b);
+      });
+    };
+    renderWear();
+    p.appendChild(bodySec);
 
     haptic('soft');
     $('#butler').classList.add('on');
