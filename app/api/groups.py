@@ -28,6 +28,8 @@ from ..core.messages import (
     agent_name_for,
     broadcast_group_update,
     create_message,
+    erase_message,
+    get_message,
     list_messages,
 )
 
@@ -799,3 +801,38 @@ async def send_message(
 
     schedule(msg)
     return msg
+
+
+@router.delete("/{group_id}/messages/{message_id}")
+async def erase(
+    group_id: int,
+    message_id: int,
+    user: dict = Depends(current_user),
+) -> dict:
+    """擦掉**自己写的**一条消息 ✓（2026-10-29）。
+
+    ★ 为什么是软删除、而不是把行删了：
+      · 引用条 / 日期胶带要靠这一行**占位** ✓ —— 真删了，下面整页会往上跳 ✓；
+      · 另一个人该**看得见**"这行不在了" ✓ —— 一句话无声消失 ✗，
+        对方只会以为漏了消息、或者网络坏了 ✓。
+      正文和附件路径**一并清空** ✓（见 `core/messages.erase_message` ✓）。
+
+    ⚠️ **只能擦自己的** ✓ —— 别人的话不归这只手管 ✓（情侣之间也一样 ✓）。
+       管家的发言也不能擦 ✗：那些是两个人共同的记录 ✓，
+       要收起来用「钉上墙 / 记一笔」那几样 ✓。
+    ⚠️ **幂等** ✓ —— 两边同时擦（或者重发一次请求）不会报错 ✓，
+       已经擦过的直接回那一条 ✓。
+    """
+    await require_member(group_id, user["id"])
+    row = await fetch_one(
+        "SELECT id, sender_id, sender_type, deleted_at FROM messages "
+        "WHERE id = ? AND group_id = ?",
+        (message_id, group_id),
+    )
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "没有这条消息")
+    if row["sender_type"] != "user" or row["sender_id"] != user["id"]:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "只能擦掉自己写的那行")
+    if row["deleted_at"]:
+        return await get_message(message_id) or {}
+    return await erase_message(group_id, message_id, user["id"])

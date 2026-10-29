@@ -353,7 +353,7 @@ class ImageIn(BaseModel):
 async def image_path(body: ImageIn) -> dict:
     await _assert_group(body.group_id)
     row = await fetch_one(
-        """SELECT m.id, m.msg_type, m.media_path, m.created_at,
+        """SELECT m.id, m.msg_type, m.media_path, m.created_at, m.deleted_at,
                   COALESCE(gm.nickname, u.nickname) AS sender_nickname
            FROM messages m
            LEFT JOIN users u ON u.id = m.sender_id
@@ -364,6 +364,10 @@ async def image_path(body: ImageIn) -> dict:
     )
     if not row:
         return {"ok": False, "error": f"这个群里没有 id={body.message_id} 的消息"}
+    # ★ 2026-10-29：被擦掉的那行**它不是图片了** ✓ —— 别回一句
+    #   "#123 是一条 image 消息，不是图片" ✗（它自己看着都糊涂 ✓）。
+    if row["deleted_at"]:
+        return {"ok": False, "error": f"#{body.message_id} 已经被擦掉了"}
     if row["msg_type"] != "image" or not row["media_path"]:
         return {"ok": False,
                 "error": f"#{body.message_id} 是一条 {row['msg_type']} 消息，不是图片"}

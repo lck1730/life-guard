@@ -577,6 +577,24 @@
   .quote .qtext { color:var(--muted); white-space:nowrap; overflow:hidden;
                   text-overflow:ellipsis; }
   /* 点了引用条跳到原消息时闪一下，否则用户不知道跳到哪了 */
+  /* ★ 2026-10-29：**擦痕** —— 被「擦掉」的那一行 ✓。
+     ⚠️ 不是气泡、也不是系统提示 ✓：一句小灰字，两边两道浅虚线 ✓，
+        像纸上一块被橡皮擦过的地方 ✓。
+     ⚠️ 行**留在原位** ✓（引用条 / 日期胶带靠它占位 ✓，另一个人也要看得见 ✓）。 */
+  .row.gone { display:block; max-width:100%; width:100%; margin:2px 0; }
+  .row.gone .gone-line {
+    display:flex; align-items:center; justify-content:center; gap:7px;
+    padding:4px 8px; color:var(--muted); opacity:.8;
+    font-size:12px; letter-spacing:.4px;
+  }
+  .row.gone .gone-line .gi { width:14px; height:14px; flex-shrink:0; }
+  .row.gone .gone-line::before, .row.gone .gone-line::after {
+    content:''; height:0; flex:0 1 44px; border-top:1px dashed var(--line);
+  }
+  /* 引用条指到一条**被擦掉**的消息 ✓ —— 框虚掉，话说清楚 ✓。 */
+  .quote.quote-gone { background:transparent; border:1px dashed var(--line); }
+  .quote.quote-gone .qwho { color:var(--muted); }
+  .quote.quote-gone .qtext { opacity:.8; }
   .row.flash .bubble { animation:qflash 1.1s ease-out; }
   @keyframes qflash { 0%,100% { box-shadow:none }
                       25% { box-shadow:0 0 0 3px var(--accent); } }

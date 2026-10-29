@@ -261,6 +261,9 @@
 
   const quoteWho = m => m.sender_type === 'agent' ? agentName() : (dispName(m) || '某人');
   const quoteText = m => {
+    // ★ 2026-10-29：被擦掉的那行只有一个说法 ✓ —— 别再说"[图片]" ✓
+    //   （正文已经没了 ✓，说有个图片会让人去找一张不存在的图 ✗）。
+    if (m.deleted) return '（这行被擦掉了）';
     if (m.msg_type === 'image') return '[图片]';
     if (m.msg_type === 'sticker') return '[表情] ' + (stickerName(m) || '');
     if (m.msg_type === 'voice') return '[语音] ' + (m.content || '');
@@ -294,11 +297,14 @@
   /** 气泡里那块引用条 */
   const buildQuoteEl = (q) => {
     const el = document.createElement('div');
-    el.className = 'quote';
+    // ★ 2026-10-29：引用的那条**被擦掉了** ✓ —— 引用条跟着变成一句"擦掉了" ✓。
+    //   ⚠️ 记下 `qid` ✓：擦除是**后来的**事 ✓，得能回头找到在屏上的这几条 ✓。
+    el.className = 'quote' + (q.deleted ? ' quote-gone' : '');
+    el.dataset.qid = q.id;
     const who = document.createElement('div'); who.className = 'qwho';
     who.textContent = quoteWho(q);
     const tx = document.createElement('div'); tx.className = 'qtext';
-    tx.textContent = q.content || '';
+    tx.textContent = q.deleted ? '（这行被擦掉了）' : (q.content || '');
     el.append(who, tx);
     el.onclick = (ev) => {
       ev.stopPropagation();
@@ -319,6 +325,14 @@
   const addMsg = (m, prepend) => {
     if ($('#msgs').querySelector(`[data-id="${m.id}"]`)) return;
     if (!prepend) clearStream();
+    // ★ 2026-10-29：**擦掉的那行** ✓ —— 不画气泡，画一道擦痕 ✓（见 `paintGone` ✓）。
+    if (m.deleted) {
+      _msgs.set(m.id, m);
+      const gone = paintGone(m);
+      if (prepend) $('#msgs').prepend(gone);
+      else { $('#msgs').appendChild(gone); tapeBefore(gone, m.created_at); scrollDown(); }
+      return;
+    }
     // 系统提示：目前只有"被点名了却没能回复"这种故障通告。
     // 渲染成居中的灰字条，**和普通消息长得完全不一样**——就是怕它被当成
     // 管家说的一句话，那样故障会被无声地消费掉（和那次提醒事故一个道理：
@@ -487,6 +501,45 @@
     _fire('message', m, row);   // agent 的 ui/app.js 可以给这一条挂东西
   };
 
+  // ── 擦掉的那一行（2026-10-29）──────────────────────────────────────
+  //
+  // ★ 擦掉 = **留一道擦痕** ✓，不是让那句话无声消失 ✓。行**留在原位** ✓：
+  //   · 引用条 / 日期胶带靠它占位 ✓ —— 抽掉整行下面会整页往上跳 ✗；
+  //   · 另一个人得**看得见**"这行不在了" ✓ —— 否则他会以为自己漏看了 / 网断了 ✗。
+  //   正文和附件路径在库里已经清空 ✓（见 `core/messages.py` 的 `erase_message` ✓），
+  //   这儿画的只是一句"这里曾经有一行" ✓。
+  const paintGone = (m) => {
+    const row = document.createElement('div');
+    row.className = 'row gone';
+    row.dataset.id = m.id;
+    row.dataset.ts = m.created_at;          // 日期胶带照样认它 ✓
+    const line = mkel('div', 'gone-line');
+    line.appendChild(ico('eraser', 'gi'));
+    line.appendChild(document.createTextNode('这行被擦掉了'));
+    row.appendChild(line);
+    return row;
+  };
+
+  /** 把一条**已经在屏上**的消息原地换成擦痕 ✓（自己擦的 / WS 推来的 / 重连补的 ✓）。 */
+  const eraseRowLocal = (m) => {
+    if (!m || m.id == null) return;
+    const old = $('#msgs').querySelector(`[data-id="${m.id}"]`);
+    if (old) old.replaceWith(paintGone(m));
+    // `_msgs` 换成擦掉后的那一份 ✓ —— 右滑引用 / 长按 @ 都从这儿取 ✓。
+    _msgs.set(m.id, m);
+    // 输入框上正挂着它当引用 → 引用条也得改 ✓（不然还显示原来那句话 ✗）
+    if (pendingQuote && pendingQuote.id === m.id) {
+      pendingQuote = m;
+      $('#qtext').textContent = quoteText(m);
+    }
+    // 别人回复里引用着它 → 那几条引用条一起换 ✓（见 `buildQuoteEl` 的 `qid` ✓）
+    $$(`#msgs .quote[data-qid="${m.id}"]`).forEach(q => {
+      q.classList.add('quote-gone');
+      const tx = q.querySelector('.qtext');
+      if (tx) tx.textContent = '（这行被擦掉了）';
+    });
+  };
+
   // ── 往回翻历史 ─────────────────────────────────────────────────────
   //
   // 首屏只装**最近 50 条**。以前是 200 条、80KB ✗ —— 群里消息只会越来越多，
@@ -625,6 +678,9 @@
     if (!e.target.closest) return;
     const row = e.target.closest('#msgs .row[data-id]');
     if (!row) return;
+    // ★ 2026-10-29：擦痕**不长按** ✓ —— 它上面没有气泡 / 头像 ✓，
+    //   弹出"引用 / 钉到墙上"那套只会给出一堆对空白的动作 ✗。
+    if (row.classList.contains('gone')) return;
     cancelPress();
     pressFired = false;
     const onAvatar = !!e.target.closest('.av');
@@ -783,9 +839,18 @@
         const st = (d.agent_status || {})[String(group && group.id)];
         if (st) setStatusTimed(st);        // 重连补状态：文字自己从配置挑 ✓
         syncMissed();
+        syncGone();                        // ★ 断线期间被擦掉的 ✓（见下 ✓）
         return;
       }
       if (pkt.type === 'message') { if (d.group_id === group.id) addMsg(d); }
+      // ★ 2026-10-29：有人擦掉了一行 ✓ —— 在屏上的原地换掉 ✓。
+      //   ⚠️ 已经是擦痕就不再动 ✓ —— 自己擦的那一下，HTTP 已经画过了 ✓，
+      //     这条广播随后会再到一次 ✓（幂等 ✓）。
+      else if (pkt.type === 'message_deleted') {
+        if (d.group_id !== group.id) return;
+        const row = $('#msgs').querySelector(`[data-id="${d.id}"]`);
+        if (!row || !row.classList.contains('gone')) eraseRowLocal(d);
+      }
       // ★ `d.text` 要带上 ✗→✓ —— 服务端**已经挑好了**那一句 ✓
       //   （思考中/不打算说话是随机挑的 ✓）。丢了它就等于白挑 ✓。
       else if (pkt.type === 'agent_status') { if (d.group_id === group.id) setStatusTimed(d.state, d.text); }
@@ -807,6 +872,25 @@
       const msgs = await api(`/groups/${group.id}/messages?after=${last}&limit=200`);
       // 同样要包一层：不包的话 forEach 会把下标传进来当 `prepend` ✗（见首屏那段的说明）
       msgs.forEach(m => addMsg(m));
+    } catch {}
+  };
+
+  /** ★ 2026-10-29：断线期间的**擦除**单独补 ✓。
+   *
+   *  ⚠️ `syncMissed` 补不到它 ✗ —— 那条按 id **递增**捞 ✓，只看得见"新到的" ✓；
+   *     擦掉是**改**一条旧行 ✓（id 不变 ✓），永远落在那个窗口外面 ✓。
+   *     所以重连后另拉最近一屏 ✓，只挑"现在已经是擦痕"的原地换掉 ✓。
+   *     ⚠️ 只换、不新增 ✓ —— 历史交给 `loadOlder` ✓（这儿顺手补消息会打乱首次加载 ✓）。
+   */
+  const syncGone = async () => {
+    if (!group) return;
+    try {
+      const msgs = await api(`/groups/${group.id}/messages?limit=80`);
+      msgs.forEach(m => {
+        if (!m.deleted) return;
+        const row = $('#msgs').querySelector(`[data-id="${m.id}"]`);
+        if (row && !row.classList.contains('gone')) eraseRowLocal(m);
+      });
     } catch {}
   };
 

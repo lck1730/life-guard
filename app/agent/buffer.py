@@ -66,5 +66,24 @@ async def consume_upto(group_id: int, max_message_id: int) -> int:
     return n
 
 
+async def drop(group_id: int, message_id: int) -> None:
+    """从缓冲里拿掉**一条**（被擦掉的那条 ✓，2026-10-29）。
+
+    ⚠️ **只动这一条** ✓ —— 别拿 `clear` 凑 ✓：缓冲里别的消息还等着
+       这一轮的上下文 ✓，清空等于把它前因后果一起吞了 ✓。
+    缓冲里没有就算了 ✓（多半已经 `drain` 走 ✓ —— 那部分擦不掉，
+    它已经看过了 ✓）。
+    """
+    dq = _buffers.get(group_id)
+    if not dq:
+        return
+    for item in list(dq):
+        if int(item.get("id") or 0) == int(message_id):
+            try:
+                dq.remove(item)
+            except ValueError:          # 期间被别处拿走了 ✓ —— 没事 ✓
+                pass
+
+
 async def clear(group_id: int) -> None:
     _buffers.pop(group_id, None)

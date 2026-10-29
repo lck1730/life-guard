@@ -214,13 +214,18 @@ async def add_memory(
     if body.message_id:
         row = await fetch_one(
             """SELECT m.id, m.msg_type, m.content, m.media_path, m.media_meta,
-                      m.sender_type, u.nickname
+                      m.sender_type, m.deleted_at, u.nickname
                FROM messages m LEFT JOIN users u ON u.id = m.sender_id
                WHERE m.id = ? AND m.group_id = ?""",
             (int(body.message_id), group_id),
         )
         if not row:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "没有这条消息")
+        # ★ 2026-10-29：擦掉的那行**钉不了** ✓ —— 正文已经清空了 ✓，
+        #   硬钉上来就是一张空白拍立得 ✓（看着像坏了 ✓）。
+        if row["deleted_at"]:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "这行已经被擦掉了")
         dup = await fetch_one(
             "SELECT id FROM memories WHERE group_id = ? AND message_id = ?",
             (group_id, int(body.message_id)),
@@ -299,7 +304,8 @@ async def group_digest(group_id: int, user: dict = Depends(current_user)) -> dic
 
     msg = await fetch_one(
         "SELECT COUNT(*) AS n, MIN(created_at) AS first_at, MAX(created_at) AS last_at "
-        "FROM messages WHERE group_id = ? AND sender_type <> 'system'",
+        "FROM messages WHERE group_id = ? AND sender_type <> 'system' "
+        "AND deleted_at IS NULL",
         (group_id,),
     )
     people = await fetch_all(
@@ -342,6 +348,7 @@ async def group_digest(group_id: int, user: dict = Depends(current_user)) -> dic
                   u.nickname AS account_nick
            FROM messages m LEFT JOIN users u ON u.id = m.sender_id
            WHERE m.group_id = ? AND m.sender_type <> 'system'
+             AND m.deleted_at IS NULL
            ORDER BY m.id DESC LIMIT 1""", (group_id,))
 
     return {

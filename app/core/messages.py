@@ -23,6 +23,8 @@ DEFAULT_AGENT_NAME = "管家"
 _SELECT = """
 SELECT m.id, m.group_id, m.sender_id, m.sender_type, m.msg_type,
        m.content, m.media_path, m.media_meta, m.reply_to, m.mentions, m.created_at,
+       -- ★ 2026-10-29：被擦掉的那一行（软删除 ✓，见 db.py 那段）
+       m.deleted_at, m.deleted_by,
        -- 群内昵称优先于账号昵称：群昵称可改，账号名是登录凭证，两者互不影响
        COALESCE(gm.nickname, u.nickname) AS sender_nickname,
        u.avatar AS sender_avatar,
@@ -39,6 +41,7 @@ SELECT m.id, m.group_id, m.sender_id, m.sender_type, m.msg_type,
        q.msg_type   AS quote_msg_type,
        q.content    AS quote_content,
        q.media_meta AS quote_media_meta,
+       q.deleted_at AS quote_deleted_at,
        COALESCE(qgm.nickname, qu.nickname) AS quote_sender_nickname
 FROM messages m
 LEFT JOIN users u ON u.id = m.sender_id
@@ -69,6 +72,19 @@ def _quote(row: dict[str, Any]) -> dict[str, Any] | None:
     qid = row.get("quote_id")
     if not qid:
         return None
+    # ★ 2026-10-29：引用条指向的那行**已经被擦掉** ✓ —— 只写一道擦痕 ✓，
+    #   别再露原来的内容 ✗（正文在库里已经清空 ✓，但类型 / 表情名这些
+    #   还留着，不拦一下就会画出"[表情] 猫猫"这种没头没尾的东西 ✓）。
+    if row.get("quote_deleted_at"):
+        return {
+            "id": qid,
+            "sender_type": row.get("quote_sender_type"),
+            "sender_nickname": row.get("quote_sender_nickname")
+            or (DEFAULT_AGENT_NAME if row.get("quote_sender_type") == "agent" else "某人"),
+            "msg_type": "text",
+            "content": "（这行被擦掉了）",
+            "deleted": True,
+        }
     kind = row.get("quote_msg_type")
     body = (row.get("quote_content") or "").strip()
     if kind == "image":
@@ -95,6 +111,10 @@ def _quote(row: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def serialize(row: dict[str, Any]) -> dict[str, Any]:
+    # ★ 2026-10-29：擦掉的那一行 ✓ —— 只剩身份和位置 ✓，
+    #   正文 / 附件 / @ 一律不往外吐 ✓（库里也已经清空了 ✓）。
+    #   ⚠️ 行**照样返回** ✓ —— 前端要拿它占位、画那道擦痕 ✓。
+    deleted = bool(row.get("deleted_at"))
     return {
         "id": row["id"],
         "group_id": row["group_id"],
@@ -110,13 +130,14 @@ def serialize(row: dict[str, Any]) -> dict[str, Any]:
             row.get("group_agent_bubble") if row["sender_type"] == "agent"
             else row.get("sender_bubble")),
         "msg_type": row["msg_type"],
-        "content": row["content"],
-        "media_path": row["media_path"],
-        "media_meta": _load_json(row.get("media_meta")),
-        "mentions": _load_json(row.get("mentions")) or [],
+        "content": None if deleted else row["content"],
+        "media_path": None if deleted else row["media_path"],
+        "media_meta": None if deleted else _load_json(row.get("media_meta")),
+        "mentions": [] if deleted else (_load_json(row.get("mentions")) or []),
         "reply_to": row["reply_to"],
         "quote": _quote(row),
         "created_at": row["created_at"],
+        "deleted": deleted,
     }
 
 
@@ -238,6 +259,42 @@ async def create_message(
             await group_member_ids(group_id),
             {"type": "message", "data": msg},
         )
+    return msg
+
+
+async def erase_message(group_id: int, message_id: int, by_user_id: int) -> dict[str, Any]:
+    """把一条消息**擦掉** ✓（2026-10-29）。
+
+    软删除：行留着（引用条 / 日期胶带要靠它占位 ✓），
+    正文、附件路径、@ 一并清空 ✓ —— 擦掉就是擦掉，库里也别留着 ✓。
+
+    ⚠️ **谁擦的由调用方先判** ✓（路由层要回 403 给"擦别人的" ✓）——
+       这里只管落库和广播，不做权限判断 ✓。
+    ⚠️ 广播的是一整条**序列化后的消息**（`deleted: true` ✓）——
+       客户端拿它原地换掉那一行 ✓，和 `message` 事件同一个形状 ✓。
+    """
+    await execute(
+        """UPDATE messages
+              SET deleted_at = ?, deleted_by = ?,
+                  content = NULL, media_path = NULL, media_meta = NULL, mentions = NULL
+            WHERE id = ? AND group_id = ?""",
+        (now(), by_user_id, message_id, group_id),
+    )
+    msg = await get_message(message_id)
+    assert msg is not None
+
+    # ★ 它**还没来得及看**的那条，从上下文缓冲里拿掉 ✓ ——
+    #   不然管家下一轮还会对着这行已经不存在的话回一句 ✓（说得还挺对 ✓，
+    #   但两个人那边谁也看不到它在回应什么 ✓）。
+    #   已经 drain 走的不动 ✓（那已经是它记下的事了，擦不掉 ✓）。
+    from ..agent import buffer as agent_buffer
+
+    await agent_buffer.drop(group_id, message_id)
+
+    await hub.broadcast(
+        await group_member_ids(group_id),
+        {"type": "message_deleted", "data": msg},
+    )
     return msg
 
 

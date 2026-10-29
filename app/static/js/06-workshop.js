@@ -1144,7 +1144,9 @@
   const pcCount = () => {
     const start = pcDayStart();
     const out = { n: 0, first: 0, last: 0, photo: 0, sticker: 0, voice: 0, file: 0 };
-    document.querySelectorAll('#msgs .row[data-ts]').forEach(function (r) {
+    // ⚠️ 擦痕不算"今天说的一条" ✓（和管家那份摘要同口径 ✓：`deleted_at IS NULL` ✓）——
+    //    否则今日卡说"12 条" ✓，屏幕上却只有 11 句 + 一道擦痕 ✓（2026-10-29）。
+    document.querySelectorAll('#msgs .row[data-ts]:not(.gone)').forEach(function (r) {
       const ts = (Number(r.dataset.ts) || 0) * 1000;
       if (!ts || ts < start) return;
       out.n++;
@@ -1227,7 +1229,9 @@
   const pcMsgEvents = () => {
     const start = pcDayStart();
     const out = [];
-    document.querySelectorAll('#msgs .row[data-ts]').forEach(function (r) {
+    // ⚠️ 擦痕不算一件事 ✓（它有 `data-ts` ✓，但没有 `who` / `bubble` ✓ ——
+    //    混进来会变成一条"…"✓，2026-10-29）。
+    document.querySelectorAll('#msgs .row[data-ts]:not(.gone)').forEach(function (r) {
       const ts = (Number(r.dataset.ts) || 0) * 1000;
       if (!ts || ts < start) return;
       const whoEl = r.querySelector('.who');
@@ -1795,10 +1799,10 @@
 
   // ── 文具托盘（长按一条消息）─────────────────────────────────────────
   //
-  // ★ 五个动作**都是真能做的** ✓（引用 / 钉到墙上 / 变成提醒 / 记一笔 / 复制 ✓）。
-  // ⚠️ **「删除」没做** ✗ —— 服务端**根本没有删消息的口子** ✓
-  //    （`/groups/<id>/messages` 只有 GET/POST ✓）。
-  //    加一个假按钮，或者拿"撤回"去凑，都是骗人 ✓ —— 宁可少一格 ✓。
+  // ★ 六个动作**都是真能做的** ✓（引用 / 钉到墙上 / 变成提醒 / 记一笔 / 复制 ✓，
+  //   以及**只有自己那条才有的「擦掉」** ✓，2026-10-29 ✓）。
+  // ⚠️ 「擦掉」是**软删除** ✓：行留着、正文清空 ✓，两个人都看得见一道擦痕 ✓
+  //    （见 `core/messages.py` 的 `erase_message` ✓）。**不是**"无声消失" ✗。
   let trayMsg = null;
 
   const trayPreview = (m) => {
@@ -1822,7 +1826,8 @@
 
   const openTray = function (row) {
     const m = _msgs.get(Number(row.dataset.id));
-    if (!m) return;
+    // 擦痕上没有托盘 ✓（长按那层已经拦了 ✓，这儿再拦一道 ✓ —— 别处也可能调进来 ✓）。
+    if (!m || m.deleted) return;
     trayMsg = m;
     const who = $('#trayWho');
     if (who) who.textContent = m.sender_type === 'agent' ? agentName() : (m.sender_nickname || '我');
@@ -1842,8 +1847,15 @@
         copyText(body); closeTray();
       } },
     ];
+    // ★ 2026-10-29：**擦掉** ✓ —— 只有**自己写的那条**才有这一格 ✓
+    //   （服务端也只认自己的 ✓，见 `api/groups.py` 的 `erase` ✓）。
+    //   放在最后 ✓：四个"拿去做点什么"在前 ✓，这个"抹掉"单独在末尾 ✓。
+    if (m.sender_type === 'user' && m.sender_id != null && me && m.sender_id === me.id) {
+      A.push({ ico: 'eraser', lbl: '擦掉', cls: 'danger',
+               fn: function () { eraseMsg(m); } });
+    }
     A.forEach(function (a) {
-      const b = mkel('button', 'tray-act' + (a.ico === 'pin' ? ' warm' : ''));
+      const b = mkel('button', 'tray-act' + (a.ico === 'pin' ? ' warm' : '') + (a.cls ? ' ' + a.cls : ''));
       b.type = 'button';
       const ic = mkel('span', 'ti');
       ic.appendChild(ico(a.ico));
@@ -1854,6 +1866,31 @@
     haptic('soft');
     const t = $('#tray');
     if (t) t.classList.add('on');
+  };
+
+  /** ★ 2026-10-29：**擦掉**自己写的一条 ✓。
+   *
+   *  ⚠️ 只擦**自己**的 ✓（服务端也拦 ✓ —— 界面这层只是别给不该有的那一格 ✓）。
+   *  ⚠️ 擦完**两个人都看不见** ✓ —— 所以话得说明白 ✓："只留一道浅浅的擦痕" ✓，
+   *     不能让人以为"只有我这边没了" ✗（那是"撤回"的语义 ✓）。
+   *  ⚠️ 本地的擦痕**当场画上** ✓（用服务端返回的那一份 ✓）；WS 那条随后也会到 ✓，
+   *     `eraseRowLocal` 是幂等的 ✓（已经是擦痕就不再画 ✓）。
+   */
+  const eraseMsg = async function (m) {
+    closeTray();
+    const yes = await confirmBox({
+      title: '擦掉这一行？',
+      body: '两个人都看不见了，只留一道浅浅的擦痕。',
+      ok: '擦掉',
+      danger: true,
+    });
+    if (!yes) return;
+    try {
+      const d = await api(`/groups/${group.id}/messages/${m.id}`, { method: 'DELETE' });
+      if (d && d.id) eraseRowLocal(d);
+      haptic('soft'); sfx('paper');
+      toast('擦掉了');
+    } catch (e) { toast(e.message || '没擦掉'); }
   };
 
   const pinMemory = async function (m) {
