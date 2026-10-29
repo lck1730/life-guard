@@ -205,6 +205,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_msg
     ON memories(group_id, message_id) WHERE message_id IS NOT NULL;
 
 
+-- ── 便签（2026-10-29 · 纸上小屋 5.8「小屋 · 便签」）────────────────────
+--
+--   两个人贴在屋里墙上的短句 ✓ —— **共享** ✓（不是私密便条 ✗）。
+--   ⚠️ 谁写的谁撕 ✓：`created_by` 不是摆设 ✓（接口里按它拦 ✓，
+--      和「擦掉」同一条规矩 ✓ —— 别人写的那张你只能看 ✓）。
+--   ⚠️ **不进提示词、不进记忆** ✓ —— 和配饰、气泡同一档：屋子里的东西 ✓，
+--      管家不听不看 ✓（它要"知道"什么，走它自己的记忆 ✓）。
+--   ⚠️ 就一句短话 ✓（上限见 `home.py` 里那段 ✓）—— 便签不是消息 ✗：
+--      这里没有回复、没有附件、没有已读 ✓。
+CREATE TABLE IF NOT EXISTS sticky_notes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    text       TEXT    NOT NULL,
+    created_by INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sticky_group ON sticky_notes(group_id, id DESC);
+
+
 -- ── 创意工坊：用户做的组件 ──────────────────────────────────────────────
 --
 -- ★ **状态和版本在这里，不在文件里** ✗→✓ —— 2026-10-07 定的。

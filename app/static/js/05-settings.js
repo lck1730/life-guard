@@ -1308,6 +1308,12 @@
     return Math.max(1, 1 - _daysFrom(d));
   };
 
+  /** 对方的成员行 ✓ —— 这个家里**另一个真人** ✓（不是管家 ✓、不是自己 ✓）。
+   *  ⚠️ 一个人在自己的空间里时返回 null ✓ —— 用到它的地方都得先判一下 ✓。 */
+  const peerMember = () => (members || []).filter(function (m) {
+    return !m.is_agent && Number(m.id) !== Number(me && me.id);
+  })[0] || null;
+
   const renderNameplate = () => {
     const house = $('#npHouse');
     if (!house) return;
@@ -1439,6 +1445,32 @@
     // 写着名字才像"我的"。
     const eMe = $('#vMe');
     if (eMe) eMe.textContent = (me && (me.nickname || me.username)) || '';
+    // ★ 2026-10-29：「对方」和「便签」两行 ✓
+    //   ⚠️ 没有对方 → 那一行**整行不显示** ✓（点进去是一屏空卡片更糟 ✓）。
+    const pm = peerMember();
+    const rowPeer = $('.item[data-act="peer"]');
+    if (rowPeer) {
+      rowPeer.style.display = pm ? '' : 'none';
+      const ePeer = $('#vPeer');
+      // ⚠️ `dispName` 吃的是**消息对象** ✗（`04-chat.js` ✓），这里是成员行 ✗ ——
+      //   所以自己查备注表 ✓（和 `dispName` 同一个来源 ✓，不另立一套 ✓）。
+      if (ePeer) {
+        const alias = pm ? ((notes && notes[String(pm.id)]) || '') : '';
+        ePeer.textContent = pm ? (alias || pm.nickname || '') : '';
+      }
+    }
+    const eNotes = $('#vNotes');
+    if (eNotes) eNotes.textContent = houseNotes ? (houseNotes.length + ' 张') : '';
+    // 便签那一格要**张数** ✓ —— 没去过小屋时手里一份都没有 ✓，
+    // 所以设置页开着、而且还没取过的时候补取一趟 ✓（取回来顺手填上 ✓）。
+    // ⚠️ 不每次渲染都取 ✗：`renderSettings` 每来一条消息都可能被调一次 ✓。
+    if (houseNotes === null && $('#settings').classList.contains('on')) {
+      refreshHouseNotes().then(function () {
+        if (!houseNotes) return;
+        const e = $('#vNotes');
+        if (e) e.textContent = houseNotes.length + ' 张';
+      });
+    }
     // 「邀请码」右边 = **码本身** ✓ / 满员了 = 「空间已满」✓
     // ★ **这一格是异步填的** ✗→✓（2026-10-09）—— "满没满"要问服务端算的
     //   `full` ✓（`bootstrap` 的 `group` 里没有它 ✗），所以这里**发一趟就走** ✓，
@@ -1649,6 +1681,15 @@
         v => saveGroup({ moved_in: v }),
         () => saveGroup({ moved_in: '' }));
       else if (act === 'paper') openPaperSet();
+      // ★ 2026-10-29：便签 ✓（屋里点墙上的便签走同一个函数 ✓）
+      else if (act === 'stickies') openNotes();
+      // ★ 2026-10-29：「对方」✓ —— 就是群里点头像那一屏 ✓（`openPeer` ✓，
+      //   备注也在它里面改 ✓）。⚠️ 没有对方时这一行是藏着的 ✓（见 `renderSettings` ✓），
+      //   这里再兜一次空 ✓ —— 万一藏之前点到了 ✓。
+      else if (act === 'peer') {
+        const pm = peerMember();
+        if (pm) openPeer(pm.id); else toast('这个家里只有你一个人');
+      }
       // ★ 2026-10-19：「聊天背景」—— 推开这一屏 ✓（上传 / 移除都在它里面 ✓）
       else if (act === 'bg') openBgSet();
       // ★ 2026-10-19：「主题」—— 夜阑 / 奶霜 / 林深 ✓（只影响这台设备 ✓）
@@ -2019,6 +2060,73 @@
   // ★ 用户 2026-10-08 定的 ✓（原话见 `dispName` 上面那段 ✓）。
   //   备注**只影响显示** ✓、**对方不感知** ✓ —— 所以这一屏的措辞也得跟着这个来 ✓
   //   （不能写成"给他改个名字"✓，那听着像对方会知道 ✓）。
+  /** 时间戳（秒）→ `10 月 29 日` ✓；不是今年的带上年份 ✓。 */
+  const fmtStamp = (ts) => {
+    const n = Number(ts) || 0;
+    if (!n) return '';
+    const d = new Date(n * 1000);
+    const y = new Date().getFullYear();
+    return (d.getFullYear() === y ? '' : d.getFullYear() + ' 年 ') +
+      (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日';
+  };
+  /** 一句「他说过的话」✓ —— 空正文（图片/表情/语音 ✓）就按类型说一句 ✓。 */
+  const peerQuote = (text, type) => {
+    const t = String(text || '').trim();
+    if (t) return t;
+    if (type === 'image') return '一张图';
+    if (type === 'sticker') return '一个表情';
+    if (type === 'voice') return '一段语音';
+    if (type === 'audio') return '一段音频';
+    if (type === 'file') return '一个文件';
+    return '';
+  };
+
+  // ★ 「对方」那一张卡 ✓（2026-10-29）——
+  //   来过 / 说过几句 / 第一句 / 最近一句 ✓，全部从 `/digest` 的 `members` 里来 ✓
+  //   （服务端当场数的 ✓，见 `home.py` 里 `group_digest` 那段 ✓）。
+  //   ⚠️ 异步回来时人可能已经离开这一屏了 ✗ → 落地前先看**这张卡还在不在** ✓
+  //      （`isConnected` ✓）—— 不在就丢掉 ✓，别往一屏已经换掉的页面上写 ✓。
+  const fillPeerFacts = async (card, uid) => {
+    let d = null;
+    try { d = await api(`/groups/${group.id}/digest`); }
+    catch (e) { return; }
+    if (!card.isConnected) return;
+    const m = ((d && d.members) || []).find(function (x) {
+      return Number(x.id) === Number(uid);
+    });
+    if (!m) return;
+    card.textContent = '';
+
+    const row = function (k, v) {
+      const r = mkel('div', 'pf-row');
+      r.appendChild(mkel('span', 'pf-k', k));
+      r.appendChild(mkel('span', 'pf-v', v));
+      card.appendChild(r);
+    };
+    const quote = function (k, text, type, ts) {
+      const q = mkel('div', 'pf-quote');
+      q.appendChild(mkel('span', 'pf-k', k));
+      const line = mkel('div', 'pf-q', peerQuote(text, type));
+      q.appendChild(line);
+      const when = fmtStamp(ts);
+      if (when) q.appendChild(mkel('span', 'pf-when', when));
+      card.appendChild(q);
+    };
+
+    row('来过', fmtStamp(m.joined_at) || '以前的住户');
+    const n = Number(m.messages) || 0;
+    row('说过', n ? n + ' 句' : '还没说过话');
+    if (n) {
+      quote('第一句', m.first_text, m.first_type, m.first_at);
+      // 只有一句的时候「最近一句」就是第一句 ✓ —— 重复写两遍像在凑数 ✗。
+      if (String(m.last_text || '') !== String(m.first_text || '') ||
+          Number(m.last_at) !== Number(m.first_at)) {
+        quote('最近一句', m.last_text, m.last_type, m.last_at);
+      }
+    }
+    card.style.display = '';
+  };
+
   const openPeer = (uid) => {
     if (uid == null) return;
     if (!$('#peer').classList.contains('on')) pushScreen('peer');
@@ -2045,6 +2153,14 @@
     //   而**名字**在别处（管家、我的）都是 19px/600 ✓ → 这里自己也起一个类 ✓（见 CSS ✓）。
     av.append(big, mkel('div', 'pname', real));
     body.appendChild(av);
+
+    // 卡片二：**这个家的对方** ✓（2026-10-29）—— 来过 / 说过几句 / 第一句 / 最近一句 ✓。
+    //   ⚠️ 全是 `/digest` **当场数的** ✓（一个字都不存 ✓）；数不上来就整张卡不画 ✓
+    //      （画一张"说过 0 句"出来是在说假话 ✗）。
+    const facts = mkel('div', 'card pf-card');
+    facts.style.display = 'none';            // 数字回来之前不占版面 ✓
+    body.appendChild(facts);
+    fillPeerFacts(facts, uid);
 
     // 卡片二：备注
     const card = mkel('div', 'card');

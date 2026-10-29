@@ -835,6 +835,197 @@
     return s;
   };
 
+  // ── 便签（2026-10-29 · 纸上小屋 5.8「小屋 · 便签」）──────────────────
+  //
+  // ★ 两个人贴在墙上的一句话 ✓ —— **共享** ✓（谁都能看 ✓，谁写的谁撕 ✓，
+  //   闸门在 home.py 那三个接口里 ✓）。
+  //   ⚠️ 设计稿 5.8 写的是「贴在桌沿」✗→ 这里挪到**窗下那面空墙** ✓：
+  //      桌沿那块面板只有 ~94 个 SVG 单位高 ✓，字缩到手机上只剩 5px 左右 ✓
+  //      （390pt 宽的手机 ≈ 0.53 倍 ✓），那不是便签是花纹 ✗。
+  //      窗下这块空墙有 200 多单位 ✓（窗台 762 到踢脚线 1005 ✓），字能落到 ~11px ✓。
+  //   ⚠️ 屋里最多画**三张** ✓（再多就成糊墙纸了 ✓）—— 要看完 / 要写 / 要撕，
+  //      点一下 → openNotes() 那张弹层 ✓。
+  //   ⚠️ **不进提示词、不进记忆** ✓ —— 和配饰、气泡同一档：屋子里的东西 ✓，
+  //      管家不听不看 ✓。
+  //   ⚠️ 这一段**不用模板字符串** ✓（规矩和上面的 SVG 一样 ✓）。
+  let houseNotes = null;      // [{id,text,created_by,created_at,nickname}] ✓；null = 还没取 ✓
+  const notesKey = function (a) {
+    return (a || []).map(function (n) { return n.id; }).join(',');
+  };
+  const noteEsc = function (s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  };
+  // 一行放几个字 ✓ —— 中文算 1 ✓、字母数字算 0.55 ✓（不量像素 ✓，够用 ✓）。
+  //   超出行数就截断 + 省略号 ✓：屋里那张是**贴着看个大概** ✓，全文在弹层里 ✓。
+  const noteBreak = function (text, per, max) {
+    const out = [];
+    const chars = Array.from(String(text || ''));
+    let line = '', w = 0;
+    for (let i = 0; i < chars.length; i++) {
+      const c = chars[i];
+      const cw = c.charCodeAt(0) > 255 ? 1 : 0.55;
+      if (w + cw > per) { out.push(line); line = ''; w = 0; }
+      line += c; w += cw;
+    }
+    if (line) out.push(line);
+    if (out.length > max) {
+      out.length = max;
+      out[max - 1] = out[max - 1].slice(0, Math.max(1, out[max - 1].length - 1)) + '…';
+    }
+    return out;
+  };
+
+  const oneNoteSvg = function (n, cx, cy, rot, mine) {
+    const W = 180, H = 170;
+    const x = cx - W / 2, y = cy - H / 2;
+    const fill = mine ? '#fbe7b2' : '#fdf8ec';
+    const edge = mine ? '#e0bd76' : '#b9cf9f';
+    const ink = mine ? '#6b4a1f' : '#4f5c3c';
+    const soft = mine ? '#f3d894' : '#e7efdb';
+    let s = '<g class="ws-note" style="cursor:pointer">' +
+      // 影子 + 纸
+      '<rect x="' + (x + 3) + '" y="' + (y + 4) + '" width="' + W + '" height="' + H +
+        '" rx="3" fill="#6a4530" opacity=".10"/>' +
+      '<rect x="' + x + '" y="' + y + '" width="' + W + '" height="' + H +
+        '" rx="3" fill="' + fill + '" stroke="' + edge + '" stroke-width="1.6"/>' +
+      // 右下折角
+      '<path d="M' + (x + W - 26) + ' ' + (y + H) + ' h26 v-26 z" fill="' + soft +
+        '" stroke="' + edge + '" stroke-width="1.2"/>' +
+      // 顶上那道胶带 ✓
+      '<rect x="' + (cx - 23) + '" y="' + (y - 7) + '" width="46" height="13" rx="1.5" ' +
+        'fill="#e2c48c" opacity=".55" transform="rotate(-4 ' + cx + ' ' + y + ')"/>';
+    const lines = noteBreak(n.text, 7, 5);
+    for (let i = 0; i < lines.length; i++) {
+      s += '<text x="' + (x + 14) + '" y="' + (y + 48 + i * 24) +
+        '" class="ws-note-t" fill="' + ink + '">' + noteEsc(lines[i]) + '</text>';
+    }
+    return '<g transform="rotate(' + rot + ' ' + cx + ' ' + cy + ')">' + s + '</g>';
+  };
+
+  const houseNotesSvg = function () {
+    if (!houseNotes || !houseNotes.length) return '';
+    // 最新那张**贴中间** ✓（一眼先看见 ✓），旧的两张往两边让 ✓。
+    //   ⚠️ 右边留到 650 为止 ✓ —— 再过去就是拍立得那块墙 ✓（652..820 ✓）。
+    const SLOT = [[375, 1.4], [190, -2.2], [560, -1.4]];
+    const myId = Number(me && me.id);
+    let s = '';
+    const n = Math.min(3, houseNotes.length);
+    for (let i = 0; i < n; i++) {
+      const it = houseNotes[i];
+      s += oneNoteSvg(it, SLOT[i][0], 885, SLOT[i][1], Number(it.created_by) === myId);
+    }
+    return s;
+  };
+
+  const loadNotes = async function () {
+    try {
+      const d = await api('/groups/' + group.id + '/notes');
+      return (d && d.items) || [];
+    } catch (e) { return null; }
+  };
+  // ★ 数变了才重画 ✓（和屋子会长同一个规矩 ✓）。
+  const refreshHouseNotes = async function () {
+    const list = await loadNotes();
+    if (list === null) return;                // 取不上来就按老样子画 ✓（墙照旧能点 ✓）
+    const before = notesKey(houseNotes);
+    houseNotes = list;
+    if (before !== notesKey(houseNotes) && $('#workshop').classList.contains('on')) paintCanvas();
+  };
+
+  // 便签弹层 ✓ —— 屋里点便签、设置里点「便签」都走这一处 ✓（只有这一份实现 ✓）。
+  //   ⚠️ 每贴一张 / 撕一张都**整张重画** ✓（列表短 ✓，不值得做局部更新 ✓）。
+  //   ⚠️ 写完不关弹层 ✓ —— 想连写两张的人不用再点进来一次 ✓。
+  const repaintHouseIfOn = function () {
+    if ($('#workshop').classList.contains('on')) paintCanvas();
+  };
+  const renderNotesSheet = function () {
+    const p = $('#sheetPanel');
+    if (!p) return;
+    p.innerHTML = '<h3>便签</h3><div class="nt-list" id="ntList"></div>' +
+      '<div class="nt-write">' +
+        '<textarea class="field nt-inp" id="ntInp" rows="2" maxlength="60" ' +
+          'placeholder="写一句，贴到墙上"></textarea>' +
+        '<button class="btn-solid nt-add" id="ntAdd">贴上</button>' +
+      '</div>';
+    const box = p.querySelector('#ntList');
+    const list = houseNotes || [];
+    const myId = Number(me && me.id);
+    if (!list.length) {
+      box.appendChild(mkel('div', 'h-empty', '墙上还空着。'));
+    }
+    list.forEach(function (n) {
+      const mine = Number(n.created_by) === myId;
+      const row = mkel('div', 'nt-row' + (mine ? ' mine' : ''));
+      row.appendChild(mkel('div', 'nt-text', n.text));
+      const meta = mkel('div', 'nt-meta');
+      meta.appendChild(mkel('span', 'nt-who', mine ? '你' : (n.nickname || '对方')));
+      row.appendChild(meta);
+      // ⚠️ 「撕掉」**只在自己写的那张上露** ✓ —— 服务端也拦 ✓（403 ✓），
+      //   这里藏起来只是别让人白点一下 ✓（闸门不在前端 ✓）。
+      if (mine) {
+        const del = mkel('button', 'nt-del', '撕掉');
+        del.onclick = function () { tearNote(n); };
+        row.appendChild(del);
+      }
+      box.appendChild(row);
+    });
+    const inp = p.querySelector('#ntInp');
+    const add = p.querySelector('#ntAdd');
+    const submit = async function () {
+      const v = String(inp.value || '').replace(/\s+/g, ' ').trim();
+      if (!v) { inp.focus(); return; }
+      if (add.disabled) return;
+      add.disabled = true;
+      try {
+        const out = await api('/groups/' + group.id + '/notes', {
+          method: 'POST', body: JSON.stringify({ text: v }),
+        });
+        houseNotes = [out].concat(houseNotes || []).slice(0, 40);
+        inp.value = '';
+        sfx('paper'); haptic('soft');
+        renderNotesSheet();
+        repaintHouseIfOn();
+      } catch (e) { toast(e.message || '没贴上'); }
+      add.disabled = false;
+    };
+    add.onclick = submit;
+    // 手机上在输入框里按回车 = 换行 ✓（那是对的 ✓）；
+    // 想不收手就贴上的，按 Ctrl/⌘ + 回车 ✓。
+    inp.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); submit(); }
+    });
+  };
+  const tearNote = async function (n) {
+    const yes = await confirmBox({
+      title: '撕掉这张便签？', body: n.text || '', ok: '撕掉', danger: true,
+    });
+    if (!yes) return;
+    try {
+      await api('/groups/' + group.id + '/notes/' + n.id, { method: 'DELETE' });
+      houseNotes = (houseNotes || []).filter(function (x) { return x.id !== n.id; });
+      sfx('paper'); haptic('soft');
+      renderNotesSheet();
+      repaintHouseIfOn();
+    } catch (e) { toast(e.message || '没撕下来'); }
+  };
+  const openNotes = async function () {
+    if (!houseNotes) houseNotes = [];
+    renderNotesSheet();                       // 先给壳 ✓，不等网络 ✓
+    openSheet();
+    const list = await loadNotes();
+    if (list === null) return;
+    // ⚠️ 和手里那份**一样就不重画** ✓ —— 重画会把已经打进去的字冲掉 ✓
+    //   （网络慢的时候人已经开始写了 ✓）。
+    const before = notesKey(houseNotes);
+    houseNotes = list;
+    if (before !== notesKey(houseNotes) && $('#sheetPanel').querySelector('#ntList')) {
+      renderNotesSheet();
+    }
+    repaintHouseIfOn();
+  };
+
   // ★ 第一次进屋的**手写标签** ✓（2026-10-29）——
   //   屋里东西不少，头一回进来未必知道哪个能点 ✓；写几个字最省事 ✓。
   //   ⚠️ 只写**东西的名字** ✓（聊天/账本/提醒/回忆/我们的家 ✓）——
@@ -943,6 +1134,9 @@
         'preserveAspectRatio="xMidYMid meet"/>' +
       // ★ 屋子会长（2026-10-29）✓ —— 用过才长出来的三样 ✓（压在屋子图上、环境光下面 ✓）
       '<g pointer-events="none">' + houseGrowSvg() + '</g>' +
+      // ★ 便签（2026-10-29）✓ —— 贴在窗下那面空墙上 ✓；**能点** ✓（不裹在
+      //   pointer-events:none 里 ✓），点一下 = 看全部 / 写一张 / 撕掉 ✓。
+      houseNotesSvg() +
       // 环境动效（光/尘/花瓣）✓ 压在屋子上、猫下面 ✓
       '<g pointer-events="none">' + flatFxSvg() + '</g>' +
       // ★ 2026-10-28：桌上摊开那本现在是**信簿** ✓ —— 点它 = **落座** ✓
@@ -998,6 +1192,11 @@
     wire('.ws-shelf', function () { openLedger(); });
     wire('.ws-clock', function () { openClock(); });
     wire('.ws-paint', function () { openMemoryWall(); });
+    // ★ 点墙上的便签 → 便签弹层 ✓（2026-10-29 ✓）。一张一张挂监听 ✓ ——
+    //   便签是**动态的** ✓（`wire` 那套按选择器只捞一个 ✓，这里可能 0~3 张 ✓）。
+    svg.querySelectorAll('.ws-note').forEach(function (g) {
+      g.addEventListener('click', function (ev) { ev.stopPropagation(); openNotes(); });
+    });
     // 信 → 我们的家 ✓。⚠️ 设置是 z10、屋子是 z22 ✓ —— **先退屋再进设置** ✓，
     //   不然设置页会藏在屋子底下 ✗（看着像"点了没反应"✓）。
     wire('.ws-mail', function () {
@@ -2346,6 +2545,7 @@
     }
     wsCanvas = list;                          // 服务端已经按**排好的位置**给了 ✓
     refreshHouseGrow();                       // ★ 不 await ✓（见上 ✓）
+    refreshHouseNotes();                      // ★ 同上 ✓（墙上那几张便签 ✓）
     paintCanvas();
   };
 

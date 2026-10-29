@@ -1104,3 +1104,79 @@ body:has(#butler.on) { overflow: hidden; }
 #chat.nightChat > header.top { color: #f2e7d4; }
 #chat.nightChat #text { color: #f2e7d4; caret-color: #f2e7d4; }
 #chat.nightChat #text::placeholder { color: #b8a68a; }
+
+/* ═══ 便签（2026-10-29 · 纸上小屋 5.8「小屋 · 便签」）═══════════════
+   ★ 屋里墙上那几张的字 ✓ —— 字在 **SVG 里画** ✓（和手写标签同一支笔 ✓）。
+   ⚠️ **不加白描边** ✗ —— 纸本身是浅底 ✓，描边只会把字糊成一块 ✗
+      （标签那圈白边是为了压住背后的画 ✓，这里用不上 ✓）。
+   ⚠️ 字号 21（SVG 单位）✓ —— 折算到手机上约 11px ✓
+      （屋内 viewBox 900 宽、slice 之后 ≈ 0.53 倍 ✓），再小就看不清了 ✗。 */
+.ws-note-t {
+  font-family: var(--hand);
+  font-size: 21px;
+  letter-spacing: .3px;
+  user-select: none;
+}
+
+/* 弹层里那几张 ✓ —— 自己写的**蜂蜜色** ✓，对方写的**纸白偏苔** ✓
+   （和墙上一个道理：一眼分得出谁写的 ✓，不用在每张上写名字 ✓）。 */
+#sheetPanel .nt-list {
+  display: flex; flex-direction: column; gap: 10px;
+  margin: 6px 0 14px;
+  max-height: 46vh; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#sheetPanel .nt-row {
+  position: relative;
+  padding: 12px 14px 10px;
+  border-radius: 12px;
+  background: #fdf8ec;
+  border: 1px solid #e4dcc6;
+  box-shadow: 0 1px 0 rgba(120, 90, 50, .06);
+}
+#sheetPanel .nt-row.mine { background: #fbe7b2; border-color: #e0bd76; }
+#sheetPanel .nt-text {
+  font-family: var(--hand);
+  font-size: 18px; line-height: 1.6;
+  color: #4a3a22;
+  word-break: break-word;
+}
+/* 「撕掉」钉在右下角 ✓ —— 它只在**自己写的**那行出现 ✓（见 `renderNotesSheet` ✓） */
+#sheetPanel .nt-del {
+  position: absolute; right: 8px; bottom: 6px;
+  border: 0; background: none;
+  font: inherit; font-size: 12px;
+  color: var(--danger);
+  padding: 4px 8px; border-radius: 8px;
+}
+#sheetPanel .nt-del:active { background: rgba(180, 60, 40, .08); }
+#sheetPanel .nt-meta { margin-top: 6px; padding-right: 52px; font-size: 11.5px; color: var(--muted); }
+#sheetPanel .nt-write { display: flex; align-items: flex-end; gap: 10px; }
+#sheetPanel .nt-inp { flex: 1; margin: 0; resize: none; line-height: 1.5; }
+#sheetPanel .nt-add { flex: 0 0 auto; margin-bottom: 10px; }
+
+/* ═══ 对方那一屏里的「在这个家」（2026-10-29）═══════════════════════
+   ★ 全是**事实** ✓（来过 / 说过几句 / 第一句 / 最近一句 ✓）——
+     一句介绍这个页面的话都没有 ✓（用户那条规矩 ✓）。
+   ⚠️ 它挂在 `.card` 上 ✓（底色/边框/圆角都沿用 ✓），这里只排里面 ✅ */
+.ascreen .pf-card { padding: 14px 18px 16px; }
+.ascreen .pf-row { display: flex; align-items: baseline; gap: 12px; padding: 5px 0; }
+.ascreen .pf-k { flex: 0 0 auto; font-size: 12.5px; color: var(--muted); letter-spacing: .06em; }
+.ascreen .pf-v {
+  flex: 1; text-align: right;
+  font-size: 15px; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ascreen .pf-quote { padding: 10px 0 2px; margin-top: 8px; border-top: 1px dashed var(--line); }
+.ascreen .pf-quote .pf-k { display: block; }
+.ascreen .pf-q {
+  margin-top: 4px;
+  font-family: var(--hand);
+  font-size: 17px; line-height: 1.6;
+  color: var(--text);
+  word-break: break-word;
+  /* 三行封顶 ✓（和「性格」那块同一条规矩 ✓，它自带末尾的 … ✓） */
+  display: -webkit-box; -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3; overflow: hidden;
+}
+.ascreen .pf-when { display: block; margin-top: 4px; text-align: right; font-size: 11.5px; color: var(--muted); }

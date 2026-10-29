@@ -527,6 +527,11 @@
     <div class="sec-g">
       <div class="grp gcard">
     <div class="item" data-act="shell"><span class="ico" data-ico="user"></span><span class="k">我的</span><span class="v" id="vMe"></span><span class="chev" data-chev></span></div>
+    <!-- ★ 2026-10-29：**对方** ✓ —— 点进去是「对方」那一屏 ✓（头像 / 备注 / 在这个家
+         说过多少句 ✓）。和「我的」并排站着 ✓：一边是自己，一边是对方 ✓。
+         ⚠️ 一个人在自己的空间里（没有别人 ✓）→ 这一行**不显示** ✓
+            （见 `renderSettings` ✓：没有对方就 `display:none` ✓）。 -->
+    <div class="item" data-act="peer"><span class="ico" data-ico="people"></span><span class="k">对方</span><span class="v" id="vPeer"></span><span class="chev" data-chev></span></div>
     <!-- ★ 邀请码：点了是**复制** ✓（满员时说的话也一样 ✓）；右边那一格
          **异步填** ✓（`refreshSpaceInfo` ✓）—— "满员没有"要问服务端 ✓。 -->
     <div class="item" data-act="invite"><span class="ico" data-ico="link"></span><span class="k">邀请码</span><span class="v" id="vInvite"></span><span class="chev" data-chev></span></div>
@@ -549,6 +554,9 @@
     <!-- ★ 信纸（2026-10-29）：横线 / 空白 / 点阵 ✓ —— **这台设备**的 ✓，
          和主题同一个规矩 ✓（存 `lg_paper:u<id>` ✓，不进服务端 ✓）。 -->
     <div class="item" data-act="paper"><span class="ico" data-ico="paper"></span><span class="k">信纸</span><span class="v" id="vPaper"></span><span class="chev" data-chev></span></div>
+    <!-- ★ 2026-10-29：便签 ✓ —— 屋里墙上那几张 ✓（点开 = 看全部 / 写一张 / 撕掉 ✓）。
+         和屋里一样**共享** ✓：两个人贴同一面墙 ✓。 -->
+    <div class="item" data-act="stickies"><span class="ico" data-ico="note"></span><span class="k">便签</span><span class="v" id="vNotes"></span><span class="chev" data-chev></span></div>
     <div class="item" data-act="gname"><span class="ico" data-ico="space"></span><span class="k">空间</span><span class="v" id="vGname"></span><span class="chev" data-chev></span></div>
     <!-- ★ 主题（2026-10-19）：三套可选（夜阑 / 奶霜 / 林深 ✓），选完立即生效 ✓。
          ⚠️ 只存这台设备、按用户 id 分开 ✓，不进服务端、不给空间里的别人 ✓。 -->

@@ -276,6 +276,77 @@ async def delete_memory(
     return {"ok": True}
 
 
+# ── 便签（2026-10-29）────────────────────────────────────────────────
+#
+# ★ 屋里墙上贴的短句 ✓ —— **共享** ✓，谁都能看 ✓；**谁写的谁撕** ✓。
+#   ⚠️ 和「擦掉」同一条规矩：撕别人的 → 403 ✓（不悄悄放行 ✗）。
+#   ⚠️ 上限 60 字**服务器说了算** ✓ —— 前端那个 `maxlength` 只是顺手 ✓
+#      （改前端就能绕过去 ✓，这个项目的闸门一律在服务端 ✓）。
+_NOTE_MAX = 60
+_NOTE_LIST_MAX = 40
+_NOTE_COLORS = ("cream", "honey", "mint", "rose")   # 留给以后挑颜色，现在不用
+
+
+class NoteIn(BaseModel):
+    text: str
+
+
+@router.get("/{group_id}/notes")
+async def list_notes(group_id: int, user: dict = Depends(current_user)) -> dict:
+    """墙上那些便签 ✓ —— **新的在前** ✓（屋里只画最近三张 ✓）。"""
+    await require_member(group_id, user["id"])
+    rows = await fetch_all(
+        """SELECT n.id, n.text, n.created_by, n.created_at,
+                  u.nickname
+           FROM sticky_notes n LEFT JOIN users u ON u.id = n.created_by
+           WHERE n.group_id = ? ORDER BY n.id DESC LIMIT ?""",
+        (group_id, _NOTE_LIST_MAX),
+    )
+    return {"items": rows}
+
+
+@router.post("/{group_id}/notes")
+async def add_note(
+    group_id: int, body: NoteIn, user: dict = Depends(current_user),
+) -> dict:
+    await require_member(group_id, user["id"])
+    # ⚠️ 换行压成空格 ✓ —— 便签是一张小纸 ✓，多行在屋里那几个格子里画不下 ✓。
+    text = " ".join((body.text or "").split())
+    if not text:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "写一句再贴")
+    if len(text) > _NOTE_MAX:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"一张便签写不下这么多（最多 {_NOTE_MAX} 字）")
+    nid = await execute(
+        "INSERT INTO sticky_notes (group_id, text, created_by, created_at) "
+        "VALUES (?,?,?,?)",
+        (group_id, text, user["id"], now()),
+    )
+    log.info("便签 +1 group=%s note=%s", group_id, nid)
+    return await fetch_one(
+        """SELECT n.id, n.text, n.created_by, n.created_at, u.nickname
+           FROM sticky_notes n LEFT JOIN users u ON u.id = n.created_by
+           WHERE n.id = ?""", (nid,)) or {}
+
+
+@router.delete("/{group_id}/notes/{note_id}")
+async def delete_note(
+    group_id: int, note_id: int, user: dict = Depends(current_user),
+) -> dict:
+    await require_member(group_id, user["id"])
+    row = await fetch_one(
+        "SELECT id, created_by FROM sticky_notes WHERE id = ? AND group_id = ?",
+        (note_id, group_id))
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "没有这张便签")
+    if int(row["created_by"]) != int(user["id"]):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "这不是你写的那张")
+    await execute("DELETE FROM sticky_notes WHERE id = ?", (note_id,))
+    return {"ok": True}
+
+
 # ── 管家面板的「它记得」 ──────────────────────────────────────────────
 
 
@@ -321,6 +392,54 @@ async def group_digest(group_id: int, user: dict = Depends(current_user)) -> dic
         "role": p["role"],
         "joined_at": p["joined_at"],
     } for p in people]
+
+    # ★ 2026-10-29：「对方」那一屏用 ✓ —— **这个人**在这个家里说过几句、
+    #   第一句是什么、最近一句是什么 ✓。全是**当场数**的 ✓（一个字都不存 ✓）。
+    #   ⚠️ 擦掉的行不算 ✓（`deleted_at IS NULL` ✓）—— 擦掉以后连"说过几句"
+    #      都跟着少一句 ✓，那才是"擦掉了"的意思 ✓。
+    #   ⚠️ 图片/语音那种 `content` 是空的 ✓ → 把 `msg_type` 一起吐出去 ✓，
+    #      前端才好说「一张图」而不是显示一个空引号 ✓。
+    said = await fetch_all(
+        """SELECT sender_id, COUNT(*) AS n,
+                  MIN(created_at) AS first_at, MAX(created_at) AS last_at
+           FROM messages
+           WHERE group_id = ? AND sender_type = 'user' AND sender_id IS NOT NULL
+             AND deleted_at IS NULL
+           GROUP BY sender_id""",
+        (group_id,),
+    )
+    firsts = await fetch_all(
+        """SELECT m.sender_id, m.content, m.msg_type
+           FROM messages m
+           JOIN (SELECT sender_id, MIN(id) AS mid FROM messages
+                 WHERE group_id = ? AND sender_type = 'user'
+                   AND sender_id IS NOT NULL AND deleted_at IS NULL
+                 GROUP BY sender_id) x ON x.mid = m.id""",
+        (group_id,),
+    )
+    lasts = await fetch_all(
+        """SELECT m.sender_id, m.content, m.msg_type
+           FROM messages m
+           JOIN (SELECT sender_id, MAX(id) AS mid FROM messages
+                 WHERE group_id = ? AND sender_type = 'user'
+                   AND sender_id IS NOT NULL AND deleted_at IS NULL
+                 GROUP BY sender_id) x ON x.mid = m.id""",
+        (group_id,),
+    )
+    said_by = {int(r["sender_id"]): r for r in said}
+    first_by = {int(r["sender_id"]): r for r in firsts}
+    last_by = {int(r["sender_id"]): r for r in lasts}
+    for m in members_out:
+        st = said_by.get(int(m["id"])) or {}
+        f = first_by.get(int(m["id"])) or {}
+        l = last_by.get(int(m["id"])) or {}
+        m["messages"] = int(st.get("n") or 0)
+        m["first_at"] = st.get("first_at")
+        m["last_at"] = st.get("last_at")
+        m["first_text"] = f.get("content") or ""
+        m["first_type"] = f.get("msg_type") or ""
+        m["last_text"] = l.get("content") or ""
+        m["last_type"] = l.get("msg_type") or ""
 
     rec = await fetch_one(
         "SELECT COUNT(*) AS n FROM records "
