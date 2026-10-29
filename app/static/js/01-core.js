@@ -331,6 +331,44 @@
 
   applyTheme(localStorage.getItem('lg_theme') || THEME_DEFAULT);
 
+  // ── 信纸（2026-10-29 · 我们的家 · 小屋）────────────────────────────
+  //
+  // ★ 三张信纸：横线 / 空白 / 点阵 ✓。它换的是**聊天那一页纸**的底纹 ✓，
+  //   不碰主题、不碰气泡 ✓（那两样各有各的开关 ✓）。
+  // ⚠️ 和主题同一条规矩 ✓：**这台设备**的偏好 ✓，按用户 id 分开存 ✓
+  //   （`lg_paper:u<id>` ✓）—— 换了账号不会把上一个人选的信纸带过去 ✓。
+  // ⚠️ 默认是**横线** ✓（`index.html` 里不写 `data-paper` 就是它 ✓）。
+  const PAPERS = [
+    { id: 'lined', name: '横线', desc: '本来的信纸' },
+    { id: 'plain', name: '空白', desc: '只有左边那道红线' },
+    { id: 'dots',  name: '点阵', desc: '像草稿本' },
+  ];
+  const PAPER_DEFAULT = 'lined';
+  const paperById = (id) => PAPERS.find(p => p.id === id) || PAPERS[0];
+  const paperOfUser = () => {
+    const uid = me && (me.id ?? me.username);
+    return (uid === undefined || uid === null || uid === '') ? '' : 'lg_paper:u' + uid;
+  };
+  const applyPaper = (id) => {
+    const p = PAPERS.some(x => x.id === id) ? id : PAPER_DEFAULT;
+    document.documentElement.dataset.paper = p;
+    try {
+      localStorage.setItem('lg_paper', p);
+      const k = paperOfUser();
+      if (k) localStorage.setItem(k, p);
+    } catch (e) { /* 存不了就算了，纸上照样生效 */ }
+    return p;
+  };
+  const syncPaperForUser = () => {
+    let saved = '';
+    try {
+      const k = paperOfUser();
+      saved = k ? (localStorage.getItem(k) || '') : '';
+    } catch (e) {}
+    applyPaper(saved || PAPER_DEFAULT);
+  };
+  applyPaper(localStorage.getItem('lg_paper') || PAPER_DEFAULT);
+
   // ★ 2026-10-28：**昼夜光线**（纸上小屋 · P0）✓
   //
   // 信纸按**本机时间**微微变暖 / 变冷 ✓ —— 不是反色，也不是滤镜：
@@ -1009,6 +1047,10 @@
     file: '<path d="M13.5 3.5H7.5A1.5 1.5 0 0 0 6 5v14a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V8z"/><polyline points="13.5 3.5 13.5 8 18 8"/><path d="M9 13h6M9 16.5h4"/>',
     audio: '<path d="M4 12h1.5M7.5 8.5v7M11 5.5v13M14.5 9v6M18 7.5v9M20.5 11v2"/>',
     frame: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M7.5 15.5l3-3 2.5 2.5 2-2 2.5 2.5"/><circle cx="9.2" cy="9.2" r="1.1"/>',
+    // ★ 2026-10-29：「我们的家」那三行 ✓（纪念日 / 入住日 / 信纸 ✓）。
+    heart: '<path d="M12 20.2S4.8 15.6 4.8 10.4A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.2 2.8c0 5.2-7.2 9.8-7.2 9.8z"/>',
+    calendar: '<rect x="3.8" y="6" width="16.4" height="14" rx="2.5"/><path d="M3.8 10.2h16.4"/><path d="M8.4 3.4v4.2M15.6 3.4v4.2"/>',
+    paper: '<rect x="4.6" y="3.8" width="14.8" height="16.4" rx="2"/><path d="M8 8.6h8M8 12.2h8M8 15.8h5"/>',
   };
 
   /** 一枚行内图标 ✓（`cls` 给 SVG 自己用 —— 只有「性格」那个朝下箭头要它 ✓）。 */

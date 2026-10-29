@@ -413,7 +413,7 @@
       img.loading = 'lazy';
       // 图片撑开高度会改变"底部"，所以在底部时跟着再滚一次（见 scrollDown 的说明）
       img.onload = () => scrollDown();
-      img.onclick = () => openLightbox(img.src);
+      img.onclick = () => openLightbox(img.src, m.id);   // ★ 带 id → 可以「收进回忆」✓
       b.appendChild(img);
     } else if (m.msg_type === 'sticker') {
       // ★ 表情（2026-10-27）：**图就是气泡** ✓ —— 没有底板、没有补白 ✓。
@@ -426,7 +426,7 @@
         img.alt = stickerName(m);
         img.loading = 'lazy';
         img.onload = () => scrollDown();
-        img.onclick = () => openLightbox(src);
+        img.onclick = () => openLightbox(src, m.id);   // ★ 带 id → 可以「收进回忆」✓
         b.appendChild(img);
       } else {
         b.textContent = '[表情]';
@@ -531,6 +531,70 @@
   });
   // 点红丝带 = 回到底部 ✓（`scrollDown(true)` 会顺手把 stickBottom 扳回 true ✓）
   $('#ribbon').onclick = () => scrollDown(true);
+
+  // ── 夜聊（2026-10-29）──────────────────────────────────────────────
+  // ★ 十点以后，聊天自己**关灯** ✓ —— 只关这一屏 ✓。
+  //   ⚠️ 挂在 `#chat` 上（不是 body ✓）：设置页 / 屋子 / 回忆墙照样亮 ✓。
+  //   ⚠️ **不存** ✓（和"夜灯"不一样 ✓）—— 夜灯是他手动开就一直开 ✓；
+  //      夜聊是"这会儿天黑了" ✓，按钟来 ✓，下次打开重新判断 ✓。
+  //      大白天推开门是一屋子黑，那不是浪漫，是吓人 ✓。
+  //   ⚠️ 只改 `--paper*` / 气泡那几个变量 ✓（和夜灯同一套值 ✓）——
+  //      正文颜色不动 ✓，对比度靠 `--text` 撑住 ✓（这条规矩全项目一致 ✓）。
+  const NIGHT_HOUSE = {
+    '--bg': '#171310', '--panel': '#221b15', '--panel2': '#2b221a',
+    '--text': '#f2e7d4', '--muted': '#b8a68a', '--line': '#3a2f24',
+    '--accent': '#e0a45e', '--accent-bg': '#3a2a1c', '--on-accent': '#1a1208',
+    '--accent-a': 'rgba(224,164,94,.16)', '--accent-line': '#5a4530',
+    '--accent-soft': 'rgba(224,164,94,.10)', '--hover': '#2a2119',
+    '--avatar-bg': '#332a20', '--quote-bg': 'rgba(224,196,160,.14)',
+    '--bubble-bg': 'rgba(48,39,30,.70)', '--bubble-agent-bg': 'rgba(40,32,24,.76)',
+    '--bubble-mine-bg': 'rgba(96,62,32,.62)',
+    '--danger': '#e08a78', '--danger-soft': 'rgba(224,138,120,.35)',
+    '--bg-scrim': 'rgba(0,0,0,.30)', '--ok': '#7fbf8a', '--warn': '#e0b45c',
+    '--bad': '#e08578', '--warn2': '#d8b06a',
+    '--shadow-md': '0 6px 24px rgba(0,0,0,.40)',
+    '--shadow-lg': '0 18px 50px rgba(0,0,0,.52)',
+    '--paper': '#241d17', '--paper-2': '#2b231b', '--paper-slip': '#31281f',
+    '--paper-edge': '#3d3125', '--paper-rule': 'rgba(214,178,132,.10)',
+    '--paper-margin': 'rgba(214,112,92,.24)', '--paper-grain': 'rgba(255,220,180,.03)',
+    '--light-glow': 'rgba(255,186,100,.22)', '--light-wash': 'rgba(0,0,0,0)',
+  };
+  const _nightLight = () => {
+    // 白天也点过夜聊的话，主题切走再回来照样是夜里 ✓（所以每次重挂一遍 ✓）
+    const c = $('#chat');
+    if (!c || !c.classList.contains('nightChat')) return;
+    const tid = document.documentElement.dataset.theme || THEME_DEFAULT;
+    if (tid !== 'cream' && tid !== 'light') return;   // 深色两套本来就是黑的 ✓，再叠只会糊 ✓
+    Object.keys(NIGHT_HOUSE).forEach((k) => c.style.setProperty(k, NIGHT_HOUSE[k]));
+  };
+  const _nightClear = () => {
+    const c = $('#chat');
+    if (!c) return;
+    Object.keys(NIGHT_HOUSE).forEach((k) => c.style.removeProperty(k));
+  };
+  const _isNightHour = () => { const h = new Date().getHours(); return h >= 22 || h < 6; };
+  const paintNightPill = () => {
+    const p = $('#nightPill');
+    if (!p) return;
+    const on = !!($('#chat') && $('#chat').classList.contains('nightChat'));
+    p.classList.toggle('on', on || _isNightHour());
+    p.classList.toggle('lit', on);
+    p.setAttribute('aria-pressed', on ? 'true' : 'false');
+    const t = p.querySelector('.np-t');
+    if (t) t.textContent = on ? '开灯' : '夜聊';
+    if (on) _nightLight(); else _nightClear();
+  };
+  if ($('#nightPill')) $('#nightPill').onclick = () => {
+    const c = $('#chat');
+    const on = !c.classList.contains('nightChat');
+    c.classList.toggle('nightChat', on);
+    if (on) { sfx('bell'); haptic('soft'); }   // 关灯不出声 ✓ —— 静下来才对 ✓
+    paintNightPill();
+  };
+  paintNightPill();
+  // ⚠️ 一个 5 分钟的小定时器足够 ✓（要跨过 22:00 / 6:00 才变 ✓，不必每分钟算 ✓）。
+  try { setInterval(paintNightPill, 5 * 60 * 1000); } catch (e) {}
+  window.__night = paintNightPill;   // 调试 / 截图钩子 ✓（和 __light 一样 ✓）
 
   // ── 长按消息 → 引用 ────────────────────────────────────────────────
   //
@@ -1164,10 +1228,17 @@
 
   loadStickers();   // 开页就预热：清单 + 缩略图 ✓（有缓存时零等待 ✓）
 
-  const openLightbox = (src) => {
+  // ★ **这张图是哪条消息** ✓（2026-10-29）—— 「收进回忆」要的是 `message_id` ✓。
+  //   只有**已经落库**的那种调用点给得出 id ✓（`m.id` ✓）；
+  //   本地刚发（`blob:` ✓）、回忆墙上的照片（墙上那张**本身就是回忆** ✓）都没有 ✓ → 藏按钮 ✓。
+  let lightboxMsgId = null;
+  const openLightbox = (src, msgId) => {
+    lightboxMsgId = msgId ? Number(msgId) : null;
     $('#lightboxTxt').hidden = true;
     $('#lightboxImg').hidden = false;
     $('#lightboxImg').src = src;
+    const memBtn = $('#lightboxMem');
+    if (memBtn) memBtn.hidden = !lightboxMsgId;
     // ★ **能不能存，只看"这张图是不是已经落在服务器上"** ✗→✓（2026-10-11）——
     //   三个调用点给的 src 只有两种 ✓：
     //     · `img.src`（聊天里那条已经落库的图 ✓）→ **绝对 http 地址** ✓ → 能存 ✓
@@ -1194,6 +1265,7 @@
     //    那张图还挂在 `<img>` 上 ✓：内存里那份**解码后的位图**还占着 ✓
     //    （手机上一张照片就是几十 MB ✓）。摘掉 src 浏览器才会回收 ✓。
     $('#lightboxImg').removeAttribute('src');
+    lightboxMsgId = null;
   };
   // ⚠️ **能直接挂 onclick、不怕"点缩略图顺手把灯箱关了"** ✓ ——
   //    灯箱现在挂在 **body 底下** ✓（见 index.html 那段 ✓），
@@ -1224,6 +1296,31 @@
       return;
     }
     window.LifeGuardNative.saveImage(src);   // 存没存上由壳那边 toast 回话 ✓
+  };
+
+  // ★ **收进回忆**（2026-10-29）—— 看见一张图，当场就能钉到墙上 ✓。
+  //   和长按托盘里的「钉上墙」走**同一个口子** ✓（`POST /memories` + `message_id` ✓），
+  //   服务端自己去消息里抓快照 ✓、还带查重 ✓（钉过的再钉一次不会多一张 ✓）。
+  if ($('#lightboxMem')) $('#lightboxMem').onclick = async (ev) => {
+    ev.stopPropagation();              // ⚠️ 别顺手把灯箱关了 ✓（按钮在灯箱里面 ✓）
+    const btn = $('#lightboxMem');
+    if (!lightboxMsgId || btn.dataset.busy === '1') return;
+    btn.dataset.busy = '1';
+    btn.textContent = '收着…';
+    try {
+      const d = await api(`/groups/${group.id}/memories`, {
+        method: 'POST',
+        body: JSON.stringify({ message_id: lightboxMsgId }),
+      });
+      sfx('pop'); haptic('soft');
+      toast(d && d.duplicated ? '这张已经在墙上了' : '收进回忆了');
+      closeLightbox();
+    } catch (e) {
+      toast('没收进去，再试一下');
+    } finally {
+      btn.dataset.busy = '';
+      btn.textContent = '收进回忆';
+    }
   };
 
   /** 看某个人的头像（放大）✓ —— 2026-10-07 用户："如果是群里其他人，

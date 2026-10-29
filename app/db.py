@@ -411,6 +411,16 @@ _MIGRATIONS: list[tuple[str, str, str]] = [
     #      （「性子」那条路已经在 `agent_user_prompt` 上了 ✓，别开第二条 ✓）。
     #   挂群上和气泡一个道理 ✓：管家没有账号 ✓，只能挂群上 ✓。
     ("groups", "agent_outfit", "TEXT"),
+    # ★ 2026-10-29：**「我们的家」的三样东西** ✓（纸上小屋 · 5.8「我们的家」✓）。
+    #   · `house_name` —— 小屋自己的名字 ✓（`groups.name` 是聊天那本簿子的名字 ✓，
+    #     两者可以是两个名字 ✓；没填就显示群名 ✓，所以老行 NULL 不用回填 ✓）。
+    #   · `anniversary` / `moved_in` —— **日期字符串** `YYYY-MM-DD` ✓（本地日子 ✓，
+    #     不是时间戳 ✓：这两样只用来数"还有几天 / 一起住了几天"✓，
+    #     存成 UTC 时间戳的话，北京时间 0 点前后会差一天 ✓）。
+    #   ⚠️ 都不是必需 ✓：NULL = 没填 ✓（入住日没填就按 `groups.created_at` 算 ✓）。
+    ("groups", "house_name", "TEXT"),
+    ("groups", "anniversary", "TEXT"),
+    ("groups", "moved_in", "TEXT"),
 ]
 
 

@@ -1263,9 +1263,158 @@
     });
   };
 
+  // ── 我们的家 · 门牌（2026-10-29）────────────────────────────────────
+  //
+  // ★ 最上面那张卡：**两位住户 + 小屋名字 + 一起住了多少天** ✓。
+  //   ⚠️ 它**一条都不存** ✓ —— 天数 / 纪念日从今天现算 ✓（存下来的话，
+  //      第二天开 App 还写着昨天那个数 ✓，这个项目栽过"同一信息两处"好几次 ✓）。
+  //   ⚠️ 日期一律按**本地日子**算 ✓（`YYYY-MM-DD` ✓）—— 存时间戳的话，
+  //      北京时间 0 点前后会差一天 ✓（见 `groups.py` 里 `_clean_day` 那段 ✓）。
+  const _dayObj = (s) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
+    if (!m) return null;
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return isNaN(d.getTime()) ? null : d;
+  };
+  const _today0 = () => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  };
+  /** 离今天差几天 ✓：正 = 还没到 ✓，0 = 就是今天 ✓，负 = 过去了 ✓。 */
+  const _daysFrom = (d) => Math.round((d - _today0()) / 86400000);
+  /** `2026-10-29` → `10 月 29 日` ✓（右边那一格用它 ✓，年份不占地方 ✓）。 */
+  const fmtDay = (s) => {
+    const d = _dayObj(s);
+    return d ? `${d.getMonth() + 1} 月 ${d.getDate()} 日` : '';
+  };
+  /** 纪念日按**年**重复 ✓ —— 明年那个还回来 ✓。 */
+  const _annivNext = (s) => {
+    const d = _dayObj(s);
+    if (!d) return null;
+    const t = _today0();
+    const y = t.getFullYear();
+    const thisYear = new Date(y, d.getMonth(), d.getDate());
+    return thisYear < t ? new Date(y + 1, d.getMonth(), d.getDate()) : thisYear;
+  };
+  /** 一起住了几天 ✓ —— 没填入住日就按**群创建那天**算 ✓（不额外存一份 ✓）。 */
+  const _homeDays = () => {
+    let d = _dayObj(group && group.moved_in);
+    if (!d) {
+      const c = Number(group && group.created_at) || 0;
+      if (!c) return null;
+      const t = new Date(c * 1000);
+      d = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    }
+    return Math.max(1, 1 - _daysFrom(d));
+  };
+
+  const renderNameplate = () => {
+    const house = $('#npHouse');
+    if (!house) return;
+    // 没填小屋名字 → 用群名 ✓（老空间不用回填 ✓）
+    house.textContent = (group && (group.house_name || group.name)) || '我们的家';
+
+    const folks = $('#npFolks');
+    folks.textContent = '';
+    const humans = (members || []).filter(m => !m.is_agent).slice(0, 2);
+    humans.forEach((m, i) => {
+      if (i) {
+        const amp = mkel('span', 'np-amp');
+        amp.textContent = '&';
+        folks.appendChild(amp);
+      }
+      const p = mkel('div', 'np-folk');
+      const av = mkel('div', 'av');
+      // ⚠️ 头像走 `paintAvatar` ✓（同一套：取不到就退回首字 ✓）
+      paintAvatar(av, m.avatar, m.nickname || '?');
+      const nm = mkel('span', 'np-name', m.nickname || '');
+      p.append(av, nm);
+      folks.appendChild(p);
+    });
+
+    const bits = [];
+    const dd = _homeDays();
+    if (dd) bits.push('一起住了 ' + dd + ' 天');
+    if (group && group.anniversary) {
+      const nxt = _annivNext(group.anniversary);
+      if (nxt) {
+        const k = _daysFrom(nxt);
+        bits.push(k === 0 ? '今天是纪念日' : '纪念日还有 ' + k + ' 天');
+      }
+    }
+    const line = $('#npLine');
+    line.textContent = bits.join(' · ');
+    line.style.display = bits.length ? '' : 'none';
+  };
+
+  /** 选日子 ✓ —— 用系统那个日期盘 ✓（`type=date` ✓）。
+   *  ⚠️ 手打 `10/29` 那种一律不收 ✓（服务端 `_clean_day` 只认 `2026-10-29` ✓）——
+   *     猜出来的日期总有一处会和你想的不一样 ✓，而错的那个会一直挂在家门上 ✓。
+   */
+  const promptDay = (title, value, onOk, onClear) => {
+    const p = $('#sheetPanel');
+    p.innerHTML = `<h3></h3><input class="field" id="dInput" type="date">
+      <div class="actions"><button class="btn-ghost" id="dCancel">取消</button>
+      <button class="btn-ghost" id="dClear">清掉</button>
+      <button class="btn-solid" id="dOk">保存</button></div>`;
+    p.querySelector('h3').textContent = title;
+    const inp = p.querySelector('#dInput');
+    inp.value = value || '';
+    // 没填过的日子别露"清掉" ✓ —— 那一下什么都不会发生，看着像没反应 ✓。
+    const clr = p.querySelector('#dClear');
+    if (!value) clr.style.display = 'none';
+    p.querySelector('#dCancel').onclick = closeSheet;
+    p.querySelector('#dOk').onclick = () => {
+      const v = inp.value.trim();
+      if (!v) { toast('先选个日子'); return; }
+      closeSheet(); onOk(v);
+    };
+    clr.onclick = () => { closeSheet(); onClear(); };
+    openSheet();
+  };
+
+  /** 信纸：横线 / 空白 / 点阵 ✓（**这台设备**的 ✓，和主题同一个规矩 ✓）。 */
+  const openPaperSet = () => {
+    const p = $('#sheetPanel');
+    p.innerHTML = `<h3>信纸</h3><div class="ppicks"></div>`;
+    const wrap = p.querySelector('.ppicks');
+    const cur = document.documentElement.dataset.paper || PAPER_DEFAULT;
+    PAPERS.forEach(x => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ppick' + (x.id === cur ? ' on' : '');
+      b.dataset.paperPick = x.id;
+      b.setAttribute('aria-pressed', x.id === cur ? 'true' : 'false');
+      const pv = mkel('span', 'pprev pv-' + x.id);   // 小样：真的底纹 ✓（CSS 画 ✓）
+      const nm = mkel('span', 'pname', x.name);
+      const mk = mkel('span', 'pmark', '使用中');
+      b.append(pv, nm, mk);
+      b.onclick = () => {
+        applyPaper(x.id);
+        closeSheet();
+        renderSettings();       // 右那一格换名字 ✓
+      };
+      wrap.appendChild(b);
+    });
+    openSheet();
+  };
+
   const renderSettings = () => {
     paintSettingsIcons();
+    renderNameplate();
     const eGname = $('#vGname'); if (eGname) eGname.textContent = group?.name || '';
+    // ★ 2026-10-29：「我们的家」那三格 + 信纸 ✓（空的一律写「未填」✓）
+    const eHouse = $('#vHouse');
+    if (eHouse) eHouse.textContent = (group && group.house_name) || '跟空间同名';
+    const eAnniv = $('#vAnniv');
+    if (eAnniv) eAnniv.textContent = fmtDay(group && group.anniversary) || '未填';
+    const eMoved = $('#vMoved');
+    if (eMoved) eMoved.textContent = fmtDay(group && group.moved_in) || '未填';
+    const ePaper = $('#vPaper');
+    if (ePaper) {
+      const cur = document.documentElement.dataset.paper || PAPER_DEFAULT;
+      ePaper.textContent = paperById(cur).name;
+    }
     // 「聊天背景」右边：只说有没有 ✓ —— 缩略图不塞进这一行 ✓（行太窄 ✓）。
     const eBg = $('#vBg');
     if (eBg) eBg.textContent = (group && group.background) ? '已设置' : '默认';
@@ -1310,11 +1459,14 @@
     const rm = $('#rowModels');
     if (rm) rm.style.display = (me && me.is_admin) ? '' : 'none';
   };
-  const promptText = (title, value, hint, onOk) => {
+  // ★ 2026-10-29：多了一个**可选**的 `onClear` ✓ —— 只有"填过、而且清掉有意义"的那种
+  //   才露「清掉」✓（小屋名字可以清回"跟空间同名"✓）。别的调用点不传 ✓ → 看不到那颗 ✓。
+  const promptText = (title, value, hint, onOk, onClear) => {
     const p = $('#sheetPanel');
     p.innerHTML = `<h3></h3><input class="field" id="sInput">
       <div class="hint" style="font-size:12px;color:var(--muted);margin-bottom:4px"></div>
       <div class="actions"><button class="btn-ghost" id="sCancel">取消</button>
+      <button class="btn-ghost" id="sClear">清掉</button>
       <button class="btn-solid" id="sOk">保存</button></div>`;
     p.querySelector('h3').textContent = title;
     // ★ **标题/说明可以是空的** ✗→✓（2026-10-09 用户定的：点「空间」改名时
@@ -1329,6 +1481,10 @@
     else p.querySelector('.hint').style.display = 'none';
     p.querySelector('#sCancel').onclick = closeSheet;
     p.querySelector('#sOk').onclick = () => { const v = inp.value.trim(); if (v) { closeSheet(); onOk(v); } };
+    // 「清掉」只在**传了 onClear、而且本来有值**的时候露 ✓（见上面那段 ✓）
+    const clr = p.querySelector('#sClear');
+    if (!onClear || !value) clr.style.display = 'none';
+    else clr.onclick = () => { closeSheet(); onClear(); };
     openSheet(); setTimeout(() => inp.focus(), 120);
   };
 
@@ -1479,6 +1635,20 @@
       const act = el.dataset.act;
       // ★ **点「空间」只改名** ✗→✓（2026-10-09 用户定的 ✓ —— 原来它推开 `#space` ✓）
       if (act === 'gname') renameSpace();
+      // ★ 2026-10-29：「我们的家」四行 ✓
+      //   · 小屋名字：空着就**跟空间同名** ✓（清掉 = 回到那个默认 ✓）
+      //   · 两个日期：用系统日期盘 ✓（只收 `YYYY-MM-DD` ✓）
+      //   · 信纸：**这台设备**的 ✓（不广播 ✓，和主题一样 ✓）
+      else if (act === 'housename') promptText('小屋名字', (group && group.house_name) || '', '',
+        v => saveGroup({ house_name: v }),
+        () => saveGroup({ house_name: '' }));
+      else if (act === 'anniv') promptDay('纪念日', (group && group.anniversary) || '',
+        v => saveGroup({ anniversary: v }),
+        () => saveGroup({ anniversary: '' }));
+      else if (act === 'movedin') promptDay('入住日', (group && group.moved_in) || '',
+        v => saveGroup({ moved_in: v }),
+        () => saveGroup({ moved_in: '' }));
+      else if (act === 'paper') openPaperSet();
       // ★ 2026-10-19：「聊天背景」—— 推开这一屏 ✓（上传 / 移除都在它里面 ✓）
       else if (act === 'bg') openBgSet();
       // ★ 2026-10-19：「主题」—— 夜阑 / 奶霜 / 林深 ✓（只影响这台设备 ✓）

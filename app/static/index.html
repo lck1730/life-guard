@@ -212,6 +212,19 @@
        点一下回到底部 ✓。位置 / 出现时机全在 `04-chat.js` 的 scroll 里管 ✓，
        这里只留一个按钮 ✓（真正的可点区域是它，丝带画在 `::before` 上 ✓）。 -->
   <button id="ribbon" aria-label="回到最新消息"></button>
+  <!-- ★ **夜聊**（2026-10-29）—— 十点以后，聊天自己「关灯」✓。
+       一颗小月亮 ✓，22:00–6:00 才出来 ✓（出来时轻轻呼吸 ✓，是提示不是催 ✓）。
+       ⚠️ 只关**这一屏**的灯 ✓（设置 / 屋子 / 回忆墙照样亮着 ✓）——
+          它是"两个人凑近说话"的那点光 ✓，不是整机夜间模式 ✓。
+       ⚠️ 不记住 ✗（2026-10-29 定的）—— 下次打开按钟来 ✓；
+          大白天的谁也不想推开门是一屋子黑 ✓。 -->
+  <button id="nightPill" type="button" aria-label="夜聊" aria-pressed="false">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+         stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 14.4A8.2 8.2 0 0 1 9.6 4a8.4 8.4 0 1 0 10.4 10.4z"/>
+    </svg>
+    <span class="np-t">夜聊</span>
+  </button>
   <div id="composer">
     <div id="atMenu"></div>
     <!-- 引用条：长按气泡选了「引用」之后出现在这里，发完自动消失。
@@ -498,6 +511,18 @@
          ⚠️ 新增三行：夜灯 / 声音 / 触感 ✓（P3 ✓）—— 都是**开关** ✓，
             不是那种点进去还要再选一次的 ✓（`.sw` ✓，见 home.css 那段 ✓）。 -->
 
+    <!-- ★★ 2026-10-29：**门牌** ✓（纸上小屋 · 5.8「我们的家」✓）。
+         住户两位 + 小屋名字 + 一起住了多少天 ✓ —— 全是**事实** ✓，
+         一个字的介绍都没有 ✓（用户那条规矩 ✓）。
+         ⚠️ 这张卡**不点**（没有 `data-act` ✓）—— 名字 / 两个日期各有各的行 ✓；
+            点卡就跳走反而像"这里还有一页" ✗，而它只是"站在门口先看一眼" ✓。
+         ⚠️ 内容全由 `renderNameplate` 现画 ✓（`index.html` 里只有壳 ✓）。 -->
+    <div class="nameplate" id="nameplate">
+      <div class="np-house" id="npHouse"></div>
+      <div class="np-folks" id="npFolks"></div>
+      <div class="np-line" id="npLine"></div>
+    </div>
+
     <div class="house-sec">住户</div>
     <div class="sec-g">
       <div class="grp gcard">
@@ -512,6 +537,18 @@
     <div class="house-sec">小屋</div>
     <div class="sec-g">
       <div class="grp gcard">
+    <!-- ★ 2026-10-29：小屋自己的名字 ✓（和下面「空间」**不是一回事** ✗：
+         那个改的是聊天那本簿子的名字 ✓，这个是挂在门上的那一块 ✓）。
+         没填就显示群名 ✓（所以老空间不用回填 ✓）。 -->
+    <div class="item" data-act="housename"><span class="ico" data-ico="frame"></span><span class="k">小屋名字</span><span class="v" id="vHouse"></span><span class="chev" data-chev></span></div>
+    <!-- ★ 两个日期：**只到天** ✓（`YYYY-MM-DD` ✓，本地日子 ✓）——
+         纪念日按年重复数下一次 ✓，入住日数"一起住了几天" ✓。
+         ⚠️ 入住日没填时门牌按群创建那天算 ✓（`groups.created_at` ✓）。 -->
+    <div class="item" data-act="anniv"><span class="ico" data-ico="heart"></span><span class="k">纪念日</span><span class="v" id="vAnniv"></span><span class="chev" data-chev></span></div>
+    <div class="item" data-act="movedin"><span class="ico" data-ico="calendar"></span><span class="k">入住日</span><span class="v" id="vMoved"></span><span class="chev" data-chev></span></div>
+    <!-- ★ 信纸（2026-10-29）：横线 / 空白 / 点阵 ✓ —— **这台设备**的 ✓，
+         和主题同一个规矩 ✓（存 `lg_paper:u<id>` ✓，不进服务端 ✓）。 -->
+    <div class="item" data-act="paper"><span class="ico" data-ico="paper"></span><span class="k">信纸</span><span class="v" id="vPaper"></span><span class="chev" data-chev></span></div>
     <div class="item" data-act="gname"><span class="ico" data-ico="space"></span><span class="k">空间</span><span class="v" id="vGname"></span><span class="chev" data-chev></span></div>
     <!-- ★ 主题（2026-10-19）：三套可选（夜阑 / 奶霜 / 林深 ✓），选完立即生效 ✓。
          ⚠️ 只存这台设备、按用户 id 分开 ✓，不进服务端、不给空间里的别人 ✓。 -->
@@ -734,6 +771,10 @@
           手机上"保存图片"就是这个意思 ✓。
        ⚠️ 打开的是 `blob:` 那种（自己刚发、还在传的 ✓）时会**藏起来** ✓ ——
           原生拿不到 blob ✓，留一个点了没反应的按钮更糟 ✗（见 openLightbox ✓）。 -->
+  <!-- ★ **收进回忆**（2026-10-29）—— 图片上直接钉，不用绕去长按托盘 ✓。
+       只有**已经落库的那条**才给（知道 message_id ✓）；本地刚发还没传完的
+       `blob:` 那条没有 id ✓ → 藏起来 ✓（同 `保存到相册` 那条规矩 ✓）。 -->
+  <button class="lbmem" id="lightboxMem" type="button" hidden>收进回忆</button>
   <button class="lbsave" id="lightboxSave" type="button" hidden>保存到相册</button>
 </div>
 

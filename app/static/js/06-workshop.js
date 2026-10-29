@@ -747,6 +747,154 @@
       '</g></g>';
   };
 
+  // ── 屋子会长（2026-10-29）────────────────────────────────────────
+  // ★ 屋里**用过什么，就多出点什么** ✓ —— 三样，都是**只加、不藏** ✓：
+  //   · 记过一笔账 → 桌角多一只**攒硬币的玻璃罐** ✓
+  //   · 设过一个提醒 → 桌上多一只**黄铜小闹钟** ✓
+  //   · 钉过一张回忆 → 墙上多**两张拍立得** ✓
+  // ⚠️ 屋里原本那本账 / 那只挂钟 / 那幅画**照旧都在** ✓ —— 那是**入口** ✓，
+  //   藏起来就少了一个入口 ✓。这里加的是"用过之后留下的痕迹" ✓。
+  // ⚠️ **一个数都不存** ✓ —— 每次从 `/digest` 现数 ✓（管家面板走同一个口子 ✓）。
+  // ⚠️ 这个文件里**不写模板字符串** ✓（见 2150 那段注释那个坑 ✓）。
+  let houseGrow = null;        // { records, reminders, memories } ✓；null = 还没数上来 ✓
+
+  const growFade = '<animate attributeName="opacity" from="0" to="1" ' +
+    'dur=".6s" begin=".15s" fill="freeze"/>';
+
+  // 攒硬币的玻璃罐 ✓ —— 桌角、那摞书左边 ✓（书 210..305 ✓，罐子 152..208 ✓）
+  const coinJarSvg = function () {
+    return '<g opacity="0" pointer-events="none">' + growFade +
+      '<ellipse cx="180" cy="1029" rx="27" ry="5.5" fill="#6a4530" opacity=".16"/>' +
+      // 罐身
+      '<path d="M160 986 q-4 6 -4 12 v18 q0 8 6 8 h32 q6 0 6 -8 v-18 q0 -6 -4 -12 z" ' +
+        'fill="#fffdf7" fill-opacity=".6" stroke="#c1a073" stroke-width="1.4"/>' +
+      // 硬币
+      '<ellipse cx="172" cy="1017" rx="8" ry="4" fill="#e8c07a" stroke="#b98c48" stroke-width="1"/>' +
+      '<ellipse cx="172" cy="1012" rx="8" ry="4" fill="#f0cf94" stroke="#b98c48" stroke-width="1"/>' +
+      '<ellipse cx="188" cy="1016" rx="6.4" ry="3.4" fill="#e8c07a" stroke="#b98c48" stroke-width="1"/>' +
+      '<ellipse cx="182" cy="1020" rx="5.4" ry="2.8" fill="#f0cf94" stroke="#b98c48" stroke-width=".9"/>' +
+      // 瓶口 + 软木塞
+      '<rect x="161" y="976" width="38" height="12" rx="4" fill="#f7ecd8" stroke="#c1a073" stroke-width="1.3"/>' +
+      '<rect x="169" y="966" width="22" height="11" rx="3.5" fill="#d3a86f" stroke="#a97c42" stroke-width="1.2"/>' +
+      // 一道高光 ✓
+      '<path d="M166 992 q-2 10 1 22" fill="none" stroke="#ffffff" stroke-opacity=".85" ' +
+        'stroke-width="2.4" stroke-linecap="round"/>' +
+    '</g>';
+  };
+
+  // 黄铜小闹钟 ✓ —— 桌上右边 ✓（挂钟底下那块空桌面 ✓，不压火漆信 590..674 ✓）
+  const brassClockSvg = function () {
+    return '<g opacity="0" pointer-events="none">' + growFade +
+      '<ellipse cx="723" cy="1030" rx="19" ry="4" fill="#6a4530" opacity=".16"/>' +
+      // 两只小脚
+      '<path d="M708 1022 l-5 9 M738 1022 l5 9" fill="none" stroke="#a97c42" ' +
+        'stroke-width="2.4" stroke-linecap="round"/>' +
+      // 顶上的小铃
+      '<path d="M711 984 q1 -11 12 -11 q11 0 12 11 z" fill="#d8a460" stroke="#a97c42" stroke-width="1.2"/>' +
+      '<path d="M715 975 q8 -8 16 0" fill="none" stroke="#a97c42" stroke-width="2.2" stroke-linecap="round"/>' +
+      // 钟身 + 表盘
+      '<circle cx="723" cy="1002" r="21" fill="#e8c07a" stroke="#a97c42" stroke-width="1.6"/>' +
+      '<circle cx="723" cy="1002" r="15.4" fill="#fffdf7" stroke="#c8a86f" stroke-width="1"/>' +
+      '<path d="M723 991 v11 M723 1002 l8 4.6" fill="none" stroke="#8d5a24" ' +
+        'stroke-width="1.8" stroke-linecap="round"/>' +
+      '<circle cx="723" cy="1002" r="1.9" fill="#8d5a24"/>' +
+    '</g>';
+  };
+
+  // 一张拍立得 ✓（空白的 ✓ —— 照片里只画远山和太阳 ✓，跟窗外那幅景一个调子 ✓）
+  const polaroidSvg = function (cx, cy, w, h, rot, sky, hill) {
+    const x = cx - w / 2, y = cy - h / 2;
+    const pw = w - 16, px = x + 8, py = y + 8;
+    return '<g transform="rotate(' + rot + ' ' + cx + ' ' + cy + ')" opacity="0">' + growFade +
+      '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="3" ' +
+        'fill="#fffdf7" stroke="#d9c8a4" stroke-width="1.4"/>' +
+      '<rect x="' + px + '" y="' + py + '" width="' + pw + '" height="' + pw + '" fill="' + sky + '"/>' +
+      '<circle cx="' + (px + pw * 0.72) + '" cy="' + (py + pw * 0.26) + '" r="' + (pw * 0.13) + '" ' +
+        'fill="#ffcf7a"/>' +
+      '<path d="M' + px + ' ' + (py + pw) + ' L' + (px + pw * 0.28) + ' ' + (py + pw * 0.56) +
+        ' L' + (px + pw * 0.52) + ' ' + (py + pw * 0.84) + ' L' + (px + pw * 0.74) + ' ' + (py + pw * 0.5) +
+        ' L' + (px + pw) + ' ' + (py + pw) + ' Z" fill="' + hill + '"/>' +
+      // 顶上那道胶带 ✓
+      '<rect x="' + (cx - 13) + '" y="' + (y - 6) + '" width="26" height="12" rx="1.5" ' +
+        'fill="#e2c48c" opacity=".55"/>' +
+    '</g>';
+  };
+
+  // 两张拍立得 ✓ —— 挂在**画框下面**那面空墙 ✓（画框 632..840 × 538..702 ✓）
+  const polaroidsSvg = function () {
+    return polaroidSvg(706, 806, 108, 126, -3.5, '#ffe9c6', '#a9c48a') +
+      polaroidSvg(776, 886, 88, 106, 4.5, '#ffdfd0', '#9dbb84');
+  };
+
+  const houseGrowSvg = function () {
+    if (!houseGrow) return '';
+    let s = '';
+    if (houseGrow.records > 0) s += coinJarSvg();
+    if (houseGrow.reminders > 0) s += brassClockSvg();
+    if (houseGrow.memories > 0) s += polaroidsSvg();
+    return s;
+  };
+
+  // ★ 第一次进屋的**手写标签** ✓（2026-10-29）——
+  //   屋里东西不少，头一回进来未必知道哪个能点 ✓；写几个字最省事 ✓。
+  //   ⚠️ 只写**东西的名字** ✓（聊天/账本/提醒/回忆/我们的家 ✓）——
+  //     不写"点这里可以…"那种**说明功能的句子** ✓（他明确不要 ✓）。
+  //   ⚠️ 字画在 **SVG 里** ✓ —— 摆在外层 div 上的话 `slice` 一裁就错位 ✓。
+  //   ⚠️ 看一眼就够 ✓：7 秒后自己淡掉 ✓，点一下也立刻淡掉 ✓，看过就再不出现 ✓。
+  const labelsKey = function () {
+    const uid = me && (me.id ?? me.username);
+    return (uid === undefined || uid === null || uid === '') ? '' : 'lg_house_labels:u' + uid;
+  };
+  const labelsSeen = function () {
+    try {
+      const k = labelsKey();
+      return !k || localStorage.getItem(k) === '1';
+    } catch (e) { return true; }
+  };
+  const markLabelsSeen = function () {
+    try { const k = labelsKey(); if (k) localStorage.setItem(k, '1'); } catch (e) {}
+  };
+
+  // [字, 字x, 字y, 箭头起点x, 箭头起点y, 箭头终点x, 箭头终点y] ✓
+  const houseLabelsSvg = function () {
+    const L = [
+      ['聊天',   452, 1214, 452, 1198, 452, 1096],
+      ['账本',   766, 512,  744, 498,  700, 472],
+      ['提醒',   715, 206,  715, 220,  715, 240],
+      ['回忆',   572, 632,  596, 632,  628, 632],
+      ['我们的家', 552, 1172, 560, 1158, 594, 1146],
+    ];
+    let s = '<g class="ws-labels" pointer-events="none">';
+    for (let i = 0; i < L.length; i++) {
+      const t = L[i];
+      // ⚠️ 虚线**先描一道白** ✓ —— 底下的画什么颜色都有（桌面是棕的 ✓、
+      //   墙是米黄的 ✓）。只画一圈琥珀，落在桌面上就跟桌面糊成一片 ✓
+      //   （我照着第一版截图看出来的 ✓，聊天那条线几乎看不见 ✓）。
+      const seg = 'M' + t[3] + ' ' + t[4] + ' L' + t[5] + ' ' + t[6];
+      s += '<g class="ws-lbl" style="animation-delay:' + (0.45 + i * 0.12) + 's">' +
+        '<path d="' + seg + '" fill="none" stroke="#fffdf7" stroke-opacity=".85" ' +
+          'stroke-width="5" stroke-linecap="round" stroke-dasharray="1 7"/>' +
+        '<path d="' + seg + '" fill="none" ' +
+          'stroke="#a97c42" stroke-width="2.1" stroke-linecap="round" stroke-dasharray="1 7"/>' +
+        '<circle cx="' + t[5] + '" cy="' + t[6] + '" r="2.6" fill="#a97c42" ' +
+          'stroke="#fffdf7" stroke-width="1.4"/>' +
+        '<text x="' + t[1] + '" y="' + t[2] + '" text-anchor="middle" class="ws-lbl-t">' +
+          t[0] + '</text>' +
+      '</g>';
+    }
+    return s + '</g>';
+  };
+
+  // 标签淡掉 ✓ —— 淡完再摘 ✓（`remove` 太早会"啪"地消失 ✓）
+  const dropLabels = function (wrap) {
+    if (!wrap) return;
+    const g = wrap.querySelector('.ws-labels');
+    if (!g || g.classList.contains('bye')) return;
+    g.classList.add('bye');
+    markLabelsSeen();
+    setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, 700);
+  };
+
   const buildFlatScene = function () {
     const wrap = document.createElement('div');
     wrap.className = 'ws-scene';
@@ -793,6 +941,8 @@
       //   **外层 svg 的 slice** ✓，内层只管把图原样贴进 viewBox。
       '<image href="/static/flat-room.svg" x="0" y="0" width="900" height="1600" ' +
         'preserveAspectRatio="xMidYMid meet"/>' +
+      // ★ 屋子会长（2026-10-29）✓ —— 用过才长出来的三样 ✓（压在屋子图上、环境光下面 ✓）
+      '<g pointer-events="none">' + houseGrowSvg() + '</g>' +
       // 环境动效（光/尘/花瓣）✓ 压在屋子上、猫下面 ✓
       '<g pointer-events="none">' + flatFxSvg() + '</g>' +
       // ★ 2026-10-28：桌上摊开那本现在是**信簿** ✓ —— 点它 = **落座** ✓
@@ -834,7 +984,9 @@
       // ★ 补一层和 rsvg 末尾相同的暗角 ✓ —— 猫是搬出来的 ✓，
       //   不补的话它会比屋里别的角落亮一档 ✓（看着像贴上去的 ✗）。
       '<rect x="0" y="0" width="900" height="1600" fill="none" stroke="#8a5a3a" ' +
-        'stroke-width="80" opacity=".05" pointer-events="none"/>';
+        'stroke-width="80" opacity=".05" pointer-events="none"/>' +
+      // ★ 头一回进屋的手写标签 ✓ —— 压在最上面 ✓，暗角也别盖住字 ✓
+      (labelsSeen() ? '' : houseLabelsSvg());
 
     // ★ 2026-10-28（P2）：屋里**每个物开自己那一屏** ✓ ——
     //   书架的账本 → 账本屏 ✓；挂钟 → 提醒 ✓；挂画 → 回忆墙 ✓；火漆信 → 我们的家 ✓。
@@ -931,6 +1083,14 @@
         setTimeout(function () { leaving = false; openButler(); }, 520);  // 动作播完再开 ✓
       });
     }
+    // ★ 头一回进屋的手写标签 ✓ —— 看一眼就够 ✓：
+    //   7 秒自己淡掉 ✓；**点哪儿都先淡掉** ✓（capture 抢在下面那些热区前面 ✓，
+    //   但不拦 ✓ —— 该开的屏照开 ✓，别让人多点一下 ✓）。
+    if (svg.querySelector('.ws-labels')) {
+      setTimeout(function () { dropLabels(wrap); }, 7000);
+      svg.addEventListener('pointerdown', function () { dropLabels(wrap); }, true);
+    }
+
     wrap.appendChild(svg);
     return wrap;
   };
@@ -1253,7 +1413,15 @@
   /** 三屏的进出：**状态栏那一下跟着走** ✓（纸是浅的 → 深色图标 ✓；
    *  灯开着 / 深色主题时又反回来 ✓，判据全在 `_syncStatusBar` ✓）。 */
   const hEnter = (id) => { pushScreen(id); _syncStatusBar(); };
-  const hLeave = (id) => { popScreen(id); setTimeout(_syncStatusBar, 220); };
+  const hLeave = (id) => {
+    popScreen(id);
+    setTimeout(_syncStatusBar, 220);
+    // ★ 这一趟可能刚记了第一笔 / 设了第一个提醒 / 钉了第一张回忆 ✓ ——
+    //   回屋里再数一遍 ✓，该"长出来"的当场就长 ✓（变了才重画 ✓，不会白闪 ✓）。
+    setTimeout(function () {
+      if ($('#workshop').classList.contains('on')) refreshHouseGrow();
+    }, 260);
+  };
 
   // ── 提醒（点墙上的挂钟 / 长按消息「变提醒」/ 工具扇 ✓）───────────────
   let clockRows = [], clockPrefill = '', clockPick = 'm10';
@@ -1570,6 +1738,12 @@
         img.src = '/media/' + m.media_path;
         img.alt = '';
         img.loading = 'lazy';
+        // ★ 点墙上的照片 → 看大图 ✓，那儿有「保存到相册」✓（2026-10-29）。
+        //   墙上这张**本身就是回忆** ✓ → 不带 message_id ✓，也就不给「收进回忆」✓。
+        img.onclick = function (ev) {
+          ev.stopPropagation();
+          openLightbox('/media/' + m.media_path);
+        };
         card.appendChild(img);
       }
       if (m.text) card.appendChild(mkel('div', 'mw-quote', m.text));
@@ -2105,6 +2279,22 @@
   //: 拖完一次性交给服务端 ✓（见 `saveArrangement` ✓）。
   let wsCanvas = [];
 
+  // ★ 屋子会长（2026-10-29）✓ —— 数一遍屋里"用过"了几样 ✓；**数变了才重画** ✓。
+  //   ⚠️ 不 await ✓：组件那趟照旧先画出来 ✓，数字回来再补一次 ✓
+  //      （列表和数字两个口子 ✓，谁也不等谁 ✓）。
+  const houseGrowKey = () => (houseGrow
+    ? [houseGrow.records, houseGrow.reminders, houseGrow.memories].join(',')
+    : '');
+  const refreshHouseGrow = async () => {
+    let d = null;
+    try { d = await api(`/groups/${group.id}/digest`); }
+    catch (e) { return; }                     // 数不上来就按老样子画 ✓（屋里东西一样能点 ✓）
+    const c = (d && d.counts) || {};
+    const before = houseGrowKey();
+    houseGrow = { records: c.records || 0, reminders: c.reminders || 0, memories: c.memories || 0 };
+    if (before !== houseGrowKey() && $('#workshop').classList.contains('on')) paintCanvas();
+  };
+
   const renderWorkshop = async () => {
     const box = $('#wsBody');
     let list = [];
@@ -2115,6 +2305,7 @@
       return;
     }
     wsCanvas = list;                          // 服务端已经按**排好的位置**给了 ✓
+    refreshHouseGrow();                       // ★ 不 await ✓（见上 ✓）
     paintCanvas();
   };
 

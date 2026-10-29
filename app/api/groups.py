@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 import os
@@ -57,7 +58,7 @@ async def _groups_for(user_id: int) -> list[dict]:
     return await fetch_all(
         """SELECT g.id, g.name, g.owner_id, g.invite_code, g.created_at, g.profile, g.agent_name,
                   g.agent_status, g.agent_user_prompt, g.agent_avatar, g.agent_bubble,
-                  g.agent_outfit,
+                  g.agent_outfit, g.house_name, g.anniversary, g.moved_in,
                   (SELECT COUNT(*) FROM group_members gm2 WHERE gm2.group_id = g.id) AS member_count
            FROM groups g
            JOIN group_members gm ON gm.group_id = g.id
@@ -381,6 +382,29 @@ class UpdateGroupIn(BaseModel):
     #   ⚠️ 只有长相 ✓：不进提示词 ✓（见 `core/outfits.py` 那段 ✓）。
     #   空字符串 / 'bell' = 回默认 ✓（落库存 NULL ✓）。
     agent_outfit: str | None = None
+    # ★ 2026-10-29：「我们的家」三样 ✓（群级 ✓、谁都能改 ✓）。
+    #   ⚠️ **空字符串 = 清掉** ✓（存 NULL ✓）；`None` = 这次不动它 ✓。
+    #   日期一律 `YYYY-MM-DD` ✓（见 `_clean_day` ✓）。
+    house_name: str | None = Field(default=None, max_length=32)
+    anniversary: str | None = None
+    moved_in: str | None = None
+
+
+def _clean_day(raw: str) -> str | None:
+    """把 `YYYY-MM-DD` 收成规范形状 ✓；空串 = 清掉 ✓；别的形状一律 422 ✓。
+
+    ⚠️ **不猜** ✓ —— "10月29" / "10/29" 都不收 ✓。猜出来的日期总有一处会和
+       用户想的不一样 ✓，而错的那个会一直挂在家门上 ✓。
+    """
+    v = (raw or "").strip()
+    if not v:
+        return None
+    try:
+        d = datetime.date.fromisoformat(v)
+    except ValueError:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "日期要写成 2026-10-29 这样")
+    return d.isoformat()
 
 
 async def _sync_name_to_shell(request: Request, group_id: int, name: str) -> None:
@@ -480,6 +504,15 @@ async def update_group(
         if v and v not in OUTFITS:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "没有这个配饰")
         fields.append("agent_outfit = ?"); params.append(store_outfit(v))
+    # ★ 2026-10-29：「我们的家」三样 ✓
+    #   · 小屋名字：空串 = 清掉 ✓（界面回落到群名 ✓）。
+    #   · 两个日期：一律过 `_clean_day` ✓ —— 形状只有一处定义 ✓。
+    if body.house_name is not None:
+        fields.append("house_name = ?"); params.append(body.house_name.strip() or None)
+    if body.anniversary is not None:
+        fields.append("anniversary = ?"); params.append(_clean_day(body.anniversary))
+    if body.moved_in is not None:
+        fields.append("moved_in = ?"); params.append(_clean_day(body.moved_in))
     if not fields:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "没有要修改的内容")
     params.append(group_id)
