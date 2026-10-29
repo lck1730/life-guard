@@ -157,132 +157,167 @@
     <!-- ★ 2026-10-29：**顶栏只剩空间名和管家的动静** ✓（用户定的 ✓）。
          ☰ 和刷新都拿掉了 ✓ —— 设置改成**右滑**进 ✓（05-settings.js 的手势），
          刷新改成**从顶栏往下拽** ✓（同文件里的 pull 那段）。
-         ⚠️ 居中现在是**结构保证** ✓：`.info` 独占整行、里面 `text-align:center` ✓，
-           右边靠 `padding` 给猫猫仔让位 ✓（左右一样宽 → 名字仍在正中 ✓）。
-         ★ 2026-10-30：**那条状态文字下线了** ✓ —— 顶栏右侧住进一只猫猫仔 ✓
-           （SVG 就在这里 ✓，动作在 `js/08-cat.js` ✓，只切 `data-mood` ✓）。 -->
+         ★ 2026-10-30 第二版：顶栏分成**上下两行** ✓ ——
+           上面一行住空间名 ✓（`.info` 独占整行 → 居中仍是结构保证 ✓），
+           下面 30px 是猫的**地板** ✓（`#catStage` ✓，见下 ✓）。
+           ⚠️ 第一版"左右各让 58px 躲猫"那条**作废** ✓ —— 猫已经不和名字抢地方了 ✓。 -->
     <div class="info">
       <div class="gname" id="gname">—</div>
     </div>
     <!-- ★ 2026-10-29 暖光：顶栏一条小灯串（纯装饰、不接事件） -->
     <div id="garland" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <!-- ★ 2026-10-30：**猫猫仔** ✓ —— 睡在顶栏的边沿上，不接手指 ✓（`pointer-events:none` ✓）。
-         画法全在这段内联 SVG 里 ✓：奶油毛 + 白描边（贴纸感 ✓）+ 绿领结金铃铛 ✓。
-         两个表情组（闭眼 / 睁眼）叠着放 ✓，CSS 按 `data-mood` 切换 ✓。
-         ⚠️ 渐变 id 带 `hc` 前缀 ✓ —— 页面里别的 SVG（旧屋场景 ✓）也有 `catFur` / `catHead` ✓，
-            同名会让浏览器用先出现的那一份 ✗。 -->
-    <div id="cat" class="cat" data-mood="sleep" role="img" aria-label="猫猫仔在打盹">
-      <span class="cat-think" aria-hidden="true"><i></i><i></i><i></i></span>
-      <span class="cat-zzz" aria-hidden="true"><i>z</i><i>z</i><i>z</i></span>
-      <span class="cat-rig">
-        <span class="cat-breathe">
-          <svg class="cat-art" viewBox="0 0 72 62" aria-hidden="true" focusable="false">
-            <defs>
-              <radialGradient id="hcCatFur" cx="38%" cy="30%" r="78%">
-                <stop offset="0%" stop-color="#fffaf1"/>
-                <stop offset="62%" stop-color="#ffe9cd"/>
-                <stop offset="100%" stop-color="#f7d4ab"/>
-              </radialGradient>
-              <linearGradient id="hcCatEar" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#f9cfb4"/>
-                <stop offset="100%" stop-color="#f2b394"/>
-              </linearGradient>
-            </defs>
-            <ellipse class="cat-shadow" cx="36" cy="59" rx="18" ry="3" fill="#5a341e" opacity=".14"/>
-            <!-- 尾巴（绕在右边 ✓）—— 先铺 4px 白边，再上奶油色，尖上一点橘 ✓ -->
-            <g class="cat-tail">
-              <path d="M 52 51 C 64 54 69 45 62 39 C 58 35 53 38 55 43" fill="none"
-                    stroke="#fffdf7" stroke-width="9" stroke-linecap="round"/>
-              <path d="M 52 51 C 64 54 69 45 62 39 C 58 35 53 38 55 43" fill="none"
-                    stroke="#f4d5b2" stroke-width="5.2" stroke-linecap="round"/>
-              <path d="M 62 39 C 58 35 53 38 55 43" fill="none"
-                    stroke="#eda972" stroke-width="5.2" stroke-linecap="round"/>
-            </g>
-            <!-- 身子（坐着 ✓） -->
-            <g class="cat-body">
-              <path d="M 18 56 C 15 41 22 29 36 29 C 50 29 57 41 54 56 Z"
-                    fill="#fffdf7" stroke="#fffdf7" stroke-width="4"/>
-              <path d="M 18 56 C 15 41 22 29 36 29 C 50 29 57 41 54 56 Z"
-                    fill="url(#hcCatFur)" stroke="#d9a273" stroke-width="1.5"/>
-              <ellipse cx="36" cy="47" rx="9.5" ry="7.5" fill="#fff8ea" opacity=".85"/>
-            </g>
-            <g class="cat-paws">
-              <ellipse cx="29" cy="55.5" rx="5.2" ry="3.2" fill="#fff8ea"
-                       stroke="#d9a273" stroke-width="1.2"/>
-              <ellipse cx="43" cy="55.5" rx="5.2" ry="3.2" fill="#fff8ea"
-                       stroke="#d9a273" stroke-width="1.2"/>
-            </g>
-            <!-- 领口 + 金铃铛（管家猫的老记号 ✓） -->
-            <g class="cat-collar">
-              <path d="M 24 35.5 Q 36 41.5 48 35.5" fill="none"
-                    stroke="#47604c" stroke-width="4" stroke-linecap="round"/>
-              <circle cx="36" cy="41.5" r="3.1" fill="#ffd166" stroke="#c9931f" stroke-width="1.2"/>
-              <circle cx="36" cy="40.6" r=".9" fill="#c9931f"/>
-              <path d="M 36 43.6 v 1.9" stroke="#c9931f" stroke-width="1" stroke-linecap="round"/>
-            </g>
-            <!-- 脑袋（耳朵在下面先画 ✓，头再压住耳根 ✓） -->
-            <g class="cat-head">
-              <g class="cat-ears">
-                <path d="M 20.5 16 L 19.5 5.5 Q 19.5 3.5 21.4 4.3 L 31 11 Z"
-                      fill="#fffdf7" stroke="#fffdf7" stroke-width="4" stroke-linejoin="round"/>
-                <path d="M 51.5 16 L 52.5 5.5 Q 52.5 3.5 50.6 4.3 L 41 11 Z"
-                      fill="#fffdf7" stroke="#fffdf7" stroke-width="4" stroke-linejoin="round"/>
-                <path d="M 20.5 16 L 19.5 5.5 Q 19.5 3.5 21.4 4.3 L 31 11 Z"
-                      fill="url(#hcCatEar)" stroke="#d9a273" stroke-width="1.4" stroke-linejoin="round"/>
-                <path d="M 51.5 16 L 52.5 5.5 Q 52.5 3.5 50.6 4.3 L 41 11 Z"
-                      fill="url(#hcCatEar)" stroke="#d9a273" stroke-width="1.4" stroke-linejoin="round"/>
-                <path d="M 22.6 13.4 L 22 7.7 Q 22 6.5 23 7.1 L 28.4 11 Z" fill="#f6b0a7"/>
-                <path d="M 49.4 13.4 L 50 7.7 Q 50 6.5 49 7.1 L 43.6 11 Z" fill="#f6b0a7"/>
+    <!-- ★★ 2026-10-30 第二版：**顶栏下面那条 30px 是猫的地板** ✓
+         用户：「猫猫活动范围有些局限，应该再整个状态栏都可以运动，左边可以有喝水吃猫粮的
+         地方，右边是窝着睡觉觉的地方，中间可以走动，也能趴着睡」。
+         · 水碗 / 饭盆在最左边 ✓、猫窝在最右边 ✓、中间随便走 / 趴 ✓
+         · 名字住上面那行 ✓，地板住下面那行 ✓ —— 两者**不抢位置** ✓
+         · 长相照「气泡猫猫」那张贴纸画 ✓（同一张脸：奶油底 + 棕描边 + 宽矮圆耳 +
+           粉耳朵 + 腮红 + 圆眼高光 + 粉三角鼻 + ω 嘴 + 胡须 + 小爱心 ✓）
+         · 动作分层：头 / 身子 / 尾巴 / 两只爪子各动各的 ✓（CSS 见 app.css ✓）
+         · 不接手指 ✓；位置由 `js/08-cat.js` 改 `--cat-x` ✓ -->
+    <div id="catStage" aria-hidden="true" data-act="">
+      <!-- 右边：猫窝 ✓（在猫后面 ✓ —— 猫趴进去就是躺在窝里 ✓） -->
+      <div class="cat-bed">
+        <svg viewBox="0 0 44 22" focusable="false">
+          <ellipse cx="22" cy="19.4" rx="19.4" ry="2.1" fill="#4a2a16" opacity=".14"/>
+          <ellipse cx="22" cy="12.6" rx="20.2" ry="8.2" fill="#f2cca4"
+                   stroke="#a8845a" stroke-width="1.5"/>
+          <ellipse cx="22" cy="11.4" rx="13.4" ry="4.7" fill="#fbeada"
+                   stroke="#d9a273" stroke-width="1.1"/>
+          <path d="M12.4 11.1 Q22 7.4 31.6 11.1 Q30.8 14.7 22 15.3 Q13.2 14.7 12.4 11.1 Z"
+                fill="#f7c7b5" opacity=".92"/>
+          <g fill="none" stroke="#c99a6e" stroke-width="1.05" stroke-linecap="round" opacity=".75">
+            <path d="M4.2 11.8 l2.1 .9"/>
+            <path d="M6.6 14.4 l2.1 .7"/>
+            <path d="M10.6 16.4 l2.1 .5"/>
+            <path d="M33.4 16.4 l2.1 -.5"/>
+            <path d="M37.4 14.4 l2.1 -.7"/>
+            <path d="M39.8 11.8 l2.1 -.9"/>
+          </g>
+        </svg>
+      </div>
+      <!-- 左边：水碗 + 饭盆 ✓（画在猫**前面** → 低头时嘴藏进碗沿 ✓） -->
+      <div class="cat-bowl cat-water">
+        <svg viewBox="0 0 20 13" focusable="false">
+          <ellipse cx="10" cy="11.3" rx="8.1" ry="1.4" fill="#4a2a16" opacity=".14"/>
+          <path d="M2 6.4 C2 10.8 18 10.8 18 6.4 Z" fill="#eec196"
+                stroke="#a8845a" stroke-width="1.2" stroke-linejoin="round"/>
+          <ellipse cx="10" cy="6.4" rx="8" ry="2.6" fill="#c9e8f2"
+                   stroke="#a8845a" stroke-width="1.2"/>
+          <ellipse cx="7.1" cy="5.8" rx="2.2" ry=".72" fill="#fff" opacity=".8"/>
+          <ellipse class="w-ripple" cx="10" cy="6.4" rx="5.3" ry="1.7"
+                   fill="none" stroke="#fff" stroke-width=".9"/>
+        </svg>
+      </div>
+      <div class="cat-bowl cat-food">
+        <svg viewBox="0 0 20 13" focusable="false">
+          <ellipse cx="10" cy="11.3" rx="8.1" ry="1.4" fill="#4a2a16" opacity=".14"/>
+          <path d="M2 6.2 C2 10.8 18 10.8 18 6.2 Z" fill="#f0c39b"
+                stroke="#a8845a" stroke-width="1.2" stroke-linejoin="round"/>
+          <ellipse cx="10" cy="6.2" rx="8" ry="2.7" fill="#f8dcb8"
+                   stroke="#a8845a" stroke-width="1.2"/>
+          <g class="kibble">
+            <circle cx="6.2" cy="5.9" r="1.45" fill="#d99a5c"/>
+            <circle cx="9" cy="6.5" r="1.35" fill="#c8843f"/>
+            <circle cx="11.9" cy="5.6" r="1.4" fill="#d99a5c"/>
+            <circle cx="13.9" cy="6.5" r="1.2" fill="#c8843f"/>
+            <circle cx="8" cy="4.7" r="1.1" fill="#e5aa6e"/>
+          </g>
+        </svg>
+      </div>
+      <!-- 猫 ✓ -->
+      <div id="cat" data-mood="sleep" data-dir="r" role="img" aria-label="猫猫仔在窝里打盹">
+        <span class="cat-think" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="cat-zzz" aria-hidden="true"><i>z</i><i>z</i><i>z</i></span>
+        <span class="cat-rig">
+          <span class="cat-breathe">
+            <svg class="cat-art" viewBox="0 0 100 92" aria-hidden="true" focusable="false">
+              <!-- 影子（趴下时会变宽 ✓） -->
+              <ellipse class="cat-shadow" cx="50" cy="89.2" rx="19" ry="2.7"
+                       fill="#5a341e" opacity=".15"/>
+              <!-- 尾巴（在身子后面 ✓，从右边绕出来 ✓） -->
+              <g class="cat-tail">
+                <path d="M 63 84 C 78 90 93 84 90 73 C 88 65 79 65 78 72 C 77.4 77 83 79 86 76"
+                      fill="none" stroke="#a8845a" stroke-width="9"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M 63 84 C 78 90 93 84 90 73 C 88 65 79 65 78 72 C 77.4 77 83 79 86 76"
+                      fill="none" stroke="#fffdf8" stroke-width="5.2"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M 90 73 C 88 65 79 65 78 72 C 77.4 77 83 79 86 76"
+                      fill="none" stroke="#f3c09a" stroke-width="5.2"
+                      stroke-linecap="round" stroke-linejoin="round"/>
               </g>
-              <circle cx="36" cy="21" r="16" fill="#fffdf7" stroke="#fffdf7" stroke-width="4"/>
-              <circle cx="36" cy="21" r="16" fill="url(#hcCatFur)" stroke="#d9a273" stroke-width="1.5"/>
-              <!-- 额头三道浅橘纹 ✓ + 左边一小块橘斑 ✓（和贴纸那只同款 ✓） -->
-              <path d="M 31 17.5 C 30 11.5 32.5 7 37.5 5.8 C 34.5 9.5 33.5 13.2 34 17.8 Z"
-                    fill="#f3bd93" opacity=".75"/>
-              <g stroke="#e9a97a" stroke-width="1.4" stroke-linecap="round" opacity=".55">
-                <path d="M 33 8.4 v 4"/>
-                <path d="M 36.4 7.6 v 4.6"/>
-                <path d="M 39.8 8.4 v 4"/>
+              <!-- 身子（坐着 ✓，趴下靠 CSS 压扁 ✓） -->
+              <g class="cat-body-pose">
+                <g class="cat-body">
+                  <path d="M 34 90 C 30 71 35 58 50 58 C 65 58 70 71 66 90 Z"
+                        fill="#fffdf8" stroke="#a8845a" stroke-width="2.5"
+                        stroke-linejoin="round"/>
+                  <path d="M 42.4 89.6 C 40.6 78.6 44.2 70.4 50 70.4 C 55.8 70.4 59.4 78.6 57.6 89.6 Z"
+                        fill="#fdf1de" opacity=".92"/>
+                </g>
               </g>
-              <!-- 泡泡高光 ✓（贴着脑袋左上一撇 ✓） -->
-              <ellipse cx="27.5" cy="11" rx="5.1" ry="3.2" fill="#fff" opacity=".62"
-                       transform="rotate(-29 27.5 11)"/>
-              <circle cx="47.6" cy="12.2" r="1.1" fill="#fff" opacity=".7"/>
-              <ellipse cx="24.8" cy="26.6" rx="3.8" ry="2.2" fill="#f7b3b0" opacity=".55"/>
-              <ellipse cx="47.2" cy="26.6" rx="3.8" ry="2.2" fill="#f7b3b0" opacity=".55"/>
-              <!-- 闭眼（睡觉 / 伸懒腰） -->
-              <g class="cat-eyes-closed" fill="none" stroke="#6b4a33" stroke-width="1.7"
-                 stroke-linecap="round">
-                <path d="M 27.5 22.5 Q 30.5 25.5 33.5 22.5"/>
-                <path d="M 38.5 22.5 Q 41.5 25.5 44.5 22.5"/>
+              <!-- 两只前爪（走路时交替抬 ✓；趴下时藏起来 ✓） -->
+              <g class="cat-paw-pose">
+                <g class="cat-paw cat-paw-l">
+                  <ellipse cx="42.4" cy="87.2" rx="6.5" ry="4.1" fill="#fffdf8"
+                           stroke="#a8845a" stroke-width="2.2"/>
+                  <path d="M 40 89.4 v -1.5 M 42.5 89.7 v -1.7 M 45 89.4 v -1.5"
+                        fill="none" stroke="#c9ae8b" stroke-width="1"
+                        stroke-linecap="round" opacity=".85"/>
+                </g>
+                <g class="cat-paw cat-paw-r">
+                  <ellipse cx="57.6" cy="87.2" rx="6.5" ry="4.1" fill="#fffdf8"
+                           stroke="#a8845a" stroke-width="2.2"/>
+                  <path d="M 55 89.4 v -1.5 M 57.5 89.7 v -1.7 M 60 89.4 v -1.5"
+                        fill="none" stroke="#c9ae8b" stroke-width="1"
+                        stroke-linecap="round" opacity=".85"/>
+                </g>
               </g>
-              <!-- 睁眼（醒着 / 思考）—— `cat-blink` 负责眨，`cat-look` 负责往哪看 ✓ -->
-              <g class="cat-eyes-open">
-                <g class="cat-blink">
-                  <g class="cat-look">
-                    <ellipse cx="30.5" cy="22" rx="2.3" ry="2.9" fill="#5a4030"/>
-                    <ellipse cx="41.5" cy="22" rx="2.3" ry="2.9" fill="#5a4030"/>
-                    <circle cx="31.2" cy="21" r=".9" fill="#fff"/>
-                    <circle cx="42.2" cy="21" r=".9" fill="#fff"/>
+              <!-- 脑袋：**和气泡猫猫同一张脸** ✓（坐标是从 `--b-head` 那张 SVG 里原样搬来的 ✓） -->
+              <g class="cat-head-pose">
+                <g class="cat-head">
+                  <path d="M21.5 49.3 L19.77 36.14 Q18.33 25.23 28.49 29.45 L42.8 35.4 A30 27 0 0 0 53.2 35.4 L67.51 29.45 Q77.67 25.23 76.23 36.14 L75.5 49.3 A30 27 0 1 1 21.5 49.3 Z"
+                        fill="#fffdf8" stroke="#a8845a" stroke-width="2.5"
+                        stroke-linejoin="round" stroke-linecap="round"/>
+                  <path d="M36.6 36.1 L27.5 32.7 Q22.8 31.0 23.3 36.0 L24.1 43.6 Z" fill="#f9c6c3"/>
+                  <path d="M59.4 36.1 L68.5 32.7 Q73.2 31.0 72.7 36.0 L71.9 43.6 Z" fill="#f9c6c3"/>
+                  <ellipse cx="26" cy="73" rx="5.5" ry="3.4" fill="#f8b8b4" opacity=".9"/>
+                  <ellipse cx="70" cy="73" rx="5.5" ry="3.4" fill="#f8b8b4" opacity=".9"/>
+                  <g class="cat-eyes-open">
+                    <g class="cat-blink">
+                      <circle cx="37" cy="61" r="4.6" fill="#4b3a2e"/>
+                      <circle cx="59" cy="61" r="4.6" fill="#4b3a2e"/>
+                      <circle cx="35.5" cy="59.3" r="1.5" fill="#fff"/>
+                      <circle cx="57.5" cy="59.3" r="1.5" fill="#fff"/>
+                    </g>
+                  </g>
+                  <g class="cat-eyes-closed" fill="none" stroke="#4b3a2e"
+                     stroke-width="2.2" stroke-linecap="round">
+                    <path d="M32.4 60.6 Q37 65.4 41.6 60.6"/>
+                    <path d="M54.4 60.6 Q59 65.4 63.6 60.6"/>
+                  </g>
+                  <path d="M44.5 67.5 L51.5 67.5 L48 71.5 Z" fill="#f2a3a0"/>
+                  <path d="M48 71.5 v2.2 M48 73.7 q-3.6 3.4 -6.6 0 M48 73.7 q3.6 3.4 6.6 0"
+                        fill="none" stroke="#4b3a2e" stroke-width="1.7" stroke-linecap="round"/>
+                  <path d="M13 62 h8 M13 69 l8 -2.5 M83 62 h-8 M83 69 l-8 -2.5"
+                        fill="none" stroke="#a8845a" stroke-width="1.5" stroke-linecap="round"/>
+                  <g class="cat-hearts" fill="#efa9a4">
+                    <ellipse cx="84" cy="30" rx="3.4" ry="2.8"/>
+                    <circle cx="80.4" cy="25.4" r="1.5"/>
+                    <circle cx="84.2" cy="23.6" r="1.5"/>
+                    <circle cx="87.8" cy="25.6" r="1.5"/>
+                    <ellipse cx="92" cy="44" rx="3.1" ry="2.5"/>
+                    <circle cx="88.8" cy="39.9" r="1.4"/>
+                    <circle cx="92.2" cy="38.3" r="1.4"/>
+                    <circle cx="95.4" cy="40.1" r="1.4"/>
                   </g>
                 </g>
               </g>
-              <!-- 鼻子 / 嘴 / 胡须 -->
-              <path d="M 35 25.8 L 37 25.8 L 36 27.2 Z" fill="#e88fa2"/>
-              <g fill="none" stroke="#a8744f" stroke-width="1.1" stroke-linecap="round">
-                <path d="M 36 27.4 Q 34.5 29.2 33 27.9"/>
-                <path d="M 36 27.4 Q 37.5 29.2 39 27.9"/>
-              </g>
-              <g fill="none" stroke="#c99770" stroke-width="1" stroke-linecap="round" opacity=".55">
-                <path d="M 22 25.6 Q 18.5 25 16 23.6"/>
-                <path d="M 22 28.4 Q 18.5 29 16 30.4"/>
-                <path d="M 50 25.6 Q 53.5 25 56 23.6"/>
-                <path d="M 50 28.4 Q 53.5 29 56 30.4"/>
-              </g>
-            </g>
-          </svg>
+            </svg>
+          </span>
         </span>
-      </span>
+      </div>
     </div>
   </header>
   <!-- 下拉刷新时从顶栏底下冒出来的小药丸 ✓ —— 平时 `opacity:0` 且不接事件 ✓，
