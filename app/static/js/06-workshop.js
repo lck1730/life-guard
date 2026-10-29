@@ -1354,7 +1354,11 @@
     m.classList.add('on');
   });
 
-    $('#backChat').onclick = closeSettings;
+  // ⚠️ 2026-10-29：`#backChat` 那个返回箭头**从 index.html 里删掉了** ✓
+  //    （用户定的：设置页只靠右滑 / 返回键回去）—— 所以这里那行
+  //    `$('#backChat').onclick = closeSettings` 也一起删 ✓。
+  //    留着会**直接炸** ✓：`$()` 拿到 null ✓，`.onclick =` 抛 TypeError ✓，
+  //    后面整段初始化都不跑了 ✓（不是"少个按钮"，是整页哑掉 ✓）。
 
   // ⚠️ **退出登录**那一段的说明留在上面那个 `logout()` 里 ✓（2026-10-08 合并时
   //    并到了一起 ✓）—— 原来这里是第二份 ✗：一份负责调 `/auth/logout` ✓、

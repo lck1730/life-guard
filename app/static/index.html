@@ -278,20 +278,11 @@
 <!-- 设置 -->
 <div class="screen" id="settings">
   <header class="sub">
-    <!-- 用 SVG 而不是文字字符 "<"：字体里的尖括号形状固定，模仿不出微信那种
-         细笔画 + 圆角端点 + 偏窄角度的味道。stroke 用 currentColor，跟随主题。 -->
-    <button class="icon-btn back" id="backChat" aria-label="返回">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-           stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 4.5 8.5 12 15 19.5" />
-      </svg>
-    </button>
+    <!-- ★ 2026-10-29：**返回箭头拿掉了** ✓（用户定的：「设置左上角左箭头不要了，
+         设置页面右滑回去主群聊」✓）—— 出去只走**右滑** ✓（05-settings.js 的手势 ✓）
+         和安卓返回键 ✓。按钮没了，那个 40px 的 `spacer` 也一起拿掉 ✓：
+         只剩 `h2` 占满一行，标题才是真居中 ✓（只留一边的占位会把它推偏 ✓）。 -->
     <h2>设置</h2>
-    <!-- ★ 2026-10-20：刷新按钮**搬去主群聊右上角**了 ✓（用户定的 ✓）。
-         这里换回**等宽占位** ✓（40px ✓）—— 右边空着的话，`h2` 会在
-         "剩余空间"里居中 ✓，看着偏右 ✓（这正是当初放按钮时顺手解决的那个问题 ✓）。 -->
-    <div class="spacer"></div>
   </header>
   <div class="body">
     <!-- ★★ **行序 2026-10-24 用户定的**（原话：「顺序：我的，管家，空间，主题，背景，
