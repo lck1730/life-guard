@@ -2087,67 +2087,160 @@
   @keyframes pullspin { to { transform:rotate(360deg); } }
 
   /* ══════════════════════════════════════════════════════════════════
-     ★ 2026-10-29：**工具抽屉**（群聊左滑）✓
-     —— 用户：「小屋界面不要之后，可以将一些功能区放到左滑出现状态栏，
-        先放个账本」✓。目前只有「账本」一行 ✓，以后加功能就往 `.dr-list` 里加 ✓。
-     ⚠️ z-index 56：压在屏（≤32）上面 ✓、在长按卡片 58 / 弹层 60 下面 ✓ ——
-        抽屉开着的时候还能弹确认框 ✓。
-     ⚠️ 抽屉**不报屏名** ✓：顶栏仍报 chat ✓，返回键先收抽屉（见 __goBack ✓）。
+     ★ 2026-10-29：**工具飞轮**（群聊左滑唤出）✓
+     —— 用户：「那个抽屉还可以更加优化，不是一页而是唤出飞轮的感觉」✓。
+     手势还是原来那一条 ✓（群聊左滑唤出 / 轮上右滑收起 / 返回键先收它 ✓），
+     换掉的是出现的东西 ✓：不再是抽屉里的一页清单 ✓，
+     而是一圈工具绕着空间名**滚进来** ✓（滚的那股劲在 JS 里，这里只管长相 ✓）。
+     ⚠️ z-index 56：压在屏（≤32）上面 ✓、在长按卡片 58 / 弹层 60 下面 ✓。
+     ⚠️ 位置 / 旋转 / 透明度**全由 JS 写在 inline style 上** ✓（要逐帧跟手 ✓）——
+        这里**别再写 transform** ✗（两条会抢同一个属性 ✓）。
      ══════════════════════════════════════════════════════════════════ */
   #drawer { position:fixed; inset:0; z-index:56; display:none; }
   #drawer.on { display:block; }
-  #drawer .dr-scrim { position:absolute; inset:0; background:rgba(8,10,14,.42);
-                      opacity:0; }
-  #drawer .dr-panel {
-    position:absolute; top:0; right:0; height:100%;
-    width:min(78vw, 320px);
-    display:flex; flex-direction:column;
-    padding:calc(var(--inset-top) + 30px) 14px calc(var(--inset-bottom) + 18px);
-    background:var(--panel);
-    border-left:1px solid var(--line);
-    border-radius:24px 0 0 24px;
-    box-shadow:-20px 0 48px rgba(0,0,0,.32);
-    transform:translateX(100%);
-    overflow:hidden;
-    will-change:transform;
+  #drawer .dr-scrim {
+    position:absolute; inset:0; opacity:0;
+    background:radial-gradient(circle at 50% 46%,
+               rgba(26,13,15,.42) 0, rgba(22,13,16,.60) 56%, rgba(17,11,14,.74) 100%);
+    -webkit-backdrop-filter:blur(4.5px) saturate(.94);
+    backdrop-filter:blur(4.5px) saturate(.94);
   }
-  #drawer .dr-panel::before {
-    content:''; position:absolute; right:-90px; top:-110px; width:260px; height:260px;
+  #drawer .dr-wheel {
+    --r:clamp(98px, 30vw, 122px);
+    position:absolute; left:50%; top:46%;
+    width:calc(var(--r) * 2 + 92px); height:calc(var(--r) * 2 + 92px);
+    opacity:0;
+    will-change:transform, opacity;
+  }
+  #drawer .dr-glow {
+    position:absolute; inset:-18px; border-radius:50%; pointer-events:none;
+    background:radial-gradient(circle, var(--accent-a), transparent 64%);
+  }
+  #drawer .dr-rotor { position:absolute; inset:0; will-change:transform; }
+  /* 最外圈：一溜很细的刻度，自己慢慢转 ✓ —— "飞轮"那股活着的感觉就靠它 ✓。 */
+  #drawer .dr-ticks {
+    position:absolute; inset:0; border-radius:50%;
+    background:repeating-conic-gradient(from 0deg,
+               var(--accent) 0deg .9deg, transparent 1deg 12deg);
+    -webkit-mask:radial-gradient(circle closest-side, transparent 0 93.2%, #000 93.5% 97.4%, transparent 97.7%);
+    mask:radial-gradient(circle closest-side, transparent 0 93.2%, #000 93.5% 97.4%, transparent 97.7%);
+    opacity:.4;
+    animation:drTick 34s linear infinite;
+  }
+  /* 每 90° 一颗长齿 ✓ —— 细齿之外再给四个"基准点" ✓，转起来才看得出轮子在转 ✓。 */
+  #drawer .dr-ticks::after {
+    content:''; position:absolute; inset:0; border-radius:50%;
+    background:repeating-conic-gradient(from 0deg,
+               var(--accent) 0deg 2deg, transparent 2.2deg 90deg);
+    -webkit-mask:radial-gradient(circle closest-side, transparent 0 90.4%, #000 90.7% 97.7%, transparent 98%);
+    mask:radial-gradient(circle closest-side, transparent 0 90.4%, #000 90.7% 97.7%, transparent 98%);
+    opacity:.62;
+  }
+  @keyframes drTick { to { transform:rotate(360deg); } }
+  /* 两道轮圈：外圈是轮廓 ✓；内圈正好穿过四个键 ✓（像轮子上的配重座 ✓）。 */
+  #drawer .dr-orbit {
+    position:absolute; inset:9px; border-radius:50%;
+    border:1px solid var(--line); opacity:.8;
+  }
+  #drawer .dr-track {
+    position:absolute; left:50%; top:50%;
+    width:calc(var(--r) * 2); height:calc(var(--r) * 2);
+    margin:calc(var(--r) * -1) 0 0 calc(var(--r) * -1);
+    border-radius:50%; border:1px solid var(--line); opacity:.28;
+  }  /* 四根短辐条（斜着 ✓，避开四个键 ✓）—— 轮子转起来时它们是最明显的参照 ✓。 */
+  #drawer .dr-spoke {
+    position:absolute; left:50%; top:50%;
+    width:calc(var(--r) * .82); height:1px; margin-top:-.5px;
+    transform-origin:0 50%;
+    background:linear-gradient(90deg, transparent, var(--accent-line) 34%, var(--line));
+    opacity:.45; pointer-events:none;
+  }
+  #drawer .sp-0 { transform:rotate(45deg); }
+  #drawer .sp-1 { transform:rotate(135deg); }
+  #drawer .sp-2 { transform:rotate(225deg); }
+  #drawer .sp-3 { transform:rotate(315deg); }
+  /* 四个键：盒子只有珠子那么大 ✓，字挂在下面 ✓ —— 珠心正好落在轮圈上 ✓。 */
+  #drawer .dr-key {
+    position:absolute; left:50%; top:50%;
+    width:86px; height:58px; margin:-29px 0 0 -43px;
+    padding:0; border:0; background:none; color:var(--text);
+    -webkit-tap-highlight-color:transparent; cursor:pointer;
+  }
+  #drawer .dk-in {
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    /* 轮子转的时候，这一层反着转回来 ✓ → 图标和字一直是正的 ✓。 */
+    transform:rotate(calc(-1 * var(--dr-spin, 0deg)));
+  }
+  #drawer .dk-bead {
+    width:58px; height:58px; border-radius:50%; flex-shrink:0;
+    display:grid; place-items:center;
+    color:var(--wi, var(--accent));
+    background:linear-gradient(160deg, var(--panel2), var(--panel));
+    border:1px solid var(--line);
+    box-shadow:0 10px 24px rgba(20,8,10,.30), inset 0 1px 0 rgba(255,255,255,.06);
+    transition:transform .2s cubic-bezier(.2,1.4,.4,1), border-color .2s ease,
+               box-shadow .2s ease;
+  }
+  #drawer .dk-bead svg { display:block; }
+  #drawer .dr-key:active .dk-bead,
+  #drawer .dr-key.is-down .dk-bead {
+    transform:scale(1.09);
+    border-color:var(--wi, var(--accent));
+    box-shadow:0 12px 28px rgba(20,8,10,.34),
+               0 0 0 7px var(--accent-a),
+               inset 0 1px 0 rgba(255,255,255,.10);
+  }
+  #drawer .dk-k {
+    font-size:12px; font-weight:600; letter-spacing:.04em;
+    color:var(--text); line-height:1;
+    padding:4px 9px; border-radius:99px;
+    background:var(--panel2); border:1px solid var(--line);
+    box-shadow:0 4px 12px rgba(20,8,10,.18);
+  }
+  #drawer .dk-0 { transform:translateY(calc(-1 * var(--r))); }
+  #drawer .dk-1 { transform:translateX(var(--r)); }
+  #drawer .dk-2 { transform:translateY(var(--r)); }
+  #drawer .dk-3 { transform:translateX(calc(-1 * var(--r))); }
+  /* 正中那枚轴心：空间名 ✓ —— 按哪个键，它就短暂变成那个键的名字 ✓。 */
+  #drawer .dr-hub {
+    position:absolute; left:50%; top:50%;
+    width:112px; height:112px; margin:-56px 0 0 -56px;
     border-radius:50%;
-    background:radial-gradient(circle, var(--accent-a), transparent 68%);
-    pointer-events:none;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:5px; padding:0 14px; text-align:center;
+    background:radial-gradient(circle at 34% 26%, var(--panel2), var(--panel) 64%);
+    border:1px solid var(--line);
+    box-shadow:0 18px 42px rgba(20,8,10,.34), inset 0 1px 0 rgba(255,255,255,.07);
   }
-  #drawer .dr-head { position:relative; padding:2px 10px 0; }
-  #drawer .dr-eyebrow { font-size:11px; color:var(--muted); letter-spacing:.16em; }
-  #drawer .dr-name { margin-top:7px; font-size:21px; font-weight:600; color:var(--text);
-                     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #drawer .dr-list { position:relative; margin-top:22px; display:flex;
-                     flex-direction:column; gap:8px; }
-  #drawer .dr-item {
-    display:flex; align-items:center; gap:12px; width:100%;
-    padding:11px 12px;
-    border-radius:16px;
-    background:var(--panel2);
-    border:1px solid transparent;
-    color:var(--text); text-align:left;
-    transition:background .16s ease, transform .16s cubic-bezier(.22,1,.36,1),
-               border-color .16s ease;
+  #drawer .dr-hub-eyebrow {
+    font-size:9px; letter-spacing:.26em; text-indent:.26em;
+    color:var(--accent); opacity:.82;
   }
-  #drawer .dr-item:active { background:var(--hover); border-color:var(--line);
-                            transform:scale(.985); }
-  #drawer .dr-ico { width:40px; height:40px; border-radius:13px;
-                    display:grid; place-items:center; flex-shrink:0;
-                    background:var(--accent-a); color:var(--accent); }
-  #drawer .dr-ico svg { display:block; }
-  #drawer .dr-k { font-size:15.5px; font-weight:600; }
-  #drawer .dr-chev { margin-left:auto; display:grid; place-items:center;
-                     color:var(--muted); opacity:.7; }
-  #drawer .dr-chev svg { display:block; }
-  /* 亮色那套的阴影和黑纱要轻一档 ✓ —— 深色下同样的数值会发灰 ✓。 */
+  #drawer .dr-hub-name {
+    font-size:13.5px; font-weight:600; line-height:1.28; color:var(--text);
+    max-width:100%;
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    overflow:hidden; word-break:break-word;
+  }
+  #drawer.open .dr-hub { animation:drHubIn .42s cubic-bezier(.22,1.3,.36,1) both; }
+  @keyframes drHubIn { from { transform:scale(.88); opacity:.55; } to { transform:scale(1); opacity:1; } }
+  /* 亮色那套的黑纱和阴影都要轻一档 ✓ —— 深色下同样的数值会发灰 ✓。 */
   [data-theme="cream"] #drawer .dr-scrim,
-  [data-theme="light"] #drawer .dr-scrim { background:rgba(60,48,32,.30); }
-  [data-theme="cream"] #drawer .dr-panel,
-  [data-theme="light"] #drawer .dr-panel { box-shadow:-20px 0 44px rgba(74,58,38,.18); }
+  [data-theme="light"] #drawer .dr-scrim {
+    background:radial-gradient(circle at 50% 46%,
+               rgba(70,56,40,.16) 0, rgba(60,48,32,.38) 56%, rgba(50,38,24,.50) 100%);
+  }
+  [data-theme="cream"] #drawer .dk-bead,
+  [data-theme="light"] #drawer .dk-bead {
+    box-shadow:0 10px 22px rgba(120,78,48,.14), inset 0 1px 0 rgba(255,255,255,.7);
+  }
+  [data-theme="cream"] #drawer .dk-k,
+  [data-theme="light"] #drawer .dk-k { box-shadow:0 4px 12px rgba(120,78,48,.10); }
+  [data-theme="cream"] #drawer .dr-hub,
+  [data-theme="light"] #drawer .dr-hub {
+    box-shadow:0 16px 36px rgba(120,78,48,.16), inset 0 1px 0 rgba(255,255,255,.8);
+  }
+
 
   /* ══════════════════════════════════════════════════════════════════
      ★★ 2026-10-29 第九版：**暖光**（主群聊优先）
@@ -2439,35 +2532,33 @@
   #settings .item[data-act="invite"] > .ico       { color:var(--hue3); }
   #settings .item[data-act="update"] > .ico       { color:var(--hue4); }
 
-  /* ── 工具抽屉：木盒里的一格暖光 ─────────────────────────────────── */
-  #drawer .dr-panel {
-    background:linear-gradient(200deg, var(--panel), var(--panel) 58%, var(--panel2));
-    box-shadow:-20px 0 50px rgba(20,8,10,.30);
+  /* ── 工具飞轮：一圈暖光绕着空间名 ─────────────────────────────── */
+  #drawer .dr-glow { background:radial-gradient(circle, var(--accent-a), transparent 62%); }
+  #drawer .dr-hub {
+    box-shadow:0 18px 44px rgba(20,8,10,.34), 0 0 0 1px var(--accent-a),
+               inset 0 1px 0 rgba(255,255,255,.07);
   }
-  [data-theme="cream"] #drawer .dr-panel,
-  [data-theme="light"] #drawer .dr-panel { box-shadow:-20px 0 44px rgba(120,78,48,.16); }
-  #drawer .dr-panel::after {
-    content:'♥'; position:absolute; right:-4px; bottom:calc(var(--inset-bottom) + 12px);
-    font-size:132px; line-height:1; color:var(--accent); opacity:.048;
-    pointer-events:none; transform:rotate(-8deg);
+  #drawer .dr-hub::after {
+    content:'♥'; position:absolute; right:13px; bottom:11px;
+    font-size:13px; line-height:1; color:var(--accent); opacity:.3;
+    pointer-events:none;
   }
-  [data-theme="cream"] #drawer .dr-panel::after,
-  [data-theme="light"] #drawer .dr-panel::after { opacity:.042; }
-  #drawer .dr-eyebrow { color:var(--accent); opacity:.78; }
-  #drawer .dr-item {
-    background:linear-gradient(180deg, var(--card-hi), transparent 80%), var(--panel2);
-    border:1px solid var(--line);
-    box-shadow:0 6px 16px rgba(20,8,10,.08);
+  [data-theme="cream"] #drawer .dr-hub,
+  [data-theme="light"] #drawer .dr-hub {
+    box-shadow:0 16px 36px rgba(120,78,48,.16), 0 0 0 1px var(--accent-a),
+               inset 0 1px 0 rgba(255,255,255,.8);
   }
-  [data-theme="cream"] #drawer .dr-item,
-  [data-theme="light"] #drawer .dr-item { box-shadow:0 6px 16px rgba(120,78,48,.07); }
-  #drawer .dr-ico {
-    background:linear-gradient(150deg, var(--accent-a), rgba(255,255,255,.04));
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+  [data-theme="cream"] #drawer .dr-hub::after,
+  [data-theme="light"] #drawer .dr-hub::after { opacity:.34; }
+  #drawer .dk-bead {
+    background:linear-gradient(160deg, var(--panel2), var(--panel) 78%);
   }
+
 
   @media (prefers-reduced-motion: reduce) {
     #chatAmb i, #chatAmb b, #garland i, #msgs > .row:last-child,
     body.hasText #send { animation:none !important; }
     .heartFly { display:none !important; }
+    /* ★ 2026-10-29：飞轮的刻度自转、轴心弹一下 —— 开了减弱动态就都别动 ✓。 */
+    #drawer .dr-ticks, #drawer.open .dr-hub { animation:none !important; }
   }
