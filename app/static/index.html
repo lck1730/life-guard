@@ -5,7 +5,7 @@
 <!-- interactive-widget：让键盘弹出时**收缩内容**而不是把页面顶上去。
      不写这个的话，安卓 WebView 会把输入框推到看不见的地方。 -->
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
-<meta name="theme-color" content="#0f1115">
+<meta name="theme-color" content="#171116">
 <script>
   // ★ 2026-10-19：先把上次用的主题贴上 ✓ —— 奶霜/林深用户不必先闪一下深色底 ✓。
   //   登录后 `syncThemeForUser()` 会按账号换成这个人自己的那套 ✓。
@@ -147,6 +147,12 @@
 
 <!-- 聊天 -->
 <div class="screen" id="chat">
+  <!-- ★ 2026-10-29 暖光：三团很慢的呼吸光 + 几粒浮尘（纯装饰、不接事件） -->
+  <div id="chatAmb" aria-hidden="true">
+    <i class="a1"></i><i class="a2"></i><i class="a3"></i>
+    <b class="m1"></b><b class="m2"></b><b class="m3"></b>
+    <b class="m4"></b><b class="m5"></b><b class="m6"></b>
+  </div>
   <header class="top">
     <!-- ★ 2026-10-29：**顶栏只剩空间名和管家状态** ✓（用户定的 ✓）。
          ☰ 和刷新都拿掉了 ✓ —— 设置改成**右滑**进 ✓（05-settings.js 的手势），
@@ -157,6 +163,8 @@
       <div class="gname" id="gname">—</div>
       <div class="status" id="status"><span class="dot"></span><span id="statusText"></span></div>
     </div>
+    <!-- ★ 2026-10-29 暖光：顶栏一条小灯串（纯装饰、不接事件） -->
+    <div id="garland" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   </header>
   <!-- 下拉刷新时从顶栏底下冒出来的小药丸 ✓ —— 平时 `opacity:0` 且不接事件 ✓，
        只在手指拽着的时候由 JS 摆位置 ✓。 -->

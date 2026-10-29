@@ -953,12 +953,50 @@
     document.body.classList.toggle('hasText', !!String(value || '').trim());
   };
 
+  /**
+   * ★ 2026-10-29 暖光：发成功的一瞬间，从纸飞机那儿飞出一小簇心 ✓
+   *    —— 纯装饰 ✓：只在**真的发成功**之后才撒 ✓（失败别撒花 ✓）；
+   *    系统开了「减弱动态效果」就整个跳过 ✓；这里出任何错都不许影响发送 ✓。
+   */
+  const burstHearts = (at) => {
+    try {
+      if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      // ⚠️ 坐标**必须在清空输入框之前量好、传进来** ✗ ——
+      //    发出去后 `syncSendBtn('')` 会把 #send 藏起来（`display:none` ✗），
+      //    那时再 `getBoundingClientRect()` 拿到的是 0×0 ✓ → 心脏在屏幕左上角 ✓，看不见 ✓。
+      if (!at || !at.x || !at.y) return;
+      const cx = at.x, cy = at.y;
+      for (let i = 0; i < 5; i++) {
+        const h = document.createElement('span');
+        h.className = 'heartFly';
+        h.textContent = i % 2 ? '♥' : '♡';
+        h.style.left = cx + 'px';
+        h.style.top = cy + 'px';
+        h.style.color = i % 2 ? 'var(--accent)' : 'var(--agent)';
+        h.style.fontSize = (12 + (i % 3) * 3) + 'px';
+        h.style.setProperty('--dx', ((i - 2) * 12 + (i % 2 ? 7 : -7)) + 'px');
+        h.style.setProperty('--dy', (-54 - (i % 3) * 16) + 'px');
+        h.style.setProperty('--rot', ((i - 2) * 15) + 'deg');
+        h.addEventListener('animationend', () => h.remove());
+        document.body.appendChild(h);
+        setTimeout(() => h.remove(), 1200);
+      }
+    } catch (e) { /* 装饰而已，别让它挡住发送 */ }
+  };
+
   const send = async () => {
     const ta = $('#text');
     const t = ta.value.trim();
     const items = pending.slice();          // 快照 ✓：发的过程里队列会变 ✓
     if (!t && !items.length) return;
     closeAtMenu();
+    // ★ 先量一下纸飞机的中心 ✓（见 `burstHearts` 上面那句注释 ✓）
+    const sendAt = (() => {
+      const btn = $('#send');
+      if (!btn) return null;
+      const r = btn.getBoundingClientRect();
+      return r.width ? { x:r.left + r.width / 2, y:r.top + r.height / 2 } : null;
+    })();
     ta.value = ''; ta.style.height = 'auto';
     syncSendBtn('');
     pending.length = 0; syncPending();      // 先清空 ✓；发失败再放回去 ✓
@@ -995,6 +1033,7 @@
         });
         clearQuote();
       }
+      burstHearts(sendAt);
     } catch (e) { toast(e.message); ta.value = t; syncSendBtn(t); }
   };
   $('#send').onclick = send;

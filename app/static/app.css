@@ -6,30 +6,30 @@
      这次顺手收进来的 ✓ —— 原来那些颜色写死在规则里 ✓，浅色主题下会
      "一块深蓝浮在奶白上" ✗（见下面那些浅色辅助变量 ✓）。 */
   :root, [data-theme="dark"] {
-    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b;
-    --text:#e6e8ee; --muted:#8b93a7; --line:#262b36;
-    --accent:#6ea8ff; --accent-bg:#1e3a5f; --on-accent:#07131f;
+    --bg:#171116; --panel:#211920; --panel2:#2c2029;
+    --text:#f7ece8; --muted:#b09aa1; --line:#3b2c36;
+    --accent:#ff9f7d; --accent-bg:#46282e; --on-accent:#2b100b;
     /* ★ 2026-10-24 描边强调色 ✓ —— 和 `--accent` **同色、只带透明度** ✓。
        用在图标框 / 胶囊 / 选中态上 ✓：底不压字 ✓，主题一换它跟着换 ✓。 */
-    --accent-a:rgba(110,168,255,.13);
-    --agent:#9dd0aa; --danger:#ff6b6b;
+    --accent-a:rgba(255,159,125,.14);
+    --agent:#f4cf8d; --danger:#ff7280;
     /* 辅助色（规则里不再写死） */
-    --accent-line:#35507a;  --accent-soft:rgba(90,140,255,.10);
-    --hover:#1d2129;        --avatar-bg:#232833;
-    --quote-bg:rgba(127,127,127,.16);
+    --accent-line:#6a4140;  --accent-soft:rgba(255,159,125,.10);
+    --hover:#2d2029;        --avatar-bg:#352631;
+    --quote-bg:rgba(255,159,125,.10);
     /* ★ 气泡半透明（2026-10-20）—— 让主群聊的背景图透出来 ✓。
        ⚠️ 用**带 alpha 的底色**，不是整体 `opacity` ✗ ——
           整体透明度会连正文一起变淡，字在照片上更糊 ✓。
        三个值对应：别人的气泡 / 小助手 / 自己 ✓。 */
-    --bubble-bg:rgba(30,34,43,.60);
-    --bubble-agent-bg:rgba(23,26,33,.66);
-    --bubble-mine-bg:rgba(30,58,95,.60);
-    --danger-soft:rgba(255,107,107,.4);
-    --bg-scrim:rgba(0,0,0,.18);
-    --warn2:#d8b06a;
-    --ok:#34c759; --warn:#ffb020; --bad:#ff453a;
-    --shadow-md:0 6px 24px rgba(0,0,0,.35);
-    --shadow-lg:0 18px 50px rgba(0,0,0,.45);
+    --bubble-bg:rgba(45,34,42,.66);
+    --bubble-agent-bg:rgba(33,25,32,.74);
+    --bubble-mine-bg:rgba(84,47,45,.62);
+    --danger-soft:rgba(255,114,128,.4);
+    --bg-scrim:rgba(16,6,10,.22);
+    --warn2:#e2b97c;
+    --ok:#66c98d; --warn:#ffc14d; --bad:#ff6b7d;
+    --shadow-md:0 6px 24px rgba(20,8,10,.42);
+    --shadow-lg:0 18px 50px rgba(20,8,10,.52);
     /* 系统留白。**由网页自己做主**——原生壳只上报数字（window.__onInsets），
        这里决定怎么用。这样调布局改网页就行，不用重装 App。
        浏览器里（没有原生壳）退回 CSS 的 env()。 */
@@ -40,46 +40,46 @@
   /* 奶霜：暖白底 + 焦糖强调色 ✓ —— 不是纯白（纯白在手机上调亮度会刺眼 ✗），
      也不是冷灰（冷灰配棕色会显脏 ✗）。气泡用面板白，自己的用淡焦糖 ✓。 */
   [data-theme="cream"], [data-theme="light"] {
-    --bg:#f6f0e4; --panel:#fffcf5; --panel2:#efe7d8;
-    --text:#2d2822; --muted:#706658; --line:#e4d8c5;
-    --accent:#9a5b2e; --accent-bg:#f2e1cb; --on-accent:#fffdf8;
-    --accent-a:rgba(154,91,46,.11);
-    --agent:#5e7d4a; --danger:#b94735;
-    --accent-line:#d8be9e;  --accent-soft:rgba(154,91,46,.10);
-    --hover:#f3eadb;        --avatar-bg:#e9dfcf;
-    --quote-bg:rgba(122,112,99,.12);
+    --bg:#fbf3e7; --panel:#fffaf2; --panel2:#f5ead9;
+    --text:#33261f; --muted:#77675a; --line:#ead9c2;
+    --accent:#a94e3a; --accent-bg:#f7ded0; --on-accent:#fffaf5;
+    --accent-a:rgba(169,78,58,.12);
+    --agent:#94661f; --danger:#b23f30;
+    --accent-line:#e2c3ab;  --accent-soft:rgba(169,78,58,.09);
+    --hover:#f6ebda;        --avatar-bg:#edddc8;
+    --quote-bg:rgba(140,100,76,.12);
     /* 气泡半透明 —— 浅色主题下照片已经有 46% 奶白纱，气泡再压一层 ✓ */
-    --bubble-bg:rgba(239,231,216,.64);
-    --bubble-agent-bg:rgba(255,252,245,.70);
-    --bubble-mine-bg:rgba(242,225,203,.64);
-    --danger-soft:rgba(185,71,53,.35);
-    --bg-scrim:rgba(255,252,245,.46);   /* 奶白下字是深色 → 照片要压得更白一点才读得清 ✓ */
-    --warn2:#8a5f1e;
-    --ok:#2f7d45; --warn:#966a12; --bad:#b23a2e;
-    --shadow-md:0 6px 24px rgba(74,58,38,.10);
-    --shadow-lg:0 18px 50px rgba(74,58,38,.16);
+    --bubble-bg:rgba(248,239,226,.72);
+    --bubble-agent-bg:rgba(255,251,244,.82);
+    --bubble-mine-bg:rgba(248,224,208,.74);
+    --danger-soft:rgba(178,63,48,.35);
+    --bg-scrim:rgba(255,250,242,.42);   /* 奶白下字是深色 → 照片要压得更白一点才读得清 ✓ */
+    --warn2:#83581b;
+    --ok:#2f7a44; --warn:#8f6410; --bad:#ad352a;
+    --shadow-md:0 6px 24px rgba(120,78,48,.11);
+    --shadow-lg:0 18px 50px rgba(120,78,48,.17);
   }
   /* 林深：墨绿底 + 苔绿强调色 ✓ —— 比夜阑暖一档（偏绿而不是偏蓝 ✓），
      但对比度保持住 ✓（深底上正文不用纯白，带一点绿灰更柔和 ✓）。 */
   [data-theme="forest"] {
-    --bg:#12231a; --panel:#1a2f22; --panel2:#233a2b;
-    --text:#e6efe3; --muted:#90a794; --line:#2e4836;
-    --accent:#8be4a0; --accent-bg:#2f5739; --on-accent:#07150d;
-    --accent-a:rgba(139,228,160,.13);
-    --agent:#e3cd82; --danger:#e37e6d;
-    --accent-line:#477552;  --accent-soft:rgba(139,228,160,.14);
-    --hover:#294334;        --avatar-bg:#294334;
-    --quote-bg:rgba(144,167,148,.15);
+    --bg:#142019; --panel:#1b2b21; --panel2:#263a2b;
+    --text:#eff4ea; --muted:#a3b5a5; --line:#344a37;
+    --accent:#f0c07a; --accent-bg:#463a24; --on-accent:#221605;
+    --accent-a:rgba(240,192,122,.14);
+    --agent:#b9d8a8; --danger:#ee8b79;
+    --accent-line:#6b5c3c;  --accent-soft:rgba(240,192,122,.10);
+    --hover:#2c4231;        --avatar-bg:#2c4231;
+    --quote-bg:rgba(240,192,122,.10);
     /* 气泡半透明 —— 同夜阑 ✓ */
-    --bubble-bg:rgba(35,58,43,.60);
-    --bubble-agent-bg:rgba(26,47,34,.66);
-    --bubble-mine-bg:rgba(47,87,57,.60);
-    --danger-soft:rgba(227,126,109,.4);
+    --bubble-bg:rgba(38,58,43,.66);
+    --bubble-agent-bg:rgba(27,43,33,.75);
+    --bubble-mine-bg:rgba(70,58,36,.66);
+    --danger-soft:rgba(238,139,121,.4);
     --bg-scrim:rgba(0,0,0,.25);
-    --warn2:#d9c68a;
-    --ok:#7bcc8a; --warn:#e6c35c; --bad:#ff8f7c;
-    --shadow-md:0 6px 24px rgba(0,0,0,.35);
-    --shadow-lg:0 18px 50px rgba(0,0,0,.45);
+    --warn2:#dcc58b;
+    --ok:#7fcc8d; --warn:#e8c65f; --bad:#ff927f;
+    --shadow-md:0 6px 24px rgba(6,14,9,.40);
+    --shadow-lg:0 18px 50px rgba(6,14,9,.50);
   }
   /* ★ 林深要一点"活气"（2026-10-20）—— 纯平涂的墨绿太"死" ✓。
      两层极淡的光晕：左上苔绿（像林间漏下的光）✓、右下一点暖金（落叶/阳光）✓。
@@ -2148,3 +2148,326 @@
   [data-theme="light"] #drawer .dr-scrim { background:rgba(60,48,32,.30); }
   [data-theme="cream"] #drawer .dr-panel,
   [data-theme="light"] #drawer .dr-panel { box-shadow:-20px 0 44px rgba(74,58,38,.18); }
+
+  /* ══════════════════════════════════════════════════════════════════
+     ★★ 2026-10-29 第九版：**暖光**（主群聊优先）
+     用户要的：年轻情侣、围绕聊天、温馨浪漫、有活力、打开就想待着。
+     做法不是"再加功能"，全部是**表面**：
+       · 底色从冷蓝灰 → **暮色暖屋**：三团很慢的呼吸光 + 几粒浮尘
+       · 顶栏一条**小灯串**（7 颗，交替色、错峰闪）+ 名字后面的暖晕
+       · 气泡：贴纸保留，只加一层很淡的纸面反光和暖影；新消息轻轻落下
+       · 输入区收成一条**窗台**（整行一颗药丸），聚焦时亮一圈；
+         纸飞机带一点光，"有字"时轻轻呼吸
+       · 发出去的一瞬间，从纸飞机那里飞出 5 颗心（只在成功后；减弱动效时跳过）
+       · 设置 / 工具抽屉：暖纸卡 + 彩色小图标，抽屉角落一枚淡淡的爱心水印
+     ⚠️ 不动结构、不动手势、不加功能、不动量出来的尺寸。
+     ⚠️ 本文件是 CRLF（按字节追加，别整文件重写）。
+     ⚠️ `.status` 那条必须补 `[hidden]` —— 我们是 ID 级选择器，
+        会压过浏览器默认的 `[hidden]{display:none}`（这里已经栽过一次）。
+     ══════════════════════════════════════════════════════════════════ */
+
+  /* ── 暖光令牌（三套主题）────────────────────────────────────────── */
+  :root, [data-theme="dark"] {
+    --amb-a:rgba(255,137,102,.17);
+    --amb-b:rgba(255,196,120,.10);
+    --amb-c:rgba(214,110,150,.09);
+    --sill-bg:#2a2028;
+    --chip-bg:rgba(255,159,125,.10);
+    --send-halo:rgba(255,159,125,.45);
+    --card-hi:rgba(255,159,125,.07);
+    --hue1:#ff9f7d; --hue2:#f4cf8d; --hue3:#a9d8b1;
+    --hue4:#a8c7ef; --hue5:#e3b0e8;
+  }
+  [data-theme="cream"], [data-theme="light"] {
+    --amb-a:rgba(255,201,160,.50);
+    --amb-b:rgba(255,228,184,.55);
+    --amb-c:rgba(255,176,186,.24);
+    --sill-bg:#fffdf9;
+    --chip-bg:rgba(255,255,255,.74);
+    --send-halo:rgba(201,110,80,.30);
+    --card-hi:rgba(255,255,255,.65);
+    --hue1:#a94e3a; --hue2:#8f6410; --hue3:#4f7a48;
+    --hue4:#3f6b93; --hue5:#8a5f8f;
+  }
+  [data-theme="forest"] {
+    --amb-a:rgba(255,193,120,.15);
+    --amb-b:rgba(126,214,150,.09);
+    --amb-c:rgba(240,200,120,.07);
+    --sill-bg:#213328;
+    --chip-bg:rgba(240,192,122,.09);
+    --send-halo:rgba(240,192,122,.40);
+    --card-hi:rgba(240,192,122,.06);
+    --hue1:#f0b08a; --hue2:#f0c07a; --hue3:#a9d8b1;
+    --hue4:#a6cdec; --hue5:#d9b3e6;
+  }
+
+  /* ── 群聊：暮色里的一间暖屋 ─────────────────────────────────────── */
+  #chat {
+    background:
+      radial-gradient(120% 60% at 50% -8%, var(--amb-a), transparent 64%),
+      radial-gradient(100% 55% at 108% 104%, var(--amb-b), transparent 66%),
+      var(--bg);
+  }
+  #chatAmb { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:0; }
+  #chatAmb i { position:absolute; border-radius:50%; }
+  #chatAmb .a1 { left:-24vw; top:-14vh; width:74vw; height:46vh;
+    background:radial-gradient(closest-side, var(--amb-a), transparent 72%);
+    animation:ambA 17s ease-in-out infinite alternate; }
+  #chatAmb .a2 { right:-26vw; bottom:-12vh; width:68vw; height:46vh;
+    background:radial-gradient(closest-side, var(--amb-b), transparent 72%);
+    animation:ambB 23s ease-in-out infinite alternate; }
+  #chatAmb .a3 { left:26vw; bottom:14vh; width:48vw; height:34vh;
+    background:radial-gradient(closest-side, var(--amb-c), transparent 74%);
+    animation:ambA 29s ease-in-out infinite alternate-reverse; }
+  #chatAmb b { position:absolute; width:4px; height:4px; border-radius:50%;
+    background:var(--agent); opacity:0; box-shadow:0 0 9px 2px var(--send-halo);
+    animation:mote 11s ease-in-out infinite; }
+  #chatAmb .m1 { left:16%; bottom:16%; animation-delay:-1s; }
+  #chatAmb .m2 { left:38%; bottom:30%; animation-delay:-4.2s; animation-duration:13s; }
+  #chatAmb .m3 { left:62%; bottom:12%; animation-delay:-7.5s; animation-duration:10s; }
+  #chatAmb .m4 { left:78%; bottom:36%; animation-delay:-2.8s; animation-duration:14s; }
+  #chatAmb .m5 { left:88%; bottom:20%; animation-delay:-9s; animation-duration:12s; }
+  #chatAmb .m6 { left:8%; bottom:42%; animation-delay:-6s; animation-duration:15s; }
+  @keyframes ambA {
+    from { transform:translate3d(0,0,0) scale(1); opacity:.72; }
+    to   { transform:translate3d(5vw,3vh,0) scale(1.14); opacity:1; }
+  }
+  @keyframes ambB {
+    from { transform:translate3d(0,0,0) scale(1.06); opacity:.65; }
+    to   { transform:translate3d(-4vw,-2vh,0) scale(1); opacity:.95; }
+  }
+  @keyframes mote {
+    0%   { opacity:0; transform:translateY(12px) scale(.6); }
+    25%  { opacity:.75; }
+    70%  { opacity:.35; }
+    100% { opacity:0; transform:translateY(-64px) scale(1.05); }
+  }
+  /* 氛围层在消息 / 输入区下面 ✓；顶栏仍然压在上面 ✓（下拉药丸要靠它） */
+  #chat > #msgs, #chat > #composer { position:relative; z-index:1; }
+  #chat > header.top { z-index:2; }
+  /* 他自己设了背景图 → 那三团呼吸光会糊在照片上 ✗；光点留着 ✓（像浮在照片上） */
+  #chat.has-bg #chatAmb i { display:none; }
+
+  /* ── 顶栏：一条小灯串 ───────────────────────────────────────────── */
+  #chat header.top {
+    background:
+      radial-gradient(130% 220% at 50% -70%, var(--amb-a), transparent 68%),
+      linear-gradient(180deg, var(--panel), var(--panel) 84%, transparent 150%);
+    border-bottom:1px solid var(--line);
+    box-shadow:0 10px 28px rgba(20,8,10,.06);
+  }
+  [data-theme="cream"] #chat header.top,
+  [data-theme="light"] #chat header.top { box-shadow:0 10px 24px rgba(120,78,48,.06); }
+  [data-theme="forest"] #chat header.top { box-shadow:0 10px 28px rgba(6,14,9,.22); }
+  #chat header.top .info { position:relative; z-index:1; }
+  /* 名字后面一团很淡的暖晕 —— 像灯照在纸上 ✓ */
+  #chat header.top .info::before {
+    content:''; position:absolute; left:50%; top:50%;
+    width:min(70vw,300px); height:60px; transform:translate(-50%,-50%);
+    background:radial-gradient(closest-side, var(--amb-b), transparent 72%);
+    opacity:.55; pointer-events:none; z-index:-1;
+  }
+  #chat header.top .gname { letter-spacing:.045em; }
+  /* 状态收成一枚小胶囊 ✓ —— 只是把"在线"说得更温柔一点 */
+  #chat header.top .status {
+    display:inline-flex; align-items:center; padding:2px 9px 2px 7px; margin-top:4px;
+    border-radius:999px; background:var(--chip-bg); border:1px solid var(--line);
+  }
+  /* ⚠️ 必须显式盖回来：上面是 ID 级作者样式，赢过浏览器默认的 `[hidden]` ✗ */
+  #chat header.top .status[hidden] { display:none; }
+  #chat header.top .dot { box-shadow:0 0 0 2px var(--chip-bg), 0 0 8px var(--send-halo); }
+
+  #garland {
+    position:absolute; left:0; right:0; top:calc(var(--inset-top) + 2px);
+    height:8px; display:flex; justify-content:space-between;
+    padding:0 26px; pointer-events:none;
+  }
+  #garland::before {
+    content:''; position:absolute; left:22px; right:22px; top:3px; height:1px;
+    background:linear-gradient(90deg, transparent, var(--accent-line) 18%,
+                                       var(--accent-line) 82%, transparent);
+    opacity:.55;
+  }
+  #garland i {
+    position:relative; width:5px; height:5px; margin-top:0; border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 5px 2px var(--send-halo), 0 0 10px 3px var(--accent-a);
+    animation:twinkle 3.8s ease-in-out infinite;
+  }
+  /* 奶霜底子亮，光晕要更实一点才看得见 ✓（不然灯串像没了 ✓） */
+  [data-theme="cream"] #garland i,
+  [data-theme="light"] #garland i {
+    box-shadow:0 0 4px 1.5px rgba(190,96,64,.46), 0 0 9px 2.5px rgba(255,176,120,.30);
+  }
+  [data-theme="cream"] #garland::before,
+  [data-theme="light"] #garland::before { opacity:.72; }
+  #garland i:nth-child(1) { --sag:2px; animation-delay:-1.2s; }
+  #garland i:nth-child(2) { --sag:4px; background:var(--agent); box-shadow:0 0 7px 2px var(--send-halo); animation-duration:4.6s; animation-delay:-2.8s; }
+  #garland i:nth-child(3) { --sag:6px; animation-duration:3.2s; animation-delay:-.4s; }
+  #garland i:nth-child(4) { --sag:6px; background:var(--agent); box-shadow:0 0 7px 2px var(--send-halo); animation-duration:5.1s; animation-delay:-3.6s; }
+  #garland i:nth-child(5) { --sag:5px; animation-duration:3.6s; animation-delay:-1.9s; }
+  #garland i:nth-child(6) { --sag:3px; background:var(--agent); box-shadow:0 0 7px 2px var(--send-halo); animation-duration:4.2s; animation-delay:-.8s; }
+  #garland i:nth-child(7) { --sag:2px; animation-duration:4.8s; animation-delay:-2.2s; }
+  @keyframes twinkle {
+    0%,100% { opacity:.35; transform:translateY(var(--sag,0)) scale(.82); }
+    50%     { opacity:1;   transform:translateY(var(--sag,0)) scale(1.15); }
+  }
+
+  /* ── 消息：气色好一点，落下来轻一点 ─────────────────────────────── */
+  #msgs { padding:12px 14px 20px; }
+  #msgs > .row:last-child { animation:msgRise .34s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes msgRise {
+    from { opacity:0; transform:translateY(12px) scale(.985); }
+    to   { opacity:1; transform:none; }
+  }
+  .row .who { letter-spacing:.02em; }
+  .row > .av { box-shadow:0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent-a); }
+
+  /* 默认气泡：一层很轻的暖影 ✓（不描边，不加宽 —— 尺寸不动） */
+  .row[data-bubble="plain"] .bubble:not(.media):not(.sticker) {
+    box-shadow:0 5px 16px rgba(20,8,10,.10);
+  }
+  [data-theme="cream"] .row[data-bubble="plain"] .bubble:not(.media):not(.sticker),
+  [data-theme="light"] .row[data-bubble="plain"] .bubble:not(.media):not(.sticker) {
+    box-shadow:0 5px 16px rgba(120,78,48,.09);
+  }
+  .row.agent[data-bubble="plain"] .bubble:not(.media):not(.sticker) {
+    box-shadow:0 6px 18px rgba(20,8,10,.14);
+  }
+  [data-theme="cream"] .row.agent[data-bubble="plain"] .bubble:not(.media):not(.sticker),
+  [data-theme="light"] .row.agent[data-bubble="plain"] .bubble:not(.media):not(.sticker) {
+    box-shadow:0 6px 18px rgba(120,78,48,.12);
+  }
+  /* 自己的那侧：一层朝上的暖光 ✓ —— 像灯从上面照下来 */
+  .row.mine[data-bubble="plain"] .bubble:not(.media):not(.sticker) {
+    background-image:linear-gradient(155deg, var(--accent-a), transparent 62%);
+    box-shadow:0 6px 20px var(--accent-a);
+  }
+
+  /* 贴纸气泡：白圈和脑袋原样 ✓，只加纸面反光 + 一层更远的暖影 */
+  .row[data-bubble]:not([data-bubble="plain"]) .bubble:not(.media):not(.sticker) {
+    background-image:linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0) 55%);
+    box-shadow:0 0 0 .16em #fffaf1, 0 .14em .45em var(--b-shadow),
+               0 .55em 1.3em rgba(20,8,10,.10);
+  }
+
+  /* 日期胶带：纸还是那张纸 ✓，加两粒小爱心、轻轻歪一点 */
+  #msgs > .daytape {
+    position:relative; padding:3px 22px 4px;
+    transform:rotate(-.5deg);
+  }
+  #msgs > .daytape::before, #msgs > .daytape::after {
+    position:absolute; top:50%; transform:translateY(-50%);
+    font-size:8px; line-height:1; color:rgba(107,82,51,.42);
+  }
+  #msgs > .daytape::before { content:'♥'; left:8px; }
+  #msgs > .daytape::after  { content:'♥'; right:8px; }
+
+  /* ── 输入区：窗台 ───────────────────────────────────────────────── */
+  #composer {
+    border-top:0;
+    background:linear-gradient(180deg, transparent, var(--bg) 54%);
+    padding-top:12px;
+  }
+  #composer::before {
+    content:''; position:absolute; left:18px; right:18px; top:0; height:1px;
+    background:linear-gradient(90deg, transparent, var(--line), transparent);
+  }
+  #composerRow {
+    padding:3px 4px; gap:2px;
+    background:var(--sill-bg); border:1px solid var(--line);
+    border-radius:26px;
+    box-shadow:0 10px 26px rgba(20,8,10,.10), inset 0 1px 0 rgba(255,255,255,.05);
+    transition:border-color .18s ease, box-shadow .18s ease;
+  }
+  [data-theme="cream"] #composerRow,
+  [data-theme="light"] #composerRow { box-shadow:0 10px 26px rgba(120,78,48,.08), inset 0 1px 0 rgba(255,255,255,.7); }
+  #composerRow:focus-within {
+    border-color:var(--accent-line);
+    box-shadow:0 10px 26px rgba(20,8,10,.12), 0 0 0 3px var(--accent-a);
+  }
+  #text { background:transparent; border-color:transparent; padding:10px 9px; }
+  #text:focus { border-color:transparent; }
+  #holdTalk { background:transparent; border-color:transparent; }
+  #send {
+    transition:transform .12s ease, filter .2s ease;
+    filter:drop-shadow(0 0 7px var(--send-halo));
+  }
+  #send:active { transform:scale(.88); }
+  body.hasText #send { animation:sendGlow 2.6s ease-in-out infinite; }
+  @keyframes sendGlow {
+    0%,100% { transform:scale(1);   filter:drop-shadow(0 0 6px var(--send-halo)); }
+    50%     { transform:scale(1.07); filter:drop-shadow(0 0 12px var(--send-halo)); }
+  }
+  /* 发成功的一小簇心（JS 里挂 .heartFly，动画完就删） */
+  .heartFly {
+    position:fixed; z-index:70; pointer-events:none;
+    line-height:1; transform:translate(-50%,-50%);
+    animation:heartFly .9s cubic-bezier(.16,.8,.3,1) forwards;
+    text-shadow:0 2px 8px var(--send-halo);
+  }
+  @keyframes heartFly {
+    0%   { opacity:0; transform:translate(-50%,-50%) scale(.4) rotate(var(--rot,0deg)); }
+    18%  { opacity:1; }
+    100% { opacity:0;
+           transform:translate(calc(-50% + var(--dx,0px)), calc(-50% + var(--dy,-64px)))
+                     scale(1.05) rotate(var(--rot,0deg)); }
+  }
+
+  /* ── 设置：暖纸卡 + 彩色小图标 ─────────────────────────────────── */
+  header.sub {
+    background:
+      radial-gradient(120% 240% at 50% -80%, var(--amb-a), transparent 70%),
+      var(--panel);
+  }
+  header.sub h2 { letter-spacing:.06em; }
+  .ascreen .grp.gcard {
+    background-image:linear-gradient(180deg, var(--card-hi), transparent 68%);
+    box-shadow:var(--glow), 0 1px 0 rgba(255,255,255,.04) inset;
+  }
+  #settings .item > .ico {
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+    transition:transform .16s cubic-bezier(.22,1,.36,1);
+  }
+  #settings .item:active > .ico { transform:scale(.92); }
+  #settings .item[data-act="shell"] > .ico        { color:var(--hue1); }
+  #settings .item[data-act="agentprofile"] > .ico { color:var(--hue2); }
+  #settings .item[data-act="gname"] > .ico        { color:var(--hue3); }
+  #settings .item[data-act="theme"] > .ico        { color:var(--hue5); }
+  #settings .item[data-act="bg"] > .ico           { color:var(--hue4); }
+  #settings .item[data-act="models"] > .ico       { color:var(--hue2); }
+  #settings .item[data-act="invite"] > .ico       { color:var(--hue3); }
+  #settings .item[data-act="update"] > .ico       { color:var(--hue4); }
+
+  /* ── 工具抽屉：木盒里的一格暖光 ─────────────────────────────────── */
+  #drawer .dr-panel {
+    background:linear-gradient(200deg, var(--panel), var(--panel) 58%, var(--panel2));
+    box-shadow:-20px 0 50px rgba(20,8,10,.30);
+  }
+  [data-theme="cream"] #drawer .dr-panel,
+  [data-theme="light"] #drawer .dr-panel { box-shadow:-20px 0 44px rgba(120,78,48,.16); }
+  #drawer .dr-panel::after {
+    content:'♥'; position:absolute; right:-4px; bottom:calc(var(--inset-bottom) + 12px);
+    font-size:132px; line-height:1; color:var(--accent); opacity:.048;
+    pointer-events:none; transform:rotate(-8deg);
+  }
+  [data-theme="cream"] #drawer .dr-panel::after,
+  [data-theme="light"] #drawer .dr-panel::after { opacity:.042; }
+  #drawer .dr-eyebrow { color:var(--accent); opacity:.78; }
+  #drawer .dr-item {
+    background:linear-gradient(180deg, var(--card-hi), transparent 80%), var(--panel2);
+    border:1px solid var(--line);
+    box-shadow:0 6px 16px rgba(20,8,10,.08);
+  }
+  [data-theme="cream"] #drawer .dr-item,
+  [data-theme="light"] #drawer .dr-item { box-shadow:0 6px 16px rgba(120,78,48,.07); }
+  #drawer .dr-ico {
+    background:linear-gradient(150deg, var(--accent-a), rgba(255,255,255,.04));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #chatAmb i, #chatAmb b, #garland i, #msgs > .row:last-child,
+    body.hasText #send { animation:none !important; }
+    .heartFly { display:none !important; }
+  }

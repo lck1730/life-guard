@@ -172,24 +172,27 @@
   //    用户 id 分开存（`lg_theme:u<id>` ✓）→ 同一个群里两个人各用各的 ✓，
   //    换账号登录也不会把上一个人的主题带过去 ✓。服务端完全不知道这件事 ✓。
   const THEMES = [
-    { id: 'dark', name: '夜阑', desc: '墨黑与夜蓝，安静得刚好',
-      color: '#0f1115', light: false,
-      vars: '--p-bg:#0f1115;--p-panel:#171a21;--p-panel2:#1e222b;'
-          + '--p-line:#262b36;--p-text:#e6e8ee;--p-muted:#8b93a7;'
-          + '--p-accent:#6ea8ff;--p-accent-bg:#1e3a5f;'
-          + '--p-accent-line:#35507a;--p-accent-soft:rgba(90,140,255,.10)' },
+    // ★ 2026-10-29「暖光」：这三组 `vars` 是**预览卡自己的颜色** ✓，
+    //    必须跟着 app.css 里那三套主题一起改 ✓ —— 不然卡片上画的还是旧配色 ✓，
+    //    点进去却是另一副样子（用户会以为没生效 ✓）。
+    { id: 'dark', name: '夜阑', desc: '暖墨与灯火，像傍晚的窗',
+      color: '#171116', light: false,
+      vars: '--p-bg:#171116;--p-panel:#211920;--p-panel2:#2c2029;'
+          + '--p-line:#3b2c36;--p-text:#f7ece8;--p-muted:#b09aa1;'
+          + '--p-accent:#ff9f7d;--p-accent-bg:#46282e;'
+          + '--p-accent-line:#6a4140;--p-accent-soft:rgba(255,159,125,.10)' },
     { id: 'cream', name: '奶霜', desc: '暖白与焦糖，像一杯温牛奶',
-      color: '#f6f0e4', light: true,
-      vars: '--p-bg:#f6f0e4;--p-panel:#fffcf5;--p-panel2:#efe7d8;'
-          + '--p-line:#e4d8c5;--p-text:#2d2822;--p-muted:#706658;'
-          + '--p-accent:#9a5b2e;--p-accent-bg:#f2e1cb;'
-          + '--p-accent-line:#d8be9e;--p-accent-soft:rgba(154,91,46,.10)' },
-    { id: 'forest', name: '林深', desc: '深林与苔绿，沉静而有生气',
-      color: '#12231a', light: false,
-      vars: '--p-bg:#12231a;--p-panel:#1a2f22;--p-panel2:#233a2b;'
-          + '--p-line:#2e4836;--p-text:#e6efe3;--p-muted:#90a794;'
-          + '--p-accent:#8be4a0;--p-accent-bg:#2f5739;'
-          + '--p-accent-line:#477552;--p-accent-soft:rgba(139,228,160,.14)' },
+      color: '#fbf3e7', light: true,
+      vars: '--p-bg:#fbf3e7;--p-panel:#fffaf2;--p-panel2:#f5ead9;'
+          + '--p-line:#ead9c2;--p-text:#33261f;--p-muted:#77675a;'
+          + '--p-accent:#a94e3a;--p-accent-bg:#f7ded0;'
+          + '--p-accent-line:#e2c3ab;--p-accent-soft:rgba(169,78,58,.09)' },
+    { id: 'forest', name: '林深', desc: '深林与暖灯，沉静而有生气',
+      color: '#142019', light: false,
+      vars: '--p-bg:#142019;--p-panel:#1b2b21;--p-panel2:#263a2b;'
+          + '--p-line:#344a37;--p-text:#eff4ea;--p-muted:#a3b5a5;'
+          + '--p-accent:#f0c07a;--p-accent-bg:#463a24;'
+          + '--p-accent-line:#6b5c3c;--p-accent-soft:rgba(240,192,122,.10)' },
   ];
   // ★ 2026-10-27：三套**气泡皮肤** —— 鸭鸭 / 猪猪 / 猫猫 ✓。
   //
