@@ -1742,7 +1742,10 @@
         //   墙上这张**本身就是回忆** ✓ → 不带 message_id ✓，也就不给「收进回忆」✓。
         img.onclick = function (ev) {
           ev.stopPropagation();
-          openLightbox('/media/' + m.media_path);
+          // ⚠️ 用 `img.src`（**已解析成绝对地址** ✓）而不是手拼的 `/media/...` ✗ ——
+          //    灯箱靠 `^https?:` 判断"这张在不在服务器上" ✓，相对路径会被当成
+          //    "存不了" ✓ → 「保存到相册」按钮直接藏起来 ✓（2026-10-29 踩过）。
+          openLightbox(img.src);
         };
         card.appendChild(img);
       }
