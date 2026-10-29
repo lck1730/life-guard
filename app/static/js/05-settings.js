@@ -1946,7 +1946,7 @@
   let pgSw = null;
   //: ★ 2026-10-29：灯箱（z 80）也算"盖着" ✓ —— 图开着的时候不该在下面滑动开抽屉 ✓。
   const _overlayOn = () =>
-    ['#sheet', '#modal', '#tray', '#lightbox'].some(s => $(s) && $(s).classList.contains('on'));
+    ['#sheet', '#modal', '#tray', '#lightbox', '#drawer'].some(s => $(s) && $(s).classList.contains('on'));
 
   //: 除了这几屏之外，**其余任何一屏开着就不认手势** ✓。
   //: ⚠️ 2026-10-29：`#settings` **从这里拿掉了** ✓ —— 它现在自己吃"左滑返回" ✓，
@@ -1967,167 +1967,236 @@
     return '';
   };
 
-  // ── 工具飞轮（2026-10-29，从「抽屉」改的）────────────────────────────
+  // ── 拉绳小工具（2026-10-29 第十二版，从「工具飞轮」改成这个）──────────
   //
-  // 用户第一版：「小屋界面不要之后，可以将一些功能区放到左滑出现状态栏，先放个账本」✓。
-  // 用户第二版：「那个抽屉还可以更加优化，不是一页而是唤出飞轮的感觉」✓。
+  // 用户：「将生活管家的飞轮展开组件变为主群聊界面上方状态栏的一个拉绳拉下
+  // 界面，目前有四个，账本，纪念日，相册，成就，后续再添加，色调图案不要照搬，
+  // 要求温馨」✓。
   //
-  // 所以手势没变 ✓（群聊左滑唤出 / 轮上右滑收起 / 返回键先收它 ✓），
-  // 变的是**出现的东西** ✓：不再是抽屉里一页清单 ✓，是一圈工具绕着生活管家 logo ✓
-  // （2026-10-29 第十版：轴心只留 logo ✓，四个键是账本 / 纪念日 / 相册 / 成就 ✓）。
+  // 手感：
+  //   · 顶栏右下角垂一根小绳（收着 38px ✓）；**手指往下走多少，绳就长多少** ✓，
+  //     布帘按同比例从顶栏底下垂下来 ✓（1:1 跟手 ✓）。
+  //   · 松手过 38% 或往下**一甩** → 开 ✓；往上甩 / 拉回去 → 收 ✓。
+  //   · 轻点绳子 → 开 / 关 ✓（不想拖的人也有个念头 ✓）。
+  //   · 布帘上点任意一个键 → 先收，再开目标页 ✓。
   //
-  // 手感（"滚进来"就靠这三行 ✓）：
-  //   · 位移：跟着手指，但映射**前快后慢** ✓（`v / 0.62`）——
-  //     拖过阈值时轮子已经基本露出来了 ✓，不会"松手才一下蹦出来" ✗。
-  //   · 整圈同时反着转 `DR_SPIN` 度 ✓（像轮子被拽着滚 ✓）。
-  //   · 每个键里那层 `.dk-in` 再反着转回来 ✓ → 滚的过程中图标和字始终是正的 ✓。
-  //   松手过阈值就用一条带**回弹**的缓动咬合 ✓；没过就照原路滚回去 ✓。
-  //
-  // ⚠️ **不借 `pushScreen`** ✗ —— 它一上来就挂动画类 ✓，和跟手这条 `transform`
-  //    抢同一个属性 ✓（原来空间那一版就是自己管 `.on` + `transition:none` ✓）。
-  // ⚠️ 飞轮**不报屏名** ✓（`tellTop` 报的是 'settings' ✓）：返回键仍然先收它 ✓，
-  //    收完就回到群聊 ✓ —— 不会把 App 退掉 ✓。
-  const DR_W = () => Math.min((window.innerWidth || 360) * 0.78, 320);
-  /** 拉这么多 = 轮子完全出来 ✓ —— 轮子不用拖一整屏 ✓（原来的 `DR_W` 是给整页抽屉的 ✓）。 */
-  const DR_FULL = () => Math.min(DR_W(), 190);
-  /** 收着的时候整圈轻轻偏多少度 ✓ —— 第十版柔和之后从 260° 收到 34° ✓
-   *  （不再像机械轮 ✓，只剩"滚进来"的那一点点劲 ✓）。 */
-  const DR_SPIN = 34;
+  // ⚠️ 面板**必须先收完再开目标页** ✓ —— 它 z 56，组件页(26) / 设置页(10)
+  //    都压不过它 ✓（和飞轮那版是同一个坑 ✓，别再踩 ✗）。
+  // ⚠️ 布帘的几何全由 JS 写在 inline style 上 ✓（要跟手 ✓）；CSS 只给初始值 ✓。
+  // ⚠️ `#drawer` 仍在 `#chat` 里 ✓ —— `#chat` 有 `z-index:0`（app.css 末尾 ✓），
+  //    设置页 / 组件页是它**外面的屏** ✓，天然压得住它 ✓。
+  // ⚠️ 拉绳自己 `stopPropagation` + `touch-action:none` ✓ —— 不能被
+  //    下拉刷新（顶栏起手）或横滑手势抢走 ✓。
+  // ⚠️ `tellTop` 认 `#drawer` ✓：开着的时候报 'settings' ✓ → 安卓返回键先收它 ✓。
+
+  const DR_TAIL = 38;        // 收着时整根绳（含木珠）的高度 ✓
+  const DR_OPEN_AT = 0.38;   // 拉过这个比例松手就开 ✓
+  const DR_FLICK = 0.5;      // px/ms ✓（往下正、往上负 ✓）
   const _drRM = !!(window.matchMedia
                    && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
-  const _drawer = $('#drawer'), _drPanel = $('#drPanel'), _drScrim = $('#drScrim'),
-        _drRotor = $('#drRotor');
-  let drTok = 0, drDragging = false, drPickTok = 0;
+  const _drawer = $('#drawer'), _drScrim = $('#drScrim'), _drBlind = $('#drBlind'),
+        _drCord = $('#drCord');
+  let drH = 0, drTok = 0, drOpen = false, drDrag = null, drPickTok = 0;
+
+  /** 量顶栏下沿 + 布帘高度 ✓ —— 顶栏会随安全区 / 字号变 ✓，别写死 ✗。 */
+  const _drMeasure = () => {
+    const hd = $('#chat header.top');
+    const r = hd ? hd.getBoundingClientRect() : null;
+    if (r) _drawer.style.setProperty('--dr-top', Math.round(r.bottom) + 'px');
+    drH = _drBlind.offsetHeight || 0;
+    return drH;
+  };
 
   /**
-   * `v` = 0（完全收在右边）→ 1（完全出来）✓。
-   * `panelAnim` / `rotorAnim` 是 CSS transition 字符串（空串 = 跟手，逐帧改 ✓）。
+   * `p` = 0（收着）→ 1（全开）✓，>1 是往下拽过头（橡皮筋 ✓）。
+   * `anim` 是 CSS transition 字符串 ✓（空串 = 跟手，逐帧改 ✓）。
    */
-  const _drShow = (v, panelAnim, rotorAnim) => {
-    v = Math.max(0, Math.min(1, v));
-    const w = window.innerWidth || 360;
-    //: 位置用的进度：**前快后慢** ✓（见上面那段 ✓）。
-    const vp = Math.min(1, v / 0.62);
-    const off = w * 0.5 + 250;
-    _drawer.classList.add('on');
-    _drawer.setAttribute('aria-hidden', v > 0.02 ? 'false' : 'true');
-    _drawer.classList.toggle('open', v >= 0.995);
-    _drPanel.style.transition = panelAnim || 'none';
-    _drScrim.style.transition = panelAnim ? 'opacity .3s ease' : 'none';
-    _drPanel.style.transform =
-      'translate(-50%,-50%) translateX(' + ((1 - vp) * off) + 'px) scale('
-      + (0.88 + 0.12 * vp) + ')';
-    _drPanel.style.opacity = String(Math.min(1, vp * 1.25));
-    _drScrim.style.opacity = String(vp);
-    // ★ 整圈倒转 ✓。⚠️ 开关减弱动态时它就不转 ✓（只留位移和淡入 ✓）。
-    const spin = _drRM ? 0 : -DR_SPIN * (1 - v);
-    _drRotor.style.transition = rotorAnim || 'none';
-    _drRotor.style.transform = 'rotate(' + spin + 'deg)';
-    _drRotor.style.setProperty('--dr-spin', spin + 'deg');
+  const _drPaint = (p, anim) => {
+    const pe = p > 1 ? 1 + (p - 1) * 0.16 : (p < 0 ? p * 0.14 : p);
+    _drBlind.style.transition = anim ? 'transform ' + anim : 'none';
+    _drCord.style.transition = anim ? 'height ' + anim : 'none';
+    _drScrim.style.transition = anim ? 'opacity ' + anim : 'none';
+    _drBlind.style.transform = 'translateY(' + ((pe - 1) * 100) + '%)';
+    _drCord.style.height = (DR_TAIL + pe * (drH + 4)) + 'px';
+    _drScrim.style.opacity = String(Math.max(0, Math.min(1, p * 1.25)));
+    if (p > 0.001) {
+      _drawer.classList.add('on');
+      _drawer.setAttribute('aria-hidden', 'false');
+    }
+  };
+
+  const openTools = () => {
+    drOpen = true;
+    const tok = ++drTok;
+    _drMeasure();
+    _drawer.classList.add('on', 'open');
+    _drawer.setAttribute('aria-hidden', 'false');
+    _drCord.setAttribute('aria-expanded', 'true');
+    tellTop();                       // 开着的这一层按 'settings' 报 ✓
+    _drPaint(1, _drRM ? '1ms linear' : '.52s cubic-bezier(.16,1.12,.3,1)');
+    setTimeout(() => {
+      if (tok !== drTok) return;
+      _drBlind.style.transition = '';
+      _drCord.style.transition = '';
+      _drScrim.style.transition = '';
+      _drBlind.style.transform = 'translateY(0%)';
+      _drCord.style.height = (DR_TAIL + drH + 4) + 'px';
+      _drScrim.style.opacity = '1';
+    }, _drRM ? 20 : 540);
   };
 
   const _drReset = () => {
     _drawer.classList.remove('on', 'open');
     _drawer.setAttribute('aria-hidden', 'true');
-    _drPanel.style.transition = '';
-    _drPanel.style.transform = '';
-    _drPanel.style.opacity = '';
-    _drRotor.style.transition = '';
-    _drRotor.style.transform = '';
-    _drRotor.style.removeProperty('--dr-spin');
+    _drCord.setAttribute('aria-expanded', 'false');
+    _drBlind.style.transition = '';
+    _drBlind.style.transform = '';
+    _drCord.style.transition = '';
+    _drCord.style.height = '';
     _drScrim.style.transition = '';
     _drScrim.style.opacity = '';
-    // 飞轮收完 → 告诉原生"又回群聊了" ✓（开着的时候报的是 'settings' ✓，见 `tellTop` ✓）。
-    tellTop();
-  };
-
-  const peekDrawer = (v) => {
-    if (!drDragging) { drDragging = true; drTok++; }
-    _drShow(v);
-  };
-
-  const _drPanelAnim = (open) => open
-    ? 'transform .46s cubic-bezier(.16,1.22,.3,1), opacity .3s ease'
-    : 'transform .28s cubic-bezier(.4,0,1,1), opacity .22s ease';
-  const _drRotorAnim = (open) => open
-    ? 'transform .5s cubic-bezier(.16,1.22,.3,1)'
-    : 'transform .3s cubic-bezier(.4,0,1,1)';
-
-  const endDrawerPeek = (open) => {
-    if (!drDragging) return;
-    drDragging = false;
-    const tok = ++drTok;
-    // 松手决定**开着** → 立刻报 'settings' ✓ —— 这时按返回键要交给网页收它 ✓，
-    // 而不是让原生当成"在群聊"直接退出 ✓。收回去那条走 `_drReset` 补报 ✓。
-    if (open) tellTop();
-    _drShow(open ? 1 : 0, _drPanelAnim(open), _drRotorAnim(open));
-    setTimeout(() => {
-      if (tok !== drTok) return;                 // 中间又拉了一下 → 这次收尾作废 ✓
-      if (open) {
-        _drPanel.style.transition = '';
-        _drPanel.style.transform = 'translate(-50%,-50%) translateX(0px) scale(1)';
-        _drPanel.style.opacity = '1';
-        _drRotor.style.transition = '';
-        _drRotor.style.transform = 'rotate(0deg)';
-        _drRotor.style.setProperty('--dr-spin', '0deg');
-        _drScrim.style.transition = '';
-        _drScrim.style.opacity = '1';
-        return;
-      }
-      _drReset();
-    }, 500);
+    tellTop();                       // 收完 → 又回群聊 ✓
   };
 
   const closeDrawer = () => {
+    drOpen = false;
     if (!_drawer.classList.contains('on')) return;
-    drDragging = false;
+    drDrag = null;
     const tok = ++drTok;
-    _drShow(0, _drPanelAnim(false), _drRotorAnim(false));
-    setTimeout(() => { if (tok === drTok) _drReset(); }, 320);
+    _drawer.classList.remove('open');
+    _drCord.setAttribute('aria-expanded', 'false');
+    _drPaint(0, _drRM ? '1ms linear' : '.36s cubic-bezier(.4,0,.9,.62)');
+    setTimeout(() => { if (tok === drTok) _drReset(); }, _drRM ? 20 : 380);
   };
 
   if (_drScrim) _drScrim.onclick = () => closeDrawer();
 
-  // ★ 四个键（2026-10-29 第十版）：**只有账本是真的** ✓，其余三个先占位 ✓。
-  //   用户原话：「除了账本不要其他，因为设置里都有…改成：账本，纪念日，相册，成就。
-  //  除了记账，其他点击后是开发中敬请期待」✓ —— 主题 / 背景 / 设置都在设置页里 ✓，
-  //  不再摆到轮子上 ✗。以后要接真的，把 `_drAct` 里那一行换成目标页就行 ✓。
+  // ── 拉绳：跟手拖 / 轻点开关 ────────────────────────────────────────
+  const _cordStart = (ev) => {
+    if (drDrag) return;
+    if (ev.touches && ev.touches.length !== 1) return;
+    const t = ev.touches && ev.touches[0];
+    const x = t ? t.clientX : ev.clientX;
+    const y = t ? t.clientY : ev.clientY;
+    ev.stopPropagation();
+    if (ev.cancelable) ev.preventDefault();
+    _drMeasure();
+    const t0 = performance.now();
+    drDrag = {
+      x0: x, y0: y, t0: t0, tm: t0, ym: y, v: 0, moved: 0,
+      from: _drawer.classList.contains('on') ? 1 : 0, p: null,
+    };
+    //: 收着起手时先把状态摆好 ✓（不然第一帧还会闪一下 CSS 的初始值 ✓）。
+    if (!drDrag.from) _drPaint(0, '');
+  };
+
+  const _cordMove = (ev) => {
+    if (!drDrag) return;
+    if (ev.touches && ev.touches.length > 1) return;
+    const t = ev.touches && ev.touches[0];
+    if (!t) return;
+    ev.stopPropagation();
+    if (ev.cancelable) ev.preventDefault();
+    const d = drDrag;
+    const dy = t.clientY - d.y0;
+    d.moved = Math.max(d.moved, Math.abs(dy), Math.abs(t.clientX - d.x0));
+    d.p = d.from + dy / Math.max(1, drH + 4);
+    const now = performance.now();
+    if (now > d.tm) {
+      const iv = (t.clientY - d.ym) / (now - d.tm);
+      d.v = d.v * 0.35 + iv * 0.65;
+    }
+    d.tm = now; d.ym = t.clientY;
+    _drPaint(d.p, '');
+  };
+
+  const _cordEnd = (ev) => {
+    if (!drDrag) return;
+    const d = drDrag;
+    drDrag = null;
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    const now = performance.now();
+    // 轻点（几乎没动、也没按太久）→ 开 / 关 ✓
+    if (d.moved < 6 && now - d.t0 < 420) {
+      if (drOpen) closeDrawer(); else openTools();
+      return;
+    }
+    //: 松手前**停住**了（90ms 没再动）→ 不算甩 ✓（和横滑那边同一个规矩 ✓）。
+    const v = (now - d.tm > 90) ? 0 : (d.v || 0);
+    const p = d.p == null ? d.from : d.p;
+    const open = d.from === 0
+      ? (p >= DR_OPEN_AT || v >= DR_FLICK)
+      : !(p <= 1 - DR_OPEN_AT || v <= -DR_FLICK);
+    if (open) openTools(); else closeDrawer();
+  };
+
+  if (_drCord) {
+    _drCord.addEventListener('touchstart', _cordStart, { passive: false });
+    _drCord.addEventListener('touchmove', _cordMove, { passive: false });
+    _drCord.addEventListener('touchend', _cordEnd);
+    _drCord.addEventListener('touchcancel', () => {
+      if (!drDrag) return;
+      drDrag = null;
+      if (drOpen) openTools(); else closeDrawer();
+    });
+    _drCord.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      if (drOpen) closeDrawer(); else openTools();
+    });
+  }
+
+  // 顶栏高度 / 布帘高度变了（转屏、安全区、字号）→ 重新量 ✓。
+  const _drRO = (el, fn) => {
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    try { new ResizeObserver(fn).observe(el); } catch (e) {}
+  };
+  _drRO($('#chat header.top'), () => _drMeasure());
+  _drRO(_drBlind, () => {
+    _drMeasure();
+    if (drOpen && !drDrag) {
+      _drBlind.style.transform = 'translateY(0%)';
+      _drCord.style.height = (DR_TAIL + drH + 4) + 'px';
+    }
+  });
+  window.addEventListener('resize', () => _drMeasure());
+  _drMeasure();
+
+  // ★ 四个键（2026-10-29 第十版/第十二版）：**只有账本是真的** ✓，其余占位 ✓。
+  //   以后要接真的，把 `_drAct` 里那一行换成目标页就行 ✓；加第五个键在 HTML 补一个
+  //   `.dt-key` ✓（`.dr-grid` 自动换行 ✓，JS 不用动 ✓）。
   const _drAct = {
     ledger: () => openComp('bookkeeping-panel', '账本'),
     anniv:  () => toast('纪念日 · 开发中，敬请期待'),
     album:  () => toast('相册 · 开发中，敬请期待'),
     award:  () => toast('成就 · 开发中，敬请期待'),
   };
-  $$('#drawer .dr-key').forEach(btn => {
+  $$('#drawer .dt-key').forEach(btn => {
     btn.onclick = () => {
       const act = _drAct[btn.dataset.act];
       if (!act) return;
       const tok = ++drPickTok;
-      // ⚠️ 必须先收飞轮再开目标页 ✓ —— 飞轮 56、组件页 26 / 设置页 24 ✓，
-      //    不收的话目标页会被**压在飞轮底下** ✓（"点了没反应"那个老形状 ✓）。
+      // ⚠️ 必须先收面板再开目标页 ✓ —— 它 z 56，压在组件页 / 设置页上面 ✓。
       closeDrawer();
       setTimeout(() => {
-        if (tok !== drPickTok) return;           // 连点了两下 → 只认最后一下 ✓
+        if (tok !== drPickTok) return;           // 连点两下 → 只认最后一下 ✓
         if (_drawer.classList.contains('on')) return;   // 这期间又拉开了 → 这次不算 ✓
         act();
-      }, 350);
+      }, 400);
     };
   });
 
   document.addEventListener('touchstart', (ev) => {
     // ⚠️ **半路多出一根手指** ✓（语音 / 系统手势…）→ 这一手就不算了 ✓，
     //    跟手拉开的抽屉得缩回去 ✓ —— 不能把它晾在半路上 ✗。
-    if (ev.touches.length !== 1) {
-      const s = pgSw; pgSw = null;
-      if (s && s.space) endDrawerPeek(false);
-      return;
-    }
+    if (ev.touches.length !== 1) { pgSw = null; return; }
     if (_overlayOn()) { pgSw = null; return; }
     const x = ev.touches[0].clientX, y = ev.touches[0].clientY;
     // ① 贴边的滑动归系统 ✓
     if (x < SW_EDGE || x > window.innerWidth - SW_EDGE) { pgSw = null; return; }
-    pgSw = { x0: x, y0: y, dir: '', d: 0, from: '', space: false };
+    pgSw = { x0: x, y0: y, dir: '', d: 0, from: '',
+             t0: performance.now(), tm: 0, xm: x };
   }, { passive: true });
 
   document.addEventListener('touchmove', (ev) => {
@@ -2151,9 +2220,8 @@
       // ★ 2026-10-29（用户纠正）：设置页是**左滑**回去 ✓（原来写的右滑 ✗）——
       //   和它进场的动效同一边 ✓：设置页从左边推进来 ✓，所以把它往左推回去 ✓
       //   （手指往左，页面跟着往左退出 ✓，不跟手、松手过阈值才走 ✓）。
-      const ok = (pgSw.dir === 'L' && (s === 'chat' || s === 'settings'))
-              || (pgSw.dir === 'R' && (s === 'chat'
-                                       || s === 'comp' || s === 'drawer'));
+      const ok = (pgSw.dir === 'L' && s === 'settings')
+              || (pgSw.dir === 'R' && (s === 'chat' || s === 'comp'));
       if (!ok) { pgSw = null; return; }
       pgSw.from = s;
       ev.preventDefault();      // ★ 认了之后**才**拦 ✓（早了会把滚动卡死 ✗）
@@ -2162,31 +2230,25 @@
     }
     pgSw.dx = dx;
     pgSw.dy = dy;
-    // ★ **跟手**：群聊左滑 → 飞轮滚出来 ✓；飞轮上右滑 → 按手指往回滚 ✓。
-    //   ⚠️ 设置页不跟手 ✓ —— 松手过阈值直接走 `closeSettings()` 的退场动画 ✓
-    //      （它有自己的推/退两条 ✓，中途接管会和那两条打架 ✓）。
-    if (pgSw.dir === 'L' && pgSw.from === 'chat') {
-      pgSw.space = true;
-      peekDrawer(-dx / DR_FULL());
-    } else if (pgSw.dir === 'R' && pgSw.from === 'drawer') {
-      pgSw.space = true;
-      peekDrawer(1 - dx / DR_FULL());
+    //: 记一下手指速度 ✓ —— 松手时算"甩"多快 ✓（见 `_endSwipe` ✓）。
+    //  用**最近一段**的位移 / 时间 ✓（不是从起手算平均 ✓）：慢慢拖到一半再一甩 ✓，
+    //  平均速度是小的 ✓，只有这一段能认出那一甩 ✓。
+    const now = performance.now();
+    if (pgSw.tm && now > pgSw.tm) {
+      const iv = (p.clientX - pgSw.xm) / (now - pgSw.tm);
+      pgSw.vx = pgSw.vx == null ? iv : pgSw.vx * 0.35 + iv * 0.65;
     }
+    pgSw.tm = now;
+    pgSw.xm = p.clientX;
+    // ★ 第十二版：**群聊左滑不再唤出工具** ✗ —— 工具改成顶栏那根拉绳了 ✓
+    //   （见上面 `_cordStart` ✓）。横向手势只剩：右进设置 / 左出设置 / 右退组件 ✓，
+    //   都不跟手 ✓ —— 松手过阈值才走 ✓。
   }, { passive: false });
 
   const _endSwipe = () => {
     const s = pgSw;
     pgSw = null;
     if (!s) return;
-    if (s.space) {
-      // ⚠️ 用**有方向的**位移判 ✓（不用 `abs` ✗ —— 手指拉出去又拉回来时，
-      //    `abs` 会把"其实已经收回来了"判成过阈值 ✗）。
-      const open = s.from === 'drawer'
-        ? (DR_FULL() - (s.dx || 0) >= SW_TRIG)  // 从全开往右拖：拖走不足阈值 → 还开着 ✓
-        : (-(s.dx || 0) >= SW_TRIG);            // 从左往左拖：过阈值 → 开 ✓
-      endDrawerPeek(open);
-      return;
-    }
     if (!s.dir) return;
     const far = Math.abs(s.dx || 0) >= SW_TRIG;
     if (!far) return;
@@ -2195,12 +2257,8 @@
     if (s.dir === 'R' && s.from === 'chat') { openSettings(); return; }
   };
   document.addEventListener('touchend', _endSwipe);
-  // ⚠️ 取消（来电、系统抢手势…）也要**把抽屉收回去** ✓ ——
-  //    `touchend` 不一定会来 ✓（这种"少一个事件"的坑这个项目栽过 ✓）。
-  document.addEventListener('touchcancel', () => {
-    const s = pgSw; pgSw = null;
-    if (s && s.space) endDrawerPeek(false);
-  });
+  // 取消（来电、系统抢手势…）→ 这一手横滑作废 ✓（拉绳有自己的 touchcancel ✓）。
+  document.addEventListener('touchcancel', () => { pgSw = null; });
 
   // ── 下拉刷新（2026-10-29）──────────────────────────────────────────
   //
@@ -2228,6 +2286,8 @@
     if (pullBusy || ev.touches.length !== 1) return;
     if (_overlayOn() || _whichScreen() !== 'chat') return;
     const t = ev.touches[0];
+    // ★ 绳子上起手的拖动归拉绳 ✓（它自己 stopPropagation ✓，这句是保险 ✓）。
+    if (ev.target && ev.target.closest && ev.target.closest('#drawer')) return;
     const r = _pullHeader.getBoundingClientRect();
     if (t.clientY > r.bottom + 8) return;      // 起手不在顶栏 → 不是下拉刷新 ✓
     pull = { x0: t.clientX, y0: t.clientY, active: false, d: 0, top: r.bottom };
