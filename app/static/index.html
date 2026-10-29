@@ -499,6 +499,20 @@
         → 它把注释里那串字**当成真标签**数了一遍 ✓ →
         顶层元素凭空多出一个 ✓、还把后面的深度算歪 ✓。
         所以这里一律写成 `div.screen#chat` 这种**不带尖括号**的写法 ✓。 -->
+<!-- ★ 2026-10-29：长按一条消息 → 动作卡片（从参考版的文具托盘裁剩两格：引用 / 复制）。
+     卡片从底下推上来，顶上贴着一条纸胶带，中间是这句话本身。
+     ⚠️ 只有这两格 ✓ —— 钉墙 / 提醒 / 记账 / 擦掉 / 盖章那些**留在参考版**里 ✗。 -->
+<div id="tray" role="dialog" aria-modal="true" aria-label="消息操作">
+  <div class="tray-scrim" id="trayScrim"></div>
+  <div class="tray-card" id="trayCard">
+    <div class="tray-tape" aria-hidden="true"></div>
+    <div class="tray-prev">
+      <div class="tray-who" id="trayWho"></div>
+      <div class="tray-txt" id="trayTxt"></div>
+    </div>
+    <div class="tray-acts" id="trayActs"></div>
+  </div>
+</div>
 <div class="lightbox" id="lightbox">
   <img id="lightboxImg" alt="">
   <div class="bigletter" id="lightboxTxt" hidden></div>

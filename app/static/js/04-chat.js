@@ -19,6 +19,60 @@
     return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
   };
 
+  // ── 日期胶带（2026-10-29，从参考版裁回来）──────────────────────────
+  //
+  // 每换一天，消息流里插一条「和纸胶带」✓（`#msgs > .daytape` ✓，见 app.css ✓）。
+  // 滚动时吸顶是 CSS 的 `position:sticky` 自己做的 ✓ —— 这里只管**什么时候插** ✓。
+  //
+  // ⚠️ 判断用**本机时区** ✓（和右边那个 `.time` 同一条口径 ✓）：
+  //    库里存的是 UTC 秒 ✓，`new Date(s*1000)` 落到本机 ✓。
+  //
+  // ⚠️ **追加**和**往回翻**是两条路 ✗：
+  //    · 追加（首屏 / 新消息）→ 在 `addMsg` 里跟前一条比一下就行 ✓；
+  //    · 往回翻（`prepend`）→ 整段插完**重排一遍** ✓（`renderDays` ✓）——
+  //      翻历史时是**倒着 prepend** ✓，边插边判会把同一天拆成好几条胶带 ✓。
+  const dayKey = s => {
+    const d = new Date(s * 1000);
+    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  };
+  const dayLabel = s => {
+    const d = new Date(s * 1000), now = new Date();
+    const same = (a, b) => a.getFullYear() === b.getFullYear()
+      && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    const y = new Date(now); y.setDate(now.getDate() - 1);
+    const md = (d.getMonth() + 1) + '月' + d.getDate() + '日';
+    if (same(d, now)) return '今天 · ' + md;
+    if (same(d, y)) return '昨天 · ' + md;
+    if (d.getFullYear() !== now.getFullYear()) return d.getFullYear() + '年' + md;
+    return md + ' · 周' + '日一二三四五六'[d.getDay()];
+  };
+  const mkTape = s => {
+    const t = document.createElement('div');
+    t.className = 'daytape';
+    t.dataset.day = String(dayKey(s));
+    t.textContent = dayLabel(s);
+    return t;
+  };
+  /** 追加一条之后：跟前一条（跳过胶带）比日期，不一样就插一条。 */
+  const tapeBefore = (row, ts) => {
+    let prev = row.previousElementSibling;
+    while (prev && !prev.dataset.ts) prev = prev.previousElementSibling;
+    if (!prev || dayKey(+prev.dataset.ts) !== dayKey(ts)) {
+      row.parentNode.insertBefore(mkTape(ts), row);
+    }
+  };
+  /** 往回翻之后：把胶带全拆了、按顺序重排一遍（`loadOlder` 里调一次 ✓）。 */
+  const renderDays = () => {
+    const box = $('#msgs');
+    box.querySelectorAll('.daytape').forEach(t => t.remove());
+    let last = '';
+    for (const el of Array.from(box.children)) {
+      if (!el.dataset || !el.dataset.ts) continue;
+      const k = String(dayKey(+el.dataset.ts));
+      if (k !== last) { box.insertBefore(mkTape(+el.dataset.ts), el); last = k; }
+    }
+  };
+
   // 把正文里的 @某人 高亮出来，让"我 @ 了谁"一眼可见
   //: 这个群**真有的**组件，`[{name, slug}]` ✓ —— 消息里的名字靠它标蓝可点 ✓。
   //:
@@ -273,6 +327,7 @@
       const sys = document.createElement('div');
       sys.className = 'sysrow';
       sys.dataset.id = m.id;
+      sys.dataset.ts = m.created_at;          // 日期胶带靠它 ✓
       // ★ 系统消息也要走渲染 ✓ —— 因为**组件那两条就是系统消息** ✓
       //   （"开始做「X」…" / "X 做完了，快去看看吧。"✓），而里面的名字要标蓝可点 ✓
       //   （用户定的"提到存在的组件就标蓝"✓）。原来这里是 `textContent = 原文` ✗。
@@ -290,7 +345,7 @@
       //    拿旧索引画的话，它自己的名字**不会变蓝** ✓（而那正是最该点的那一次 ✓）。
       refreshCompIndex().then(put);
       if (prepend) $('#msgs').prepend(sys);
-      else { $('#msgs').appendChild(sys); scrollDown(); }
+      else { $('#msgs').appendChild(sys); tapeBefore(sys, m.created_at); scrollDown(); }
       return;
     }
     const mine = m.sender_id !== null && m.sender_id === me.id;
@@ -298,6 +353,7 @@
     const row = document.createElement('div');
     row.className = 'row' + (mine ? ' mine' : '') + (isAgent ? ' agent' : '');
     row.dataset.id = m.id;
+    row.dataset.ts = m.created_at;            // 日期胶带靠它 ✓
     const av = document.createElement('div');
     av.className = 'av';
     // ★ 2026-10-06：**和「我的」用同一张图** ✓。
@@ -416,7 +472,7 @@
     //   （按成员表查 ✓，消息里那份只是成员表还没到时的兜底 ✓，见 `bubbleForMsg` ✓）。
     setRowBubble(row, m);
     if (prepend) $('#msgs').prepend(row);
-    else { $('#msgs').appendChild(row); scrollDown(); }
+    else { $('#msgs').appendChild(row); tapeBefore(row, m.created_at); scrollDown(); }
     _fire('message', m, row);   // agent 的 ui/app.js 可以给这一条挂东西
   };
 
@@ -440,6 +496,8 @@
       // **倒着 prepend**：每 prepend 一次都插在最前，所以要从新到旧反着来，
       // 最终顺序才是正的。
       for (let i = older.length - 1; i >= 0; i--) addMsg(older[i], true);
+      // ★ 整段插完**重排**一遍胶带 ✓ —— 边插边判会把同一天拆成好几条 ✓（见 renderDays ✓）。
+      renderDays();
       oldestId = older[0].id;
       if (older.length < 50) historyDone = true;
       // 把"新增的高度"补进滚动位置 —— 视觉上停在你原来那条消息上，不跳
@@ -468,23 +526,20 @@
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
   };
 
-  // ── 长按：头像 → @ 他；气泡 → **什么都不做**（交给系统）✗→✓（2026-10-11）──
+  // ── 长按：头像 → @ 他；气泡 → **弹一张动作卡片**（2026-10-29）──────────
   //
-  // ★ 用户这次定的（原话）：「长按消息不再有小卡片，就是默认系统的复制行为」✓。
+  // ★ 用户这次定的（原话）：「长按消息的卡片，但是只保留引用和复制，其他的先不要」✓。
   //
-  // ⚠️ **这条改过三次，把来路写清楚** ✗（不然下次又绕回来）：
+  // ⚠️ **这条改过四次，把来路写清楚** ✗（不然下次又绕回来）：
   //     · 2026-10-07：长按**让给浏览器** ✓（选中文字 → 系统那套自由复制 ✓）
-  //     · 2026-10-08：**收回来自己处理** ✓ —— 弹一张小卡片（自由复制 / 引用 ✓），
-  //       为此把 CSS 里气泡的选择整个关掉了 ✓
-  //     · 2026-10-11（现在）：**卡片整个不要了** ✓ —— 回到第一天那个样子 ✓。
-  //   之所以现在能回去：**引用搬到了右滑** ✓（见 `05-settings.js` ✓），
-  //   长按这条不用再替它扛着了 ✓。
+  //     · 2026-10-08：**收回来自己处理** ✓ —— 弹一张小卡片，为此关掉了气泡的选择 ✓
+  //     · 2026-10-11：**卡片整个不要了** ✓ —— 引用搬去右滑 ✓，长按还给系统 ✓
+  //     · 2026-10-29（现在）：**卡片回来了** ✓、**右滑引用拆掉** ✓ ——
+  //       引用和复制都在这张卡片里 ✓（用户从参考版里点名要的就是它 ✓）。
   //
-  // ⚠️ 下面那个分支里**故意什么都不做** ✗ —— 看着像"把代码删空了" ✓，
-  //    其实**这个空就是那个功能本身** ✓：气泡的 CSS 已经把
-  //    `user-select` / `-webkit-touch-callout` 打开了 ✓（见 app.css 那段 ✓），
-  //    长按自然就出系统那排（选中 + 复制/全选/搜索 ✓），拦不拦都一样 ✓。
-  //    ⚠️ **别在这儿补 `preventDefault`** ✗ —— 补了就等于又把它关回去 ✓。
+  // ⚠️ 所以气泡的 `user-select` / `-webkit-touch-callout` 在 app.css 里**又关掉了** ✓
+  //    —— 系统那层选词会和卡片打架 ✓（安卓的选择手柄还会把卡片压在下面 ✗）。
+  //    复制没丢 ✓：卡片里那一格就是它 ✓（`copyText` ✓）。
   const onPressStart = (e) => {
     if (!e.target.closest) return;
     const row = e.target.closest('#msgs .row[data-id]');
@@ -495,9 +550,10 @@
     pressTimer = setTimeout(() => {
       pressTimer = null;
       pressFired = true;
-      // ★ **只剩头像这一条了** ✓ —— 它不是"消息那张卡片" ✓，
-      //   而且 @ 这件事**没有别的手势替得了** ✓（右滑已经被引用占了 ✓）。
+      // 头像 → @ 他 ✓（**没有别的手势替得了** ✓）；
+      // 气泡 → 动作卡片 ✓（引用 / 复制 ✓）—— 和滚动抢不抢？`touchmove` 会取消它 ✓。
       if (onAvatar) atFromRow(row);
+      else openTray(row);
     }, PRESS_MS);
   };
 
@@ -512,22 +568,14 @@
     toast('已 @ ' + nm);
   };
 
-  // ── ★ **引用：右滑一条消息** ✗→✓（2026-10-11 用户：「将引用变为右滑消息」）──
+  // ── 引用：**右滑**那条路已经拆掉了（2026-10-29）──────────────────
   //
-  //   它 2026-10-07 在这儿待过两天 ✓（判据、阻尼、"↩ 引用"那条提示都挺好看 ✓），
-  //   2026-10-08 撤掉换成了长按卡片 ✓ —— 当时的理由是"横滑要腾给进组件界面"✓。
-  //   现在长按那条不要了 ✓ → 引用搬回横滑 ✓，但**只往右** ✓：
-  //     · 往**左**永远归「进组件界面」✓（2026-10-09 用户点名"不能到处出现"✓）——
-  //       一左一右**方向相反** ✓，所以两边**不抢** ✓（这是它能回来住下的前提 ✓）。
-  //     · 往**右**在群聊上**本来是空的** ✓（引擎里那条只认 wall/comp ✓，也就是"往回退"✓），
-  //       现在归引用 ✓。
-  //
-  //   ⚠️ 具体实现在**不在这儿** ✗ —— 它接进了 `05-settings.js` 那台手势引擎 ✓
-  //      （左滑进收纳页、下拉进对话、"继续左滑…"那条跟手提示，**全在那一处** ✓）。
-  //      "手势的大脑"只能有一台 ✓ —— 两处各接一套，迟早互相抢 ✓，
-  //      或者只有一处知道"屏幕上现在是什么"✓（这个项目为"同一件事两处实现"栽过好几次 ✓）。
-  //      这边只出两样 ✓：`quoteChatMsg`（把一条消息变成引用 ✓），
-  //      以及 `.row` 上那点跟手位移要用的类名 ✓。
+  //    · 2026-10-11 用户定的：「将引用变为右滑消息」✓ —— 它接了 `05-settings.js`
+  //      那台手势引擎（"手势的大脑"只能有一台 ✓）；
+  //    · 2026-10-29 用户定的：「去掉消息右滑引用的逻辑，已经在长按消息中实现了」✓
+  //      —— 手势引擎里那三段（判据 / 跟手位移 / 松手触发）**一起删了** ✓，
+  //      这边只留 `quoteChatMsg`（长按卡片里「引用」那一格调它 ✓）。
+  //   ⚠️ 往**左**进组件界面那条手势**没动** ✓，跟这事不相干 ✓。
 
   /** ★ **把一条消息变成"引用"** ✗→✓（2026-10-11）—— 右滑那条手势唯一的落点 ✓。
    *
@@ -539,6 +587,100 @@
     const m = _msgs.get(Number(id));
     if (m) setQuote(m);
   };
+
+  // ── 动作卡片（长按一条消息）─────────────────────────────────────────
+  //
+  // ★ 只有**两格** ✓：引用 / 复制 ✓（用户 2026-10-29 从参考版的文具托盘里点名要的 ✓）。
+  //   ⚠️ 钉上墙 / 变提醒 / 记一笔 / 擦掉 / 盖章那些**都留在参考版**里 ✗ ——
+  //      别看着参考版顺手加回来 ✓（他明说了"其他的先不要"✓）。
+  //
+  // ⚠️ 卡片从**底下推上来** ✓（`.tray-card` 的 transition ✓），
+  //    顶上贴一条纸胶带 ✓、中间是这句话本身 ✓（`#trayWho` / `#trayTxt` 那两行 ✓）。
+  let trayMsg = null;
+
+  /** 卡片中间那句话 —— 不是纯文字的消息给一个"[图片]"这样的占位 ✓。 */
+  const trayPreview = (m) => {
+    if (!m) return '［消息］';
+    if (m.msg_type === 'text') return m.content || '';
+    if (m.msg_type === 'sticker') return '［表情］';
+    if (m.msg_type === 'image') return '［图片］';
+    if (m.msg_type === 'file') {
+      const meta = m.media_meta || {};
+      return '［文件］' + (meta.original_name || '');
+    }
+    if (m.msg_type === 'audio' || m.msg_type === 'voice') return '［语音］';
+    return '［消息］';
+  };
+
+  const closeTray = () => {
+    const t = $('#tray');
+    if (t) t.classList.remove('on');
+    trayMsg = null;
+  };
+
+  // 图标照参考版那套画法（24 格、描边、圆端点、`currentColor` ✓）——
+  // ⚠️ 稳定版没有 `ico()` 那个总表 ✓，这里只带**这两枚** ✓（多一枚都没用 ✓）。
+  const TRAY_ICO = {
+    quote: '<path d="M9.5 7H6.5A2.5 2.5 0 0 0 4 9.5V12h3.5L5.5 16.5"/>'
+         + '<path d="M19.5 7H16.5A2.5 2.5 0 0 0 14 9.5V12h3.5L15.5 16.5"/>',
+    copy: '<rect x="9" y="9" width="11" height="11" rx="2"/>'
+        + '<path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/>',
+  };
+  const trayIco = (name) => {
+    const n = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    n.setAttribute('viewBox', '0 0 24 24');
+    n.setAttribute('fill', 'none');
+    n.setAttribute('stroke', 'currentColor');
+    n.setAttribute('stroke-width', '1.75');
+    n.setAttribute('stroke-linecap', 'round');
+    n.setAttribute('stroke-linejoin', 'round');
+    n.innerHTML = TRAY_ICO[name] || '';
+    return n;
+  };
+
+  const openTray = (row) => {
+    const m = _msgs.get(Number(row.dataset.id));
+    if (!m) return;
+    trayMsg = m;
+    const who = $('#trayWho');
+    if (who) who.textContent = m.sender_type === 'agent' ? agentName() : (m.sender_nickname || '我');
+    const txt = $('#trayTxt');
+    if (txt) txt.textContent = trayPreview(m);
+    const acts = $('#trayActs');
+    if (!acts) return;
+    acts.innerHTML = '';
+    const body = m.msg_type === 'text' ? (m.content || '') : '';
+    const A = [
+      { ic: 'quote', lbl: '引用', fn: () => { setQuote(m); closeTray(); toast('引用它'); } },
+      { ic: 'copy',  lbl: '复制', fn: () => {
+          if (!body) { toast('这条没有字'); return; }
+          // ⚠️ 复没复制上**要说一声** ✓（这个项目最烦的"做了像没做"✓）——
+          //    `execCommand` 有的壳里会被拒 ✓，静默失败比没这个按钮更糟 ✗。
+          const ok = copyText(body);
+          closeTray();
+          toast(ok ? '复制了' : '没复制上，选中文字试试');
+        } },
+    ];
+    A.forEach((a) => {
+      const b = mkel('button', 'tray-act');
+      b.type = 'button';
+      const ic = mkel('span', 'ti');
+      ic.appendChild(trayIco(a.ic));
+      b.append(ic, mkel('span', 'tl', a.lbl));
+      b.onclick = a.fn;
+      acts.appendChild(b);
+    });
+    const t = $('#tray');
+    if (t) t.classList.add('on');
+  };
+
+  if ($('#trayScrim')) $('#trayScrim').onclick = closeTray;
+  // 卡片开着时点空白处 → 收卡片 ✓（点卡片本身不关 ✓ —— 那一格是给你的 ✓）。
+  // 长按弹出时安卓会顺手弹系统菜单 ✗ → 气泡上把 contextmenu 挡掉 ✓。
+  document.addEventListener('contextmenu', (ev) => {
+    if (ev.target.closest && ev.target.closest('#msgs .bubble')) ev.preventDefault();
+  });
+
 
 
   $('#msgs').addEventListener('touchstart', onPressStart, { passive: true });

@@ -1945,36 +1945,17 @@
   //: ★ **70 → 96**（2026-10-09 用户定的 ✓）—— 2026-10-24 跟手之后它只剩
   //:   "阈值"这一个身份 ✓（原来还兼着提示条走满格的行程 ✓，提示条已删 ✓）。
   const SW_TRIG = 96;
-  //: ★ **右滑引用**的阈值 ✓（2026-10-11 用户：「将引用变为右滑消息」）——
-  //:   ⚠️ 比左滑那个(96) **小得多** ✗ —— 它们不是一类动作 ✓：
-  //:      左滑是**换一整个界面** ✓（要拉得够 ✓，整屏跟手、松手才定 ✓）；
-  //:      右滑是**给这条消息挂个引用** ✓（一次干脆的短划 ✓，要拉 96px 手很累 ✓）。
-  //:   ⚠️ 它同时是"行跟手时能走多远"的**上限** ✓（拖到这儿就顶住 ✓）——
-  //:      改它**同时改两件事**（阈值 + 行程 ✓），别只按"阈值"去调 ✓
-  //:      （左滑那个数 2026-10-24 起已经不兼行程了 ✓ —— 那一屏自己跟手 ✓）。
-  const QUOTE_TRIG = 56;
+  // ⚠️ **右滑引用整套已经拆掉** ✗→✓（2026-10-29 用户：「去掉消息右滑引用的逻辑，
+  //    已经在长按消息中实现了」✓）—— `QUOTE_TRIG` / `qDragRow` / `_endQuoteDrag`
+  //    原样留在参考版里 ✓。这里**只剩左滑**那一套 ✓（进空间 / 退组件页 ✓）。
   let pgSw = null;
-  //: 跟手那一下正在挪的是哪一行 ✓ —— 松手 / 取消 / 被别的手势接管，
-  //: **都得把它收回原位** ✓（留一行歪在那儿，比什么都不做更让人犯嘀咕 ✓）。
-  let qDragRow = null;
-
-  /** 把跟手那行收回原位 ✓（三条路都走它 ✓：松手 ✓、取消 ✓、换一行 ✓）。 */
-  const _endQuoteDrag = () => {
-    const r = qDragRow;
-    qDragRow = null;
-    if (!r) return;
-    r.classList.remove('swiping', 'quoteready');
-    // ⚠️ 给一段**短回弹** ✓ —— 直接"啪"地归位太生硬 ✓，
-    //    而且那一段正好是"我刚才那下没够"的收尾 ✓。
-    r.style.transition = 'transform .17s cubic-bezier(.22,1,.36,1)';
-    r.style.transform = '';
-  };
-
   // ⚠️ `#msgcard` 从这一串里**去掉了** ✗→✓（2026-10-11）—— 那张长按小卡片整个删了 ✓。
   //    留着它**不会报错** ✓（`$(s)` 是 null ✓、`.some` 直接跳过 ✓），
   //    但那就是**一个永远为假的判断** ✓ —— 下一个人读到会以为"世上还有这么个东西" ✓。
+  //: ★ 2026-10-29：`#tray`（长按那条消息的动作卡片 ✓）也列进来 ✓ ——
+  //:   它整屏盖着（`z-index:58` ✓），不列的话在卡片上滑动还会把空间推出来 ✓。
   const _overlayOn = () =>
-    ['#sheet', '#modal'].some(s => $(s) && $(s).classList.contains('on'));
+    ['#sheet', '#modal', '#tray'].some(s => $(s) && $(s).classList.contains('on'));
 
   //: 除了这三屏之外，**其余任何一屏开着就不认手势** ✓（用户 2026-10-09：
   //: 「[组件沙箱]界面，只有在主群聊时右滑才出现，不能到处出现」✓）。
@@ -2008,13 +1989,7 @@
     const x = ev.touches[0].clientX, y = ev.touches[0].clientY;
     // ① 贴边的滑动归系统 ✓
     if (x < SW_EDGE || x > window.innerWidth - SW_EDGE) { pgSw = null; return; }
-    // ★ **起手按着的是哪一条消息** ✗→✓（2026-10-11）—— 右滑引用要用它 ✓。
-    //   ⚠️ 必须**在这一刻**抓 ✗ —— 等判出方向再去 `closest` 就晚了 ✓：
-    //      那会儿手指已经移开 ✓，`ev.target` 是**那一刻手指底下那个元素** ✓
-    //      （早就不是刚按下去那一条了 ✓，最常见的是滑到了隔壁行 ✓）。
-    const row = ev.target && ev.target.closest
-      ? ev.target.closest('#msgs .row[data-id]') : null;
-    pgSw = { x0: x, y0: y, dir: '', d: 0, row };
+    pgSw = { x0: x, y0: y, dir: '', d: 0 };
   }, { passive: true });
 
   document.addEventListener('touchmove', (ev) => {
@@ -2042,21 +2017,13 @@
       // ③ 这一屏上这个方向有没有意义？没有就把手势丢掉 ✓（免得吃掉正常滚动 ✓）
       const s = _whichScreen();
       const ok = (pgSw.dir === 'L' && s === 'chat')
-              || (pgSw.dir === 'R' && s === 'comp')
-              // ★ 2026-10-14：**右滑 `'wall'`（组件界面）不再认** ✗→✓ ——
-              //   组件界面现在是**可横滑的卧室场景** ✓，右滑要拿来**平移看别处** ✓。
-              //   认了的话 `preventDefault` 会把原生横滚吃掉 ✗ → 滑不动 ✗。
-              //   退出改走**点猫 → 回主群聊** ✓ + 系统返回 ✓（见 `06-workshop.js:catNode` ✓）。
-              // ★ **右滑引用** ✗→✓（2026-10-11）—— 两个条件**缺一不可** ✓：
-              //   ① 屏幕是群聊 ✓
-              //   ② **起手按着的是一条消息** ✓（`pgSw.row` ✓）
-              //   ⚠️ 少了② 的话：在**顶栏、输入框、空白处**右滑也会被认下 ✓ →
-              //      `preventDefault` 吃掉那一下 ✓、松手又什么都没发生 ✓
-              //      —— 用户在那些地方右滑本来是有用的（比如选字 ✓），
-              //      被我们白白吞掉 ✓。**认了就得给个交代** ✓，给不出就别认 ✓。
-              || (pgSw.dir === 'R' && !!pgSw.row && s === 'chat');
-      // ★ 2026-10-13：**下拉那一条撤了** ✗→✓ —— 只留群聊右上角一个入口进统一聊天 ✓
-      //   （用户：「只留右上角入口」✓）。'D' 不再算手势 ✓ —— 下拉回到正常滚动 ✓。
+              || (pgSw.dir === 'R' && s === 'comp');
+      // ★ 2026-10-14：**右滑 `'wall'`（组件界面）不认** ✓ ——
+      //   组件界面现在是**可横滑的卧室场景** ✓，右滑要拿来**平移看别处** ✓。
+      //   认了的话 `preventDefault` 会把原生横滚吃掉 ✗ → 滑不动 ✗。
+      //   退出改走**点猫 → 回主群聊** ✓ + 系统返回 ✓（见 `06-workshop.js:catNode` ✓）。
+      // ⚠️ 2026-10-29：「右滑群聊里一条消息 = 引用」那一支**删了** ✓ ——
+      //   引用搬进长按卡片 ✓（`04-chat.js` 的 `openTray` ✓）。
       if (!ok) { pgSw = null; return; }
       ev.preventDefault();      // ★ 认了之后**才**拦 ✓（早了会把滚动卡死 ✗）
     } else {
@@ -2072,29 +2039,13 @@
       pgSw.space = true;
       peekWorkshop(-dx);
     }
-    // ★ **右滑那一条：行跟着手走一点** ✗→✓（2026-10-11）——
-    //   ⚠️ **不跟手是不行的** ✗：右滑是个"短划" ✓，划完手指就抬了 ✓，
-    //      中间没有任何反馈的话，用户根本分不清"我是划了还是滚了一下"✓
-    //      （这个项目最烦的"做了像没做"✓）。
-    //   ⚠️ 跟**一半不到**、而且**封顶** ✓ —— 走到 `QUOTE_TRIG` 就顶住不再走 ✓：
-    //      再走就会把行推出屏幕 ✓（而那时候他其实已经可以松手了 ✓）。
-    //   ⚠️ **不给它任何提示条** ✗ —— 右滑是**一次短划** ✓，
-    //      反馈由**行自己跟手**给 ✓（左滑那边 2026-10-24 起也没提示条了 ✓，
-    //      改成整屏跟手 ✓）。
-    else if (pgSw.dir === 'R' && pgSw.row) {
-      if (qDragRow !== pgSw.row) { _endQuoteDrag(); pgSw.row.style.transition = 'none'; qDragRow = pgSw.row; }
-      const d = Math.max(0, Math.min(QUOTE_TRIG, dx));
-      qDragRow.classList.add('swiping');
-      qDragRow.classList.toggle('quoteready', d >= QUOTE_TRIG);
-      qDragRow.style.transform = d ? `translateX(${d}px)` : '';
-    }
+    // ⚠️ 这里原来还有一支「右滑 → 那一行跟着手指走一点」✓，
+    //    **2026-10-29 跟着右滑引用一起删了** ✓（群聊里的右滑现在什么都不做 ✓）。
   }, { passive: false });
 
   const _endSwipe = () => {
     const s = pgSw;
     pgSw = null;
-    // ⚠️ **跟手那行无论成不成都要收回原位** ✓ —— 见 `_endQuoteDrag` 那段 ✓。
-    _endQuoteDrag();
     if (!s) return;
     // ★ **跟手拉开的那一屏要在 `_whichScreen()` 之前处置** ✗→✓ ——
     //   它现在正 `.on` 着 ✓，按"最上面是谁"现算得到的是 `'wall'` ✓，
@@ -2104,15 +2055,6 @@
     //    拉回来时 `dx` 会变正 ✓，`abs` 会把"其实已经收回来了"判成过阈值 ✗。
     if (s.space) { endWorkshopPeek(-(s.dx || 0) >= SW_TRIG); return; }
     if (!s.dir) return;
-    // ★ **右滑 = 引用手里那条** ✗→✓（2026-10-11 用户：「将引用变为右滑消息」）——
-    //   排在最前面 ✓：它和下面几条**按屏幕互斥** ✓（有 `row` 就一定是消息列表 ✓），
-    //   写在最前头最不容易看错 ✓。
-    if (s.dir === 'R' && s.row) {
-      if (Math.abs(s.dx || 0) >= QUOTE_TRIG) {
-        quoteChatMsg(Number(s.row.dataset.id));
-      }
-      return;
-    }
     const far = Math.abs(s.dx || 0) >= SW_TRIG;
     if (!far) return;
     if (s.dir === 'R' && _whichScreen() === 'comp') { closeComp(); return; }
@@ -2122,7 +2064,6 @@
   //    （`touchend` 不一定会来 ✓，这种"少一个事件"的坑这个项目栽过 ✓）。
   document.addEventListener('touchcancel', () => {
     const s = pgSw; pgSw = null;
-    _endQuoteDrag();
     // 跟手拉开的那一屏也要缩回去 ✓（来电 / 系统抢手势的时候 ✓）
     if (s && s.space) endWorkshopPeek(false);
   });

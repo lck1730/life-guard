@@ -462,9 +462,12 @@
 
      ⚠️ **要连子元素一起开**（`*` ✓）—— 气泡正文里的 `**粗体**` / `` `代码` ``
         那种是**自带颜色的子元素** ✓，只开父级的话那几段还是选不中 ✓。 */
+  /* ★ 2026-10-29：**又收回来了** ✗→✓ —— 长按现在弹一张卡片（引用 / 复制 ✓），
+     系统那层选词会和卡片打架 ✓（安卓的选择手柄还会把卡片压在下面 ✗）→ 关掉 ✓。
+     复制**没有丢** ✓：卡片里那一格就是它 ✓（`copyText` ✓，一键全选复制 ✓）。 */
   .row .bubble, .row .bubble * {
-    -webkit-user-select:text; user-select:text;
-    -webkit-touch-callout:default;
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none;
   }
   /* ⚠️ **图片 / 文件 / 音频那种"整块"仍然不给选** ✗ —— 它们里面**没有字可选** ✓，
      放开之后唯一的效果是**长按弹出系统那个图片菜单** ✓（存图片 / 打开图片 ✓）——
@@ -731,10 +734,8 @@
      **2026-10-08 整个撤了** ✗→✓：引用改成长按 ✓，而横滑留给"进组件界面" ✓。
      留着是死代码 ✓（而且下一个人会照着它去改一个不存在的手势 ✓）。 */
 
-  /* ★ 消息旁边的小卡片（长按气泡弹出来的 ✓，微信那种 ✓）
-     ⚠️ 容器**不盖住整个屏幕** ✗（`pointer-events:none` ✓）—— 盖住的话
-        手指就滚不动列表了 ✓；收起靠"点别处 / 滚动 / 返回键" ✓（见 JS ✓）。
-     z-index 58：在弹层(50)之上 ✓、确认框(60)之下 ✓ —— 和长按那一族保持一致 ✓。 */
+  /* ★ 长按消息那张卡片 **2026-10-29 又回来了** ✓ —— 现在的名字是 `#tray` ✓，
+     样式写在文件末尾 ✓（z-index 58：弹层(50)之上 ✓、确认框(60)之下 ✓）。 */
   /* ★ 文件卡片 / 音频条（2026-10-08） */
   .filecard { display:flex; align-items:center; gap:10px; min-width:190px; }
   .filecard .fi { font-size:22px; line-height:1; flex-shrink:0; }
@@ -747,23 +748,9 @@
   .audiobar { min-width:210px; }
   .audiobar audio { width:100%; height:34px; display:block; }
 
-  /* ── 右滑引用：跟手 + "松手就引用" ✗→✓（2026-10-11 用户：「将引用变为右滑消息」）──
-     ⚠️ **这块地方原来就是干这个的** ✓（2026-10-07 那版「左右滑可以引用，有那种动态感」✓），
-        2026-10-08 跟着长按卡片一起撤了 ✓（当时的理由是"横滑要腾给进组件界面"✓）——
-        现在引用搬回横滑 ✓，方向改成**只往右** ✓（往左那条永远归"进收纳页"✓，不抢 ✓）。
-
-     ⚠️ **行要跟着手指走一点点** ✗ —— 完全不跟手的话，"滑了但不知道滑到没有" ✓
-        （这个项目最烦的那种"做了像没做"✓）。位移由 JS 给（见 `05-settings.js` ✓）：
-        走一半、封顶在阈值上 ✓。
-     ⚠️ **"松手就成了"这件事由气泡自己说** ✓：过了阈值给它描一圈淡虚线 ✓。
-        描**气泡**而不是描行 ✗ —— 行比气泡宽一截 ✓，
-        描行看着像"选中了整个列表项"✓，不是"引用这一条"✓。
-     ⚠️ 用 `outline` 不用 `border` ✗ —— border 会改尺寸 ✓，
-        在一张正在跟着手滑的列表里，尺寸一变就是"跳一下" ✓。 */
-  .row.swiping { will-change:transform; }
-  .row.quoteready .bubble {
-    outline:1px dashed var(--accent); outline-offset:2px;
-  }
+  /* ⚠️ 这里原来是「右滑引用」的跟手样式 ✗→✓（2026-10-29 拆掉）——
+     引用现在在**长按卡片**里 ✓，右滑不再认任何手势 ✓
+     （`05-settings.js` 那边一起删了 ✓，别只删一半 ✓）。 */
 
   /* 头像上**不许选字** ✓ —— 长按头像的活儿是"@ 他" ✓，
      让浏览器顺手把那个字选中了会显得很脏 ✓。 */
@@ -2007,3 +1994,88 @@
   @media (prefers-reduced-motion: reduce) {
     .ascreen .btn-save:active { transform:none; }
   }
+
+  /* ── 日期胶带（2026-10-29，从参考版裁回来的第一样）─────────────────────
+     ★ 每换一天，消息流里插一条和纸胶带 ✓（`#msgs > .daytape` ✓）。
+       滚动时**自己吸顶** ✓ —— `position:sticky` 是浏览器算的 ✓，不挂 scroll 监听 ✓。
+     ⚠️ 判断用**本机时区** ✓（和 `.time` 同一条口径 ✓，见 `04-chat.js` ✓）。
+     ⚠️ 胶带是**纸**，不是信息条 ✓：三个主题下是同一个颜色 ✓
+        （深色主题里它最显眼 —— 那是故意的 ✓，一天开始的地方就该亮一下 ✓）。 */
+  #msgs > .daytape {
+    position:sticky; top:0; z-index:3; align-self:center;
+    margin:2px 0 0; padding:3px 14px 4px;
+    font-size:11px; letter-spacing:.10em; line-height:1.4;
+    color:#6b5233;
+    background:#e7d3b0;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.55), 0 1px 3px rgba(20,12,4,.20);
+    clip-path:polygon(2% 0, 98% 0, 100% 18%, 97.5% 44%, 100% 70%, 98% 100%,
+                      2% 100%, 0 72%, 2.5% 46%, 0 20%);
+    pointer-events:none; white-space:nowrap;
+  }
+
+  /* ── 长按一条消息 → 动作卡片（2026-10-29，参考版托盘裁剩两格）────────────
+     形状照参考版：从底下推上来的一张托盘 ✓、顶上贴一条纸胶带 ✓、
+     中间是这句话本身 ✓、下面一排动作 ✓（**图标 + 字** —— 光图标猜不出来 ✓）。
+     ⚠️ 只有「引用」「复制」两格 ✓ —— 钉墙 / 提醒 / 记账 / 擦掉 / 盖章
+        都**留在参考版**里 ✗，别顺手加回来 ✓。 */
+  #tray { position:fixed; inset:0; z-index:58; display:none; }
+  #tray.on { display:block; }
+  #tray .tray-scrim {
+    position:absolute; inset:0;
+    background:rgba(0,0,0,.45);
+    opacity:0; transition:opacity .22s ease;
+  }
+  #tray.on .tray-scrim { opacity:1; }
+  #tray .tray-card {
+    position:absolute; left:8px; right:8px;
+    bottom:calc(var(--inset-bottom) + var(--kb) + 8px);
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:16px 14px 12px;
+    box-shadow:0 18px 46px rgba(0,0,0,.42);
+    transform:translateY(calc(100% + 24px));
+    transition:transform .3s cubic-bezier(.22, 1, .36, 1);
+  }
+  #tray.on .tray-card { transform:none; }
+  #tray .tray-tape {
+    position:absolute; left:50%; top:-9px;
+    width:76px; height:20px; margin-left:-38px;
+    background:#e7d3b0;
+    border-left:1px dashed rgba(110,84,48,.5);
+    border-right:1px dashed rgba(110,84,48,.5);
+    transform:rotate(-1.4deg);
+    border-radius:2px;
+    box-shadow:0 1px 3px rgba(0,0,0,.22);
+  }
+  #tray .tray-prev {
+    position:relative;
+    padding:2px 12px 10px;
+    border-left:2px solid var(--accent);
+    margin:2px 2px 10px;
+  }
+  #tray .tray-who { font-size:12.5px; color:var(--muted); margin-bottom:3px; letter-spacing:.3px; }
+  #tray .tray-txt {
+    font-size:15px; line-height:1.55; color:var(--text);
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
+    overflow:hidden; word-break:break-word;
+  }
+  #tray .tray-acts { display:flex; gap:4px; }
+  #tray .tray-act {
+    flex:1; min-width:0;
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    padding:10px 2px 8px;
+    border-radius:12px;
+    color:var(--text);
+    transition:background .16s ease, transform .16s cubic-bezier(.22, 1, .36, 1);
+  }
+  #tray .tray-act:active { background:var(--panel2); transform:scale(.94); }
+  #tray .tray-act .ti {
+    width:40px; height:40px; border-radius:13px;
+    display:grid; place-items:center;
+    background:var(--panel2);
+    color:var(--text);
+    border:1px solid var(--line);
+  }
+  #tray .tray-act .ti svg { width:21px; height:21px; }
+  #tray .tray-act .tl { font-size:11px; color:var(--muted); white-space:nowrap; }
