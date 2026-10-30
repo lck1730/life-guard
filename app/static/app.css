@@ -2578,8 +2578,12 @@
   [data-theme="cream"] #cat .cat-art,
   [data-theme="light"] #cat .cat-art { filter:drop-shadow(0 2px 2px rgba(120,78,48,.13)); }
 
+  /* ★ 2026-10-30：灯串**再往上靠 10px** ✓（用户：「顶部的彩灯装饰再靠上一些」✓）。
+     原来是 `inset + 2px` ✓ —— 贴在状态栏下沿 ✓，看着离屏幕顶还远 ✓。
+     现在钻进状态栏那条的下半截 ✓，但不碰系统图标（图标住中间那圈 ✓）。
+     ⚠️ 用 `max(2px, …)` 兜底 ✓ —— 浏览器里 `--inset-top` 是 0 ✓，减成负数会被切掉 ✓。 */
   #garland {
-    position:absolute; left:0; right:0; top:calc(var(--inset-top) + 2px);
+    position:absolute; left:0; right:0; top:max(2px, calc(var(--inset-top) - 8px));
     height:8px; display:flex; justify-content:space-between;
     padding:0 26px; pointer-events:none;
   }
