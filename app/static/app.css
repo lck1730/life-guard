@@ -2486,10 +2486,11 @@
     --card-hi:rgba(255,159,125,.07);
     --hue1:#ff9f7d; --hue2:#f4cf8d; --hue3:#a9d8b1;
     --hue4:#a8c7ef; --hue5:#e3b0e8;
-    /* ★ 群名艺术字（2026-10-30 第三版）：暖金 → 珊瑚的描金渐变 ✓
-       a=顶上高光 ✓ b=主色 ✓ c=底边 ✓ rim=字体描边 ✓ edge=底下那道厚度 ✓ */
-    --title-a:#fff6e0; --title-b:#ffb184; --title-c:#e26845;
-    --title-edge:rgba(110,38,24,.50); --title-glow:rgba(255,159,125,.30);
+    /* ★ 群名软糖字（2026-10-30 第四版）：奶蜜桃渐变 ✓
+       a=顶端奶白 ✓ b=蜜桃主色 ✓ c=底边杏橘 ✓
+       edge=每个字底下一层柔影 ✓ glow=一圈很淡的暖晕 ✓ */
+    --title-a:#fff7ea; --title-b:#ffd6b6; --title-c:#ffab86;
+    --title-edge:rgba(86,26,16,.30); --title-glow:rgba(255,159,125,.22);
   }
   [data-theme="cream"], [data-theme="light"] {
     --amb-a:rgba(255,201,160,.50);
@@ -2501,9 +2502,10 @@
     --card-hi:rgba(255,255,255,.65);
     --hue1:#a94e3a; --hue2:#8f6410; --hue3:#4f7a48;
     --hue4:#3f6b93; --hue5:#8a5f8f;
-    /* 奶霜的"描金"要更实（底子亮，浅金看不见 ✗）：焦糖 → 砖红 ✓ */
-    --title-a:#e8a273; --title-b:#a94e3a; --title-c:#7f2c1f;
-    --title-edge:rgba(120,50,30,.18); --title-glow:rgba(201,110,80,.20);
+    /* 奶霜底子亮：字要压得住（浅粉/浅金在这儿会糊 ✗）→ 珊瑚 → 砖红 ✓，
+       但不是上一版的"黑边小招牌" ✓（硬描边才是"雷"的根源 ✗）。 */
+    --title-a:#f2896d; --title-b:#d4583e; --title-c:#a83b2a;
+    --title-edge:rgba(120,50,30,.20); --title-glow:rgba(201,110,80,.14);
   }
   [data-theme="forest"] {
     --amb-a:rgba(255,193,120,.15);
@@ -2515,9 +2517,9 @@
     --card-hi:rgba(240,192,122,.06);
     --hue1:#f0b08a; --hue2:#f0c07a; --hue3:#a9d8b1;
     --hue4:#a6cdec; --hue5:#d9b3e6;
-    /* 林深：灯光金 → 苔金 ✓ */
-    --title-a:#fff3cb; --title-b:#f0c07a; --title-c:#c98f3e;
-    --title-edge:rgba(20,16,4,.45); --title-glow:rgba(240,192,122,.28);
+    /* 林深：奶金 → 苔金 ✓ */
+    --title-a:#fff8e4; --title-b:#f6cf8e; --title-c:#e8a860;
+    --title-edge:rgba(20,16,4,.38); --title-glow:rgba(240,192,122,.22);
   }
 
   /* ── 群聊：暮色里的一间暖屋 ─────────────────────────────────────── */
@@ -2586,36 +2588,48 @@
     background:radial-gradient(closest-side, var(--amb-b), transparent 72%);
     opacity:.55; pointer-events:none; z-index:-1;
   }
-  /* ★ 2026-10-30 第三版：**群名改成艺术字** ✓（用户：「群昵称改成艺术字」✓）。
-     做法是"描金小招牌"✓：暖金 → 珊瑚的渐变填字 ✓ + 外面一圈很淡的暖光 ✓ +
-     光沿着字面慢慢扫过去（9s 一轮，很轻 ✓）。
-     ⚠️ 渐变靠 `background-clip:text` ✓ —— 所以 `-webkit-text-fill-color` 必须是透明的 ✓；
-        换掉它字就整个不见了 ✗。
-     ⚠️ `filter` 的 drop-shadow 只描**字的外形** ✓（不套盒子 ✓）。
-     ⚠️ 减弱动效时**不扫光** ✓（字还在 ✓）。
-     ⚠️ 这是**群名本身** ✓，不是说明文字 ✓（[[lifeguard-no-intro-copy]] 那条不冲突 ✓）。 */
+  /* ★ 2026-10-30 第四版：**群名换成"软糖字"** ✓（用户：「群昵称字体太雷庭了，
+     不够可爱」✓）。第三版那套"描金小招牌"**整条作废** ✓ —— 900 粗 + 硬描边 +
+     金渐变放在 41px 的顶栏上像商铺招牌 ✗，不像两个人过日子的地方 ✓。
+     这一版：站酷快乐体（圆头、手写感 ✓）+ 奶蜜桃渐变 ✓ + 每个字**轻轻起伏** ✓。
+     ⚠️ 每个字要是一个 span 才各自动 ✓（`03-auth.js` 的 `fitGname` 拆 ✓）；
+        拆完 `text-overflow:ellipsis` **对我们不生效** ✗（它对 inline-block 无效 ✓），
+        所以超长名字由 JS 从尾巴删字、补一个"…" ✓（读屏走 aria-label 读全名 ✓）。
+     ⚠️ 这一层**不写** `-webkit-text-fill-color:transparent` ✓ —— 渐变挂在 span 上 ✓；
+        留在这里的话，**字体文件加载失败时整行名字会隐形** ✗（只剩一圈影子 ✓）。
+        所以 `.gname` 自己保留一个实色 `color` 兜底 ✓。
+     ⚠️ 幅度只有 ±1.6px / ±1.5° ✓ —— 顶栏已经有猫在走 ✓，字再晃大就是蹦迪 ✗。
+     ⚠️ 减弱动效时**不抖** ✓（字、渐变、配色都还在 ✓）。
+     ⚠️ 这是**群名本身** ✓，不是说明文字 ✓（[[lifeguard-no-intro-copy]] 不冲突 ✓）。 */
   #chat header.top .gname {
-    font-size:21px; font-weight:900; line-height:24px;
-    letter-spacing:.085em;
-    /* 两层：①一道很淡的光在字面上扫过 ✓ ②上亮下深的描金渐变（立体感来源 ✓） */
-    background-image:
-      linear-gradient(100deg, transparent 34%, rgba(255,255,255,.30) 48%, transparent 62%),
-      linear-gradient(180deg, var(--title-a) 0%, var(--title-b) 52%, var(--title-c) 100%);
-    background-size:250% 100%, 100% 100%;
-    background-position:-60% 50%, 0 0;
-    background-repeat:no-repeat;
+    font-family:"ZCOOL KuaiLe",-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;
+    font-weight:400; font-size:24px; line-height:24px;
+    letter-spacing:.02em;
+    color:var(--title-b);          /* 兜底：字体没到 / JS 没拆字时也是暖色 ✓ */
+    transform:rotate(-1deg);       /* 整行歪一点点 ✓ —— 比一条死平线活泼 ✓ */
+  }
+  #chat header.top .gname span {
+    display:inline-block; transform-origin:50% 85%;
+    background-image:linear-gradient(180deg,
+      var(--title-a) 0%, var(--title-b) 52%, var(--title-c) 100%);
     -webkit-background-clip:text; background-clip:text;
     -webkit-text-fill-color:transparent; color:transparent;
-    filter:drop-shadow(0 1.5px 0 var(--title-edge))
-           drop-shadow(0 0 6px var(--title-glow));
-    animation:titleSheen 10s ease-in-out infinite;
+    filter:drop-shadow(0 2px 2px var(--title-edge))
+           drop-shadow(0 0 7px var(--title-glow));
+    animation:gnameBob 3.8s ease-in-out infinite;
+    animation-delay:calc(var(--i) * -.22s);   /* 错峰：像被手指一颗颗点过 ✓ */
   }
-  @keyframes titleSheen {
-    0%, 100% { background-position:-60% 50%, 0 0; }
-    50%      { background-position:160% 50%, 0 0; }
+  #chat header.top .gname span:nth-child(2n) { animation-name:gnameBobAlt; }
+  @keyframes gnameBob {
+    0%, 100% { transform:translateY(.6px) rotate(-1.6deg); }
+    50%      { transform:translateY(-1.6px) rotate(1.4deg); }
+  }
+  @keyframes gnameBobAlt {
+    0%, 100% { transform:translateY(-1.4px) rotate(1.5deg); }
+    50%      { transform:translateY(.8px) rotate(-1.5deg); }
   }
   @media (prefers-reduced-motion: reduce) {
-    #chat header.top .gname { animation:none; }
+    #chat header.top .gname span { animation:none; }
   }
   /* ★ 2026-10-30：状态胶囊没了 ✓ —— 顶栏右侧住着猫猫仔 ✓（见上面那段 ✓）。
      奶霜底子亮，影子要更轻一点 ✓；深色下白描边自己就够立 ✓。 */

@@ -627,8 +627,70 @@
     return bgTask;
   };
 
+  // ★ 2026-10-30：**顶栏群名改成"软糖字"** ✓（用户：「群昵称字体太雷庭了，不够可爱」✓）。
+  //
+  //   为什么要拆字：整行只能整体歪 ✓，做不出"每个字轻轻起落"的软乎劲儿 ✓。
+  //   拆成 span 后每个字自己抖 ✓（幅度 / 周期在 app.css 里 ✓，`--i` 控制错峰 ✓）。
+  //
+  //   ⚠️ 拆完 `text-overflow:ellipsis` 就**不灵了** ✗（它管不了 inline-block ✓），
+  //      所以超长名字由这里从尾巴删字、补一个"…" ✓；读屏靠 `aria-label` 读全名 ✓
+  //      （空间名最长 32 字 ✓，不是理论问题 ✓）。
+  //   ⚠️ 开机时 `_paintBoot()` 是**先 renderHeader、后 show('chat')** ✓ ——
+  //      画的那一刻 #chat 还是 display:none ✓，`clientWidth` 是 0 ✓；
+  //      这时**不能**截断（会把整行删光 ✗）。宽度为 0 就只画不量 ✓，
+  //      再靠 ResizeObserver 等它真有宽度时补量一次 ✓。
+  //   ⚠️ 字体是异步到的 ✓ —— 先用回退字体量、字到了再量一次 ✓；
+  //      否则 ZCOOL 比系统字宽/窄时，省略号会早一步或晚一步 ✓。
+  const GN_FONT = '24px "ZCOOL KuaiLe"';
+  let gnameRO = null, gnameFitRaf = 0;
+
+  const fitGname = () => {
+    const el = $('#gname');
+    if (!el) return;
+    const text = (group && group.name) || '—';
+    el.setAttribute('aria-label', text);      // 删过字之后读屏仍是全名 ✓
+    el.textContent = '';
+    const spans = [];
+    Array.from(text).forEach((ch, i) => {
+      const s = document.createElement('span');
+      s.textContent = ch === ' ' ? ' ' : ch;   // 空格也要占位 ✓
+      s.style.setProperty('--i', i);
+      el.appendChild(s);
+      spans.push(s);
+    });
+    // 藏起来的屏宽度是 0 → 只画不量 ✓（等 ResizeObserver 叫我们回来 ✓）
+    if (el.clientWidth > 0) {
+      let cut = spans.length;
+      let dots = null;
+      while (cut > 0 && el.scrollWidth > el.clientWidth) {
+        spans[--cut].remove();
+        if (!dots) {
+          dots = document.createElement('span');
+          dots.className = 'gn-cut';
+          dots.textContent = '…';
+          el.appendChild(dots);
+        }
+      }
+    }
+    // 字体还没到 → 到齐之后再量一遍 ✓（`check` 为 true 时不再排队 ✓，不会自己转圈 ✓）
+    if (document.fonts && !document.fonts.check(GN_FONT, text)) {
+      document.fonts.load(GN_FONT, text)
+        .then(() => { if (((group && group.name) || '—') === text) fitGname(); })
+        .catch(() => {});
+    }
+  };
+
+  const queueGnameFit = () => {
+    if (gnameFitRaf) return;
+    gnameFitRaf = requestAnimationFrame(() => { gnameFitRaf = 0; fitGname(); });
+  };
+
   const renderHeader = () => {
-    $('#gname').textContent = group?.name || '';
+    fitGname();
+    if (!gnameRO && 'ResizeObserver' in window) {
+      const el = $('#gname');
+      if (el) { gnameRO = new ResizeObserver(queueGnameFit); gnameRO.observe(el); }
+    }
     setStatus(curStatus);
     ensureChatBackground();
   };
