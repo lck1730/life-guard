@@ -1,7 +1,17 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   顶栏那只猫猫仔（2026-10-31 · 第五版：慢生活 + 动作拆细）
+   顶栏那只猫猫仔（2026-10-31 · 第九版：水碗 / 饭盆拿掉，左边换成猪猪 + 鸭鸭）
 
-   用户这一版的原话：
+   第九版用户原话：
+     「去掉水和食物，然后在上面添加猪猪和鸭鸭陪伴猫猫，
+       形象就是来自气泡的猪猪和鸭鸭形象，试试」
+   → 左边挪出两只**不吃不喝的伙伴** ✓（长相照气泡贴纸那两张脸画 ✓，
+     身子是我补的 ✓ —— 见 index.html / app.css ✓）；
+     猫多了个 `friends` 站 ✓（猪猪右手边那块地 ✓），会走过去挨着坐 ✓；
+     一走近，它俩就原地蹦一下 + 冒爱心 ✓（见下面 maybeFriends ✓）。
+     ★ **喝水 / 吃猫粮整套删了** ✓ —— 水碗、饭盆、舌头、涟漪、猫粮碎渣全没了 ✓，
+       `drink` / `eat` 两个心情也跟着没了 ✓（别再捡回来 ✗）。
+
+   第五版（动作那一版）的用户原话：
      「猫猫动作很僵硬」「吃饭喝水睡觉动作穿模且不自然」「建模也有点粗糙」
      「猫猫有点多动症，按理来说猫猫应该比较懒，不会一直动来动去，并且跑步速度很快」
      「跑步动作也不自然」「形象还是要保持，建模细节可以优化，动作类型也可以多一些，
@@ -26,14 +36,15 @@
         而且**每一种都有"入 / 出"的过渡** ✓，不再硬切 ✗。
 
    站台（顶栏那 30px，和群名同一条线、压在名字前面，见 index.html ✓）：
-     water 最左的水碗 ✓    food 饭盆 ✓
+     friends 最左边：鸭鸭 + 猪猪 ✓（猫挨着它们坐 = "陪伴" ✓）
      mid1 / mid2 中间两块地 ✓（趴下就是"趴着睡" ✓）
      bed 最右的猫窝 ✓（默认就睡在这儿 ✓）
 
    规矩：
      · **用户一开口（think / 醒着）就原地站住** ✓ —— 不许把人话晾着、自己溜达 ✗
-     · 用户的事办完 → 在碗边就回中间 ✓，在窝里就地趴下 ✓
-     · **没事干才溜达** ✓，而且**偏爱近处** ✓（懒得走远 ✓）；吃完饭 2 分钟内不再去饭盆 ✓
+     · 用户的事办完 → 在朋友们旁边就回中间 ✓，在窝里就地趴下 ✓
+     · **没事干才溜达** ✓，而且**偏爱近处** ✓（懒得走远 ✓）
+     · 走到猪猪 / 鸭鸭旁边 → 它俩蹦一下 + 冒爱心 ✓（见下面 maybeFriends ✓）
      · 页面不可见 / 减弱动态 → 一律不动 ✓
 
    心情表：
@@ -46,8 +57,6 @@
      perk    竖起耳朵（一下抬头 ✓）
      think   想事情（头顶三颗点 + 尾巴快摆 ✓）
      walk    走过去（小碎步 + 身子左右摇 + 尾巴稳 ✓）
-     drink   低头喝水（水碗起涟漪 + 小舌头 ✓）
-     eat     低头吃猫粮（猫粮轻颤 ✓）
      stretch 伸懒腰（1.9s ✓，跟 app.css 的 catStretch / catStretchHead 一致 ✓）
    ═══════════════════════════════════════════════════════════════════════ */
 (() => {
@@ -57,11 +66,13 @@
   const stage = document.getElementById('catStage');
   if (!el || !stage) return;
 
-  const waterEl = stage.querySelector('.cat-water');
-  const foodEl = stage.querySelector('.cat-food');
   const bedEl = stage.querySelector('.cat-bed');
+  // ★ 第九版：左边那两只伙伴 ✓（水碗 / 饭盆拿掉以后站在这儿 ✓）
+  //   猫走过去挨着坐时，它俩蹦一下 + 冒爱心 ✓（见下面 maybeFriends ✓）
+  const friendEls = [stage.querySelector('.cat-pig'), stage.querySelector('.cat-duck')];
+  const pigEl = friendEls[0];
   // ★ 第八版：墙上那只挂着的猫猫玩具 ✓（住在 #catWall 里 ✓，不是 stage 里 ✓）
-  //   —— 猫从底下过 / 去饭盆时，给它挂一个 `.swish` 让它荡一下 ✓（见下面 maybeToy）
+  //   —— 猫从底下过时，给它挂一个 `.swish` 让它荡一下 ✓（见下面 maybeToy）
   const toyEl = document.querySelector('#catWall .cw-toy');
 
   const reduce = () => !!(window.matchMedia &&
@@ -78,15 +89,12 @@
     perk:    '猫猫仔竖起了耳朵',
     think:   '猫猫仔在琢磨',
     walk:    '猫猫仔在走动',
-    drink:   '猫猫仔在喝水',
-    eat:     '猫猫仔在吃猫粮',
     stretch: '猫猫仔伸了个懒腰',
   };
 
   const WALK_V = 30;        // px/s ✓（猫慢慢溜达 ✓；旧版 58px/s = 小跑 ✗）
   const STEP_MS = 720;      // 一步的时间 ✓（慢 ✓；走路时写进 --step-ms ✓）
   const SLEEP_MS = [26000, 74000];   // 睡一觉多久 ✓
-  const MEAL_GAP = 120000;  // 吃完 2 分钟内不再去饭盆 ✓
 
   let spot = 'bed';        // 站在哪个站 ✓
   let mood = 'sleep';      // 现在什么心情 ✓（CSS 只认这一个 ✓）
@@ -94,11 +102,10 @@
   let x = 0;               // 现在的 --cat-x ✓
   let wokeOnce = false;    // 打开 App 时别先醒一下 ✓（第一个 idle 继续睡 ✓）
   let hidden = document.hidden;
-  let lastMeal = 0;        // 上一次吃猫粮的时刻 ✓
 
   let stepRaf = 0;         // 正在走的逐帧句柄 ✓（0 = 没在走 ✓）
   let idleTimer = null;    // 下一次自己找事做 ✓
-  let actTimer = null;     // 当前这一段（吃多久 / 坐多久 / 趴下那 0.9s）✓
+  let actTimer = null;     // 当前这一段（坐多久 / 趴下那 0.9s）✓
   let thinkTimer = null;   // 思考的兜底 ✓
 
   const clearT = (t) => { if (t) clearTimeout(t); return null; };
@@ -107,19 +114,22 @@
 
   // ── 位置 ────────────────────────────────────────────────────────────
   // 站哪 = 那个东西的**实测中心** − 猫身上那个点相对猫箱左边的距离 ✓。
-  // 嘴在 viewBox 的 48/100 ✓（低头够碗 ✓）；身子在 50/100 ✓（趴窝 ✓）。
+  // 身子在 viewBox 的 50/100 ✓（趴窝 ✓）；`friends` 站用它的**右沿** ✓（贴着猪猪坐 ✓）。
   const rectIn = (node) => {
     const r = node.getBoundingClientRect();
     const s = stage.getBoundingClientRect();
-    return { mid: r.left - s.left + r.width / 2 };
+    return { mid: r.left - s.left + r.width / 2, right: r.right - s.left };
   };
 
   const xFor = (name) => {
     const w = catW();
     const sw = stage.clientWidth || 320;
     let px;
-    if (name === 'water' || name === 'food') {
-      px = rectIn(name === 'water' ? waterEl : foodEl).mid - w * 0.48;
+    if (name === 'friends') {
+      // 第九版：坐在**猪猪右手边** ✓ —— 猫的左沿离它 2px ✓（猪猪 30–48、猫 33 宽
+      // → 50–83 ✓）。320px 下名字左沿 ≈81 ✓，会压住一点点 ✓ —— 和走过去时一样 ✓，
+      // 猫本来就压在名字前面 ✓（用户要的 ✓，别调回去 ✗）。
+      px = pigEl ? rectIn(pigEl).right + 2 : sw * 0.15;
     } else if (name === 'bed') {
       px = rectIn(bedEl).mid - w * 0.5;
     } else if (name === 'mid1') {
@@ -127,7 +137,8 @@
     } else {                                  // mid2
       px = sw * 0.60 - w * 0.5;
     }
-    // ★ 左边放宽到 0 ✓（旧版卡在 2px → 脸对不准水碗 ✓，水碗在 15.5 处 ✓）
+    // ★ 左边放宽到 0 ✓（旧版卡在 2px → 脸对不准碗 ✓；现在朋友们在 5–48 ✓，
+    //   `friends` 站要贴着猪猪 ✓ —— 卡死左边就会把它推歪 ✓）
     return Math.max(0, Math.min(sw - w - 2, px));
   };
 
@@ -135,14 +146,15 @@
     x = px;
     el.style.setProperty('--cat-x', px + 'px');
     maybeToy();          // ★ 第八版：走到玩具底下就扒一下 ✓（见下面 maybeToy ✓）
+    maybeFriends();      // ★ 第九版：走到猪猪 / 鸭鸭旁边 → 它俩高兴一下 ✓
   };
 
   // ── 墙上那只挂着的猫猫玩具（2026-10-31 第八版）────────────────────────
   // 用户：「可以在合适位置摆放一个挂起来的猫猫玩具，我觉得可以放在群昵称和饭的中间」✓
   // 位置和长相全在 index.html / app.css 里 ✓；这里只管**什么时候动** ✓：
-  // 猫走到玩具底下（去饭盆 / 喝水 / 路过）→ 给玩具挂 `.swish` 荡一下 ✓。
+  // 猫走到玩具底下（路过 / 去朋友们那儿）→ 给玩具挂 `.swish` 荡一下 ✓。
   // ⚠️ 只在**刚进入范围**那一下触发 ✓（`toyIn` 闩住 ✓），不是每帧都挂 ✗。
-  // ⚠️ 两次之间隔 9s ✓ —— 不然猫在饭盆边吃饭，玩具会一直叮当响 ✗。
+  // ⚠️ 两次之间隔 9s ✓ —— 不然猫停在底下，玩具会一直叮当响 ✗。
   // ⚠️ 减弱动效 / 睡着的时候**不动** ✓（趴着睡还扒玩具就不像猫了 ✓）。
   let toyC = 0, catHalf = 16.5;
   let toyIn = false, toyRest = 0, toyTimer = null;
@@ -150,10 +162,25 @@
   const TOY_COOL = 9000;    // 两次之间至少隔 9s ✓
   const TOY_SWISH_MS = 2500; // 跟 app.css 的 2 段 × 1.2s 对得上 ✓
 
-  /** 量一次玩具中心 ✓（resize 时重来 ✓）—— 逐帧别再读布局 ✗。 */
-  const measureToy = () => {
+  // ── 猪猪 / 鸭鸭（2026-10-31 第九版）─────────────────────────────────
+  // 猫一走近（或者挨着它们坐下）→ 给两只挂 `.happy` ✓（原地蹦一下 + 冒爱心 ✓，
+  // 动画在 app.css ✓）。这里只管**什么时候高兴** ✓：
+  // ⚠️ 同样只在**刚进入范围**那一下触发 ✓（`frIn` 闩住 ✓）；两次隔 11s ✓。
+  // ⚠️ 只有 walk / awake / look 时才高兴 ✓ —— 睡着 / 想事情 / 洗脸时不算"走过来了" ✓。
+  // ⚠️ 减弱动效时**不挂** ✓（CSS 里也关了 ✓）。
+  let pigC = 0;
+  let frIn = false, frRest = 0, frTimer = null;
+  const FRIEND_NEAR = 44;     // 猫身中心离猪猪中心多近算"过来了" ✓（猪猪中心 ≈39 ✓）
+  const FRIEND_COOL = 11000;  // 两次之间至少隔 11s ✓
+  const FRIEND_HAPPY_MS = 1600; // 和 app.css 的 frHop(2×.62s) / frLove(1.5s) 对得上 ✓
+
+  /** 量一次玩具 / 猪猪的中心 + 猫半宽 ✓（resize 时重来 ✓）—— 逐帧别再读布局 ✗。 */
+  const measureScene = () => {
     catHalf = catW() / 2;
     if (toyEl) toyC = toyEl.offsetLeft + toyEl.offsetWidth / 2;
+    // ★ 猪猪和猫都住在 `#catStage` 里 ✓ → offsetLeft 是同一个原点 ✓
+    //   （`#catWall` 和 `#catStage` 都是 inset:0 ✓，跟 toyC 比也成立 ✓）。
+    if (pigEl) pigC = pigEl.offsetLeft + pigEl.offsetWidth / 2;
   };
 
   const maybeToy = () => {
@@ -163,7 +190,7 @@
     if (toyIn) return;                             // 还在范围里 ✓ → 不重复挂 ✓
     toyIn = true;
     if (reduce()) return;
-    if (mood !== 'walk' && mood !== 'eat' && mood !== 'drink' && mood !== 'awake') return;
+    if (mood !== 'walk' && mood !== 'awake' && mood !== 'look') return;
     const now = performance.now();
     if (now < toyRest) return;
     toyRest = now + TOY_COOL;
@@ -175,15 +202,32 @@
     }, TOY_SWISH_MS);
   };
 
+  const maybeFriends = () => {
+    if (!pigEl) return;
+    const d = Math.abs(pigC - (x + catHalf));
+    if (d > FRIEND_NEAR) { frIn = false; return; }  // 走开了 ✓ → 下次进来还能高兴 ✓
+    if (frIn) return;                              // 还在范围里 ✓ → 不重复蹦 ✓
+    frIn = true;
+    if (reduce()) return;
+    if (mood !== 'walk' && mood !== 'awake' && mood !== 'look') return;
+    const now = performance.now();
+    if (now < frRest) return;
+    frRest = now + FRIEND_COOL;
+    friendEls.forEach((n) => { if (n) n.classList.add('happy'); });
+    frTimer = clearT(frTimer);
+    frTimer = setTimeout(() => {
+      frTimer = null;
+      friendEls.forEach((n) => { if (n) n.classList.remove('happy'); });
+    }, FRIEND_HAPPY_MS);
+  };
+
   // ── 心情 ────────────────────────────────────────────────────────────
   const setMood = (m) => {
     mood = m;
     if (el.getAttribute('data-mood') !== m) el.setAttribute('data-mood', m);
     const label = LABEL[m] || LABEL.sleep;
     if (el.getAttribute('aria-label') !== label) el.setAttribute('aria-label', label);
-    // 碗里的动静跟着心情走 ✓（水波 / 猫粮轻颤 ✓，见 app.css）
-    const act = (m === 'eat' || m === 'drink') ? m : '';
-    if (stage.dataset.act !== act) stage.dataset.act = act;
+    // ★ 第九版：`data-act` 没用了 ✓（水波 / 猫粮那些跟着碗一起删了 ✓）。
     // ★ 第六版：地板也要知道心情 ✓ —— 猫窝垫子只在**睡着**的时候贴着呼吸起伏 ✓
     //   （CSS 那边用 `#catStage[data-mood="sleep"]` 挑 ✓；别用 `:has()` ✗，
     //    老一点儿的 WebView 不认 ✓）
@@ -337,14 +381,14 @@
     }, ms);
   };
 
-  /** 挑下一个地方 ✓：**近的更容易被挑中** ✓（懒 ✓），刚吃过饭不去饭盆 ✓。 */
+  /** 挑下一个地方 ✓：**近的更容易被挑中** ✓（懒 ✓）。
+   *  `friends` 给得比其它都重一点 ✓ —— 不然它老是睡在窝里 ✓，
+   *  左边那两位一整天都没猫陪 ✓（第九版加这个站就是为了"陪伴" ✓）。 */
   const pickSpot = () => {
-    const now = Date.now();
     const pool = [
-      { name: 'mid1',  w: 1.6 },
-      { name: 'mid2',  w: 1.3 },
-      { name: 'water',  w: 0.8 },
-      { name: 'food',   w: now - lastMeal < MEAL_GAP ? 0 : 1.0 },
+      { name: 'mid1',   w: 1.6 },
+      { name: 'mid2',   w: 1.3 },
+      { name: 'friends', w: 2.6 },
       { name: 'bed',    w: 1.1 },
     ].filter((t) => t.name !== spot && t.w > 0);
     if (!pool.length) return 'mid1';
@@ -368,22 +412,21 @@
   const arrive = () => {
     if (mode !== 'auto') return;
 
-    if (spot === 'water' || spot === 'food') {
-      // 喝 / 吃 3–5s ✓ → 抬头醒一会儿 ✓ → 回中间趴下 ✓
-      setMood(spot === 'water' ? 'drink' : 'eat');
-      if (spot === 'food') lastMeal = Date.now();
+    if (spot === 'friends') {
+      // 挨着猪猪 / 鸭鸭坐一会儿 ✓（发呆 → 望望风 ✓）→ 回中间趴下 ✓
+      setMood('awake');
       actTimer = clearT(actTimer);
       actTimer = setTimeout(() => {
         actTimer = null;
         if (mode !== 'auto') return;
-        setMood('awake');
+        setMood('look');
         actTimer = setTimeout(() => {
           actTimer = null;
           if (mode !== 'auto') return;
-          const back = Math.random() < 0.72 ? 'mid1' : 'mid2';
+          const back = Math.random() < 0.7 ? 'mid1' : 'mid2';
           walkTo(back, () => { if (mode === 'auto') settleAndSleep(); });
-        }, rnd(1200, 2300));
-      }, rnd(3200, 5400));
+        }, rnd(2400, 4200));
+      }, rnd(2200, 3600));
       return;
     }
 
@@ -460,7 +503,7 @@
     }, ms || 60000);
   };
 
-  /** 醒着但不冒泡泡 ✓。`ms` 到了以后就地趴下 / 从碗边回家 ✓。 */
+  /** 醒着但不冒泡泡 ✓。`ms` 到了以后就地趴下 / 从朋友们那儿回家 ✓。 */
   const userAwake = (ms) => {
     mode = 'user';
     clearAuto();
@@ -471,7 +514,7 @@
       actTimer = null;
       if (mode !== 'user') return;
       mode = 'auto';
-      if (spot === 'water' || spot === 'food') {
+      if (spot === 'friends') {
         walkTo('mid1', () => { if (mode === 'auto') settleAndSleep(); });
       } else {
         settleAndSleep();
@@ -521,7 +564,7 @@
     lastW = w;
     if (w < 40) return;           // 这一屏还没显示出来 ✓（等它显示 ✓）
     freeze();
-    measureToy();                 // ★ 第八版：玩具中心 / 猫半宽 跟着屏宽重量 ✓
+    measureScene();               // ★ 第八 / 九版：玩具、猪猪的中心 + 猫半宽 跟着屏宽重量 ✓
     setX(xFor(spot));
   };
   if (window.ResizeObserver) new ResizeObserver(replace).observe(stage);
