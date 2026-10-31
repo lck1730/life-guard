@@ -346,9 +346,12 @@
   [data-theme="forest"] #catStage::after {
     background:linear-gradient(0deg, rgba(0,0,0,.20), transparent); }
   #catStage .cat-bowl, #catStage .cat-bed { position:absolute; bottom:0; line-height:0; }
-  #catStage .cat-bowl { left:8px; width:15px; z-index:3; }
-  #catStage .cat-food { left:40px; }
-  #catStage .cat-bed { right:7px; width:37px; z-index:1; }
+  /* ★ 2026-10-31 第六版：碗放大到 20px、窝放大到 56px ✓（原来是 15 / 37 ✓）——
+     窝要**比猫宽一圈** ✓，猫两边才看得见垫子和毯子 ✓；碗也要画得下杯垫和徽记 ✓。
+     ⚠️ 左边还是 58px 的让位 ✓（水碗 5–25、饭盆 35–55 ✓）；窝右缘离屏边 3px ✓。 */
+  #catStage .cat-bowl { left:5px; width:20px; z-index:3; }
+  #catStage .cat-food { left:35px; }
+  #catStage .cat-bed { right:3px; width:56px; z-index:1; }
   #catStage svg { display:block; width:100%; height:auto; overflow:visible; }
   #catStage .cat-bed svg { filter:drop-shadow(0 1px 1px rgba(80,44,26,.10)); }
 
@@ -581,9 +584,37 @@
   #catStage .w-ripple { opacity:0; transform-box:fill-box; transform-origin:50% 50%; }
   #catStage[data-act="drink"] .w-ripple {
     animation:catRipple 1.1s ease-out infinite; }
+  #catStage[data-act="drink"] .w-ripple2 { animation-delay:.46s; }
   #catStage .kibble { transform-box:fill-box; transform-origin:50% 100%; }
   #catStage[data-act="eat"] .kibble {
     animation:catKibble .55s ease-in-out infinite; }
+
+  /* —— ★ 2026-10-31 第六版：让**东西自己也有点呼吸** ✓（不是死的布景 ✓）
+     · 水面的高光慢慢晃 ✓（一整天都在 ✓，只是**不使用**的时候不漾开 ✓）
+     · 喝水时才溅三颗小水珠 ✓；吃的时候才掉碎渣 ✓（平时纹丝不动 ✓，不然像地震 ✗）
+     · 窝里那团暖光在慢慢呼吸 ✓；睡觉时垫子贴着呼吸起伏 ✓
+     · 毯子一角、小鱼尾巴、挂着的星星都是很慢的小动静 ✓（周期互不整除 ✓） */
+  #catStage .w-shimmer { transform-box:fill-box; transform-origin:50% 50%;
+                         animation:catWater 6.2s ease-in-out infinite; }
+  #catStage .w-drop { opacity:0; transform-box:fill-box; transform-origin:50% 100%; }
+  #catStage[data-act="drink"] .w-drop { animation:catDrop .92s ease-out infinite; }
+  #catStage[data-act="drink"] .w-drop.d2 { animation-delay:.17s; }
+  #catStage[data-act="drink"] .w-drop.d3 { animation-delay:.35s; }
+  #catStage .k-crumb { transform-box:fill-box; transform-origin:50% 100%; }
+  #catStage[data-act="eat"] .k-crumb { animation:catCrumb .62s ease-in-out infinite; }
+  #catStage[data-act="eat"] .k-crumb .c2 { animation:catCrumb .62s ease-in-out infinite .18s; }
+  #catStage[data-act="eat"] .k-crumb .c3 { animation:catCrumb .62s ease-in-out infinite .34s; }
+  #catStage .bed-glow { transform-box:fill-box; transform-origin:50% 50%;
+                        animation:catBedGlow 7.4s ease-in-out infinite; }
+  #catStage .bed-star { transform-box:fill-box; transform-origin:50% 15%;
+                        animation:catBedStar 4.8s ease-in-out infinite; }
+  #catStage .bed-fish { transform-box:fill-box; transform-origin:8% 100%;
+                        animation:catBedFish 6.6s ease-in-out infinite; }
+  #catStage .bed-blanket { transform-box:fill-box; transform-origin:4% 12%;
+                           animation:catBedBlanket 9.2s ease-in-out infinite; }
+  #catStage[data-mood="sleep"] .cat-bed-pad {
+    transform-box:fill-box; transform-origin:50% 88%;
+    animation:catBedSquish 6.8s ease-in-out infinite; }
 
   @keyframes catBlink {
     0%, 86%, 100% { transform:scaleY(1); }
@@ -710,6 +741,28 @@
   }
   @keyframes catKibble { 0%, 100% { transform:translateY(0); }
                          50% { transform:translateY(-.8px); } }
+  @keyframes catWater {
+    0%, 100% { opacity:.42; transform:translateX(-.5px) scaleX(.94); }
+    50% { opacity:.9; transform:translateX(.6px) scaleX(1.05); }
+  }
+  @keyframes catDrop {
+    0% { opacity:0; transform:translate(0, 1.3px) scale(.5); }
+    22% { opacity:.95; }
+    68% { opacity:.6; }
+    100% { opacity:0; transform:translate(-.9px, -2.6px) scale(.9); }
+  }
+  @keyframes catCrumb { 0%, 100% { opacity:.85; transform:translateY(0) rotate(0); }
+                        45% { opacity:1; transform:translateY(-1.7px) rotate(26deg); } }
+  @keyframes catBedGlow { 0%, 100% { opacity:.13; transform:scale(.97); }
+                          50% { opacity:.3; transform:scale(1.05); } }
+  @keyframes catBedStar { 0%, 100% { opacity:.45; transform:scale(.86) rotate(-6deg); }
+                          50% { opacity:1; transform:scale(1.08) rotate(6deg); } }
+  @keyframes catBedFish { 0%, 100% { transform:rotate(-3deg); }
+                          50% { transform:rotate(5deg) translateY(-.4px); } }
+  @keyframes catBedBlanket { 0%, 100% { transform:rotate(0); }
+                             50% { transform:rotate(1.1deg); } }
+  @keyframes catBedSquish { 0%, 100% { transform:scale(1); }
+                            50% { transform:scale(1.018, .986); } }
   /* 减弱动态：动作全停 ✓，但睡觉 / 思考的**表情和姿势**照样换 ✓（信息不丢 ✓） */
   @media (prefers-reduced-motion: reduce) {
     #cat *, #catStage svg * { animation:none !important; transition:none !important; }

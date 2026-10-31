@@ -182,53 +182,220 @@
            粉耳朵 + 腮红 + 圆眼高光 + 粉三角鼻 + ω 嘴 + 胡须 + 小爱心 ✓）
          · 动作分层：头 / 身子 / 尾巴 / 两只爪子各动各的 ✓（CSS 见 app.css ✓）
          · 不接手指 ✓；位置由 `js/08-cat.js` 改 `--cat-x` ✓ -->
-    <div id="catStage" aria-hidden="true" data-act="">
-      <!-- 右边：猫窝 ✓（在猫后面 ✓ —— 猫趴进去就是躺在窝里 ✓） -->
+    <div id="catStage" aria-hidden="true" data-act="" data-mood="sleep">
+      <!-- 右边：猫窝 ✓（在猫后面 ✓ —— 猫趴进去就是躺在窝里 ✓）
+           ★ 2026-10-31 第六版：不再是"一只椭圆垫子" ✗ ——
+             编织篮身 + 后沿卷边（当靠背 ✓）+ 缝线垫子 + 小枕头 + 盖毯 +
+             小鱼玩具 + 挂着的小星星 + 一团暖光 ✓。
+             左右两边各露一截垫子 / 毯子 ✓（猫正好坐在中间那个洞里 ✓）。
+           ⚠️ 篮子前圈本来就**比后圈低** ✓（透视 ✓）—— 猫的肚皮刚好落在前圈上沿 ✓，
+             自己不画"围栏"也能看出是**陷在窝里**的 ✓。 -->
       <div class="cat-bed">
-        <svg viewBox="0 0 44 22" focusable="false">
-          <ellipse cx="22" cy="19.4" rx="19.4" ry="2.1" fill="#4a2a16" opacity=".14"/>
-          <ellipse cx="22" cy="12.6" rx="20.2" ry="8.2" fill="#f2cca4"
-                   stroke="#a8845a" stroke-width="1.5"/>
-          <ellipse cx="22" cy="11.4" rx="13.4" ry="4.7" fill="#fbeada"
-                   stroke="#d9a273" stroke-width="1.1"/>
-          <path d="M12.4 11.1 Q22 7.4 31.6 11.1 Q30.8 14.7 22 15.3 Q13.2 14.7 12.4 11.1 Z"
-                fill="#f7c7b5" opacity=".92"/>
-          <g fill="none" stroke="#c99a6e" stroke-width="1.05" stroke-linecap="round" opacity=".75">
-            <path d="M4.2 11.8 l2.1 .9"/>
-            <path d="M6.6 14.4 l2.1 .7"/>
-            <path d="M10.6 16.4 l2.1 .5"/>
-            <path d="M33.4 16.4 l2.1 -.5"/>
-            <path d="M37.4 14.4 l2.1 -.7"/>
-            <path d="M39.8 11.8 l2.1 -.9"/>
+        <svg viewBox="0 0 56 28" focusable="false">
+          <defs>
+            <linearGradient id="lgBedRim" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#f3d6b2"/>
+              <stop offset="1" stop-color="#d9ac7e"/>
+            </linearGradient>
+            <radialGradient id="lgBedPad" cx="42%" cy="30%" r="80%">
+              <stop offset="0" stop-color="#fffaf5"/>
+              <stop offset=".6" stop-color="#fde9dc"/>
+              <stop offset="1" stop-color="#f6d3bd"/>
+            </radialGradient>
+            <linearGradient id="lgBedBlanket" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#fad2c0"/>
+              <stop offset="1" stop-color="#eeae98"/>
+            </linearGradient>
+          </defs>
+          <ellipse cx="28" cy="26.3" rx="23.4" ry="2.2" fill="#4a2a16" opacity=".15"/>
+          <ellipse class="bed-glow" cx="28" cy="18.8" rx="23.6" ry="9"
+                   fill="#ffd8a4" opacity=".2"/>
+          <!-- 篮身 + 编织纹 ✓ -->
+          <ellipse cx="28" cy="16" rx="25" ry="11" fill="url(#lgBedRim)"
+                   stroke="#b98d5f" stroke-width="1.35"/>
+          <g fill="none" stroke="#bf9060" stroke-linecap="round" opacity=".5">
+            <ellipse cx="28" cy="16" rx="23.2" ry="9.6" stroke-width=".65"
+                     stroke-dasharray="2.4 2.1"/>
+            <path d="M7.4 19.8 C11 23.2 18 25.6 25 26.4" stroke-width=".8"/>
+            <path d="M11.6 23.1 l2.3 1.5" stroke-width=".8"/>
+            <path d="M16.4 25.2 l2.5 1" stroke-width=".8"/>
+            <path d="M48.6 19.8 C45 23.2 38 25.6 31 26.4" stroke-width=".8"/>
+            <path d="M44.4 23.1 l-2.3 1.5" stroke-width=".8"/>
+            <path d="M39.6 25.2 l-2.5 1" stroke-width=".8"/>
+          </g>
+          <!-- 后沿卷边 ✓（比垫子高 → 像靠背 ✓；下半截被垫子压住 ✓） -->
+          <path d="M5.2 14.6 C5.2 4.2 50.8 4.2 50.8 14.6" fill="none"
+                stroke="#c39a6f" stroke-width="6.2" stroke-linecap="round"/>
+          <path d="M5.2 14.6 C5.2 4.2 50.8 4.2 50.8 14.6" fill="none"
+                stroke="#f6ddc1" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M9.2 10.8 C11.6 7.4 18 6.2 24 5.8" fill="none" stroke="#fff"
+                stroke-width="1.1" stroke-linecap="round" opacity=".5"/>
+          <!-- 垫子 + 缝线 + 四颗小毛栗扣 ✓ -->
+          <ellipse class="cat-bed-pad" cx="28" cy="16.4" rx="18.5" ry="7.6"
+                   fill="url(#lgBedPad)" stroke="#d6ab7f" stroke-width=".9"/>
+          <ellipse cx="28" cy="16.4" rx="16.2" ry="6.3" fill="none"
+                   stroke="#e5b48e" stroke-width=".7" stroke-dasharray="1.5 2.1"/>
+          <g fill="#f3c2b0" stroke="#d9a08c" stroke-width=".5">
+            <circle cx="13.6" cy="14.9" r="1.05"/>
+            <circle cx="42.4" cy="14.9" r="1.05"/>
+            <circle cx="20.2" cy="21.8" r=".95"/>
+            <circle cx="35.8" cy="21.8" r=".95"/>
+          </g>
+          <!-- 左前方盖毯 ✓（猫压住一角 → 像自己钻进去的 ✓） -->
+          <g class="bed-blanket">
+            <path d="M3.6 17.8 C7.6 15.9 14.6 16.3 18.8 18.6 C21 21.5 19.2 24.8 14.8 25.9 C9.6 26.9 4.6 25.1 3.2 22.3 C2.6 20.8 2.7 19 3.6 17.8 Z"
+                  fill="url(#lgBedBlanket)" stroke="#d99f89" stroke-width=".9"/>
+            <path d="M5 21.3 C8.6 22.7 13.8 22.9 18.2 21.6" fill="none"
+                  stroke="#e3a38d" stroke-width="1" stroke-linecap="round"/>
+            <path d="M4.4 23.2 C8.2 24.6 14 24.8 18.4 23.4" fill="none"
+                  stroke="#fff2e8" stroke-width=".8" stroke-dasharray="1.5 1.9"
+                  stroke-linecap="round" opacity=".9"/>
+            <path d="M8.4 18.4 C8.9 20.2 8.6 22.2 7.6 23.8" fill="none"
+                  stroke="#e3a38d" stroke-width=".8" stroke-linecap="round" opacity=".7"/>
+          </g>
+          <!-- 左后方小枕头 ✓（猫挡住大半，只露一角 ✓） -->
+          <g class="bed-pillow" transform="rotate(-8 11 10)">
+            <rect x="6.2" y="6.6" width="10.4" height="7" rx="3.1" fill="#fff7ef"
+                  stroke="#d6ab7f" stroke-width=".85"/>
+            <path d="M8.2 11.2 h6.4" fill="none" stroke="#e8c9ad" stroke-width=".65"
+                  stroke-dasharray="1.2 1.5"/>
+            <path d="M11.4 8.6 c1.1 -1.3 3.2 -.3 2.6 1.2 c-.4 1 -1.8 1.8 -2.6 2.4 c-.8 -.6 -2.2 -1.4 -2.6 -2.4 c-.6 -1.5 1.5 -2.5 2.6 -1.2 z"
+                  fill="#f3b3ab" opacity=".9"/>
+          </g>
+          <!-- 右前方小鱼玩具 ✓ -->
+          <g class="bed-fish">
+            <ellipse cx="48.2" cy="19.6" rx="3.4" ry="2.1" fill="#f8cfc4"
+                     stroke="#d99f89" stroke-width=".75" transform="rotate(-12 48.2 19.6)"/>
+            <path d="M45.2 20.6 l-2.6 -1.2 l.4 2.5 l-1.4 1.6 l2.6 .1 Z" fill="#f8cfc4"
+                  stroke="#d99f89" stroke-width=".7" stroke-linejoin="round"/>
+            <circle cx="50" cy="19" r=".42" fill="#a9735a"/>
+            <path d="M47.4 21.2 q1.8 -.8 3.4 -.5" fill="none" stroke="#e8b3a4"
+                  stroke-width=".6" stroke-linecap="round"/>
+            <path d="M50.8 18.3 l.9 3.4" fill="none" stroke="#e8b3a4"
+                  stroke-width=".55" stroke-linecap="round"/>
+          </g>
+          <!-- 右边挂一颗小星星 ✓（慢慢眨 ✓） -->
+          <g class="bed-star">
+            <path d="M51.6 12.4 C51.8 14.2 52.4 15 53.6 15.6" fill="none"
+                  stroke="#bb8f63" stroke-width=".6" stroke-linecap="round"/>
+            <path d="M53.6 14.6 l.7 1.6 1.7 .2 -1.3 1.2 .35 1.7 -1.5 -.8 -1.5 .8 .35 -1.7 -1.3 -1.2 1.7 -.2 Z"
+                  fill="#ffd98e" stroke="#daa84f" stroke-width=".4" stroke-linejoin="round"/>
           </g>
         </svg>
       </div>
-      <!-- 左边：水碗 + 饭盆 ✓（画在猫**前面** → 低头时嘴藏进碗沿 ✓） -->
+      <!-- 左边：水碗 + 饭盆 ✓（画在猫**前面** → 低头时下巴藏进碗沿 ✓）
+           ★ 2026-10-31 第六版：两只碗都有**杯垫 / 碗身 / 釉线 / 徽记 / 厚碗口** ✓。
+             碗口高度量过 ✓：近边 ≈5.3px、远边 ≈7.8px（屏幕像素），
+             猫低头时嘴在 7.5px ✓ → 下巴藏在沿后、鼻尖还在沿上 ✓。 -->
       <div class="cat-bowl cat-water">
-        <svg viewBox="0 0 20 13" focusable="false">
-          <ellipse cx="10" cy="11.3" rx="8.1" ry="1.4" fill="#4a2a16" opacity=".14"/>
-          <path d="M2 6.4 C2 10.8 18 10.8 18 6.4 Z" fill="#eec196"
-                stroke="#a8845a" stroke-width="1.2" stroke-linejoin="round"/>
-          <ellipse cx="10" cy="6.4" rx="8" ry="2.6" fill="#c9e8f2"
-                   stroke="#a8845a" stroke-width="1.2"/>
-          <ellipse cx="7.1" cy="5.8" rx="2.2" ry=".72" fill="#fff" opacity=".8"/>
-          <ellipse class="w-ripple" cx="10" cy="6.4" rx="5.3" ry="1.7"
-                   fill="none" stroke="#fff" stroke-width=".9"/>
+        <svg viewBox="0 0 24 16" focusable="false">
+          <defs>
+            <linearGradient id="lgWBody" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#f7dbb8"/>
+              <stop offset="1" stop-color="#e0b587"/>
+            </linearGradient>
+          </defs>
+          <!-- 杯垫 ✓ -->
+          <ellipse cx="12" cy="14.4" rx="11.1" ry="1.7" fill="#4a2a16" opacity=".13"/>
+          <ellipse cx="12" cy="14.1" rx="10.8" ry="1.55" fill="#f4dfc7"
+                   stroke="#d3ab7c" stroke-width=".7"/>
+          <ellipse cx="12" cy="14.1" rx="9.6" ry="1.1" fill="none" stroke="#e2c3a0"
+                   stroke-width=".5" stroke-dasharray="1.4 1.5"/>
+          <!-- 碗身 + 底圈 + 釉线 + 高光 ✓ -->
+          <path d="M3.4 6.8 C3.6 13.1 7.8 14.2 12 14.2 C16.2 14.2 20.4 13.1 20.6 6.8 Z"
+                fill="url(#lgWBody)" stroke="#a8845a" stroke-width="1.1"
+                stroke-linejoin="round"/>
+          <path d="M9.2 14.1 C9.6 14.9 10.6 15.2 12 15.2 C13.4 15.2 14.4 14.9 14.8 14.1"
+                fill="none" stroke="#c09569" stroke-width=".75" stroke-linecap="round"/>
+          <path d="M4.6 10.4 C7.4 11.8 16.6 11.8 19.4 10.4" fill="none"
+                stroke="#c99a6e" stroke-width=".55" opacity=".5"/>
+          <path d="M6.5 8.4 C6.8 10.2 8 11.5 9.9 12.1" fill="none" stroke="#fff"
+                stroke-width=".8" stroke-linecap="round" opacity=".38"/>
+          <!-- 爪印徽记 ✓（一眼认出这是水碗 ✓） -->
+          <g fill="#c99a6e" opacity=".55">
+            <ellipse cx="12" cy="12.3" rx="1.15" ry=".9"/>
+            <circle cx="10.45" cy="10.85" r=".44"/>
+            <circle cx="12" cy="10.5" r=".44"/>
+            <circle cx="13.55" cy="10.85" r=".44"/>
+          </g>
+          <!-- 碗口 + 水面 + 水光 ✓ -->
+          <ellipse cx="12" cy="6.8" rx="9.5" ry="2.95" fill="#fbeada"
+                   stroke="#a8845a" stroke-width="1.1"/>
+          <ellipse cx="12" cy="7" rx="8.15" ry="2.3" fill="#cbe9f2"
+                   stroke="#a6cfda" stroke-width=".5"/>
+          <ellipse class="w-shimmer" cx="9.2" cy="6.25" rx="2.7" ry=".62"
+                   fill="#fff" opacity=".7"/>
+          <ellipse cx="15" cy="7.65" rx="1.7" ry=".42" fill="#eaf8fc" opacity=".8"/>
+          <ellipse class="w-ripple" cx="12" cy="7" rx="5.4" ry="1.55"
+                   fill="none" stroke="#fff" stroke-width=".85"/>
+          <ellipse class="w-ripple w-ripple2" cx="12" cy="7" rx="3" ry=".9"
+                   fill="none" stroke="#fff" stroke-width=".7"/>
+          <!-- 溅起的小水珠 ✓（只在喝的时候冒 ✓） -->
+          <g fill="#cfeaf3" stroke="#9fcbd8" stroke-width=".35">
+            <circle class="w-drop d1" cx="16.7" cy="4.5" r=".78"/>
+            <circle class="w-drop d2" cx="18.4" cy="3.4" r=".56"/>
+            <circle class="w-drop d3" cx="14.8" cy="3.3" r=".5"/>
+          </g>
         </svg>
       </div>
       <div class="cat-bowl cat-food">
-        <svg viewBox="0 0 20 13" focusable="false">
-          <ellipse cx="10" cy="11.3" rx="8.1" ry="1.4" fill="#4a2a16" opacity=".14"/>
-          <path d="M2 6.2 C2 10.8 18 10.8 18 6.2 Z" fill="#f0c39b"
-                stroke="#a8845a" stroke-width="1.2" stroke-linejoin="round"/>
-          <ellipse cx="10" cy="6.2" rx="8" ry="2.7" fill="#f8dcb8"
-                   stroke="#a8845a" stroke-width="1.2"/>
+        <svg viewBox="0 0 24 16" focusable="false">
+          <defs>
+            <linearGradient id="lgFBody" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#f4d2a9"/>
+              <stop offset="1" stop-color="#dcae7c"/>
+            </linearGradient>
+          </defs>
+          <ellipse cx="12" cy="14.4" rx="11.1" ry="1.7" fill="#4a2a16" opacity=".13"/>
+          <ellipse cx="12" cy="14.1" rx="10.8" ry="1.55" fill="#f3dcc2"
+                   stroke="#d3ab7c" stroke-width=".7"/>
+          <ellipse cx="12" cy="14.1" rx="9.6" ry="1.1" fill="none" stroke="#e2c3a0"
+                   stroke-width=".5" stroke-dasharray="1.4 1.5"/>
+          <path d="M3.4 6.8 C3.6 13.1 7.8 14.2 12 14.2 C16.2 14.2 20.4 13.1 20.6 6.8 Z"
+                fill="url(#lgFBody)" stroke="#a8845a" stroke-width="1.1"
+                stroke-linejoin="round"/>
+          <path d="M9.2 14.1 C9.6 14.9 10.6 15.2 12 15.2 C13.4 15.2 14.4 14.9 14.8 14.1"
+                fill="none" stroke="#c09569" stroke-width=".75" stroke-linecap="round"/>
+          <path d="M4.6 10.4 C7.4 11.8 16.6 11.8 19.4 10.4" fill="none"
+                stroke="#c99a6e" stroke-width=".55" opacity=".5"/>
+          <!-- 小鱼徽记 ✓（和水碗的爪印分得开 ✓） -->
+          <g fill="#bd8a56" opacity=".6">
+            <path d="M9.6 11.6 C10.4 10.4 12.6 10.4 13.4 11.4 C12.8 12.5 10.6 12.7 9.6 11.6 Z"/>
+            <path d="M13.4 11.4 l1.7 -.7 l-.2 1.5 Z"/>
+            <circle cx="10.5" cy="11.3" r=".28" fill="#fdf1e2"/>
+          </g>
+          <path d="M6.5 8.4 C6.8 10.2 8 11.5 9.9 12.1" fill="none" stroke="#fff"
+                stroke-width=".8" stroke-linecap="round" opacity=".35"/>
+          <ellipse cx="12" cy="6.8" rx="9.5" ry="2.95" fill="#f8dcb8"
+                   stroke="#a8845a" stroke-width="1.1"/>
+          <!-- 猫粮堆 + 小鱼饼干 ✓（只有吃的时候才颤 ✓） -->
           <g class="kibble">
-            <circle cx="6.2" cy="5.9" r="1.45" fill="#d99a5c"/>
-            <circle cx="9" cy="6.5" r="1.35" fill="#c8843f"/>
-            <circle cx="11.9" cy="5.6" r="1.4" fill="#d99a5c"/>
-            <circle cx="13.9" cy="6.5" r="1.2" fill="#c8843f"/>
-            <circle cx="8" cy="4.7" r="1.1" fill="#e5aa6e"/>
+            <ellipse cx="8.2" cy="6.6" rx="1.55" ry="1.15" fill="#d99a5c"/>
+            <ellipse cx="11" cy="6.9" rx="1.6" ry="1.1" fill="#c8843f"/>
+            <ellipse cx="13.8" cy="6.6" rx="1.5" ry="1.15" fill="#dda05f"/>
+            <ellipse cx="16" cy="7" rx="1.3" ry=".95" fill="#c8843f"/>
+            <ellipse cx="9.4" cy="5.4" rx="1.4" ry="1" fill="#e5aa6e"/>
+            <ellipse cx="12.2" cy="5.5" rx="1.5" ry="1.05" fill="#d9965a"/>
+            <ellipse cx="14.8" cy="5.6" rx="1.25" ry=".95" fill="#e5aa6e"/>
+            <ellipse cx="11" cy="4.4" rx="1.2" ry=".9" fill="#e8b47c"/>
+            <g fill="#fff" opacity=".4">
+              <ellipse cx="7.8" cy="6.2" rx=".45" ry=".28"/>
+              <ellipse cx="10.6" cy="6.5" rx=".45" ry=".28"/>
+              <ellipse cx="14.4" cy="5.2" rx=".4" ry=".25"/>
+            </g>
+            <g transform="rotate(-18 15.4 4.1)">
+              <path d="M13.6 4.7 C14.2 3.2 16.4 3 17.2 4.1 C16.7 5.5 14.4 5.7 13.6 4.7 Z"
+                    fill="#f0b27a" stroke="#c98a52" stroke-width=".5"/>
+              <path d="M17.2 4.1 l1.5 -1 l-.2 2.1 Z" fill="#f0b27a"
+                    stroke="#c98a52" stroke-width=".5" stroke-linejoin="round"/>
+              <circle cx="14.5" cy="4.2" r=".26" fill="#8a5330"/>
+            </g>
+          </g>
+          <!-- 撒在垫子上的碎渣 ✓ -->
+          <g class="k-crumb" fill="#c8843f">
+            <circle cx="19.2" cy="13.9" r=".62"/>
+            <circle class="c2" cx="21" cy="13.3" r=".5"/>
+            <circle class="c3" cx="17.6" cy="14.4" r=".42"/>
           </g>
         </svg>
       </div>

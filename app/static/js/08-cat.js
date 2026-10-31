@@ -142,6 +142,10 @@
     // 碗里的动静跟着心情走 ✓（水波 / 猫粮轻颤 ✓，见 app.css）
     const act = (m === 'eat' || m === 'drink') ? m : '';
     if (stage.dataset.act !== act) stage.dataset.act = act;
+    // ★ 第六版：地板也要知道心情 ✓ —— 猫窝垫子只在**睡着**的时候贴着呼吸起伏 ✓
+    //   （CSS 那边用 `#catStage[data-mood="sleep"]` 挑 ✓；别用 `:has()` ✗，
+    //    老一点儿的 WebView 不认 ✓）
+    if (stage.dataset.mood !== m) stage.dataset.mood = m;
   };
 
   // ── 走过去 ──────────────────────────────────────────────────────────
