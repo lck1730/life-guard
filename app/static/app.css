@@ -314,14 +314,85 @@
                   ⚠️ 左右两头留给碗 / 窝：`.info` 的左右各让 58px ✓（名字仍居中 ✓）。
                   ⚠️ 顶栏高度**没有地方写死** ✓：小工具帘 `--dr-top` 是 05-settings.js
                      量 header 的 rect ✓（还挂了 ResizeObserver ✓），下拉刷新也读它 ✓。
-                  ⚠️ `position:relative; z-index:2` 是给下拉刷新那颗药丸让位的 ✓。 */
-               padding:calc(var(--inset-top) + 6px) 12px 10px;
+                  ⚠️ `position:relative; z-index:2` 是给下拉刷新那颗药丸让位的 ✓。
+                  ★★ 2026-10-31 第七版：顶栏**长高 16px** ✓（41 → 57 ✓）——
+                     用户：「往墙面做点东西吧」✓。上面多出来的这截是**墙** ✓，
+                     名字那一行和猫**一个像素都没动** ✓（还压在原来的位置 ✓）。
+                     ⚠️ 高度仍然**没有地方写死** ✓ —— 小工具帘 / 下拉刷新都是
+                        量 header 的 rect ✓（05-settings.js ✓）。 */
+               padding:calc(var(--inset-top) + 22px) 12px 10px;
                display:flex; align-items:center; flex-shrink:0;
                position:relative; z-index:2; }
   header.top .info { flex:1; min-width:0; text-align:center; padding:0 58px;
                      line-height:24px; }
   header.top .gname { font-size:17px; font-weight:600; overflow:hidden;
                       text-overflow:ellipsis; white-space:nowrap; }
+
+  /* ── 房间的墙和地板（2026-10-31 第七版）──────────────────────────
+     用户：「往墙面做点东西吧」✓ —— 左边一扇小窗、右边一簇拍立得、地上一条毯子 ✓。
+     ★ 这一层在**群名和猫的后面** ✓：`#catWall{z-index:0}` ✓、
+       `.info` 本来就是 `z-index:1` ✓（见下面 2026-10-29 那段 ✓）、
+       `#catStage{z-index:3}` ✓。所以猫从窗前走过去时在窗户**前面** ✓。
+     ★ 顶栏因此从 41px 长到 57px ✓ —— 上面多出一截墙 ✓；
+       **名字和猫还在同一行** ✓（那一行本身一个像素都没动 ✓）。
+     ★ 窗 / 照片都按 `bottom` 定位 ✓ —— 不吃状态栏 inset ✓，
+       手机上有刘海时它们还是贴着地板走 ✓。
+     ⚠️ 左右都避开了名字那个 250px、会省略号的文本盒 ✓ —— 长名字也压不上来 ✓。
+     ⚠️ 减弱动效时：照片不晃、光不呼吸、星子不闪 ✓（东西都还在 ✓）。 */
+  #catWall { position:absolute; inset:0; z-index:0; pointer-events:none;
+             overflow:hidden; }
+  /* ★ 墙纸：极淡的小圆点 ✓ + 窗边一圈暖光 ✓（★ 第七版补 ✓）——
+     这一笔很轻（线色 1px、间距 26×19）✓：远看是"布纹墙" ✓，
+     近看才认得出是点点 ✓，不会在群名后面起噪点 ✗。
+     ⚠️ 用 `var(--line)` 而不是写死颜色 ✓ —— 三套主题各自协调 ✓。 */
+  #catWall::before { content:''; position:absolute; inset:0; pointer-events:none;
+                     background-image:
+                       radial-gradient(circle at 50% 50%, var(--line) 1px, transparent 1.2px),
+                       radial-gradient(150px 72px at 22px 94%, rgba(255,183,120,.10), transparent 72%),
+                       radial-gradient(130% 90% at 50% -34%, rgba(255,214,160,.09), transparent 62%);
+                     background-size:30px 22px, 100% 100%, 100% 100%;
+                     background-position:9px 4px, 0 0, 0 0;
+                     opacity:.38; }
+  /* 地板 ✓（★ 第七版补 ✓）—— 9px 一条暖木色 ✓：碗 / 窝 / 猫 / 地毯全都站上去 ✓，
+     不然上面那些东西全是"浮着"的 ✗。底色用**暖棕半透明**而不是主题变量 ✓ ——
+     三套主题下都像同一块木地板 ✓（奶霜下是浅木、夜阑 / 林深下是深木 ✓）。 */
+  #catWall .cw-floor { position:absolute; left:0; right:0; bottom:0; height:9px;
+                       pointer-events:none;
+                       background:
+                         linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 48%),
+                         linear-gradient(180deg, rgba(196,132,88,.26), rgba(140,88,58,.32));
+                       box-shadow:0 -1px 0 rgba(176,120,80,.34),
+                                  inset 0 1px 0 rgba(255,236,210,.18); }
+  /* 左：小窗 ✓（27px 宽 ✓，窗台离碗 2px ✓） */
+  #catWall .cw-win { position:absolute; left:9px; bottom:15px; width:27px;
+                     line-height:0; }
+  #catWall .cw-win svg { display:block; width:100%; height:auto; }
+  #catWall .cw-win-glow { transform-box:fill-box; transform-origin:50% 50%;
+                          animation:cwGlow 7.5s ease-in-out infinite; }
+  #catWall .cw-star { transform-box:fill-box; transform-origin:50% 50%;
+                      animation:cwStar 3.6s ease-in-out infinite; }
+  #catWall .cw-star.s2 { animation-duration:4.4s; animation-delay:-1.3s; }
+  #catWall .cw-star.s3 { animation-duration:3.1s; animation-delay:-2.1s; }
+  #catWall .cw-star.s4 { animation-duration:5.2s; animation-delay:-.7s; }
+  @keyframes cwGlow { 0%,100% { opacity:.72; transform:scale(.96); }
+                      50%     { opacity:1;   transform:scale(1.06); } }
+  @keyframes cwStar { 0%,100% { opacity:.35; transform:scale(.8); }
+                      50%     { opacity:1;   transform:scale(1.1); } }
+  /* 右：拍立得 ✓（挂在小钉子上 ✓，整簇慢慢晃 ✓ —— 绳子跟着走才对 ✓） */
+  #catWall .cw-pics { position:absolute; right:12px; bottom:30px; width:36px;
+                      line-height:0; transform-origin:50% 9%;
+                      animation:cwPicSway 8.6s ease-in-out infinite; }
+  #catWall .cw-pics svg { display:block; width:100%; height:auto; }
+  @keyframes cwPicSway { 0%,100% { transform:rotate(-1.4deg); }
+                         50%     { transform:rotate(1.4deg); } }
+  /* 地上一条小地毯 ✓（猫从上面走过 ✓ —— 只铺在中间一小段 ✓，
+     ⚠️ 别横贯整条墙 ✓：那样看着像一根搁板压在群名底下 ✗） */
+  #catWall .cw-rug { position:absolute; right:56px; bottom:0; width:64px;
+                     height:8px; line-height:0; }
+  #catWall .cw-rug svg { display:block; width:100%; height:8px; }
+  @media (prefers-reduced-motion: reduce) {
+    #catWall .cw-pics, #catWall .cw-win-glow, #catWall .cw-star { animation:none; }
+  }
 
   /* ── 顶栏那一行上的 30px 地板：左边水盆饭盆 / 右边猫窝 / 中间随便走 ──────
      ★ 2026-10-30 第三版：**不再是顶栏下面一条** ✓ —— 它压在群名那一行上 ✓。

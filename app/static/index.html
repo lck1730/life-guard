@@ -167,6 +167,185 @@
            （用户：「如果猫猫运动到昵称位置，猫猫要在昵称前面」✓）。
            ⚠️ `.info` 左右各让 58px ✓ —— 给最左的碗 / 最右的窝腾地方 ✓（名字仍居中 ✓）。
            ⚠️ 第二版"名字住上一行、地板住下一行"**作废** ✓。 -->
+    <!-- ★★ 2026-10-31 第七版：**房间里有了墙和地板** ✓
+         （用户：「往墙面做点东西吧」✓ —— 上一版我说过"下一步可以往墙面上做
+           挂画 / 小窗 / 地毯这类" ✓，他点头了 ✓）。
+         全部在**群名和猫的后面** ✓（z-index:0 ✓），一共这几样：
+           · **墙纸** ✓ —— 极淡的小圆点 + 从左上洒下来的暖光 ✓（见 app.css 的
+             `#catWall::before` ✓）；远看只是一层布纹 ✓，不跟群名抢注意力 ✓
+           · 左边一扇**小窗** ✓ —— 暖暮色的天、月牙、星子、远处屋顶的灯、窗台，
+             窗台上还摆了一盆**小绿植** ✓；窗里透出一圈暖光 ✓（慢慢呼吸 ✓）
+           · 右边一小簇**拍立得** ✓ —— 挂在灯串下面那枚小钉子上，轻轻晃 ✓
+             （一张是爱心、一张是爪印 ✓）
+           · 地上一块**圆地毯** ✓ —— 铺在名字右边、猫窝左边 ✓，猫走去窝里时
+             会踩过它 ✓。★ 画成**椭圆**而不是长条 ✗ —— 长条在地板线上像一根
+             搁板；有透视的椭圆才认得出是"躺在地上的毯子" ✓
+           · 一条 **9px 的地板** ✓ —— 碗 / 窝 / 猫 / 地毯都站在它上面 ✓。
+             ★ 这一条是后来补的 ✓：没有它，上面所有东西都像**贴纸浮在半空** ✗
+         ⚠️ 顶栏为了这面墙从 41px 长到 57px ✓ —— **名字和猫还在同一行** ✓，
+            只是它们上面多出一截墙 ✓（名字那一行本身没动 ✓）。
+         ⚠️ 两边的东西都避开名字那个 250px、**会省略号**的文本盒 ✓
+            （左边 9–36px ✓、右边贴右 12px ✓ —— 长名字也压不上来 ✓）。
+         ⚠️ 窗和照片都按 `bottom` 定位 ✓（见 app.css ✓）—— 手机上有状态栏
+            inset 时它们还是贴着地板走 ✓，不会钻进状态栏 ✓。 -->
+    <div id="catWall" aria-hidden="true">
+      <!-- 地板 ✓（★ 第七版补的 ✓）—— 碗 / 窝 / 猫 / 地毯都站在这条上 ✓。
+           没有它，窗和拍立得会像"贴纸浮在半空"✗（第一版看着就发飘 ✓）。 -->
+      <div class="cw-floor"></div>
+      <!-- 左：小窗 ✓ -->
+      <div class="cw-win">
+        <svg viewBox="0 0 30 30" focusable="false">
+          <defs>
+            <linearGradient id="cwSky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#493349"/>
+              <stop offset=".42" stop-color="#7c4a5c"/>
+              <stop offset=".72" stop-color="#c1735f"/>
+              <stop offset="1" stop-color="#f2b184"/>
+            </linearGradient>
+            <radialGradient id="cwGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0" stop-color="#ffd59a" stop-opacity=".40"/>
+              <stop offset=".6" stop-color="#ffcf92" stop-opacity=".12"/>
+              <stop offset="1" stop-color="#ffcf92" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <!-- 窗里透出来的暖光 ✓（呼吸 ✓，`.cw-win-glow` 见 app.css） -->
+          <ellipse class="cw-win-glow" cx="15" cy="15.5" rx="19" ry="16"
+                   fill="url(#cwGlow)"/>
+          <!-- 外框（拱顶 ✓） -->
+          <path d="M3 13 C3 6.6 27 6.6 27 13 L27 25.6 L3 25.6 Z"
+                fill="#f7e2c8" stroke="#b98d5f" stroke-width="1.15"/>
+          <!-- 玻璃（暮色）✓ -->
+          <path d="M5.1 13.4 C5.1 8.5 24.9 8.5 24.9 13.4 L24.9 23.4 L5.1 23.4 Z"
+                fill="url(#cwSky)"/>
+          <!-- 月牙 ✓ -->
+          <path d="M19.6 11.1 a2.1 2.1 0 1 0 2.2 3.1 a2.7 2.7 0 1 1 -2.2 -3.1 Z"
+                fill="#ffe9bd"/>
+          <!-- 星子 ✓（各自闪 ✓） -->
+          <g fill="#fff4d9">
+            <path class="cw-star s1" d="M8.4 13.2 l.42 1.02 1.1 .08 -.84 .76 .26 1.1 -.94 -.56 -.94 .56 .26 -1.1 -.84 -.76 1.1 -.08 Z"/>
+            <circle class="cw-star s2" cx="12.4" cy="10.9" r=".5"/>
+            <circle class="cw-star s3" cx="7.2" cy="17.6" r=".42"/>
+            <circle class="cw-star s4" cx="12.9" cy="19.1" r=".34"/>
+          </g>
+          <!-- 远处的屋顶 + 两盏暖灯 ✓（"有人住在外面"的那种安心感 ✓） -->
+          <g>
+            <path d="M4.6 20.5 L8.2 17.9 L11.8 20.5 L11.8 23.4 L4.6 23.4 Z"
+                  fill="#5a3547" opacity=".75"/>
+            <path d="M13.4 21.4 L16.6 19.2 L19.8 21.4 L19.8 23.4 L13.4 23.4 Z"
+                  fill="#5a3547" opacity=".6"/>
+            <path d="M21.8 21.9 L24.6 20 L25 21.9 L25 23.4 L21.8 23.4 Z"
+                  fill="#5a3547" opacity=".5"/>
+            <rect x="7.1" y="20.6" width="1.15" height="1.3" rx=".2"
+                  fill="#ffcf86" opacity=".9"/>
+            <rect x="15.6" y="21.8" width="1" height="1.1" rx=".2"
+                  fill="#ffcf86" opacity=".75"/>
+          </g>
+          <!-- 窗棂 ✓ -->
+          <path d="M15 8.9 L15 23.4" stroke="#f7e2c8" stroke-width="1.05"/>
+          <path d="M5.1 16.4 L24.9 16.4" stroke="#f7e2c8" stroke-width="1.05"/>
+          <!-- 玻璃反光 ✓ -->
+          <path d="M6.8 21.9 L10.8 13.6" stroke="#fff" stroke-width=".9"
+                opacity=".13" stroke-linecap="round"/>
+          <!-- 窗台上那盆小绿植 ✓（★ 第七版补 ✓）—— 只有 5px 宽，
+               但一下就把"窗"变成"有人住的窗" ✓（这是最便宜的一笔细节 ✓） -->
+          <g class="cw-plant">
+            <path d="M20.0 22.0 c-.2 -1.5 -1.05 -2.35 -2.1 -2.65 c.2 1.15 .9 2.25 2.1 2.65 Z"
+                  fill="#9dbb80" stroke="#6f8f58" stroke-width=".3"/>
+            <path d="M22.6 22.0 c.2 -1.6 1.1 -2.45 2.15 -2.7 c-.25 1.2 -.95 2.3 -2.15 2.7 Z"
+                  fill="#8fae74" stroke="#6f8f58" stroke-width=".3"/>
+            <path d="M21.3 21.9 c-.55 -1.4 -.55 -2.55 -.2 -3.35"
+                  fill="none" stroke="#6f8f58" stroke-width=".4" stroke-linecap="round"/>
+            <path d="M21.15 22.2 h2.35 l-.4 3.15 h-1.55 Z"
+                  fill="#c9805f" stroke="#9a5a45" stroke-width=".35"/>
+            <path d="M19.85 22.95 h4.95" stroke="#e3a183" stroke-width=".35" opacity=".8"/>
+          </g>
+          <!-- 窗台 ✓ -->
+          <rect x="1.2" y="25.4" width="27.6" height="2.8" rx="1.3"
+                fill="#fbe9d1" stroke="#b98d5f" stroke-width=".9"/>
+          <path d="M1.2 26.2 H28.8" stroke="#fff" stroke-width=".5" opacity=".5"/>
+        </svg>
+      </div>
+      <!-- 右：一小簇拍立得 ✓（挂在一枚小钉子上，慢慢晃 ✓） -->
+      <div class="cw-pics">
+        <svg viewBox="0 0 40 24" focusable="false">
+          <!-- 钉子 + 两根线 ✓ -->
+          <path d="M20 2.4 L14.6 7.9" stroke="#b08a63" stroke-width=".55"
+                stroke-linecap="round"/>
+          <path d="M20 2.4 L29.6 8.6" stroke="#b08a63" stroke-width=".55"
+                stroke-linecap="round"/>
+          <circle cx="20" cy="2.2" r=".85" fill="#a8845a"/>
+          <circle cx="20" cy="2.2" r=".32" fill="#e8c9a8" opacity=".7"/>
+          <!-- 爱心那张 ✓（歪 6° ✓） -->
+          <g class="cw-photo-a" transform="rotate(-6 13 17)">
+            <rect x="4.4" y="7.4" width="17" height="16.6" rx="1.2"
+                  fill="#fffaf2" stroke="#d9b491" stroke-width=".8"/>
+            <rect x="6.3" y="9.2" width="13.2" height="10.1" rx=".7" fill="#f5c9bd"/>
+            <path d="M12.9 16.4 c-1.35 -1.55 -4.2 -.55 -3.4 1.6
+                     c.5 1.35 2.35 2.35 3.4 3.1 c1.05 -.75 2.9 -1.75 3.4 -3.1
+                     c.8 -2.15 -2.05 -3.15 -3.4 -1.6 Z" fill="#e9756c"/>
+            <path d="M8.6 22.4 h9.2" stroke="#dcc0a3" stroke-width=".7"
+                  stroke-linecap="round" stroke-dasharray="1.1 1.3"/>
+            <path d="M11.4 20.2 h3.6" stroke="#e2cbb2" stroke-width=".55"
+                  stroke-linecap="round"/>
+            <rect x="13.1" y="6.9" width="3.1" height="2.2" rx=".6" fill="#d9ac7e"
+                  stroke="#b98d5f" stroke-width=".45"/>
+          </g>
+          <!-- 爪印那张 ✓（歪 5° ✓） -->
+          <g class="cw-photo-b" transform="rotate(5 28 17.5)">
+            <rect x="20.2" y="8.2" width="16" height="16" rx="1.1"
+                  fill="#fffaf2" stroke="#d9b491" stroke-width=".8"/>
+            <rect x="21.9" y="9.9" width="12.6" height="9.6" rx=".65" fill="#dce9ea"/>
+            <g fill="#d98f7c">
+              <ellipse cx="28.2" cy="16.4" rx="2.5" ry="2.1"/>
+              <circle cx="25.4" cy="13.6" r=".82"/>
+              <circle cx="27.4" cy="12.8" r=".9"/>
+              <circle cx="29.4" cy="12.9" r=".88"/>
+              <circle cx="31.2" cy="13.9" r=".76"/>
+            </g>
+            <path d="M24.1 22.3 h9.6" stroke="#dcc0a3" stroke-width=".7"
+                  stroke-linecap="round" stroke-dasharray="1.1 1.3"/>
+            <rect x="28.1" y="7.7" width="3" height="2.2" rx=".6" fill="#d9ac7e"
+                  stroke="#b98d5f" stroke-width=".45"/>
+          </g>
+        </svg>
+      </div>
+      <!-- 地上那块圆地毯 ✓（★ 第七版补 ✓）—— 铺在中间那两块地之间 ✓，
+           猫走到 mid1 / mid2 时就踩在它上面 ✓。
+           ★ 画成**椭圆**（不是长条 ✗）—— 长条在地板线上像一根搁板 ✗；
+             有透视的椭圆才认得出是"躺在地上"的 ✓。 -->
+      <div class="cw-rug">
+        <svg viewBox="0 0 76 10" preserveAspectRatio="none" focusable="false">
+          <defs>
+            <linearGradient id="cwRugG" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#e0aa9f"/>
+              <stop offset=".55" stop-color="#cb9189"/>
+              <stop offset="1" stop-color="#a86f6a"/>
+            </linearGradient>
+          </defs>
+          <!-- 影子 ✓ -->
+          <ellipse cx="38" cy="6.6" rx="34.5" ry="3.1" fill="rgba(90,52,40,.18)"/>
+          <!-- 两头的流苏 ✓（斜着甩出去 ✓，认得出是毛线毯 ✓） -->
+          <g stroke="#efd3c0" stroke-width=".55" stroke-linecap="round" opacity=".75">
+            <path d="M3.6 3.5 L1.2 2.4"/><path d="M3.3 5.2 L.9 4.9"/><path d="M3.6 6.9 L1.2 7.7"/>
+            <path d="M72.4 3.5 L74.8 2.4"/><path d="M72.7 5.2 L75.1 4.9"/><path d="M72.4 6.9 L74.8 7.7"/>
+          </g>
+          <!-- 毯身 ✓ + 两圈编织纹 ✓ + 中心一小块 ✓ -->
+          <ellipse cx="38" cy="5.2" rx="34" ry="4.4" fill="url(#cwRugG)"/>
+          <ellipse cx="38" cy="5.05" rx="26.5" ry="3.25" fill="none"
+                   stroke="#f2c9bb" stroke-width=".55" opacity=".5"/>
+          <ellipse cx="38" cy="5.0" rx="18.5" ry="2.2" fill="none"
+                   stroke="#955f5b" stroke-width=".5" opacity=".32"/>
+          <ellipse cx="38" cy="4.95" rx="9.5" ry="1.15" fill="#e7b3a6" opacity=".55"/>
+          <path d="M9.5 3.1 A 29 3.6 0 0 1 66.5 3.1" fill="none"
+                stroke="#fff0e6" stroke-width=".5" opacity=".38" stroke-linecap="round"/>
+          <g fill="#f7e2d5" opacity=".5">
+            <circle cx="17" cy="3.05" r=".4"/><circle cx="25" cy="2.15" r=".4"/>
+            <circle cx="34" cy="1.8" r=".4"/><circle cx="43" cy="1.8" r=".4"/>
+            <circle cx="52" cy="2.15" r=".4"/><circle cx="60" cy="3.05" r=".4"/>
+          </g>
+        </svg>
+      </div>
+    </div>
     <div class="info">
       <div class="gname" id="gname">—</div>
     </div>
