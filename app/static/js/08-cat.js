@@ -1,5 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   顶栏那只猫猫仔（2026-10-31 · 第九版：水碗 / 饭盆拿掉，左边换成猪猪 + 鸭鸭）
+   顶栏那只猫猫仔（2026-10-31 · 第十版：猪猪 / 鸭鸭也会自己过日子了）
+
+   第十版用户原话：
+     「猪猪和鸭鸭也要和猫猫一样，自己会动，会睡觉，彼此会互动」
+   → 两只小伙伴**各有一套作息** ✓（挪两步 / 东张西望 / 拍翅膀或嗅一嗅 /
+     自己蹦一下 / 打盹 ✓，见下面「猪猪 / 鸭鸭自己的日子」✓）；
+     另外隔二三十秒会**走到中间面对面** ✓（歪头看对方 + 蹦 + 冒爱心 ✓），
+     再各回各家 ✓。地盘仍锁在顶栏左边那 58px 让位里 ✓，谁也不穿过谁 ✓。
 
    第九版用户原话：
      「去掉水和食物，然后在上面添加猪猪和鸭鸭陪伴猫猫，
@@ -167,20 +174,21 @@
   // 动画在 app.css ✓）。这里只管**什么时候高兴** ✓：
   // ⚠️ 同样只在**刚进入范围**那一下触发 ✓（`frIn` 闩住 ✓）；两次隔 11s ✓。
   // ⚠️ 只有 walk / awake / look 时才高兴 ✓ —— 睡着 / 想事情 / 洗脸时不算"走过来了" ✓。
+  // ⚠️ 第十版起两只自己会走动 ✓ → 中心不再用 `offsetLeft`（那是没位移的位置 ✗），
+  //    改看它们**现在**走到哪儿了 ✓（见下面 `frCenter` ✓）；睡着的会被叫醒 ✓。
   // ⚠️ 减弱动效时**不挂** ✓（CSS 里也关了 ✓）。
-  let pigC = 0;
-  let frIn = false, frRest = 0, frTimer = null;
+  let frIn = false, frRest = 0;
   const FRIEND_NEAR = 44;     // 猫身中心离猪猪中心多近算"过来了" ✓（猪猪中心 ≈39 ✓）
   const FRIEND_COOL = 11000;  // 两次之间至少隔 11s ✓
   const FRIEND_HAPPY_MS = 1600; // 和 app.css 的 frHop(2×.62s) / frLove(1.5s) 对得上 ✓
 
-  /** 量一次玩具 / 猪猪的中心 + 猫半宽 ✓（resize 时重来 ✓）—— 逐帧别再读布局 ✗。 */
+  /** 量一次玩具的中心 + 猫半宽 ✓（resize 时重来 ✓）—— 逐帧别再读布局 ✗。 */
   const measureScene = () => {
     catHalf = catW() / 2;
     if (toyEl) toyC = toyEl.offsetLeft + toyEl.offsetWidth / 2;
-    // ★ 猪猪和猫都住在 `#catStage` 里 ✓ → offsetLeft 是同一个原点 ✓
-    //   （`#catWall` 和 `#catStage` 都是 inset:0 ✓，跟 toyC 比也成立 ✓）。
-    if (pigEl) pigC = pigEl.offsetLeft + pigEl.offsetWidth / 2;
+    // ★ 第十版：猪猪会自己走动 ✓ —— 它的中心改成**量一次"没位移"的左边** ✓，
+    //   再跟当前 offset 相加 ✓（见下面 `frMeasure` / `frCenter` ✓）。
+    //   `#catWall` 和 `#catStage` 都是 inset:0 ✓，跟 toyC 比也成立 ✓。
   };
 
   const maybeToy = () => {
@@ -203,22 +211,267 @@
   };
 
   const maybeFriends = () => {
-    if (!pigEl) return;
-    const d = Math.abs(pigC - (x + catHalf));
+    if (!pigF) return;
+    const d = Math.abs(frCenter(pigF) - (x + catHalf));
     if (d > FRIEND_NEAR) { frIn = false; return; }  // 走开了 ✓ → 下次进来还能高兴 ✓
     if (frIn) return;                              // 还在范围里 ✓ → 不重复蹦 ✓
     frIn = true;
     if (reduce()) return;
     if (mood !== 'walk' && mood !== 'awake' && mood !== 'look') return;
+    if (frMeeting) return;                         // 正在碰面 ✓ → 别打断它俩 ✓
     const now = performance.now();
     if (now < frRest) return;
     frRest = now + FRIEND_COOL;
-    friendEls.forEach((n) => { if (n) n.classList.add('happy'); });
-    frTimer = clearT(frTimer);
-    frTimer = setTimeout(() => {
-      frTimer = null;
-      friendEls.forEach((n) => { if (n) n.classList.remove('happy'); });
-    }, FRIEND_HAPPY_MS);
+    fr.forEach((f) => {
+      if (f.mood === 'sleep') {                    // 睡着的被猫猫叫醒 ✓
+        f.timer = clearT(f.timer);
+        frMood(f, 'awake');
+        frSchedule(f, rnd(5000, 9000));
+      }
+      frHappy(f);                                  // 各挂各的 ✓（第十版起会自己动 ✓）
+    });
+  };
+
+  // ── 猪猪 / 鸭鸭自己的日子（2026-10-31 第十版）──────────────────────────
+  // 用户：「猪猪和鸭鸭也要和猫猫一样，自己会动，会睡觉，彼此会互动」✓
+  // 跟猫一个路子 ✓：**CSS 管长相和动作**（只认 `data-mood` ✓，见 app.css ✓），
+  // 这里只管**什么时候干什么** ✓。两只各有一套作息 ✓，互不共用一个节拍器 ✓。
+  //
+  // 地盘：18px 各占一段 ✓ —— 顶栏左边一共只有 58px 让位 ✓，谁也不穿过谁 ✓。
+  //   鸭鸭 base 5px → off −2…+13（实际 3–18 ✓）
+  //   猪猪 base 30px → off 0…+10（实际 30–40 ✓）
+  //   碰头：鸭鸭 off +13（右沿 36）、猪猪 off +6（左沿 36）→ 刚好贴在一起 ✓。
+  //
+  // 心情（CSS 见 app.css）：awake 站着 / walk 挪两步 / look 东张西望 /
+  //   preen 拍翅膀或嗅一嗅 / sleep 趴下打盹（闭眼 + z z ✓）/ meet 面对面打招呼 ✓。
+  //
+  // ⚠️ 猫一开口（mode=user）两只就**停下待着** ✓（frHold ✓），猫办完事再接着过 ✓。
+  // ⚠️ 页面不可见 / 减弱动效 → 不动 ✓（和猫同一条规矩 ✓）。
+  // ⚠️ 猫走到旁边时，睡着的会被**叫醒**蹦一下 ✓（maybeFriends ✓ 照旧 ✓）。
+  const FR_V = 16;                  // px/s ✓（比猫的 30 还慢 ✓）
+  const FR_NAP_MS = [14000, 32000]; // 小睡一会儿 ✓（比猫短得多 ✓）
+  const fr = [
+    { key: 'duck', el: friendEls[1], lo: -2, hi: 13, meet: 13 },
+    { key: 'pig',  el: friendEls[0], lo: 0,  hi: 10, meet: 6  },
+  ].filter((d) => !!d.el).map((d) => ({
+    ...d, base: 0, w: 18, off: 0, raf: 0, timer: null, happyT: null,
+    mood: 'awake', measured: false,
+  }));
+  const duckF = fr.find((f) => f.key === 'duck');
+  const pigF = fr.find((f) => f.key === 'pig');
+  let frMeeting = false, frMeetTimer = null, frMeetStep = null;
+
+  /** 量一次"没位移时的左边" ✓（resize 重来 ✓）—— 逐帧别再读布局 ✗。 */
+  const frMeasure = () => {
+    if (!fr.length) return;
+    const s = stage.getBoundingClientRect();
+    if (s.width < 40) return;
+    fr.forEach((f) => {
+      const r = f.el.getBoundingClientRect();
+      if (!r.width) return;
+      f.w = r.width;
+      // ★ 量的时候可能正在半路 ✓ → 减掉当前的 --fr-x ✓，才是站位的原點 ✓
+      if (!f.measured) { f.base = r.left - s.left - f.off; f.measured = true; }
+    });
+  };
+  const frCenter = (f) => f.base + f.off + f.w / 2;
+  const frSetX = (f, off) => {
+    f.off = off;
+    f.el.style.setProperty('--fr-x', off.toFixed(2) + 'px');
+  };
+  const frTilt = (f, deg) => f.el.style.setProperty('--fr-tilt', deg + 'deg');
+  const frMood = (f, m) => {
+    if (f.mood === m) return;
+    f.mood = m;
+    f.el.dataset.mood = m;
+  };
+  const frStopWalk = (f) => {
+    if (f.raf) { cancelAnimationFrame(f.raf); f.raf = 0; }
+  };
+  const frHappy = (f, ms) => {
+    f.el.classList.add('happy');
+    f.happyT = clearT(f.happyT);
+    f.happyT = setTimeout(() => {
+      f.happyT = null;
+      f.el.classList.remove('happy');
+    }, ms || FRIEND_HAPPY_MS);
+  };
+
+  /** 挪到 `to` ✓（慢起慢收 ✓；就十几像素，中段也不会快到"跑"✓）。 */
+  const frWalk = (f, to, done) => {
+    frStopWalk(f);
+    const from = f.off;
+    const dist = Math.abs(to - from);
+    if (reduce() || dist < 0.6) {
+      frSetX(f, to);
+      if (done) done();
+      return;
+    }
+    frMood(f, 'walk');
+    const dur = Math.max(0.5, dist / FR_V + 0.3);
+    const t0 = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - t0) / (dur * 1000));
+      const e = t * t * (3 - 2 * t);
+      frSetX(f, from + (to - from) * e);
+      if (t < 1) { f.raf = requestAnimationFrame(tick); return; }
+      f.raf = 0;
+      if (done) done();
+    };
+    f.raf = requestAnimationFrame(tick);
+  };
+
+  const frCanAct = () => !hidden && !reduce() && mode === 'auto' && !frMeeting;
+  const frSchedule = (f, ms) => {
+    f.timer = clearT(f.timer);
+    f.timer = setTimeout(() => { f.timer = null; frAct(f); }, ms);
+  };
+
+  /** 睡够了 ✓ → 醒着待一会儿 ✓ */
+  const frWake = (f) => {
+    frTilt(f, 0);
+    frMood(f, 'awake');
+    frSchedule(f, rnd(1200, 2800));
+  };
+
+  /** 自己找点事做 ✓（懒 ✓：一部分时候干脆什么都不做 ✓）。 */
+  const frAct = (f) => {
+    if (!frCanAct()) { frSchedule(f, 2200); return; }
+    if (f.mood === 'sleep') { frWake(f); return; }
+
+    const r = Math.random();
+    if (r < 0.30) {                                   // 挪两步 ✓
+      const to = Math.max(f.lo, Math.min(f.hi, f.off + rnd(-10, 10)));
+      if (Math.abs(to - f.off) < 2.2) {
+        frMood(f, 'awake');
+        frSchedule(f, rnd(2200, 4600));
+        return;
+      }
+      frWalk(f, to, () => { frMood(f, 'awake'); frSchedule(f, rnd(2200, 5200)); });
+      return;
+    }
+    if (r < 0.55) {                                   // 东张西望 ✓
+      frMood(f, 'look');
+      frSchedule(f, rnd(2200, 4200));
+      return;
+    }
+    if (r < 0.72) {                                   // 拍翅膀 / 嗅一嗅 ✓
+      frMood(f, 'preen');
+      frSchedule(f, rnd(1800, 3200));
+      return;
+    }
+    if (r < 0.85) {                                   // 自己高兴一下 ✓
+      frHappy(f);
+      frSchedule(f, rnd(2400, 4800));
+      return;
+    }
+    if (r < 0.97) {                                   // 打个盹 ✓
+      frMood(f, 'sleep');
+      frSchedule(f, rnd(FR_NAP_MS[0], FR_NAP_MS[1]));
+      return;
+    }
+    frMood(f, 'awake');                               // 什么都不干 ✓
+    frSchedule(f, rnd(3000, 6000));
+  };
+
+  const scheduleMeet = (ms) => {
+    frMeetTimer = clearT(frMeetTimer);
+    frMeetTimer = setTimeout(tryMeet, ms == null ? rnd(24000, 52000) : ms);
+  };
+
+  const tryMeet = () => {
+    frMeetTimer = null;
+    if (hidden) return;
+    if (reduce() || mode !== 'auto' || frMeeting) {
+      scheduleMeet(rnd(10000, 20000));
+      return;
+    }
+    // 猫就在左边（陪着它们 / 趴着睡）→ 先别挤过去 ✓
+    if (pigF && Math.abs((x + catHalf) - frCenter(pigF)) < 55) {
+      scheduleMeet(rnd(12000, 24000));
+      return;
+    }
+    frMeet();
+  };
+
+  /** 两只走到中间面对面 ✓ → 歪头 + 蹦 + 爱心 ✓ → 各回各家 ✓。 */
+  const frPart = () => {
+    frMeetStep = null;
+    frMeeting = false;
+    [duckF, pigF].forEach((f) => {
+      if (!f) return;
+      frTilt(f, 0);
+      frMood(f, 'awake');
+      frWalk(f, 0, () => { frMood(f, 'awake'); frSchedule(f, rnd(2500, 6000)); });
+    });
+    scheduleMeet(rnd(26000, 55000));
+  };
+
+  const frGreet = () => {
+    if (!frMeeting || !duckF || !pigF) return;
+    frMood(duckF, 'meet');
+    frMood(pigF, 'meet');
+    frTilt(duckF, 12);         // 头往对方那边歪 ✓
+    frTilt(pigF, -12);
+    frHappy(duckF, 1300);
+    frHappy(pigF, 1300);
+    frMeetStep = clearT(frMeetStep);
+    frMeetStep = setTimeout(() => {
+      if (!frMeeting) return;
+      frHappy(duckF, 1300);
+      frHappy(pigF, 1300);
+      frMeetStep = setTimeout(frPart, rnd(1400, 2400));
+    }, 1500);
+  };
+
+  const frMeet = () => {
+    if (!duckF || !pigF) return;
+    frMeeting = true;
+    fr.forEach((f) => {
+      f.timer = clearT(f.timer);
+      f.happyT = clearT(f.happyT);
+      f.el.classList.remove('happy');
+      frStopWalk(f);
+    });
+    let left = 2;
+    const arrival = () => { left -= 1; if (left === 0) frGreet(); };
+    frWalk(duckF, duckF.meet, arrival);
+    frWalk(pigF, pigF.meet, arrival);
+  };
+
+  /** 猫开口了 / 页面藏起来了 → 两只停下待着 ✓（睡觉的照睡 ✓）。 */
+  const frHold = () => {
+    frMeeting = false;
+    frMeetTimer = clearT(frMeetTimer);
+    frMeetStep = clearT(frMeetStep);
+    fr.forEach((f) => {
+      f.timer = clearT(f.timer);
+      f.happyT = clearT(f.happyT);
+      frStopWalk(f);
+      f.el.classList.remove('happy');
+      frTilt(f, 0);
+      if (f.mood === 'meet' || f.mood === 'walk') frMood(f, 'awake');
+    });
+  };
+
+  /** 猫的事办完了 → 接着自己过日子 ✓ */
+  const frResume = () => {
+    if (hidden) return;
+    fr.forEach((f) => {
+      if (!f.timer) frSchedule(f, f.mood === 'sleep' ? rnd(8000, 16000) : rnd(2000, 6000));
+    });
+    scheduleMeet(rnd(20000, 42000));
+  };
+
+  const frInit = () => {
+    if (!fr.length) return;
+    frMeasure();
+    fr.forEach((f) => {
+      f.el.dataset.mood = 'awake';
+      f.el.style.setProperty('--fr-x', '0px');
+      frSchedule(f, rnd(4500, 9000));
+    });
+    scheduleMeet(rnd(22000, 42000));   // 头一次碰面别太早 ✓
   };
 
   // ── 心情 ────────────────────────────────────────────────────────────
@@ -496,6 +749,7 @@
     clearAuto();
     stopWalk();
     setMood('think');
+    frHold();                 // ★ 第十版：两只也停下 ✓（别在人说话时溜达 ✓）
     thinkTimer = clearT(thinkTimer);
     thinkTimer = setTimeout(() => {
       thinkTimer = null;
@@ -510,10 +764,12 @@
     thinkTimer = clearT(thinkTimer);
     stopWalk();
     setMood('awake');
+    frHold();                 // ★ 第十版：回话前后两只陪着待着 ✓
     actTimer = setTimeout(() => {
       actTimer = null;
       if (mode !== 'user') return;
       mode = 'auto';
+      frResume();             // ★ 第十版：猫的事完了，两只接着过日子 ✓
       if (spot === 'friends') {
         walkTo('mid1', () => { if (mode === 'auto') settleAndSleep(); });
       } else {
@@ -531,6 +787,7 @@
     if (!wokeOnce) {
       if (mood === 'think' || stepRaf) return;   // 让它把手上的事做完 ✓
       mode = 'auto';
+      frResume();                                // ★ 第十版：两只也继续过 ✓
       if (mood === 'sleep' || mood === 'settle') { scheduleSleep(); return; }
       settleAndSleep();
       return;
@@ -547,8 +804,9 @@
   // ── 页面不可见就别空转 ✓（动画本来也会被浏览器节流 ✓，定时器自己收 ✓）──
   document.addEventListener('visibilitychange', () => {
     hidden = document.hidden;
-    if (hidden) { clearAuto(); freeze(); return; }
+    if (hidden) { clearAuto(); freeze(); frHold(); return; }
     if (mode !== 'auto') return;
+    frResume();                 // ★ 第十版：切回来接着过 ✓
     if (mood === 'walk' || mood === 'look' || mood === 'groom' ||
         mood === 'knead' || mood === 'stretch' || mood === 'yawn') {
       setMood('sleep');
@@ -564,7 +822,8 @@
     lastW = w;
     if (w < 40) return;           // 这一屏还没显示出来 ✓（等它显示 ✓）
     freeze();
-    measureScene();               // ★ 第八 / 九版：玩具、猪猪的中心 + 猫半宽 跟着屏宽重量 ✓
+    measureScene();               // ★ 第八 / 九版：玩具的中心 + 猫半宽 跟着屏宽重量 ✓
+    frMeasure();                  // ★ 第十版：两只"没位移时的站位"也量一次 ✓
     setX(xFor(spot));
   };
   if (window.ResizeObserver) new ResizeObserver(replace).observe(stage);
@@ -582,4 +841,5 @@
   setMood('sleep');
   replace();
   scheduleSleep(rnd(12000, 22000));
+  frInit();                     // ★ 第十版：两只开始自己过日子 ✓
 })();
