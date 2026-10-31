@@ -345,6 +345,78 @@
           </g>
         </svg>
       </div>
+      <!-- ★★ 2026-10-31 第八版：**墙上一只挂着的猫猫玩具** ✓
+           （用户：「可以在合适位置摆放一个挂起来的猫猫玩具，我觉得可以放在
+             群昵称和饭的中间」✓）
+           · 位置：**群名左边缘和饭盆右边缘的中点** ✓ —— 320px 下是
+             55–81 这段空当 ✓（饭盆右沿 55 ✓、名字左沿 81 ✓），玩具 59–77 ✓，
+             两边各留 4px ✓；390px 下空当更宽（55–119 ✓），它仍然守在
+             饭盆这一侧 ✓，不会被名字压住 ✓。
+           · 挂法：墙上一枚**小木钉** ✓ + 一段绳子 ✓ + 一个**小蝴蝶结** ✓，
+             下面是**毛毡小老鼠** ✓ + 一枚**黄铜小铃铛** ✓ —— 一眼认得出是
+             逗猫玩具 ✓，而且跟碗边的鱼饼干、窝里的小鱼是同一套"手作"语气 ✓。
+           · **不挡名字** ✓：x 在名字左边那截空当里 ✓；`#catWall` 是 z-index:0 ✓，
+             猫（z3）从它前面走过时会把它挡住 ✓（物理上就该这样 ✓ ——
+             玩具钉在墙上 ✓，猫在它前头溜达 ✓）。
+           · 按 `bottom` 定位 ✓（和窗 / 照片 / 地毯一样 ✓）—— 手机上有状态栏
+             inset 时它还是贴着地板荡 ✓，不会飘到天花板上去 ✗。
+           · 动画：轻轻荡 ✓（`cwToySway` ✓）；猫走到饭盆那块、或者从它底下
+             经过时，08-cat.js 会给它挂一个 `.swish` ✓ → 荡得明显一点 ✓
+             （猫扒了一下 ✓）。⚠️ 减弱动效时**完全不动** ✓（CSS 里关 ✓、
+             JS 那边也不挂 swish ✓）。
+           ⚠️ 纯装饰 ✓ 不接手指 ✓（`pointer-events:none` 沿 `#catWall` ✓）。 -->
+      <div class="cw-toy">
+        <svg viewBox="0 0 18 28" focusable="false">
+          <!-- 小木钉 ✓（墙上的影 + 钉头 + 一点高光 ✓） -->
+          <ellipse cx="9" cy="1.6" rx="2.4" ry=".8" fill="rgba(90,52,40,.12)"/>
+          <circle cx="9" cy="2" r="1.45" fill="#c8955f" stroke="#a8845a" stroke-width=".5"/>
+          <circle cx="9" cy="2" r=".42" fill="#7d5738" opacity=".55"/>
+          <circle cx="8.55" cy="1.55" r=".4" fill="#f6e0c4" opacity=".8"/>
+          <!-- 绳子 ✓（微微歪一点 ✓，不是一根死线 ✓） -->
+          <path d="M9 3.4 C9.35 5.4 8.72 7.3 9 9.2" fill="none"
+                stroke="#b08a63" stroke-width=".5" stroke-linecap="round"/>
+          <!-- 蝴蝶结 ✓ -->
+          <path d="M9 10.1 C7.5 8.6 5.9 9.1 6.2 10.4 C6.45 11.6 8.1 11.4 9 10.4 Z"
+                fill="#e08a77" stroke="#a8695a" stroke-width=".45" stroke-linejoin="round"/>
+          <path d="M9 10.1 C10.5 8.6 12.1 9.1 11.8 10.4 C11.55 11.6 9.9 11.4 9 10.4 Z"
+                fill="#e08a77" stroke="#a8695a" stroke-width=".45" stroke-linejoin="round"/>
+          <circle cx="9" cy="10.35" r=".95" fill="#d98f7c" stroke="#a8695a" stroke-width=".4"/>
+          <!-- 毛毡小老鼠 ✓（头朝上 ✓，两只耳朵先画在身子后面 ✓） -->
+          <circle cx="5.9" cy="13" r="2" fill="#e8b3a4" stroke="#a8695a" stroke-width=".55"/>
+          <circle cx="5.9" cy="13" r="1.05" fill="#f4c1b5"/>
+          <circle cx="12.1" cy="13" r="2" fill="#e8b3a4" stroke="#a8695a" stroke-width=".55"/>
+          <circle cx="12.1" cy="13" r="1.05" fill="#f4c1b5"/>
+          <path d="M9 11.9 C12.3 11.9 14.2 14.3 14.2 17.1 C14.2 20.5 12.1 22.6 9 22.6
+                   C5.9 22.6 3.8 20.5 3.8 17.1 C3.8 14.3 5.7 11.9 9 11.9 Z"
+                fill="#d9957f" stroke="#a8695a" stroke-width=".6" stroke-linejoin="round"/>
+          <ellipse cx="9" cy="19.4" rx="2.3" ry="2.7" fill="#f6dcc8" opacity=".85"/>
+          <!-- 脸 ✓：圆眼 + 粉鼻 + ω 嘴 + 胡须 ✓（跟猫同一套画法 ✓） -->
+          <ellipse cx="7.15" cy="15.75" rx=".55" ry=".62" fill="#4e3027"/>
+          <ellipse cx="10.85" cy="15.75" rx=".55" ry=".62" fill="#4e3027"/>
+          <circle cx="7.36" cy="15.55" r=".18" fill="#fff" opacity=".85"/>
+          <circle cx="11.06" cy="15.55" r=".18" fill="#fff" opacity=".85"/>
+          <path d="M8.55 17.25 H9.45 L9 17.85 Z" fill="#cf746e"/>
+          <path d="M9 17.85 C8.7 18.35 8.25 18.35 8.05 18.15" fill="none"
+                stroke="#a8695a" stroke-width=".35" stroke-linecap="round"/>
+          <path d="M9 17.85 C9.3 18.35 9.75 18.35 9.95 18.15" fill="none"
+                stroke="#a8695a" stroke-width=".35" stroke-linecap="round"/>
+          <g stroke="#b98d5f" stroke-width=".35" stroke-linecap="round" opacity=".85">
+            <path d="M6.9 17.15 L5 16.7"/><path d="M6.85 17.75 L4.95 17.95"/>
+            <path d="M11.1 17.15 L13 16.7"/><path d="M11.15 17.75 L13.05 17.95"/>
+          </g>
+          <!-- 尾巴 ✓（往右卷一下 ✓） -->
+          <path d="M9 22.7 C9.4 25 12.1 24.8 11.8 26.9" fill="none"
+                stroke="#b98d5f" stroke-width=".8" stroke-linecap="round"/>
+          <!-- 小铃铛 ✓（自己轻轻摆 ✓，见 app.css 的 `.toy-bell` ✓） -->
+          <g class="toy-bell">
+            <path d="M9 22.8 V24.15" stroke="#b08a63" stroke-width=".4" stroke-linecap="round"/>
+            <circle cx="9" cy="25.4" r="1.35" fill="#e7b963" stroke="#b78c42" stroke-width=".5"/>
+            <path d="M9 24.35 V25.1" stroke="#b78c42" stroke-width=".35" stroke-linecap="round"/>
+            <circle cx="9" cy="26.35" r=".3" fill="#b78c42"/>
+            <circle cx="8.6" cy="25" r=".3" fill="#fff" opacity=".6"/>
+          </g>
+        </svg>
+      </div>
     </div>
     <div class="info">
       <div class="gname" id="gname">—</div>

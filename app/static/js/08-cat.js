@@ -60,6 +60,9 @@
   const waterEl = stage.querySelector('.cat-water');
   const foodEl = stage.querySelector('.cat-food');
   const bedEl = stage.querySelector('.cat-bed');
+  // ★ 第八版：墙上那只挂着的猫猫玩具 ✓（住在 #catWall 里 ✓，不是 stage 里 ✓）
+  //   —— 猫从底下过 / 去饭盆时，给它挂一个 `.swish` 让它荡一下 ✓（见下面 maybeToy）
+  const toyEl = document.querySelector('#catWall .cw-toy');
 
   const reduce = () => !!(window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -131,6 +134,45 @@
   const setX = (px) => {
     x = px;
     el.style.setProperty('--cat-x', px + 'px');
+    maybeToy();          // ★ 第八版：走到玩具底下就扒一下 ✓（见下面 maybeToy ✓）
+  };
+
+  // ── 墙上那只挂着的猫猫玩具（2026-10-31 第八版）────────────────────────
+  // 用户：「可以在合适位置摆放一个挂起来的猫猫玩具，我觉得可以放在群昵称和饭的中间」✓
+  // 位置和长相全在 index.html / app.css 里 ✓；这里只管**什么时候动** ✓：
+  // 猫走到玩具底下（去饭盆 / 喝水 / 路过）→ 给玩具挂 `.swish` 荡一下 ✓。
+  // ⚠️ 只在**刚进入范围**那一下触发 ✓（`toyIn` 闩住 ✓），不是每帧都挂 ✗。
+  // ⚠️ 两次之间隔 9s ✓ —— 不然猫在饭盆边吃饭，玩具会一直叮当响 ✗。
+  // ⚠️ 减弱动效 / 睡着的时候**不动** ✓（趴着睡还扒玩具就不像猫了 ✓）。
+  let toyC = 0, catHalf = 16.5;
+  let toyIn = false, toyRest = 0, toyTimer = null;
+  const TOY_NEAR = 34;      // 猫身中心离玩具多近算"扒得到" ✓
+  const TOY_COOL = 9000;    // 两次之间至少隔 9s ✓
+  const TOY_SWISH_MS = 2500; // 跟 app.css 的 2 段 × 1.2s 对得上 ✓
+
+  /** 量一次玩具中心 ✓（resize 时重来 ✓）—— 逐帧别再读布局 ✗。 */
+  const measureToy = () => {
+    catHalf = catW() / 2;
+    if (toyEl) toyC = toyEl.offsetLeft + toyEl.offsetWidth / 2;
+  };
+
+  const maybeToy = () => {
+    if (!toyEl) return;
+    const d = Math.abs(toyC - (x + catHalf));
+    if (d > TOY_NEAR) { toyIn = false; return; }   // 走开了 ✓ → 下次进来还能触发 ✓
+    if (toyIn) return;                             // 还在范围里 ✓ → 不重复挂 ✓
+    toyIn = true;
+    if (reduce()) return;
+    if (mood !== 'walk' && mood !== 'eat' && mood !== 'drink' && mood !== 'awake') return;
+    const now = performance.now();
+    if (now < toyRest) return;
+    toyRest = now + TOY_COOL;
+    toyEl.classList.add('swish');
+    toyTimer = clearT(toyTimer);
+    toyTimer = setTimeout(() => {
+      toyTimer = null;
+      toyEl.classList.remove('swish');
+    }, TOY_SWISH_MS);
   };
 
   // ── 心情 ────────────────────────────────────────────────────────────
@@ -479,6 +521,7 @@
     lastW = w;
     if (w < 40) return;           // 这一屏还没显示出来 ✓（等它显示 ✓）
     freeze();
+    measureToy();                 // ★ 第八版：玩具中心 / 猫半宽 跟着屏宽重量 ✓
     setX(xFor(spot));
   };
   if (window.ResizeObserver) new ResizeObserver(replace).observe(stage);

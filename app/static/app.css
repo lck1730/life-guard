@@ -390,8 +390,45 @@
   #catWall .cw-rug { position:absolute; right:56px; bottom:0; width:64px;
                      height:8px; line-height:0; }
   #catWall .cw-rug svg { display:block; width:100%; height:8px; }
+  /* ★★ 2026-10-31 第八版：墙上的**猫猫玩具** ✓（毛毡小老鼠 + 铃铛 ✓，
+     见 index.html ✓）—— 用户在它出生那天点的名：「挂在群昵称和饭的中间」✓。
+     · `left:59px; width:18px` → 占 59–77 ✓：320px 下饭盆右沿 55 ✓、名字左沿 81 ✓，
+       正好落在中间那段 26px 的空当里 ✓（两边各留 4px ✓）。
+       ⚠️ 这里**故意用固定 px**（不跟着屏宽缩放 ✗）—— 因为它是参照
+       饭盆（5–55 ✓）和名字那一截边缘定位的 ✓，不是居中装饰 ✓；
+       390px 下空当更宽（55–119 ✓），它留在饭盆这头就对了 ✓。
+     · `bottom:10px`（和窗 / 照片 / 地毯同一个参照 ✓）—— 手机上有 inset 时
+       它还是贴着地板荡 ✓，不会飘到天花板上去 ✗。
+     · 绕**钉子**转 ✓：`transform-origin` 定在钉头（顶边往下 2px ✓）——
+       下面的身子才会荡 ✓，钉子自己不动 ✓。
+     · 摆幅只有 ±2.6° ✓（猫走过才 7° ✓）—— 这是根挂着的绳儿 ✓，不是风铃 ✗。 */
+  #catWall .cw-toy { position:absolute; left:59px; bottom:10px; width:18px;
+                     line-height:0; transform-origin:50% 2px;
+                     animation:cwToySway 5.4s ease-in-out infinite; }
+  #catWall .cw-toy svg { display:block; width:100%; height:auto; overflow:visible;
+                         filter:drop-shadow(0 1px 1px rgba(80,44,26,.12)); }
+  #catWall .cw-toy .toy-bell { transform-box:fill-box; transform-origin:50% 0;
+                               animation:cwToyBell 2.7s ease-in-out infinite; }
+  @keyframes cwToySway { 0%,100% { transform:rotate(-2.6deg); }
+                         50%     { transform:rotate(2.6deg); } }
+  @keyframes cwToyBell { 0%,100% { transform:rotate(-3.2deg); }
+                         50%     { transform:rotate(3.2deg); } }
+  /* 猫从底下过 / 去饭盆 → JS 挂 `.swish`（08-cat.js ✓）：荡得明显一点 ✓，
+     像被爪子扒了一下 ✓（2.5s 后 JS 把类摘掉 ✓，自动回到上面那个轻摆 ✓）。 */
+  #catWall .cw-toy.swish { animation:cwToySwish 1.2s ease-in-out 2; }
+  @keyframes cwToySwish {
+    0%   { transform:rotate(0deg); }
+    18%  { transform:rotate(-7deg); }
+    42%  { transform:rotate(6deg); }
+    66%  { transform:rotate(-3.4deg); }
+    86%  { transform:rotate(1.8deg); }
+    100% { transform:rotate(0deg); }
+  }
   @media (prefers-reduced-motion: reduce) {
-    #catWall .cw-pics, #catWall .cw-win-glow, #catWall .cw-star { animation:none; }
+    #catWall .cw-pics, #catWall .cw-win-glow, #catWall .cw-star,
+    #catWall .cw-toy, #catWall .cw-toy .toy-bell { animation:none; }
+    /* 减弱动效时**连 swish 也不给** ✓（JS 那边也不会加 ✓，这里再兜一道 ✓） */
+    #catWall .cw-toy.swish { animation:none; }
   }
 
   /* ── 顶栏那一行上的 30px 地板：左边水盆饭盆 / 右边猫窝 / 中间随便走 ──────
