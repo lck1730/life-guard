@@ -535,132 +535,273 @@
           </g>
         </svg>
       </div>
-      <!-- 左边：猪猪 + 鸭鸭 ✓（2026-10-31 第九版）
-           用户：「去掉水和食物，然后在上面添加猪猪和鸭鸭陪伴猫猫，
-                   形象就是来自气泡的猪猪和鸭鸭形象，试试」✓
-           · 长相**照气泡贴纸那两张脸画** ✓（见 app.css 的 `.row[data-bubble]`）：
-             鸭鸭 = 鹅黄底 + 两撮呆毛 + 橙喙 + 腮红 + 星星 ✓
-             猪猪 = 樱粉底 + 斜圆耳 + 粉鼻筒（两个鼻孔）+ 腮红 + 小爱心 ✓
-             贴纸只有脑袋 ✓ —— 这里在脑袋下面补一个小圆身子 / 小脚 ✓，
-             才站得住（猫也是这么补的身子 ✓）。
-           · 尺寸 **18px**、站在地板最左边 ✓（原来是水碗 5–25 / 饭盆 35–55 ✓，
-             现在 鸭鸭 5–23 / 猪猪 30–48 ✓，中间留 7px 喘气 ✓）。
+      <!-- 左边：猪猪 + 鸭鸭 ✓（2026-11-01 第十一版：重新建模 ✓）
+           用户：「你不觉得猫猫建模很精致，猪猪鸭鸭很粗糙吗，而且个头还没有保持一致。
+                   另外交互比较生硬」✓
+           三件事一起改 ✓：
+           ① **个头**：18px → **28px** ✓（猫 33px 宽 / 30px 高 ✓）——
+              脑袋从 ~10px 长到 **18.5px** ✓，和猫那颗 ~20px 的脑袋终于一个量级 ✓；
+              全身 ~26px 高 ✓（猫 ~30px ✓——小一圈，但不"迷你"✓）。
+              两只各 28px ✓：鸭鸭 1–29、猪猪 30–58 ✓，还是原来那 58px 让位 ✓。
+           ② **建模**：照猫"拆件"的路子重画 ✓（不是只换颜色 ✓）——
+              鸭鸭：两片尾羽 / 蹼脚 + 三根趾线 / 翅膀三层羽毛 / 胸口软毛 /
+                    上喙高光 + 鼻孔 + 下喙缝 / 眼睛两颗高光 / 星星 ✓；
+              猪猪：双层耳（外耳 + 内耳 + 高光）/ 分趾蹄 / 两圈卷尾巴 /
+                    肚皮软毛 / 鼻筒高光 + 鼻孔反光 / 腮红 ✓。
+              脸**还是气泡贴纸那张** ✓ —— 坐标同一套、按 1.1 倍放大 ✓，长相没变 ✓。
+              ⚠️ 线宽从 2.4 提到 **3** ✓（28px 下 ≈ 0.84px，和猫的 0.83px 对得上 ✓；
+                 以前 18px + 2.4 → 0.43px，比猫细一半 → 看着"糊、糙"✓）。
+           ③ **交互**：见 app.css / js/08-cat.js 的第十一版注释 ✓ ——
+              蹦的时候头跟着一起蹦（`.fr-hop` ✓）、走动左右脚交替 ✓、
+              趴下前先 `settle` ✓、醒来有时伸懒腰 ✓、猫走近时眼睛跟着看 ✓、
+              两只碰面改成"靠过去 → 歪头 → 一起蹦 → 分开"✓。
            · 层序：它们 z1（在猫**后面** ✓）—— 猫走过去 / 挨着坐下时在前面 ✓。
-           · ★ 第十版起它们**自己会过日子** ✓（用户：「猪猪和鸭鸭也要和猫猫一样，
-             自己会动，会睡觉，彼此会互动」✓）：挪两步 / 东张西望 / 拍翅膀或嗅一嗅 /
-             打盹 / 定期走到中间面对面 ✓。动作写在 app.css ✓，作息在 js/08-cat.js ✓。
            · 睡着时冒 z z ✓（`.fr-zzz` ✓，平时 opacity:0 ✓）。
+           ⚠️ 给右耳 / 右翅 / 右脚做镜像时，**镜像必须放在里层 `<g>` 的 transform 上** ✓ ——
+              外层组由 CSS 动画写 `transform` ✓，写在同一层会把镜像压掉 ✓（老坑 ✓）。
            ⚠️ 不接手指 ✓（整条 `#catStage` 都是 `pointer-events:none` ✓）。 -->
       <div class="cat-friend cat-duck">
         <svg viewBox="0 0 100 100" focusable="false">
-          <ellipse cx="50" cy="96.4" rx="27" ry="3.4" fill="#4a2a16" opacity=".14"/>
-          <g class="fr-body">
-            <!-- 小脚 ✓ -->
-            <g fill="#f9a83c" stroke="#cf7d15" stroke-width="1.6" stroke-linejoin="round">
-              <path d="M35 91.4 q-6.4 1 -7.4 4 q-.3 2 3.6 2 h10.4 q2.4 0 1.2 -3.2 l-2 -3 Z"/>
-              <path d="M65 91.4 q6.4 1 7.4 4 q.3 2 -3.6 2 h-10.4 q-2.4 0 -1.2 -3.2 l2 -3 Z"/>
+          <ellipse cx="50" cy="96.2" rx="25" ry="3.1" fill="#4a2a16" opacity=".15"/>
+          <g class="fr-hop">
+            <g class="fr-body">
+              <!-- 尾羽 ✓（身后左边探出两片 ✓，比"一个圆身子"多一层 ✓） -->
+              <path d="M30.6 71.4 C22.4 67.6 16.2 61 17.4 54.2 C23.8 56 29 60.8 31.8 66.4 Z"
+                    fill="#ffd23f" stroke="#d9a01c" stroke-width="2.6"
+                    stroke-linejoin="round"/>
+              <path d="M27.4 80.6 C20.4 79.6 15.6 75.6 14.4 70.6 C20.2 70.8 25.4 73.4 29 77 Z"
+                    fill="#ffe066" stroke="#d9a01c" stroke-width="2.4"
+                    stroke-linejoin="round"/>
+              <!-- 蹼脚 ✓（画在身子**下面** ✓ → 脚踝被身子盖住 ✓；三根趾线 ✓） -->
+              <g class="fr-foot fr-foot-l">
+                <path d="M41.5 88.4 C35.6 88.8 31 91.6 30.8 94.6 C30.6 96.6 32.4 97.6 35.4 97.6
+                         L45.2 97.6 C47.2 97.6 47.8 96 46.6 94.4 C44.6 91.8 43.2 89.6 41.5 88.4 Z"
+                      fill="#f9a83c" stroke="#cf7d15" stroke-width="2.8"
+                      stroke-linejoin="round"/>
+                <path d="M33.6 96.6 L35.4 93.6 M37.6 97.4 L38.4 93.8 M41.4 97.4 L41.6 94"
+                      fill="none" stroke="#e08b1e" stroke-width="1.5"
+                      stroke-linecap="round" opacity=".75"/>
+              </g>
+              <g class="fr-foot fr-foot-r">
+                <g transform="translate(100,0) scale(-1,1)">
+                  <path d="M41.5 88.4 C35.6 88.8 31 91.6 30.8 94.6 C30.6 96.6 32.4 97.6 35.4 97.6
+                           L45.2 97.6 C47.2 97.6 47.8 96 46.6 94.4 C44.6 91.8 43.2 89.6 41.5 88.4 Z"
+                        fill="#f9a83c" stroke="#cf7d15" stroke-width="2.8"
+                        stroke-linejoin="round"/>
+                  <path d="M33.6 96.6 L35.4 93.6 M37.6 97.4 L38.4 93.8 M41.4 97.4 L41.6 94"
+                        fill="none" stroke="#e08b1e" stroke-width="1.5"
+                        stroke-linecap="round" opacity=".75"/>
+                </g>
+              </g>
+              <!-- 身子 ✓（下宽上窄的鸭梨形 ✓） -->
+              <path d="M50 53 C33.5 53 24.5 64 24.5 76.5 C24.5 88 35 93.6 50 93.6
+                       C65 93.6 75.5 88 75.5 76.5 C75.5 64 66.5 53 50 53 Z"
+                    fill="#ffe066" stroke="#d9a01c" stroke-width="3"
+                    stroke-linejoin="round"/>
+              <ellipse cx="50" cy="84.6" rx="16.6" ry="7.6" fill="#fff3b0" opacity=".6"/>
+              <path d="M26.8 76.6 C27.2 85 32.8 91.2 41 93"
+                    fill="none" stroke="#efbe35" stroke-width="3.4"
+                    stroke-linecap="round" opacity=".4"/>
+              <path d="M73.2 76.6 C72.8 85 67.2 91.2 59 93"
+                    fill="none" stroke="#efbe35" stroke-width="3.4"
+                    stroke-linecap="round" opacity=".4"/>
+              <!-- 胸口软毛 ✓（下巴底下那排小波浪 ✓） -->
+              <path d="M43.4 65.8 q2.8 3.6 5.6 .2 q2.6 3.2 5.4 -.2 q2.2 2.6 4.4 -.5"
+                    fill="none" stroke="#e8b62e" stroke-width="1.7"
+                    stroke-linecap="round" opacity=".7"/>
+              <!-- 翅膀 ✓（三层羽毛 ✓；伸懒腰 / 拍翅膀时张开 ✓） -->
+              <g class="fr-wing fr-wing-l">
+                <path d="M27.8 62.6 C22.6 67.6 21.4 76.4 25.4 82.6 C27.4 85.8 31.4 85.6 32.6 82
+                         C34 77.4 33.4 71.4 31.8 66.4 Z"
+                      fill="#ffea8f" stroke="#d9a01c" stroke-width="2.6"
+                      stroke-linejoin="round"/>
+                <path d="M25.6 71 q3.6 1.6 6.4 .8 M25.4 76.4 q4 1.4 7 .2 M26.4 81 q3.4 1 6 -.4"
+                      fill="none" stroke="#d9a01c" stroke-width="1.5"
+                      stroke-linecap="round" opacity=".6"/>
+              </g>
+              <g class="fr-wing fr-wing-r">
+                <g transform="translate(100,0) scale(-1,1)">
+                  <path d="M27.8 62.6 C22.6 67.6 21.4 76.4 25.4 82.6 C27.4 85.8 31.4 85.6 32.6 82
+                           C34 77.4 33.4 71.4 31.8 66.4 Z"
+                        fill="#ffea8f" stroke="#d9a01c" stroke-width="2.6"
+                        stroke-linejoin="round"/>
+                  <path d="M25.6 71 q3.6 1.6 6.4 .8 M25.4 76.4 q4 1.4 7 .2 M26.4 81 q3.4 1 6 -.4"
+                        fill="none" stroke="#d9a01c" stroke-width="1.5"
+                        stroke-linecap="round" opacity=".6"/>
+                </g>
+              </g>
             </g>
-            <!-- 小圆身子 ✓ -->
-            <ellipse cx="50" cy="76" rx="24" ry="18.5" fill="#ffe066"
-                     stroke="#d9a01c" stroke-width="2.4"/>
-            <!-- 翅膀 ✓ -->
-            <path d="M27.4 69.6 q-7.4 5.4 -3 12.4 q4.8 5 12.6 .8" fill="#ffea8f"
-                  stroke="#d9a01c" stroke-width="2" stroke-linecap="round"/>
-            <path d="M72.6 69.6 q7.4 5.4 3 12.4 q-4.8 5 -12.6 .8" fill="#ffea8f"
-                  stroke="#d9a01c" stroke-width="2" stroke-linecap="round"/>
-          </g>
-          <g class="fr-head">
-            <!-- 两撮呆毛（照贴纸 ✓） -->
-            <g class="fr-tuft" fill="#ffe066" stroke="#d9a01c" stroke-width="2.4"
-               stroke-linejoin="round" stroke-linecap="round">
-              <path d="M40 17 q-5-9 3-13 q-1 6 4 8 Z"/>
-              <path d="M50 14 q-1-11 8-11 q-5 4-3 9 Z"/>
-            </g>
-            <ellipse cx="50" cy="40" rx="27" ry="23.5" fill="#ffe066"
-                     stroke="#d9a01c" stroke-width="2.4"/>
-            <ellipse cx="27" cy="48" rx="5.6" ry="3.6" fill="#f9a83c" opacity=".55"/>
-            <ellipse cx="73" cy="48" rx="5.6" ry="3.6" fill="#f9a83c" opacity=".55"/>
-            <g class="fr-blink">
-              <circle cx="38" cy="35" r="4.2" fill="#4a3a1e"/>
-              <circle cx="62" cy="35" r="4.2" fill="#4a3a1e"/>
-              <circle cx="36.6" cy="33.5" r="1.4" fill="#fff"/>
-              <circle cx="60.6" cy="33.5" r="1.4" fill="#fff"/>
-            </g>
-            <path d="M37 46 q13-8 26 0 q-13 10 -26 0 Z" fill="#f9a63a"
-                  stroke="#cf7d15" stroke-width="2" stroke-linejoin="round"/>
-            <path d="M40 48.6 q10-3.6 20 0" fill="none" stroke="#cf7d15"
-                  stroke-width="1.6" stroke-linecap="round"/>
-            <!-- 星星 ✓（贴纸右上角那两颗 ✓） -->
-            <g fill="#f7c948">
-              <path d="M84 12 l2.2 5.4 5.4 2.2 -5.4 2.2 -2.2 5.4 -2.2 -5.4 -5.4 -2.2 5.4 -2.2 Z"/>
-              <circle cx="92" cy="33" r="1.8"/>
+            <g class="fr-head">
+              <!-- 两撮呆毛 ✓（照贴纸 ✓，按 1.1 倍放到新脸上 ✓） -->
+              <g class="fr-tuft" fill="#ffe066" stroke="#d9a01c" stroke-width="3"
+                 stroke-linejoin="round" stroke-linecap="round">
+                <path d="M37.9 15.4 q-5.5-9.9 3.3-14.3 q-1.1 6.6 4.4 8.8 Z"/>
+                <path d="M48.9 10.2 q-1.1-12.1 8.8-12.1 q-5.5 4.4-3.3 9.9 Z"/>
+              </g>
+              <ellipse cx="50" cy="36" rx="33" ry="28.5" fill="#ffe066"
+                       stroke="#d9a01c" stroke-width="3"/>
+              <path d="M25.4 26.6 q4.8-10.2 13.8-14.2" fill="none" stroke="#fff7c9"
+                    stroke-width="3.2" stroke-linecap="round" opacity=".55"/>
+              <ellipse cx="25.4" cy="44.6" rx="6.2" ry="4" fill="#f9a83c" opacity=".5"/>
+              <ellipse cx="74.6" cy="44.6" rx="6.2" ry="4" fill="#f9a83c" opacity=".5"/>
+              <g class="fr-blink">
+                <g class="fr-eye fr-eye-l">
+                  <circle cx="36.8" cy="29.6" r="5" fill="#4a3a1e"/>
+                  <circle cx="35.3" cy="27.9" r="1.7" fill="#fff"/>
+                  <circle cx="38.5" cy="30.8" r=".72" fill="#fff" opacity=".7"/>
+                </g>
+                <g class="fr-eye fr-eye-r">
+                  <circle cx="63.2" cy="29.6" r="5" fill="#4a3a1e"/>
+                  <circle cx="61.7" cy="27.9" r="1.7" fill="#fff"/>
+                  <circle cx="64.9" cy="30.8" r=".72" fill="#fff" opacity=".7"/>
+                </g>
+              </g>
+              <!-- 上喙 + 下喙 ✓（高光 / 鼻孔 / 嘴缝三层 ✓） -->
+              <path d="M35.7 42.6 q14.3 -8.8 28.6 0 q-14.3 11 -28.6 0 Z"
+                    fill="#f9a63a" stroke="#cf7d15" stroke-width="2.7"
+                    stroke-linejoin="round"/>
+              <path d="M41.2 40.8 q5.2-2.2 9.4-1.2" fill="none" stroke="#ffd48a"
+                    stroke-width="1.7" stroke-linecap="round" opacity=".9"/>
+              <ellipse cx="45" cy="41.9" rx="1.15" ry=".9" fill="#d9822a"/>
+              <ellipse cx="55" cy="41.9" rx="1.15" ry=".9" fill="#d9822a"/>
+              <path d="M41.4 45.4 q8.6 -3.2 17.2 0" fill="none" stroke="#cf7d15"
+                    stroke-width="1.9" stroke-linecap="round"/>
+              <!-- 星星 ✓（贴纸右上角那两颗 ✓） -->
+              <g fill="#f7c948" stroke="#e2b132" stroke-width=".8" stroke-linejoin="round">
+                <path d="M84.6 8.4 l2.9 7 7 2.9 -7 2.9 -2.9 7 -2.9-7 -7-2.9 7-2.9 Z"/>
+                <path d="M92.4 30.6 l1.5 3.6 3.6 1.5 -3.6 1.5 -1.5 3.6 -1.5-3.6 -3.6-1.5 3.6-1.5 Z"/>
+              </g>
+              <circle cx="78.6" cy="23" r="1.3" fill="#f7c948"/>
             </g>
           </g>
           <!-- 高兴时才冒的爱心 ✓ -->
           <g class="fr-love" fill="#f4888f">
             <path d="M12 32 q-3.6-5-6.6-2 q-2.2 2.3 1.7 5.8 l4.9 4.4 4.9-4.4 q3.9-3.5 1.7-5.8 q-3-3-6.6 2 Z"/>
+            <path d="M90 50 q-2.8-3.9-5.1-1.6 q-1.7 1.8 1.3 4.5 l3.8 3.4 3.8-3.4 q3-2.7 1.3-4.5 q-2.3-2.3-5.1 1.6 Z"/>
           </g>
         </svg>
-        <!-- ★ 第十版：睡着时冒的 z z ✓（平时 opacity:0 ✓；见 app.css ✓） -->
         <span class="fr-zzz" aria-hidden="true"><i>z</i><i>z</i></span>
       </div>
       <div class="cat-friend cat-pig">
         <svg viewBox="0 0 100 100" focusable="false">
-          <ellipse cx="50" cy="96.4" rx="27" ry="3.4" fill="#4a2a16" opacity=".14"/>
-          <g class="fr-body">
-            <!-- 小蹄子 ✓（cy 95.4 → 露在身子下沿外面一点点 ✓；
-                 原来 92 整个被肚子盖住了 ✗） -->
-            <g fill="#f9b8bd" stroke="#b25a62" stroke-width="1.6">
-              <ellipse cx="42" cy="95.4" rx="5.4" ry="3.4"/>
-              <ellipse cx="58" cy="95.4" rx="5.4" ry="3.4"/>
+          <ellipse cx="50" cy="96.2" rx="25" ry="3.1" fill="#4a2a16" opacity=".15"/>
+          <g class="fr-hop">
+            <g class="fr-body">
+              <!-- 小卷尾巴 ✓（身后右边绕两圈 ✓ + 一点高光 ✓） -->
+              <path d="M74.2 78.6 C82.6 78.2 85.4 70.6 79.4 68.4 C74.6 66.8 72.2 71.6 75.4 73.8
+                       C78.2 75.6 80.4 72.8 78.2 71.2"
+                    fill="none" stroke="#b25a62" stroke-width="3"
+                    stroke-linecap="round"/>
+              <path d="M76.4 76.2 C80.6 75.4 81.6 72.2 79 70.8"
+                    fill="none" stroke="#ffd3d6" stroke-width="1.1"
+                    stroke-linecap="round" opacity=".75"/>
+              <!-- 分趾小蹄子 ✓（画在身子**下面** ✓ → 蹄子只露一截 ✓） -->
+              <g class="fr-foot fr-foot-l">
+                <path d="M36.4 89.8 C35.4 92.6 36.2 95.8 38.6 96.8 C41.4 98 45.4 97.8 46.8 96.2
+                         C47.8 94.8 47.4 92 46.2 89.8 Z"
+                      fill="#f9b8bd" stroke="#b25a62" stroke-width="2.8"
+                      stroke-linejoin="round"/>
+                <path d="M41.6 91.4 v4.8" fill="none" stroke="#b25a62" stroke-width="1.5"
+                      stroke-linecap="round" opacity=".5"/>
+              </g>
+              <g class="fr-foot fr-foot-r">
+                <g transform="translate(100,0) scale(-1,1)">
+                  <path d="M36.4 89.8 C35.4 92.6 36.2 95.8 38.6 96.8 C41.4 98 45.4 97.8 46.8 96.2
+                           C47.8 94.8 47.4 92 46.2 89.8 Z"
+                        fill="#f9b8bd" stroke="#b25a62" stroke-width="2.8"
+                        stroke-linejoin="round"/>
+                  <path d="M41.6 91.4 v4.8" fill="none" stroke="#b25a62" stroke-width="1.5"
+                        stroke-linecap="round" opacity=".5"/>
+                </g>
+              </g>
+              <!-- 身子 ✓ -->
+              <path d="M50 53 C33.5 53 24.5 64 24.5 76.5 C24.5 88 35 93.6 50 93.6
+                       C65 93.6 75.5 88 75.5 76.5 C75.5 64 66.5 53 50 53 Z"
+                    fill="#ffdedf" stroke="#b25a62" stroke-width="3"
+                    stroke-linejoin="round"/>
+              <ellipse cx="50" cy="84.6" rx="16.6" ry="7.8" fill="#fff1f1" opacity=".72"/>
+              <path d="M27.2 76.6 C27.8 84.6 33.2 90.6 41.2 92.6"
+                    fill="none" stroke="#f0aab0" stroke-width="3.4"
+                    stroke-linecap="round" opacity=".4"/>
+              <path d="M72.8 76.6 C72.2 84.6 66.8 90.6 58.8 92.6"
+                    fill="none" stroke="#f0aab0" stroke-width="3.4"
+                    stroke-linecap="round" opacity=".4"/>
+              <!-- 肚皮上那圈软毛 ✓ -->
+              <path d="M43.8 90.4 C42.4 82.6 45.2 77.4 50 77.4 C54.8 77.4 57.6 82.6 56.2 90.4"
+                    fill="none" stroke="#f0b6ba" stroke-width="1.6"
+                    stroke-linecap="round" opacity=".7"/>
             </g>
-            <ellipse cx="50" cy="78" rx="24" ry="16.5" fill="#ffdedf"
-                     stroke="#b25a62" stroke-width="2.4"/>
-            <!-- 小卷尾巴 ✓ -->
-            <path d="M73.2 82 q7.6-1.4 6-6.6 q-1.6-4.4-6.2-2.4" fill="none"
-                  stroke="#b25a62" stroke-width="2" stroke-linecap="round"/>
-          </g>
-          <g class="fr-head">
-            <!-- 斜圆耳 ✓（先画 → 耳根被脸压住 ✓，和贴纸一样 ✓）
-                 ⚠️ 歪的角度放在**外层 `<g>` 的 transform 上** ✓ —— 不能留在
-                 `<ellipse>` 自己身上 ✗：app.css 的 `frEar` 动画会写 CSS
-                 `transform` ✓，而 CSS transform **压过** SVG 的 transform 属性 ✓
-                 → 耳朵会悄悄变回水平（实测过 ✓，位置对、角度没了 ✗）。 -->
-            <g transform="rotate(-40 31 20)">
-              <ellipse class="fr-ear l" cx="31" cy="20" rx="12.5" ry="9"
-                       fill="#ffd8da" stroke="#b25a62" stroke-width="2.4"
-                       stroke-linejoin="round"/>
-              <ellipse cx="32.4" cy="20" rx="7.4" ry="4.8" fill="#f9b8bd"/>
+            <g class="fr-head">
+              <!-- 双层耳 ✓（外耳 + 内耳 + 高光；耳根被脸压住 ✓）
+                   ⚠️ 镜像在里层 `<g>` 上 ✓ —— 外层 `.fr-ear` 的 transform 留给
+                      CSS 动画（frEar）✓，写在同层会被压掉 ✓（老坑 ✓）。 -->
+              <g class="fr-ear l">
+                <g transform="rotate(-16 32 18)">
+                  <path d="M32.4 26 C21.4 26 14 18.4 16 9.6 C17.8 2.8 26 2.4 31.6 8.4
+                           C35.6 12.4 36.2 21.4 32.4 26 Z"
+                        fill="#ffd8da" stroke="#b25a62" stroke-width="3"
+                        stroke-linejoin="round"/>
+                  <path d="M29.6 20.8 C23.4 20.2 19.6 15.6 20.8 11 C22 7.2 26.6 7 29.2 10.2
+                           C31.4 12.8 31.8 17.8 29.6 20.8 Z"
+                        fill="#f9b8bd"/>
+                  <path d="M22.4 12.4 q-2.2 3.4 -.8 6.4" fill="none" stroke="#ffd3d6"
+                        stroke-width="1.3" stroke-linecap="round" opacity=".8"/>
+                </g>
+              </g>
+              <g class="fr-ear r">
+                <g transform="translate(100,0) scale(-1,1) rotate(-16 32 18)">
+                  <path d="M32.4 26 C21.4 26 14 18.4 16 9.6 C17.8 2.8 26 2.4 31.6 8.4
+                           C35.6 12.4 36.2 21.4 32.4 26 Z"
+                        fill="#ffd8da" stroke="#b25a62" stroke-width="3"
+                        stroke-linejoin="round"/>
+                  <path d="M29.6 20.8 C23.4 20.2 19.6 15.6 20.8 11 C22 7.2 26.6 7 29.2 10.2
+                           C31.4 12.8 31.8 17.8 29.6 20.8 Z"
+                        fill="#f9b8bd"/>
+                  <path d="M22.4 12.4 q-2.2 3.4 -.8 6.4" fill="none" stroke="#ffd3d6"
+                        stroke-width="1.3" stroke-linecap="round" opacity=".8"/>
+                </g>
+              </g>
+              <!-- 脸 ✓（气泡贴纸那张，按 1.1 倍放大 ✓） -->
+              <ellipse cx="50" cy="36" rx="33" ry="28.5" fill="#ffdedf"
+                       stroke="#b25a62" stroke-width="3"/>
+              <path d="M25.4 26.6 q4.8-10.2 13.8-14.2" fill="none" stroke="#fff5f5"
+                    stroke-width="3.4" stroke-linecap="round" opacity=".55"/>
+              <ellipse cx="25.2" cy="45.2" rx="6.4" ry="4" fill="#ffa9b2" opacity=".8"/>
+              <ellipse cx="74.8" cy="45.2" rx="6.4" ry="4" fill="#ffa9b2" opacity=".8"/>
+              <g class="fr-blink">
+                <g class="fr-eye fr-eye-l">
+                  <circle cx="36.8" cy="29.6" r="4.9" fill="#4a2c2f"/>
+                  <circle cx="35.3" cy="27.9" r="1.7" fill="#fff"/>
+                  <circle cx="38.4" cy="30.8" r=".72" fill="#fff" opacity=".7"/>
+                </g>
+                <g class="fr-eye fr-eye-r">
+                  <circle cx="63.2" cy="29.6" r="4.9" fill="#4a2c2f"/>
+                  <circle cx="61.7" cy="27.9" r="1.7" fill="#fff"/>
+                  <circle cx="64.8" cy="30.8" r=".72" fill="#fff" opacity=".7"/>
+                </g>
+              </g>
+              <!-- 粉鼻筒 ✓（鼻梁阴影 + 高光 + 两个鼻孔 + 鼻孔反光 ✓） -->
+              <ellipse cx="50" cy="45" rx="14.4" ry="10.6" fill="#ffc2c7"
+                       stroke="#b25a62" stroke-width="2.9"/>
+              <path d="M40.4 38.6 q9.6-3.2 19.2 0" fill="none" stroke="#ff9aa6"
+                    stroke-width="1.7" stroke-linecap="round" opacity=".55"/>
+              <path d="M41.4 41.4 q3-1.6 6-1.2" fill="none" stroke="#fff0f1"
+                    stroke-width="1.6" stroke-linecap="round" opacity=".85"/>
+              <ellipse cx="44.8" cy="45" rx="2.1" ry="2.8" fill="#a04b55"/>
+              <ellipse cx="55.2" cy="45" rx="2.1" ry="2.8" fill="#a04b55"/>
+              <ellipse cx="44.2" cy="44.1" rx=".7" ry=".9" fill="#d07a84" opacity=".7"/>
+              <ellipse cx="54.6" cy="44.1" rx=".7" ry=".9" fill="#d07a84" opacity=".7"/>
+              <!-- 嘴 ✓（鼻筒下面那条笑线 ✓） -->
+              <path d="M43.6 56.4 q6.4 4.6 12.8 0" fill="none" stroke="#b25a62"
+                    stroke-width="2" stroke-linecap="round" opacity=".7"/>
             </g>
-            <g transform="rotate(40 69 20)">
-              <ellipse class="fr-ear r" cx="69" cy="20" rx="12.5" ry="9"
-                       fill="#ffd8da" stroke="#b25a62" stroke-width="2.4"
-                       stroke-linejoin="round"/>
-              <ellipse cx="67.6" cy="20" rx="7.4" ry="4.8" fill="#f9b8bd"/>
-            </g>
-            <ellipse cx="50" cy="42" rx="27" ry="24" fill="#ffdedf"
-                     stroke="#b25a62" stroke-width="2.4"/>
-            <ellipse cx="28" cy="50" rx="5.4" ry="3.4" fill="#ffa9b2" opacity=".85"/>
-            <ellipse cx="72" cy="50" rx="5.4" ry="3.4" fill="#ffa9b2" opacity=".85"/>
-            <g class="fr-blink">
-              <circle cx="38" cy="37" r="4.2" fill="#4a2c2f"/>
-              <circle cx="62" cy="37" r="4.2" fill="#4a2c2f"/>
-              <circle cx="36.6" cy="35.5" r="1.4" fill="#fff"/>
-              <circle cx="60.6" cy="35.5" r="1.4" fill="#fff"/>
-            </g>
-            <!-- 粉鼻筒 + 两个鼻孔 ✓ -->
-            <ellipse cx="50" cy="52" rx="12.5" ry="9.2" fill="#ffc2c7"
-                     stroke="#b25a62" stroke-width="2.2"/>
-            <ellipse cx="45.4" cy="52" rx="1.8" ry="2.4" fill="#a04b55"/>
-            <ellipse cx="54.6" cy="52" rx="1.8" ry="2.4" fill="#a04b55"/>
           </g>
           <!-- 高兴时才冒的爱心 ✓ -->
           <g class="fr-love" fill="#f4888f">
-            <path d="M14 30 q-3.6-5-6.6-2 q-2.2 2.3 1.7 5.8 l4.9 4.4 4.9-4.4 q3.9-3.5 1.7-5.8 q-3-3-6.6 2 Z"/>
-            <path d="M88 44 q-2.8-3.9-5.1-1.6 q-1.7 1.8 1.3 4.5 l3.8 3.4 3.8-3.4 q3-2.7 1.3-4.5 q-2.3-2.3-5.1 1.6 Z"/>
+            <path d="M12 30 q-3.6-5-6.6-2 q-2.2 2.3 1.7 5.8 l4.9 4.4 4.9-4.4 q3.9-3.5 1.7-5.8 q-3-3-6.6 2 Z"/>
+            <path d="M90 48 q-2.8-3.9-5.1-1.6 q-1.7 1.8 1.3 4.5 l3.8 3.4 3.8-3.4 q3-2.7 1.3-4.5 q-2.3-2.3-5.1 1.6 Z"/>
           </g>
         </svg>
-        <!-- ★ 第十版：睡着时冒的 z z ✓ -->
         <span class="fr-zzz" aria-hidden="true"><i>z</i><i>z</i></span>
       </div>
       <!-- 猫 ✓（2026-10-31 第五版：身子拆件 + 慢生活 ✓）

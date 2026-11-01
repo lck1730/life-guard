@@ -456,44 +456,70 @@
   [data-theme="forest"] #catStage::after {
     background:linear-gradient(0deg, rgba(0,0,0,.20), transparent); }
   #catStage .cat-friend, #catStage .cat-bed { position:absolute; bottom:0; line-height:0; }
-  /* ★ 2026-10-31 第九版：**水碗 / 饭盆拿掉了** ✓（用户：去掉水和食物 ✓）——
-     那块地方现在站的是**猪猪 + 鸭鸭** ✓（长相照气泡贴纸那两张脸 ✓）。
-     · 18px 宽：鸭鸭 5–23、猪猪 30–48 ✓（中间留 7px ✓）。
+  /* ★ 2026-11-01 第十一版：**猪猪 / 鸭鸭重新建模 + 个头对齐 + 动作重做** ✓
+     用户：「你不觉得猫猫建模很精致，猪猪鸭鸭很粗糙吗，而且个头还没有保持一致。
+             另外交互比较生硬」✓
+     · **个头**：18px → **28px** ✓（鸭鸭 1–29、猪猪 30–58 ✓ —— 还是 58px 让位 ✓；
+       猫 33px 宽 / 30px 高 ✓，它们 ~26px 高 → 小一圈但不"迷你"✓）。
+     · **线宽**：svg 里 2.4 → **3** ✓ —— 28px 下 ≈0.84px，和猫的 0.83px 对上 ✓。
+       （以前 18px + 2.4 → 0.43px ✓，比猫细一半 → 所以看着"糊 / 糙"✓。）
      · 都放 z1 —— 在猫**后面** ✓：猫走过去 / 挨着坐下时在前面 ✓。
-     · 窝还是 56px（比猫宽一圈 ✓，两边才看得见垫子和毯子 ✓），右缘离屏边 3px ✓。
+     · 窝还是 56px（右缘离屏边 3px ✓），位置没动 ✓。
      ⚠️ 左边仍是 58px 的让位 ✓（`.info` 的 padding ✓）—— 两个小朋友刚好塞满 ✓。 */
-  #catStage .cat-friend { width:18px; z-index:1;
+  #catStage .cat-friend { width:28px; z-index:1;
                           transform:translateX(var(--fr-x, 0px));
                           will-change:transform; }
-  #catStage .cat-duck { left:5px; }
+  #catStage .cat-duck { left:1px; }
   #catStage .cat-pig { left:30px; }
   #catStage .cat-bed { right:3px; width:56px; z-index:1; }
   #catStage svg { display:block; width:100%; height:auto; overflow:visible; }
   #catStage .cat-bed svg,
   #catStage .cat-friend svg { filter:drop-shadow(0 1px 1px rgba(80,44,26,.10)); }
 
-  /* —— 猪猪 / 鸭鸭的小动作 ✓（2026-10-31 第九版）——
-     和猫一个路子：**拆件** + 周期互不整除 ✓，谁也别跟谁同步 ✓。
-     · 身子：一起一伏（呼吸 ✓）；鸭鸭 4.7s、猪猪 5.6s。
-     · 眼睛：隔几秒眨一下 ✓（两个小朋友错开 ✓）。
-     · 鸭鸭的两撮呆毛慢慢摇 ✓；猪猪的两只耳朵偶尔转一转 ✓。
-     · `.happy`：猫走近时由 08-cat.js 挂上 ✓ —— 原地蹦两下 + 冒爱心 ✓，
-       1.6s 后 JS 摘掉 ✓（回了 `.fr-body` 的呼吸 ✓）。 */
+  /* —— 猪猪 / 鸭鸭的小动作 ✓（2026-11-01 第十一版）——
+     还是老分工：**CSS 只管长相和动作** ✓（认 `data-mood` ✓），
+     什么时候干什么、走到哪儿，全在 08-cat.js ✓（和猫一模一样 ✓）。
+     · 身子一起一伏（呼吸 ✓）；鸭鸭 4.7s、猪猪 5.6s（周期不整除 ✓）。
+     · 眼睛隔几秒眨一下 ✓（两只错开 ✓）。
+     · 鸭鸭呆毛慢慢摇 ✓；猪猪耳朵偶尔转 ✓。
+     · `--fr-x`    走动位移 ✓（JS 逐帧写 ✓，慢起慢收 ✓）
+     · `--fr-tilt` 歪头 ✓ / `--fr-droop` 低头 ✓ / `--fr-gaze` 眼神 ✓
+     ★ 第十一版新加的：
+       · **`.fr-hop` 把身子 + 脑袋一起包住** ✓ —— 以前 `frHop` 只挂在 `.fr-body` 上 ✗，
+         脑袋是兄弟节点、钉在原地 ✓：身子一弹、头不弹，是最"生硬"的那处 ✓。
+       · **左右脚交替** ✓（`.fr-foot-l` / `.fr-foot-r` ✓）—— 以前是整只左右晃、
+         脚不动，看着像滑步 ✓。
+       · 趴下前先 `settle` ✓（不是"啪"一下闭上眼 ✓）；醒来偶尔 `stretch` ✓。
+       · 走路时脑袋轻轻点一下 ✓（`frWalkHead` ✓）。
+       · 碰面不再"到站就歪头"✓：靠过去 → 歪头 → 一起蹦 → 慢慢分开 ✓（JS 排的 ✓）。
+     ⚠️ 位移挂在 `.cat-friend` 上 ✓ —— **别挂到 svg 上** ✗：svg 上已经有
+        walk / preen / meet 三套 transform 动画 ✓，会互相压掉 ✓。 */
   #catStage .cat-friend .fr-body { transform-box:fill-box; transform-origin:50% 100%;
                                    animation:frBreathe 5.6s ease-in-out infinite; }
   #catStage .cat-duck .fr-body { animation-duration:4.7s; }
   #catStage .cat-friend .fr-blink { transform-box:fill-box; transform-origin:50% 50%;
-                                    animation:frBlink 6.1s steps(1,end) infinite; }
+                                    animation:frBlink 6.1s steps(1,end) infinite;
+                                    transition:transform .42s ease; }
   #catStage .cat-pig .fr-blink { animation-duration:7.3s; animation-delay:-2.2s; }
   #catStage .cat-duck .fr-tuft { transform-box:fill-box; transform-origin:50% 100%;
                                  animation:frTuft 5.3s ease-in-out infinite; }
   #catStage .cat-pig .fr-ear { transform-box:fill-box; transform-origin:50% 88%;
                                animation:frEar 6.7s ease-in-out infinite; }
   #catStage .cat-pig .fr-ear.r { animation-delay:-3.1s; }
+  /* 眼神 ✓：JS 只写 `--fr-gaze` ✓，滑过去交给 CSS ✓（猫走到哪边眼睛跟到哪边 ✓） */
+  #catStage .cat-friend .fr-eye { transform:translateX(var(--fr-gaze, 0px));
+                                  transition:transform .55s cubic-bezier(.34,1.1,.5,1); }
+  /* 脚 / 翅膀的转轴 ✓（都是 SVG 用户单位 ✓） */
+  #catStage .cat-friend .fr-foot { transform-box:fill-box; transform-origin:50% 18%; }
+  #catStage .cat-duck .fr-wing { transform-box:view-box; }
+  #catStage .cat-duck .fr-wing-l { transform-origin:31px 66px; }
+  #catStage .cat-duck .fr-wing-r { transform-origin:69px 66px; }
+  #catStage .cat-friend .fr-hop { transform-box:fill-box; transform-origin:50% 100%;
+                                  transition:transform .62s cubic-bezier(.34,1.16,.44,1); }
   #catStage .cat-friend .fr-love { opacity:0; transform-box:fill-box;
                                    transform-origin:50% 100%; }
-  #catStage .cat-friend.happy .fr-body { animation:frHop .62s cubic-bezier(.3,1.4,.5,1) 2; }
-  #catStage .cat-friend.happy .fr-love { animation:frLove 1.5s ease-out 1; }
+  #catStage .cat-friend.happy .fr-hop { animation:frHop .86s cubic-bezier(.3,1.35,.5,1) 1; }
+  #catStage .cat-friend.happy .fr-love { animation:frLove 1.7s ease-out 1; }
   @keyframes frBreathe { 0%, 100% { transform:scale(1); }
                          50% { transform:scale(1.022, .982); } }
   @keyframes frBlink { 0%, 92%, 100% { transform:scaleY(1); }
@@ -504,47 +530,95 @@
                      88% { transform:rotate(-7deg); }
                      92% { transform:rotate(2.4deg); }
                      96% { transform:rotate(0); } }
-  @keyframes frHop { 0%, 100% { transform:translateY(0) scale(1); }
-                     34% { transform:translateY(-1.7px) scale(1.03,.97); }
-                     68% { transform:translateY(0) scale(.99,1.02); } }
-  @keyframes frLove { 0% { opacity:0; transform:translateY(1.5px) scale(.5); }
-                      22% { opacity:1; }
-                      100% { opacity:0; transform:translateY(-4px) scale(1); } }
+  /* 一次软软的蹦 ✓（以前蹦两下、还是只弹身子 ✓） */
+  @keyframes frHop { 0% { transform:translateY(0) scale(1); }
+                     30% { transform:translateY(-2.4px) scale(1.03,.96); }
+                     62% { transform:translateY(0) scale(.985,1.015); }
+                     82% { transform:translateY(-.5px) scale(1.005,.997); }
+                     100% { transform:translateY(0) scale(1); } }
+  @keyframes frLove { 0% { opacity:0; transform:translateY(2px) scale(.5); }
+                      18% { opacity:1; }
+                      60% { opacity:.9; }
+                      100% { opacity:0; transform:translateY(-5px) scale(1.05); } }
+  @keyframes frStepL { 0%, 46%, 100% { transform:translateY(0) rotate(0); }
+                       18% { transform:translateY(-4px) rotate(-5deg); }
+                       34% { transform:translateY(0) rotate(0); } }
+  @keyframes frStepR { 0%, 46%, 100% { transform:translateY(0) rotate(0); }
+                       68% { transform:translateY(-4px) rotate(5deg); }
+                       84% { transform:translateY(0) rotate(0); } }
+  @keyframes frWalkHead { 0%, 100% { transform:translateY(0) rotate(0); }
+                          30% { transform:translateY(1px) rotate(.8deg); }
+                          62% { transform:translateY(0) rotate(0); }
+                          82% { transform:translateY(.6px) rotate(-.6deg); } }
+  @keyframes frFlapL { 0%, 100% { transform:rotate(0); }
+                       45% { transform:rotate(22deg); }
+                       70% { transform:rotate(6deg); } }
+  @keyframes frFlapR { 0%, 100% { transform:rotate(0); }
+                       45% { transform:rotate(-22deg); }
+                       70% { transform:rotate(-6deg); } }
+  @keyframes frStretch { 0%, 100% { transform:translateY(0) scale(1,1); }
+                         35% { transform:translateY(-1.4px) scale(1.015,.975); }
+                         62% { transform:translateY(-.2px) scale(.995,1.01); } }
+  @keyframes frMeetSway { 0%, 100% { transform:translateY(0) rotate(-.8deg); }
+                          50% { transform:translateY(-.9px) rotate(.8deg); } }
 
-  /* —— 猪猪 / 鸭鸭自己的日子 ✓（2026-10-31 第十版）——
-     用户：「猪猪和鸭鸭也要和猫猫一样，自己会动，会睡觉，彼此会互动」✓
-     ★ 还是老分工：**CSS 只管长相和动作**（认 `data-mood` ✓），
-       什么时候干什么全在 08-cat.js ✓（和猫一模一样 ✓）。
-     · `--fr-x`   = 走动的位移 ✓（JS 逐帧写 ✓，慢起慢收 ✓）
-     · `--fr-tilt` = 头往哪边歪 ✓（碰面时两只各朝对方歪 8° ✓）
-     · walk   左右摆 + 小碎步 ✓
-     · look   头慢慢地左右看 ✓
-     · preen  鸭鸭拍翅膀 / 猪猪探鼻子（头快速转两下 ✓）
-     · sleep  闭眼 + 头低下去 + 身子压扁起伏 ✓（外加 z z ✓）
-     · meet   两只贴在一起 ✓：轻轻颠 + 头往对方那边歪 ✓
+  /* —— 猪猪 / 鸭鸭的日子 ✓（2026-11-01 第十一版）——
+     · walk    走起来：左右摆 + **左右脚交替** + 脑袋轻点 ✓
+     · look    头慢慢地左右看 ✓
+     · preen   鸭鸭拍翅膀 ✓ / 猪猪探头晃晃 ✓
+     · stretch 伸懒腰 ✓（鸭子翅膀张开 ✓）—— 醒来时偶尔来一下 ✓
+     · settle  趴下前那一下 ✓（0.9s 后 JS 才切到 sleep ✓）
+     · sleep   闭眼 + 头低下去 + 身子压扁起伏 ✓（外加 z z ✓）
+     · meet    两只贴在一起 ✓：轻轻晃 + 头往对方那边歪 ✓
      ⚠️ 位移挂在 `.cat-friend` 上 ✓ —— **别挂到 svg 上** ✗：svg 上已经有
         walk / preen / meet 三套 transform 动画 ✓，会互相压掉 ✓。 */
   #catStage .cat-friend .fr-head { transform-box:fill-box; transform-origin:50% 100%;
       transform:rotate(var(--fr-tilt, 0deg)) translateY(var(--fr-droop, 0px));
       transition:transform .6s cubic-bezier(.34,1.2,.42,1); }
   #catStage .cat-friend[data-mood="walk"] svg {
-      animation:frWaddle .46s ease-in-out infinite; transform-origin:50% 100%; }
+      animation:frWaddle .54s ease-in-out infinite; transform-origin:50% 100%; }
+  #catStage .cat-friend[data-mood="walk"] .fr-foot-l {
+      animation:frStepL .54s ease-in-out infinite; }
+  #catStage .cat-friend[data-mood="walk"] .fr-foot-r {
+      animation:frStepR .54s ease-in-out infinite; }
+  #catStage .cat-friend[data-mood="walk"] .fr-head {
+      animation:frWalkHead .54s ease-in-out infinite; }
   #catStage .cat-friend[data-mood="look"] .fr-head {
       animation:frLook 3.6s ease-in-out infinite; }
   #catStage .cat-friend[data-mood="preen"] svg {
       animation:frPreen .58s ease-in-out 4; transform-origin:50% 100%; }
   #catStage .cat-friend[data-mood="preen"] .fr-head {
       animation:frLook 1.2s ease-in-out infinite; }
+  #catStage .cat-duck[data-mood="preen"] .fr-wing-l {
+      animation:frFlapL .4s ease-in-out 3; }
+  #catStage .cat-duck[data-mood="preen"] .fr-wing-r {
+      animation:frFlapR .4s ease-in-out 3; }
+  #catStage .cat-friend[data-mood="stretch"] .fr-hop {
+      animation:frStretch .95s cubic-bezier(.3,1.2,.5,1) 1; }
+  #catStage .cat-friend[data-mood="stretch"] .fr-blink {
+      animation:none; transform:scaleY(.55); }
+  #catStage .cat-duck[data-mood="stretch"] .fr-wing-l {
+      animation:frFlapL .5s ease-in-out 2; }
+  #catStage .cat-duck[data-mood="stretch"] .fr-wing-r {
+      animation:frFlapR .5s ease-in-out 2; }
   #catStage .cat-friend[data-mood="meet"] svg {
-      animation:frMeetBob 1.9s ease-in-out infinite; transform-origin:50% 100%; }
+      animation:frMeetSway 2.6s ease-in-out infinite; transform-origin:50% 100%; }
+  #catStage .cat-friend[data-mood="settle"] .fr-hop {
+      transform:translateY(1.6px) scaleY(.94); }
+  #catStage .cat-friend[data-mood="settle"] .fr-head {
+      --fr-tilt:0deg; --fr-droop:1px; }
+  #catStage .cat-friend[data-mood="settle"] .fr-blink {
+      animation:none; transform:scaleY(.16); }
+  #catStage .cat-friend[data-mood="sleep"] .fr-hop {
+      transform:translateY(2.2px) scaleY(.9); }
   #catStage .cat-friend[data-mood="sleep"] .fr-body {
       animation:frSleep 6.6s ease-in-out infinite; }
   #catStage .cat-friend[data-mood="sleep"] .fr-head {
-      --fr-tilt:0deg; --fr-droop:1.8px; }
+      --fr-tilt:0deg; --fr-droop:2px; }
   #catStage .cat-friend[data-mood="sleep"] .fr-blink {
       animation:none; transform:scaleY(.12); }
   /* z z z ✓（睡着才有 ✓；字比猫的小一号 ✓，别飘出顶栏 ✓） */
-  #catStage .cat-friend .fr-zzz { position:absolute; left:6px; top:-5px;
+  #catStage .cat-friend .fr-zzz { position:absolute; left:8px; top:-7px;
       width:12px; height:10px; opacity:0; transition:opacity .4s ease;
       pointer-events:none; }
   #catStage .cat-friend[data-mood="sleep"] .fr-zzz { opacity:1; }
@@ -557,18 +631,16 @@
   #catStage .cat-duck .fr-zzz i:nth-child(2) { left:4px; bottom:3px; font-size:5px; animation-delay:2.1s; }
   #catStage .cat-pig .fr-zzz i:nth-child(1) { left:1px; bottom:0; font-size:4px; animation-delay:1.4s; }
   #catStage .cat-pig .fr-zzz i:nth-child(2) { left:5px; bottom:3px; font-size:5px; animation-delay:3.2s; }
-  @keyframes frWaddle { 0%, 100% { transform:rotate(-2.4deg) translateY(0); }
-                        25% { transform:rotate(0) translateY(-.7px); }
-                        50% { transform:rotate(2.4deg) translateY(0); }
-                        75% { transform:rotate(0) translateY(-.7px); } }
+  @keyframes frWaddle { 0%, 100% { transform:rotate(-2.6deg) translateY(0); }
+                        25% { transform:rotate(-.6deg) translateY(-.8px); }
+                        50% { transform:rotate(2.6deg) translateY(0); }
+                        75% { transform:rotate(.6deg) translateY(-.8px); } }
   @keyframes frLook { 0%, 100% { transform:rotate(-5deg); }
                       35% { transform:rotate(0); }
                       70% { transform:rotate(5deg); } }
   @keyframes frPreen { 0%, 100% { transform:rotate(0) translateY(0); }
                        25% { transform:rotate(-3.2deg) translateY(-.5px); }
                        70% { transform:rotate(3deg) translateY(0); } }
-  @keyframes frMeetBob { 0%, 100% { transform:translateY(0); }
-                         50% { transform:translateY(-.9px); } }
   @keyframes frSleep { 0%, 100% { transform:scale(1.015,.985); }
                        50% { transform:scale(1.04,.95); } }
   @keyframes frZ { 0% { opacity:0; transform:translate(0, 2px) scale(.7); }

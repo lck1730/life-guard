@@ -1,5 +1,21 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   顶栏那只猫猫仔（2026-10-31 · 第十版：猪猪 / 鸭鸭也会自己过日子了）
+   顶栏那只猫猫仔（2026-11-01 · 第十一版：猪猪 / 鸭鸭重新建模 + 动作不再硬）
+
+   第十一版用户原话：
+     「你不觉得猫猫建模很精致，猪猪鸭鸭很粗糙吗，而且个头还没有保持一致。
+       另外交互比较生硬」
+   → 三件事（长相在 index.html / app.css ✓，这一页只管**动**的第三件 ✓）：
+     ① 个头：18px → 28px ✓（见 app.css ✓；这里只把地盘跟着改掉 ✓）。
+     ② 建模：重新拆件画 ✓（见 index.html ✓），线宽 2.4 → 3 ✓。
+     ③ **动作不再硬** ✓：
+        · **眼睛跟着猫走** ✓（`frWatch` 逐帧写 `--fr-gaze` ✓）——
+          猫一走近，两只就看着它 ✓；脑袋也轻轻朝它偏 ✓。
+        · **猫来时睡着的**：先伸懒腰再高兴 ✓（不再"唰"地坐起来蹦 ✗）。
+        · **趴下前先 settle** ✓（0.9s 矮下去 ✓ 再闭眼 ✓ —— 以前是直接切 sleep ✗）。
+        · **醒来先 stretch** ✓（34% 概率 ✓）。
+        · **碰面重排** ✓：靠过去 → 站定 0.45s → 歪头 → 一起蹦 → 再歪一下 →
+          分开前各拍一下（preen ✓）→ 慢慢走回去 ✓。不再"到站就歪头 + 连蹦两下" ✗。
+        · 蹦改成**一次软软的** ✓、身子和脑袋一起弹 ✓（`.fr-hop` ✓，见 app.css ✓）。
 
    第十版用户原话：
      「猪猪和鸭鸭也要和猫猫一样，自己会动，会睡觉，彼此会互动」
@@ -133,8 +149,9 @@
     const sw = stage.clientWidth || 320;
     let px;
     if (name === 'friends') {
-      // 第九版：坐在**猪猪右手边** ✓ —— 猫的左沿离它 2px ✓（猪猪 30–48、猫 33 宽
-      // → 50–83 ✓）。320px 下名字左沿 ≈81 ✓，会压住一点点 ✓ —— 和走过去时一样 ✓，
+      // 第九版：坐在**猪猪右手边** ✓ —— 猫的左沿离它 2px ✓
+      // （第十一版：猪猪 30–58、猫 33 宽 → 60–93 ✓ —— 让位还是 58px ✓）。
+      // 320px 下名字左沿 ≈81 ✓，会压住一点点 ✓ —— 和走过去时一样 ✓，
       // 猫本来就压在名字前面 ✓（用户要的 ✓，别调回去 ✗）。
       px = pigEl ? rectIn(pigEl).right + 2 : sw * 0.15;
     } else if (name === 'bed') {
@@ -154,6 +171,7 @@
     el.style.setProperty('--cat-x', px + 'px');
     maybeToy();          // ★ 第八版：走到玩具底下就扒一下 ✓（见下面 maybeToy ✓）
     maybeFriends();      // ★ 第九版：走到猪猪 / 鸭鸭旁边 → 它俩高兴一下 ✓
+    frWatch();           // ★ 第十一版：走到哪儿，它俩的眼睛就跟到哪儿 ✓
   };
 
   // ── 墙上那只挂着的猫猫玩具（2026-10-31 第八版）────────────────────────
@@ -178,9 +196,11 @@
   //    改看它们**现在**走到哪儿了 ✓（见下面 `frCenter` ✓）；睡着的会被叫醒 ✓。
   // ⚠️ 减弱动效时**不挂** ✓（CSS 里也关了 ✓）。
   let frIn = false, frRest = 0;
-  const FRIEND_NEAR = 44;     // 猫身中心离猪猪中心多近算"过来了" ✓（猪猪中心 ≈39 ✓）
+  const FRIEND_NEAR = 44;     // 猫身中心离猪猪中心多近算"过来了" ✓
+                              // （第十一版：猪猪 28px 站 30–58 ✓，中心 ≈44 ✓；
+                              //   猫坐 friends 站 = 60–93 ✓，中心 76.5 ✓ → 32.5 ✓ 够近 ✓）
   const FRIEND_COOL = 11000;  // 两次之间至少隔 11s ✓
-  const FRIEND_HAPPY_MS = 1600; // 和 app.css 的 frHop(2×.62s) / frLove(1.5s) 对得上 ✓
+  const FRIEND_HAPPY_MS = 1800; // 和 app.css 的 frHop(.86s ×1) / frLove(1.7s) 对得上 ✓
 
   /** 量一次玩具的中心 + 猫半宽 ✓（resize 时重来 ✓）—— 逐帧别再读布局 ✗。 */
   const measureScene = () => {
@@ -223,10 +243,18 @@
     if (now < frRest) return;
     frRest = now + FRIEND_COOL;
     fr.forEach((f) => {
-      if (f.mood === 'sleep') {                    // 睡着的被猫猫叫醒 ✓
+      if (f.mood === 'sleep' || f.mood === 'settle') {
+        // ★ 第十一版：睡着的先**伸懒腰** ✓（0.9s 后再蹦 ✓）——
+        //   旧版一睁眼就蹦 ✗，那是"机器人被叫醒"✓，不是小动物 ✓。
         f.timer = clearT(f.timer);
-        frMood(f, 'awake');
-        frSchedule(f, rnd(5000, 9000));
+        frMood(f, 'stretch');
+        f.timer = setTimeout(() => {
+          f.timer = null;
+          frMood(f, 'awake');
+          frHappy(f);
+          frSchedule(f, rnd(5000, 9000));
+        }, 900);
+        return;                                    // 这次先不蹦 ✓（上面已经排好 ✓）
       }
       frHappy(f);                                  // 各挂各的 ✓（第十版起会自己动 ✓）
     });
@@ -237,10 +265,12 @@
   // 跟猫一个路子 ✓：**CSS 管长相和动作**（只认 `data-mood` ✓，见 app.css ✓），
   // 这里只管**什么时候干什么** ✓。两只各有一套作息 ✓，互不共用一个节拍器 ✓。
   //
-  // 地盘：18px 各占一段 ✓ —— 顶栏左边一共只有 58px 让位 ✓，谁也不穿过谁 ✓。
-  //   鸭鸭 base 5px → off −2…+13（实际 3–18 ✓）
-  //   猪猪 base 30px → off 0…+10（实际 30–40 ✓）
-  //   碰头：鸭鸭 off +13（右沿 36）、猪猪 off +6（左沿 36）→ 刚好贴在一起 ✓。
+  // 地盘：第十一版两只各 28px ✓ —— 顶栏左边一共只有 58px 让位 ✓，谁也不穿过谁 ✓。
+  //   鸭鸭 base 1px  → off −1…+4  （实际 0–33 ✓）
+  //   猪猪 base 30px → off −4…+2  （实际 26–60 ✓）
+  //   碰头：鸭鸭 off +6.5（身右沿 ≈28.6）、猪猪 off −6.5（身左沿 ≈30.4）
+  //         → 中间留 ~1.8px ✓（脸稍微挨着 ✓ —— 是在"贴贴"✓，不是穿模 ✓）。
+  //   ⚠️ 这两个 offset 是**照着 28px 的身宽**定的 ✓ —— 再改宽度要一起改 ✓。
   //
   // 心情（CSS 见 app.css）：awake 站着 / walk 挪两步 / look 东张西望 /
   //   preen 拍翅膀或嗅一嗅 / sleep 趴下打盹（闭眼 + z z ✓）/ meet 面对面打招呼 ✓。
@@ -251,10 +281,10 @@
   const FR_V = 16;                  // px/s ✓（比猫的 30 还慢 ✓）
   const FR_NAP_MS = [14000, 32000]; // 小睡一会儿 ✓（比猫短得多 ✓）
   const fr = [
-    { key: 'duck', el: friendEls[1], lo: -2, hi: 13, meet: 13 },
-    { key: 'pig',  el: friendEls[0], lo: 0,  hi: 10, meet: 6  },
+    { key: 'duck', el: friendEls[1], lo: -1, hi: 4,    meet: 6.5  },
+    { key: 'pig',  el: friendEls[0], lo: -4, hi: 2,    meet: -6.5 },
   ].filter((d) => !!d.el).map((d) => ({
-    ...d, base: 0, w: 18, off: 0, raf: 0, timer: null, happyT: null,
+    ...d, base: 0, w: 28, off: 0, raf: 0, timer: null, happyT: null,
     mood: 'awake', measured: false,
   }));
   const duckF = fr.find((f) => f.key === 'duck');
@@ -280,6 +310,32 @@
     f.el.style.setProperty('--fr-x', off.toFixed(2) + 'px');
   };
   const frTilt = (f, deg) => f.el.style.setProperty('--fr-tilt', deg + 'deg');
+
+  /** ★ 第十一版：眼睛（外加一点点脑袋）跟着猫走 ✓ —— 这是"不生硬"最要紧的一条 ✓。
+   *  以前它俩只有被碰到的**那一下**才动 ✓（蹦完立刻回原样 ✗），猫在旁边坐半天，
+   *  两只正眼都不看它一眼 ✗ —— 用户说的"交互生硬"有一半是这个 ✓。
+   *  · 只写两个自定义属性 ✓，**不读布局** ✓（`frCenter` 用的是量好的 base ✓）。
+   *  · `--fr-gaze` 是 **SVG 用户单位** ✓（100 的 viewBox ✓，28px 下 1 单位 ≈ 0.28px ✓）。
+   *  · 碰面时**不抢** ✓（那会儿两只只看对方 ✓，歪头由 frGreet 排 ✓）。
+   *  · 睡着 / settle 时不写 tilt ✓（CSS 也把 tilt 压成 0 ✓）；走远 → 回 0 ✓。
+   *  · 滑过去交给 CSS ✓（`.fr-eye` 0.55s / `.fr-head` 0.6s 过渡 ✓，见 app.css ✓）。 */
+  const frWatch = () => {
+    if (!fr.length || frMeeting || reduce()) return;
+    const cc = x + catHalf;
+    fr.forEach((f) => {
+      const dx = cc - frCenter(f);
+      const near = Math.abs(dx) < 92;
+      const g = near ? Math.max(-2.6, Math.min(2.6, dx / 13)) : 0;
+      f.el.style.setProperty('--fr-gaze', g.toFixed(2));
+      if (f.mood === 'walk' || f.mood === 'sleep' || f.mood === 'settle') return;
+      if (near && Math.abs(dx) < 58) {
+        frTilt(f, Math.max(-4.5, Math.min(4.5, dx / 9)).toFixed(1));
+      } else if (f.mood !== 'meet') {
+        frTilt(f, 0);
+      }
+    });
+  };
+
   const frMood = (f, m) => {
     if (f.mood === m) return;
     f.mood = m;
@@ -327,11 +383,32 @@
     f.timer = setTimeout(() => { f.timer = null; frAct(f); }, ms);
   };
 
-  /** 睡够了 ✓ → 醒着待一会儿 ✓ */
+  /** 睡够了 ✓ → 有时候先伸个懒腰 ✓（第十一版）→ 再醒着待一会儿 ✓。
+   *  ⚠️ 伸懒腰时**别同时挂 .happy** ✗ —— 两套动画都写在 `.fr-hop` 上 ✓，
+   *     后写的会压掉前一套 ✓（睡着的被叫醒那条路已经改成"先伸完再高兴"✓）。 */
   const frWake = (f) => {
     frTilt(f, 0);
+    if (Math.random() < 0.34) {
+      frMood(f, 'stretch');
+      frSchedule(f, rnd(900, 1100));
+      return;
+    }
     frMood(f, 'awake');
     frSchedule(f, rnd(1200, 2800));
+  };
+
+  /** ★ 第十一版：趴下前先**矮下去** ✓（0.9s ✓，和 app.css 的 `.fr-hop` 过渡一致 ✓），
+   *  再闭眼睡 ✓ —— 旧版是直接切 `sleep` ✗，眼睛"啪"一下就没了 ✓，硬 ✓。
+   *  ⚠️ 0.9s 里用户一开口 → frHold 会把计时器收掉 ✓ 并把这个状态收成 sleep ✓。 */
+  const frSettle = (f) => {
+    frMood(f, 'settle');
+    f.timer = clearT(f.timer);
+    f.timer = setTimeout(() => {
+      f.timer = null;
+      if (!frCanAct()) return;
+      frMood(f, 'sleep');
+      frSchedule(f, rnd(FR_NAP_MS[0], FR_NAP_MS[1]));
+    }, 900);
   };
 
   /** 自己找点事做 ✓（懒 ✓：一部分时候干脆什么都不做 ✓）。 */
@@ -365,9 +442,8 @@
       frSchedule(f, rnd(2400, 4800));
       return;
     }
-    if (r < 0.97) {                                   // 打个盹 ✓
-      frMood(f, 'sleep');
-      frSchedule(f, rnd(FR_NAP_MS[0], FR_NAP_MS[1]));
+    if (r < 0.97) {                                   // 打个盹 ✓（先 settle ✓）
+      frSettle(f);
       return;
     }
     frMood(f, 'awake');                               // 什么都不干 ✓
@@ -398,30 +474,54 @@
   const frPart = () => {
     frMeetStep = null;
     frMeeting = false;
+    // ★ 第十一版：分开前**各拍一下 / 嗅一下** ✓（0.62s ✓）——
+    //   旧版歪头一撤就拔腿走 ✗，像被喊了"解散"✓。
     [duckF, pigF].forEach((f) => {
       if (!f) return;
       frTilt(f, 0);
-      frMood(f, 'awake');
-      frWalk(f, 0, () => { frMood(f, 'awake'); frSchedule(f, rnd(2500, 6000)); });
+      f.el.style.setProperty('--fr-gaze', '0');
+      frMood(f, 'preen');
     });
+    frMeetStep = setTimeout(() => {
+      frMeetStep = null;
+      [duckF, pigF].forEach((f) => {
+        if (!f) return;
+        frMood(f, 'awake');
+        frWalk(f, 0, () => { frMood(f, 'awake'); frSchedule(f, rnd(2500, 6000)); });
+      });
+    }, 620);
     scheduleMeet(rnd(26000, 55000));
   };
 
   const frGreet = () => {
     if (!frMeeting || !duckF || !pigF) return;
+    frMeetStep = clearT(frMeetStep);
+    // ① 站定，**眼睛先看过去** ✓（头还没歪 ✓ —— 先看见、再歪头 ✓）
     frMood(duckF, 'meet');
     frMood(pigF, 'meet');
-    frTilt(duckF, 12);         // 头往对方那边歪 ✓
-    frTilt(pigF, -12);
-    frHappy(duckF, 1300);
-    frHappy(pigF, 1300);
-    frMeetStep = clearT(frMeetStep);
+    frTilt(duckF, 0);
+    frTilt(pigF, 0);
+    duckF.el.style.setProperty('--fr-gaze', '2.6');
+    pigF.el.style.setProperty('--fr-gaze', '-2.6');
+    // ② 0.45s 后才歪头 ✓（头跟着眼睛走 ✓，这才像"看见对方了"✓）
     frMeetStep = setTimeout(() => {
       if (!frMeeting) return;
-      frHappy(duckF, 1300);
-      frHappy(pigF, 1300);
-      frMeetStep = setTimeout(frPart, rnd(1400, 2400));
-    }, 1500);
+      frTilt(duckF, 9);
+      frTilt(pigF, -9);
+      // ③ 再 0.52s 才蹦 ✓（一次软的 ✓ + 一轮爱心 ✓）
+      frMeetStep = setTimeout(() => {
+        if (!frMeeting) return;
+        frHappy(duckF, 1700);
+        frHappy(pigF, 1700);
+        // ④ 蹦完再歪深一点 ✓（互相蹭一下 ✓）→ 才分开 ✓
+        frMeetStep = setTimeout(() => {
+          if (!frMeeting) return;
+          frTilt(duckF, 13);
+          frTilt(pigF, -13);
+          frMeetStep = setTimeout(frPart, rnd(1300, 2000));
+        }, 900);
+      }, 520);
+    }, 450);
   };
 
   const frMeet = () => {
@@ -450,7 +550,13 @@
       frStopWalk(f);
       f.el.classList.remove('happy');
       frTilt(f, 0);
-      if (f.mood === 'meet' || f.mood === 'walk') frMood(f, 'awake');
+      f.el.style.setProperty('--fr-gaze', '0');
+      // ★ 第十一版：半截状态要收口 ✓ —— settle 收成 sleep ✓
+      //   （不然计时器被收掉、它还半蹲着闭着眼 ✓，一直定在那儿 ✓）
+      if (f.mood === 'settle') { frMood(f, 'sleep'); return; }
+      if (f.mood === 'meet' || f.mood === 'walk' || f.mood === 'stretch') {
+        frMood(f, 'awake');
+      }
     });
   };
 
@@ -469,6 +575,7 @@
     fr.forEach((f) => {
       f.el.dataset.mood = 'awake';
       f.el.style.setProperty('--fr-x', '0px');
+      f.el.style.setProperty('--fr-gaze', '0');
       frSchedule(f, rnd(4500, 9000));
     });
     scheduleMeet(rnd(22000, 42000));   // 头一次碰面别太早 ✓
