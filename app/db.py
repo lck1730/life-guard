@@ -283,6 +283,34 @@ CREATE TABLE IF NOT EXISTS login_attempts (
     locked_until INTEGER NOT NULL DEFAULT 0    -- 锁定到期时间
 );
 
+-- ★ 2026-11-01：**「我们」—— 两个人的日常记录** ✓。
+--
+--   `us_meta` 一个群一行 ✓：在一起的那一天（默认 2024-07-17）✓。
+--   `us_moments` 一条一件小事 ✓：文字 / 照片 / 时间都在这儿 ✓。
+--
+--   ⚠️ `happened_at` 是**记录那一刻** ✓（服务端写 ✓，客户端不改 ✗）——
+--      界面按它分「今天 / 昨天 / 几月几日」✓，用户不用手填日期 ✓。
+--   ⚠️ 删除是**软删** ✓（`deleted_at` ✓）—— 手滑删掉还能捡回来 ✓，
+--      而且照片文件不会被连带清掉 ✓（文件由媒体那套统一管 ✓）。
+CREATE TABLE IF NOT EXISTS us_meta (
+    group_id    INTEGER PRIMARY KEY REFERENCES groups(id) ON DELETE CASCADE,
+    together_at TEXT    NOT NULL,              -- 本地日期，YYYY-MM-DD
+    updated_at  INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS us_moments (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    text        TEXT    NOT NULL DEFAULT '',
+    media_path  TEXT,                          -- 相对 data/media 的图片路径
+    happened_at INTEGER NOT NULL,
+    created_at  INTEGER NOT NULL,
+    deleted_at  INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_us_moments_group
+    ON us_moments(group_id, deleted_at, happened_at DESC, id DESC);
+
 -- `agent_state` 已删除（2026-10-04）。它装的是冷却时刻、当日发言预算、
 -- 提问回执窗口、沉默计数、活跃度档位——**判断闸撤掉之后这些全没了消费者**。
 -- 它从来没存过有价值的东西，所以是干净地删掉，不像 ledger_entries / group_memory

@@ -476,6 +476,12 @@
     //   ⚠️ 它**不报屏名** ✓：收掉它就回到群聊 ✓（顶栏一直是 chat ✓）。
     if ($('#drawer').classList.contains('on')) { closeDrawer(); return; }
     if ($('#sheet').classList.contains('on')) { closeSheet(); return; }
+    // ★ 2026-11-01：**「我们」**（`#us`，z-index 34 ✓）—— 它现在是屏里最高的一层 ✓。
+    //    写这一刻的那张纸住在这一屏里面 ✓ → 照"从上往下"先收纸 ✓，再按一次才退屏 ✓。
+    if ($('#usComposer') && $('#usComposer').classList.contains('on')) {
+      usCloseComposer(); return;
+    }
+    if ($('#us').classList.contains('on')) { closeUs(); return; }
     // ★ 创意工坊那几屏（2026-10-07）—— **压在管家那三屏上面** ✓：
     //   组件页 > 工坊 > 编状态 > 改资料 > 管家列表 > 群设置 ✓。
     // ⚠️ **顺序必须严格等于 z-index 从大到小** ✗→✓（2026-10-08 重排过一次）——
@@ -490,8 +496,9 @@
     //    照"z-index 从大到小"这条铁律 ✓，它必须**排在 #meEdit / #me 之前** ✓：
     //    写在后头的话（一开始就是 ✗），返回键会先关掉**下面那层「我的」** ✓，
     //    气泡页留在屏幕上纹丝不动 ✓ —— 又是"按了没反应"那个形状 ✓。
-    //    ⚠️ 现在它是**所有屏里最高的一层** ✓（32 ✓），所以在屏里排第一 ✓；
-    //      以后再有比 32 高的屏，记得插到它上面 ✓。
+    //    ⚠️ 2026-11-01 起 `#us`（34）比它高 ✓ —— 那一支已经插在**前面** ✓；
+    //      它自己仍是「我的」那一族里最高的 ✓（32 ✓）。
+    //      以后再有比 34 高的屏，记得插到 `#us` 上面 ✓。
     if ($('#bubbleSet').classList.contains('on')) { popScreen('bubbleSet'); return; }
     if ($('#meEdit').classList.contains('on')) { closeMeEdit(); return; }
     if ($('#me').classList.contains('on')) { closeMe(); return; }

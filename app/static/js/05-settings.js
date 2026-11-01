@@ -1956,6 +1956,7 @@
   const _OTHER_SCREENS = [
     '#bgSet', '#themeSet', '#bubbleSet', '#models', '#me', '#meAccount', '#meEdit',
     '#space', '#peer', '#selfIntro', '#agent', '#agentEdit', '#login', '#init',
+    '#us',
   ];
 
   const _whichScreen = () => {
@@ -2163,12 +2164,12 @@
   window.addEventListener('resize', () => _drMeasure());
   _drMeasure();
 
-  // ★ 四个键（2026-10-29 第十版/第十二版）：**只有账本是真的** ✓，其余占位 ✓。
+  // ★ 四个键（2026-10-29 第十版/第十二版）：账本 / **我们** 是真的 ✓，其余占位 ✓。
   //   以后要接真的，把 `_drAct` 里那一行换成目标页就行 ✓；加第五个键在 HTML 补一个
   //   `.dt-key` ✓（`.dr-grid` 自动换行 ✓，JS 不用动 ✓）。
   const _drAct = {
     ledger: () => openComp('bookkeeping-panel', '账本'),
-    anniv:  () => toast('纪念日 · 开发中，敬请期待'),
+    anniv:  () => openUs(),          // ★ 2026-11-01：纪念日 → 我们 ✓
     album:  () => toast('相册 · 开发中，敬请期待'),
     award:  () => toast('成就 · 开发中，敬请期待'),
   };

@@ -1080,7 +1080,7 @@
             <span class="dt-nm">账本</span>
           </button>
           <button class="dt-key" type="button" role="menuitem"
-                  data-act="anniv" aria-label="纪念日">
+                  data-act="anniv" aria-label="我们">
             <span class="dt-ico" style="--wi:var(--dr-wb)">
               <svg viewBox="0 0 24 24" width="23" height="23" fill="none"
                    stroke="currentColor" stroke-width="1.7"
@@ -1089,7 +1089,7 @@
                          1-1.5 2.4-2.6 4.3-2.6 3.3 0 5.3 3.1 4.2 6.3C19.1 15.7 12 20 12 20z"/>
               </svg>
             </span>
-            <span class="dt-nm">纪念日</span>
+            <span class="dt-nm">我们</span>
           </button>
           <button class="dt-key" type="button" role="menuitem"
                   data-act="album" aria-label="相册">
@@ -1264,6 +1264,98 @@
   </header>
   <div class="abody" id="bubbleBody"></div>
 </div>
+<!-- ★ 2026-11-01：**「我们」** —— 抽屉里原来那个「纪念日」✓。
+     两个人的日常记录：在一起的第几天 ✓、随手记下的小事 + 照片 ✓、文字搜索 ✓。
+     ⚠️ 和其它整屏子页一样 → 必须列进 `_OTHER_SCREENS` ✓、并在 `__goBack`
+        里加一支 ✓（见 `android-back-key-only-knows-settings` ✓）。
+     ⚠️ **一句功能介绍都不写** ✗（用户明确要求「不要介绍行文字」✓）——
+        这一屏上出现的每个字都是**数据**（天数 / 日期 / 谁记的 / 搜索词 ✓）。 -->
+<div class="screen ascreen us" id="us">
+  <header class="sub us-bar">
+    <button class="icon-btn back" id="usBack" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 4.5 8.5 12 15 19.5" />
+      </svg>
+    </button>
+    <h2>我们</h2>
+    <div class="spacer"></div>
+  </header>
+
+  <div class="abody us-body" id="usBody">
+    <section class="us-hero">
+      <span class="us-orb us-orb-a" aria-hidden="true"></span>
+      <span class="us-orb us-orb-b" aria-hidden="true"></span>
+      <span class="us-beat" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor">
+          <path d="M12 21s-7.5-4.6-9-8.6C1.5 8.7 3.6 5.4 7 5.4c1.9 0 3.4 1 5 2.9
+                   1.6-1.9 3.1-2.9 5-2.9 3.4 0 5.5 3.3 4 7C19.5 16.4 12 21 12 21z"/>
+        </svg>
+      </span>
+      <div class="us-hero-cap">在一起</div>
+      <div class="us-hero-days"><span id="usDays">—</span><em>天</em></div>
+      <div class="us-hero-since" id="usSince">始于 2024.7.17</div>
+    </section>
+
+    <div class="us-search" id="usSearchWrap">
+      <svg class="us-search-ico" viewBox="0 0 24 24" width="19" height="19"
+           fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" aria-hidden="true">
+        <circle cx="10.8" cy="10.8" r="6.3" />
+        <line x1="15.5" y1="15.5" x2="20" y2="20" />
+      </svg>
+      <input id="usSearch" type="search" maxlength="60" autocomplete="off"
+             enterkeyhint="search" placeholder="找一件小事" aria-label="搜索回忆">
+      <button class="us-search-x" id="usSearchClear" type="button"
+              aria-label="清空搜索" hidden>×</button>
+    </div>
+
+    <div class="us-list" id="usList"></div>
+    <button class="us-more" id="usMore" type="button" hidden>再往前翻翻</button>
+  </div>
+
+  <button class="us-fab" id="usFab" type="button" aria-label="记录这一刻">
+    <svg viewBox="0 0 24 24" width="23" height="23" fill="none"
+         stroke="currentColor" stroke-width="2.1" stroke-linecap="round">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  </button>
+
+  <div class="us-composer" id="usComposer" aria-hidden="true">
+    <div class="us-cmask" id="usCMask"></div>
+    <div class="us-csheet" role="dialog" aria-modal="true" aria-label="记录这一刻">
+      <div class="us-cgrip" aria-hidden="true"></div>
+      <div class="us-cdate">
+        <span id="usCDay">今天</span>
+        <i aria-hidden="true"></i>
+        <span id="usCTime">现在</span>
+      </div>
+      <textarea id="usText" rows="3" maxlength="2000"
+                placeholder="这一刻……" aria-label="这一刻想记住什么"></textarea>
+      <div class="us-cphoto" id="usCPhoto" hidden>
+        <img id="usCPreview" alt="">
+        <button class="us-crm" id="usCRemove" type="button" aria-label="移除照片">×</button>
+      </div>
+      <div class="us-cbar">
+        <button class="us-cpick" id="usPick" type="button">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+               stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 8.5h3l1.4-2h7.2l1.4 2h3v10H4z" />
+            <circle cx="12" cy="13" r="3.2" />
+          </svg>
+          <span>照片</span>
+        </button>
+        <button class="us-csave" id="usSave" type="button">收进回忆</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- 「我们」里选照片 ✓（和背景 / 读图那两个分开 ✓）。 -->
+<input type="file" id="fileUs" accept="image/*" hidden>
+
 <!-- 背景图选择器 —— 只收图片 ✓；真正的白名单在服务端 ✓。 -->
 <input type="file" id="fileBg" accept="image/*" hidden>
 <!-- 读图测试用的选图器 ✓ —— 在「模型 → 读图」那块半屏板子里用 ✓

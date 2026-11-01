@@ -57,6 +57,7 @@ from .api.internal import _records_spec, router as internal_router
 from .api.media import router as media_router
 from .api.shell import router as shell_router
 from .api.shell import sweep_leaving as shell_router_sweep
+from .api.us import router as us_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -126,6 +127,8 @@ app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 app.include_router(groups_router)
 app.include_router(media_router)
 app.include_router(internal_router)
+# ★ 2026-11-01：「我们」（两个人的日常记录）✓。
+app.include_router(us_router)
 # ★ 2026-10-08 合并：**「壳」那一半搬进来了** ✓（登录 / 注册 / 账号 / 生活空间 ✓）。
 #   路径一个字没改 ✓ —— 手机上缓存着老页面、老书签 ✓。
 #   ⚠️ 挂载顺序有讲究 ✗：它必须在 `groups_router` **之后** ——
