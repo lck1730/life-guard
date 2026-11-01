@@ -1,5 +1,26 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   顶栏那只猫猫仔（2026-11-01 · 第十三版：三小只别分开）
+   顶栏那只猫猫仔（2026-11-01 · 第十四版：各有各的窝）
+
+   第十四版用户原话：
+     「全都在左边扎堆了，其实可以最右边的小窝给猪猪和鸭鸭睡觉，
+       地毯给猫猫睡觉，他们也可以在其他地方玩和睡觉，不要老是在左边」
+   → 三件事：
+     ① **最右边那只猫窝归猪猪 / 鸭鸭** ✓ —— 两只现在会**一起去窝里睡** ✓
+        （`relocate` / `frZone` ✓，见下面「两只的日子」✓）。
+     ② **地毯归猫猫** ✓ —— 猫的睡觉点从窝改成**地毯中心** ✓（`spot='rug'` ✓）；
+        另外两块地只是坐着玩 ✓，困了**自己走回地毯**再趴下 ✓（`goSleep` ✓）。
+     ③ **不再老在左边** ✓ —— 两只**成对**在「左边老家 / 最右的窝」两块地方
+        轮换 ✓（joint outing ✓ —— 故意不各走各的 ✗，不然"多贴"就没了 ✓）；
+        碰面也改成**就地碰头** ✓（不再硬拽回左边老家 ✓）。
+        ⚠️ 中间**不设站** ✗ —— 群名就在正中间（≈164px ✓），站过去会把它挡掉 ✓。
+        猫的 `mid1`（45% ✓）同理删掉 ✓，只留偏左的 `mid2`（20% ✓）。
+     ⚠️ 猫去贴贴时，两只若在窝里 → 猫坐**窝左边的地毯沿** ✓，不挤进窝 ✓
+        （`xFor('friends')` 按猪猪在不在右半屏分流 ✓）。
+     ⚠️ 两只搬家时**不许**搔扰正在走过来贴贴的猫 ✓（`relocate` 见 `spot==='friends'` ✓）。
+     ⚠️ 它俩在自己窝里是**轮着打盹**的 ✓ —— 原来"睡着了不许打扰"会让搬家
+        一直排不上 ✗（实测 62s 还在窝里 ✓）→ 现在**叫醒再走** ✓（先醒 0.5–1.1s ✓）。
+     ⚠️ 地毯上的站位往右偏 **8px** ✓ —— 360 宽时名字正好贴着地毯，
+        不偏猫头会压住最后一个字 ✗（仍在地毯上 ✓）。
 
    第十三版用户原话：
      「猪猪和鸭鸭需要多贴，频率高，猫猫也可以加入，但是频率不要太高，
@@ -99,9 +120,10 @@
         而且**每一种都有"入 / 出"的过渡** ✓，不再硬切 ✗。
 
    站台（顶栏那 30px，和群名同一条线、压在名字前面，见 index.html ✓）：
-     friends 最左边：鸭鸭 + 猪猪 ✓（猫挨着它们坐 = "陪伴" ✓）
-     mid1 / mid2 中间两块地 ✓（趴下就是"趴着睡" ✓）
-     bed 最右的猫窝 ✓（默认就睡在这儿 ✓）
+     friends 老家最左边：鸭鸭 + 猪猪 ✓（猫挨着它们坐 = "陪伴" ✓）
+     rug 地毯（右半 ✓）：**猫的床** ✓（默认就睡在这儿 ✓）
+     nest 最右边的猫窝 ✓：**猪猪 / 鸭鸭的床** ✓（第十四版起 ✓）
+     ⚠️ 群名在正中间 ✓ —— 三只都**别停在它底下** ✗（挡字 ✓）
 
    规矩：
      · **用户一开口（think / 醒着）就原地站住** ✓ —— 不许把人话晾着、自己溜达 ✗
@@ -130,6 +152,9 @@
   if (!el || !stage) return;
 
   const bedEl = stage.querySelector('.cat-bed');
+  // ★ 第十四版：**地毯归猫猫睡** ✓ —— 它住在 #catWall 里（和 stage 一样 inset:0 ✓），
+  //   量中心照样能用 stage 的 rect 减 ✓（见下面 rectIn ✓）。
+  const rugEl = document.querySelector('#catWall .cw-rug');
   // ★ 第九版：左边那两只伙伴 ✓（水碗 / 饭盆拿掉以后站在这儿 ✓）
   //   猫走过去挨着坐时，它俩蹦一下 + 冒爱心 ✓（见下面 maybeFriends ✓）
   const friendEls = [stage.querySelector('.cat-pig'), stage.querySelector('.cat-duck')];
@@ -164,9 +189,9 @@
   const TRIO_GAP_MS = [75000, 120000];   // 猫下一次主动贴贴 ✓
   const TRIO_AFTER_MS = [150000, 240000];// 贴完 / 贴完睡醒之后再等多久 ✓
 
-  // ★ 第十三版：开局睡在**朋友们旁边** ✓（以前是 `bed` —— 一打开 App
-  //   三只就一头一尾，用户说的"离太远"有一半是这个 ✓）
-  let spot = 'mid1';       // 站在哪个站 ✓
+  // ★ 第十四版：开局就睡在**自己的地毯上** ✓（用户：「地毯给猫猫睡觉」✓）——
+  //   猪猪 / 鸭鸭在它右边那个窝里 ✓（见下面 frInit ✓），不再全挤左边 ✓。
+  let spot = 'rug';        // 站在哪个站 ✓（rug / mid2 / friends ✓）
   let mood = 'sleep';      // 现在什么心情 ✓（CSS 只认这一个 ✓）
   let mode = 'auto';       // auto = 自己过日子 ✓ / user = 用户的事还没完 ✓
   let x = 0;               // 现在的 --cat-x ✓
@@ -188,7 +213,11 @@
   const rectIn = (node) => {
     const r = node.getBoundingClientRect();
     const s = stage.getBoundingClientRect();
-    return { mid: r.left - s.left + r.width / 2, right: r.right - s.left };
+    return {
+      left: r.left - s.left,
+      mid: r.left - s.left + r.width / 2,
+      right: r.right - s.left,
+    };
   };
 
   const xFor = (name) => {
@@ -200,23 +229,28 @@
       //   · 猫盒 33px，但画面只占中间 ≈7–25 ✓（`viewBox` 两边是空的 ✓）；
       //     猪猪盒 28px，画面 ≈5–23 ✓。以前「盒子右沿 +2」→ 画面之间
       //     实际空了 14px ✗ —— 用户说的「猫猫孤零零」一半是这个 ✓。
-      //   · 现在猫盒左沿 = 猪猪盒右沿 − 10 → 猫脸左边正好贴到猪猪脸右边 ✓
+      //   · 猫盒左沿 = 猪猪盒右沿 − 10 → 猫脸左边正好贴到猪猪脸右边 ✓
       //     （头挨着头 ✓，猫在 z2、压在前面 ✓，不是在穿模 ✓）。
-      //   ⚠️ 不卡 58px 那条线 ✓ —— 三只并排本来就该比让位宽一点 ✓；
-      //     猫本来就压在名字前面 ✓（用户要的 ✓，别调回去 ✗）。
-      px = pigEl ? rectIn(pigEl).right - 10 : sw * 0.15;
-    } else if (name === 'bed') {
-      px = rectIn(bedEl).mid - w * 0.5;
-    } else if (name === 'mid1') {
-      // ★ 第十三版：**贴着朋友们坐** ✓ —— 不再按屏宽取 36% ✗（那是名字左边，
-      //   离猪猪 ~50px，看着还是"各玩各的"✓）。锚在猪猪右沿 +4 ✓：
-      //   猫盒 33px、画面占中间 ≈7–25 ✓ → 猫脸离猪猪脸 ~10px ✓（挨着、没穿模 ✓）。
-      px = pigEl ? rectIn(pigEl).right + 4 : sw * 0.22;
+      //   ★ 第十四版：猪猪要是跑到**右半屏**（窝里去了 ✓）→ 右边没地方站 ✗，
+      //     猫改坐**窝左边的窝沿 / 地毯右端** ✓（`bed left − 猫宽 + 12` ✓）——
+      //     正好趴在地毯上陪它们 ✓，不挤进 56px 的窝里 ✓。
+      if (pigEl && rectIn(pigEl).mid > sw / 2) {
+        const bedLeft = bedEl ? rectIn(bedEl).left : sw - 59;
+        px = bedLeft - w + 12;
+      } else {
+        px = pigEl ? rectIn(pigEl).right - 10 : sw * 0.15;
+      }
+    } else if (name === 'rug') {
+      // ★ 第十四版：**地毯中心** ✓（用户：「地毯给猫猫睡觉」✓）
+      //   ⚠️ 再往右偏 8px ✓：390 宽有 16px 余量 ✓，360 宽名字正好贴着地毯 ✓
+      //   （名字居中、宽 ≈164 ✓），不偏的话猫头会压住最后一个字 ✗。
+      //   仍在地毯上 ✓（地毯 64 宽、猫 33 ✓，右边还剩 7px ✓）。
+      px = (rugEl ? rectIn(rugEl).mid : sw * 0.7) - w * 0.5 + 8;
     } else {                                  // mid2
-      // 再往外一点点，但还在这团人边上 ✓（猪猪右沿 +18 ✓，不是屏宽 60% ✗）
-      //   ★ 第十三版第一稿是 +36 ✓ —— 截出来看猫脸离猪猪 ~45px ✗，
-      //     还是在"各站各的"✓；+18 以后离猪猪脸 ~30px ✓，群名也不挤 ✓。
-      px = pigEl ? rectIn(pigEl).right + 18 : sw * 0.2;
+      // ★ 第十四版：只留**偏左这一块** ✓（20% ✓）—— 离老家那两只近，
+      //   但不压在它们身上 ✓。**不能放中间** ✗ —— 群名就在正中间，
+      //   猫蹲在 45% 会把"鼻子"两个字挡掉 ✓（和两只的 mid 一个道理 ✓）。
+      px = sw * 0.20 - w * 0.5;
     }
     // ★ 左边放宽到 0 ✓（旧版卡在 2px → 脸对不准碗 ✓；现在朋友们在 5–48 ✓，
     //   `friends` 站要贴着猪猪 ✓ —— 卡死左边就会把它推歪 ✓）
@@ -339,17 +373,26 @@
   // ⚠️ 猫走到旁边时，睡着的会被**叫醒**蹦一下 ✓（maybeFriends ✓ 照旧 ✓）。
   const FR_V = 16;                  // px/s ✓（比猫的 30 还慢 ✓）
   const FR_NAP_MS = [14000, 32000]; // 小睡一会儿 ✓（比猫短得多 ✓）
+  // ★ 第十四版：两只**成对**换地方 ✓ —— 家（左边老家）/ nest（最右边的窝 ✓）。
+  //   每 60–100s 换一块 ✓（隔着 330px ✓，40–75s 会变成一半时间都在赶路 ✗）；
+  //   换的时候一起走 ✓（不各走各的 ✗ —— 用户之前要的"多贴"就是靠它俩待在一起 ✓）。
+  //   ⚠️ **中间那块不要了** ✗ —— 群名就在正中间（≈164px 宽 ✓），
+  //   两只站在那儿正好压住头两个字 ✗（80s 截图里"大象"被挡没了 ✓）。
+  const ZONE_GAP_MS = [60000, 100000];
+  const FR_W = 28;
   const fr = [
-    { key: 'duck', el: friendEls[1], lo: -1, hi: 3,    meet: 6.5  },
-    { key: 'pig',  el: friendEls[0], lo: -3, hi: 1,    meet: -6.5 },
+    { key: 'duck', el: friendEls[1] },
+    { key: 'pig',  el: friendEls[0] },
   ].filter((d) => !!d.el).map((d) => ({
-    ...d, base: 0, w: 28, off: 0, raf: 0, timer: null, happyT: null,
-    mood: 'awake', measured: false,
+    ...d, base: 0, w: FR_W, off: 0, raf: 0, timer: null, happyT: null,
+    mood: 'awake', measured: false, zone: 'home',
   }));
   const duckF = fr.find((f) => f.key === 'duck');
   const pigF = fr.find((f) => f.key === 'pig');
   let frMeeting = false, frMeetTimer = null, frMeetStep = null;
   let nuzzleRest = 0;   // ★ 第十三版：两只蹭猫**共用**的冷却 ✓（见 frAct ✓）
+  let frZone = 'home';  // ★ 第十四版：两只现在待在哪块地方 ✓（三选一 ✓）
+  let zoneTimer = null; // 下一次一起换地方 ✓
 
   // ★ 第十二版：三只凑一起 ✓
   //   frSnugging = 猫正在蹭它们 ✓（这会儿两只只负责靠过去眯眼 ✓，不许自己溜达 ✗）
@@ -379,6 +422,27 @@
     f.el.style.setProperty('--fr-x', off.toFixed(2) + 'px');
   };
   const frTilt = (f, deg) => f.el.style.setProperty('--fr-tilt', deg + 'deg');
+
+  // ── ★ 第十四版：三块地方 ✓ ──────────────────────────────────────────
+  // `off` 是相对**老家**的位移 ✓（base 就是 CSS 里那只的 left ✓，见 frMeasure ✓）。
+  //   home  : 0        → 鸭 1px / 猪 30px（老站位 ✓）
+  //   nest  : 窝里 ✓ —— 鸭 贴窝左沿 +1 ✓ / 猪 再往右一只 ✓（两只正好塞满 56px ✓）
+  // ⚠️ 只有这两块 ✓ —— 中间是**群名**（见 ZONE_GAP_MS 上面那条 ✓）。
+  const frLeft = (f) => f.base + f.off;
+  const zoneTarget = (f, zone) => {
+    const sw = stage.clientWidth || 320;
+    const second = f.key === 'duck' ? 0 : FR_W + 1;
+    if (zone === 'nest') {
+      const bedLeft = bedEl ? rectIn(bedEl).left : sw - 59;
+      return bedLeft + 1 + second - f.base;
+    }
+    return 0;                              // home ✓
+  };
+  /** 在当前这块地方能蹭多远 ✓（窝里几乎不动 ✓，老家能逛几步 ✓）。 */
+  const zoneRange = (f) => {
+    if (f.zone === 'nest') return [zoneTarget(f, 'nest') - 1, zoneTarget(f, 'nest') + 1];
+    return f.key === 'duck' ? [-1, 3] : [-3, 1];   // 老家的老范围 ✓
+  };
 
   /** ★ 第十一版：眼睛（外加一点点脑袋）跟着猫走 ✓ —— 这是"不生硬"最要紧的一条 ✓。
    *  以前它俩只有被碰到的**那一下**才动 ✓（蹦完立刻回原样 ✗），猫在旁边坐半天，
@@ -576,9 +640,17 @@
       return;
     }
 
+    // ★ 第十四版：**在自己窝里**待着 → 多半就趴下睡 ✓（用户：
+    //   「最右边的小窝给猪猪和鸭鸭睡觉」✓）。别的地方照旧 ✓。
+    if (f.zone === 'nest' && f.mood === 'awake' && Math.random() < 0.35) {
+      frSettle(f);
+      return;
+    }
+
     const r = Math.random();
     if (r < 0.30) {                                   // 挪两步 ✓
-      const to = Math.max(f.lo, Math.min(f.hi, f.off + rnd(-10, 10)));
+      const lim = zoneRange(f);                       // ★ 第十四版：按当前那块地 ✓
+      const to = Math.max(lim[0], Math.min(lim[1], f.off + rnd(-10, 10)));
       if (Math.abs(to - f.off) < 2.2) {
         frMood(f, 'awake');
         frSchedule(f, rnd(2200, 4600));
@@ -632,6 +704,12 @@
       scheduleMeet(rnd(5000, 10000));
       return;
     }
+    // ★ 第十四版：正在**搬家**（走去窝里 / 走去中间 ✓）→ 到了再碰 ✓；
+    //   半路把它俩拦下来会变成永远走不到窝里 ✗。
+    if (fr.some((f) => f.mood === 'walk')) {
+      scheduleMeet(rnd(3500, 7000));
+      return;
+    }
     // 猫**正贴着**它们（friends 站）→ 先别挤进去 ✓
     //   ★ 第十三版：55 → 26 ✓ —— 猫改成常驻 `mid1`（离猪猪 ~35px）以后，
     //   旧的 55 会一直挡住碰面 ✗（整段"多贴"就没了 ✓）。
@@ -674,8 +752,14 @@
       }, 900);
       scheduleMeet(rnd(22000, 32000));   // 睡醒以后再来 ✓（睡着时 tryMeet 会挡 ✓）
     };
-    frWalk(duckF, 1, settleBoth);
-    frWalk(pigF, -1, settleBoth);
+    // ★ 第十四版：**就地**各退 5.5px ✓（不再写死老家那两条 1 / −1 ✗）——
+    //   在窝里碰完就睡在窝里 ✓；回老家碰完就睡在老家 ✓。
+    //   ⚠️ 退开以后还得**在屏内** ✓ —— 窝贴右沿 ✓，猪猪再往右 5.5 会出界 ✗。
+    const sw = stage.clientWidth || 320;
+    const duckTo = Math.max(1 - duckF.base, duckF.off - 5.5);
+    const pigTo = Math.min(sw - 2 - FR_W - pigF.base, pigF.off + 5.5);
+    frWalk(duckF, duckTo, settleBoth);
+    frWalk(pigF, pigTo, settleBoth);
   };
 
   /** 两只走到中间面对面 ✓ → 歪头 + 蹦 + 爱心 ✓ → 各回各家 ✓。 */
@@ -695,7 +779,11 @@
       [duckF, pigF].forEach((f) => {
         if (!f) return;
         frMood(f, 'awake');
-        frWalk(f, 0, () => { frMood(f, 'awake'); frSchedule(f, rnd(2500, 6000)); });
+        // ★ 第十四版：回**它们现在待的那块地方** ✓，不再一律回老家 ✗
+        frWalk(f, zoneTarget(f, f.zone), () => {
+          frMood(f, 'awake');
+          frSchedule(f, rnd(2500, 6000));
+        });
       });
     }, 620);
     scheduleMeet(rnd(9000, 18000));   // ★ 第十三版：26–55s → 9–18s ✓
@@ -742,6 +830,22 @@
     }, 450);
   };
 
+  /** ★ 第十四版：**就地碰头** ✓ —— 两只现在在哪块地方，就在哪块地方贴 ✓。
+   *  · 取它俩**盒子中心的中点**当碰面点 ✓；保持老站位（猪猪盒左沿 = 鸭鸭 +16 ✓，
+   *    画出来中间 ~1.8px ✓ 不穿模 ✓）。
+   *  · 夹在屏内 ✓（离右沿留 2px ✓）。
+   *  · ⚠️ 以前是写死回老家（6.5 / −6.5 ✓）—— 现在它们去中间 / 窝里以后，
+   *    那套会变成"每次都横穿全屏回来碰头"✗（用户要的"别老在左边"就白改了 ✓）。 */
+  const frMeetPair = () => {
+    const sw = stage.clientWidth || 320;
+    const c = (frLeft(duckF) + FR_W / 2 + frLeft(pigF) + FR_W / 2) / 2;
+    const duckLeft = Math.max(1, Math.min(sw - 46, c - 22));
+    return {
+      duck: duckLeft - duckF.base,
+      pig: duckLeft + 16 - pigF.base,
+    };
+  };
+
   const frMeet = () => {
     if (!duckF || !pigF) return;
     frMeeting = true;
@@ -751,10 +855,11 @@
       f.el.classList.remove('happy');
       frStopWalk(f);
     });
+    const m = frMeetPair();
     let left = 2;
     const arrival = () => { left -= 1; if (left === 0) frGreet(); };
-    frWalk(duckF, duckF.meet, arrival);
-    frWalk(pigF, pigF.meet, arrival);
+    frWalk(duckF, m.duck, arrival);
+    frWalk(pigF, m.pig, arrival);
   };
 
   /** 猫开口了 / 页面藏起来了 → 两只停下待着 ✓（睡觉的照睡 ✓）。 */
@@ -764,6 +869,7 @@
     frMeetTimer = clearT(frMeetTimer);
     frMeetStep = clearT(frMeetStep);
     trioTimer = clearT(trioTimer);   // 用户的事优先 ✓；办完 frResume 会重排 ✓
+    zoneTimer = clearT(zoneTimer);   // ★ 第十四版：搬家也停下 ✓（同上 ✓）
     fr.forEach((f) => {
       f.timer = clearT(f.timer);
       f.happyT = clearT(f.happyT);
@@ -791,6 +897,7 @@
     });
     scheduleMeet(rnd(8000, 15000));   // ★ 第十三版：两只之间勤快 ✓
     if (!trioTimer) scheduleTrio(rnd(60000, 110000));  // ★ 猫偶尔加入 ✓
+    if (!zoneTimer) scheduleZone(rnd(30000, 55000));   // ★ 第十四版：继续换地方 ✓
   };
 
   // ── ★ 第十二版：三只凑一起 ✓ ─────────────────────────────────────────
@@ -875,7 +982,7 @@
         actTimer = setTimeout(() => {
           actTimer = null;
           if (mode !== 'auto') return;
-          walkTo(Math.random() < 0.5 ? 'mid1' : 'mid2', arrive);
+          walkTo('mid2', arrive);
         }, rnd(3400, 5400));
       }, rnd(3000, 4200));
     }, rnd(900, 1600));
@@ -916,17 +1023,114 @@
     scheduleTrio(rnd(TRIO_AFTER_MS[0], TRIO_AFTER_MS[1]));
   };
 
+  // ── ★ 第十四版：两只**成对**换地方 ✓（家 / 名字中间 / 最右边的窝 ✓）────
+  // 用户：「最右边的小窝给猪猪和鸭鸭睡觉…他们也可以在其他地方玩和睡觉，
+  //         不要老是在左边」✓
+  // · 40–75s 换一块 ✓；**两只一起走** ✓（猪猪晚半拍出发 ✓，不并排像列队 ✗）。
+  // · 到窝里 → 65% 先坐一下再趴下睡 ✓（`frSettle` ✓，这就是"窝是它俩的"✓）。
+  // · 别在这儿抢活儿：猫正走过来贴贴 / 已经贴着 / 正在碰面 / 正在贴 / 半路 → 往后挪 ✓
+  //   （**睡着的不算** ✓ —— 叫起来再走 ✓，见下 ✓）。
+  // · 换完重排下一次 ✓；用户一开口 `frHold` 会把 `zoneTimer` 收掉 ✓，
+  //   `frResume` 再排上 ✓（和碰面、贴贴同一个规矩 ✓）。
+  const scheduleZone = (ms) => {
+    zoneTimer = clearT(zoneTimer);
+    zoneTimer = setTimeout(relocate, ms == null ? rnd(ZONE_GAP_MS[0], ZONE_GAP_MS[1]) : ms);
+  };
+
+  /** 下一块地方 ✓（不挑现在这块 ✓；窝稍微偏一点 ✓ —— 那才是"睡觉的地方"✓）。 */
+  const pickZone = () => {
+    const pool = ['home', 'nest'].filter((z) => z !== frZone);
+    const w = { home: 1.0, nest: 1.25 };
+    let total = 0;
+    const ws = pool.map((z) => { total += w[z]; return w[z]; });
+    let r = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) { r -= ws[i]; if (r <= 0) return pool[i]; }
+    return pool[pool.length - 1];
+  };
+
+  const relocate = () => {
+    zoneTimer = null;
+    if (hidden || reduce() || mode !== 'auto') return;
+    // ★ 第十四版：**睡着的也叫得起来** ✓ —— 旧版把 sleep / settle 也当成"别打扰"✗，
+    //   可它俩在自己窝里是轮着打盹的 ✓（一只睡、一只醒 ✓）——"两只都醒着"的
+    //   窗口几乎没有 ✗，计时器次次被挡 ✓（实测 62s 还没挪窝 ✗）。
+    //   现在：先醒 → 半秒 → 走过去 → 到了再睡（到窝里 65% ✓）。
+    //   真正不能打断的只剩贴贴 / 碰面 / 半路那几种 ✓（去贴贴的猫也不打扰 ✓）。
+    if (frMeeting || frSnugging || stepRaf || spot === 'friends' ||
+        fr.some((f) => f.mood === 'cuddle' || f.mood === 'nuzzle' ||
+                        f.mood === 'meet' || f.mood === 'stretch' ||
+                        f.mood === 'preen' || f.mood === 'walk')) {
+      scheduleZone(rnd(4000, 7000));
+      return;
+    }
+    frZone = pickZone();
+    fr.forEach((f, i) => {
+      f.zone = frZone;
+      f.timer = clearT(f.timer);
+      f.happyT = clearT(f.happyT);
+      f.el.classList.remove('happy', 'nuzzle');
+      frTilt(f, 0);
+      f.el.style.setProperty('--fr-gaze', '0');
+      const walkAway = () => {
+        frWalk(f, zoneTarget(f, f.zone), () => {
+          if (f.zone !== frZone) return;          // 又换新的了 → 听新的 ✓
+          frMood(f, 'awake');
+          if (frZone === 'nest' && Math.random() < 0.65) {
+            f.timer = clearT(f.timer);
+            f.timer = setTimeout(() => {
+              f.timer = null;
+              if (!frCanAct() || frMeeting || f.zone !== 'nest') return;
+              frSettle(f);
+            }, rnd(1600, 3400));
+            return;
+          }
+          frSchedule(f, rnd(2400, 5000));
+        });
+      };
+      const go = () => {
+        // 睡着 / 正要趴下 → 先站起来醒一下 ✓（别直接从趴着"滑"出去 ✗）
+        if (f.mood === 'sleep' || f.mood === 'settle') {
+          frMood(f, 'awake');
+          f.timer = clearT(f.timer);
+          f.timer = setTimeout(() => {
+            f.timer = null;
+            if (!frCanAct() || f.zone !== frZone) { frSchedule(f, rnd(2000, 4000)); return; }
+            walkAway();
+          }, rnd(500, 1100));
+          return;
+        }
+        walkAway();
+      };
+      if (i) {                                    // 猪猪晚半拍 ✓
+        f.timer = clearT(f.timer);
+        f.timer = setTimeout(() => {
+          f.timer = null;
+          if (frCanAct()) go(); else frSchedule(f, 2000);
+        }, rnd(350, 1500));
+      } else {
+        go();
+      }
+    });
+    scheduleZone();
+  };
+
   const frInit = () => {
     if (!fr.length) return;
     frMeasure();
+    // ★ 第十四版：开场就**睡在最右边的窝里** ✓（用户：「最右边的小窝给
+    //   猪猪和鸭鸭睡觉」✓）—— 猫在地毯上，正好是两处不同的床 ✓。
+    frZone = 'nest';
     fr.forEach((f) => {
-      f.el.dataset.mood = 'awake';
-      f.el.style.setProperty('--fr-x', '0px');
+      f.zone = 'nest';
+      f.mood = 'sleep';
+      f.el.dataset.mood = 'sleep';
+      frSetX(f, zoneTarget(f, 'nest'));
       f.el.style.setProperty('--fr-gaze', '0');
-      frSchedule(f, rnd(4500, 9000));
+      frSchedule(f, rnd(FR_NAP_MS[0], FR_NAP_MS[1]));
     });
-    scheduleMeet(rnd(8000, 14000));    // ★ 第十三版：头一次碰面别等太久 ✓
-    scheduleTrio(rnd(45000, 75000));   // ★ 第十三版：猫头一次贴贴也放晚一点 ✓
+    scheduleMeet(rnd(12000, 22000));   // ★ 第十四版：开场都在睡 → 醒了再碰 ✓
+    scheduleTrio(rnd(45000, 80000));   // ★ 第十三版：猫头一次贴贴也放晚一点 ✓
+    scheduleZone(rnd(30000, 50000));   // ★ 第十四版：睡醒再换地方 ✓
   };
 
   // ── 心情 ────────────────────────────────────────────────────────────
@@ -1097,23 +1301,19 @@
   };
 
   /** 挑下一个地方 ✓：**近的更容易被挑中** ✓（懒 ✓）。
-   *  ★ 第十二版：`friends` 权重 2.6 → 3.6 ✓，而且距离惩罚放宽到 210 ✓ ——
-   *  以前从窝里醒来时，左边那两位几乎永远排不上 ✓（这就是"猫猫孤零零"✓）。
-   *  ★ 第十三版：**反过来调** ✓ —— 用户现在要的是"三小只不要离太远" +
-   *  "猫猫偶尔加入" ✓。所以：
-   *    · `mid1` / `mid2` 抬到 2.0 / 1.5 ✓ —— 醒来大多就在朋友们旁边坐着 ✓
-   *      （这两个站本身已经锚在猪猪右沿了 ✓，见 `xFor` ✓）；
-   *    · `friends` 3.6 → **0.8** ✓ —— 贴上去（还会一起午睡 ✓）只偶尔发生 ✓；
-   *    · 猫窝 1.1 → **0.3** ✓ —— 窝还在，只是很少去 ✓；去了也别赖在那儿 ✓
-   *      （`decide` 里醒来七成先回 `mid1` / `mid2` ✓）。 */
+   *  ★ 第十四版：**地毯是它的床** ✓（用户：「地毯给猫猫睡觉」✓）——
+   *    · `rug` 权重最高 ✓ —— 大部分时间就趴在地毯上 ✓（真猫一天睡十几个小时 ✓）；
+   *    · `mid2` 是**玩的地方** ✓（偏左一块 ✓，不在群名底下 ✓），
+   *      到了就坐坐、洗脸、望风 ✓，困了**自己走回地毯**再睡 ✓（`goSleep` ✓）；
+   *    · `friends` 照旧偶尔去 ✓（0.8 ✓，贴完多半一起午睡 ✓）；
+   *    · 老家的 `bed`（窝）**不再是猫的** ✓ —— 归猪猪 / 鸭鸭了 ✓。 */
   const pickSpot = () => {
     const pool = [
-      { name: 'mid1',   w: 2.0 },
-      { name: 'mid2',   w: 1.5 },
+      { name: 'rug',    w: 2.6 },
+      { name: 'mid2',   w: 1.1 },
       { name: 'friends', w: 0.8, easy: 200 },
-      { name: 'bed',    w: 0.3 },
     ].filter((t) => t.name !== spot && t.w > 0);
-    if (!pool.length) return 'mid1';
+    if (!pool.length) return 'rug';
 
     let total = 0;
     const weights = pool.map((t) => {
@@ -1130,6 +1330,13 @@
     return pool[pool.length - 1].name;
   };
 
+  /** ★ 第十四版：困了 → **回地毯上**再趴下 ✓（用户：「地毯给猫猫睡觉」✓）。
+   *  已经在地毯上就原地趴 ✓；在别处玩就慢慢走回去 ✓（30px/s ✓）。 */
+  const goSleep = () => {
+    if (spot === 'rug') { settleAndSleep(); return; }
+    walkTo('rug', () => { if (mode === 'auto') settleAndSleep(); });
+  };
+
   /** 到站以后干什么 ✓。 */
   const arrive = () => {
     if (mode !== 'auto') return;
@@ -1141,9 +1348,10 @@
       return;
     }
 
-    if (spot === 'bed') { settleAndSleep(); return; }
+    // ★ 第十四版：地毯 = 猫自己的床 ✓ —— 到了直接趴下 ✓。
+    if (spot === 'rug') { settleAndSleep(); return; }
 
-    // 中间两块地：坐一会儿 ✓，有时顺带洗个脸 / 望望风 ✓，然后趴下 ✓
+    // 名字中间那两块地：坐一会儿 ✓，有时洗个脸 / 望望风 ✓，困了回地毯 ✓
     const r = Math.random();
     if (r < 0.5) {
       setMood('awake');
@@ -1151,7 +1359,7 @@
       actTimer = setTimeout(() => {
         actTimer = null;
         if (mode !== 'auto') return;
-        if (Math.random() < 0.3) doIdle(); else settleAndSleep();
+        if (Math.random() < 0.3) doIdle(); else goSleep();
       }, rnd(2400, 4600));
       return;
     }
@@ -1161,7 +1369,7 @@
       actTimer = setTimeout(() => {
         actTimer = null;
         if (mode !== 'auto') return;
-        settleAndSleep();
+        goSleep();
       }, 3600);
       return;
     }
@@ -1170,7 +1378,7 @@
     actTimer = setTimeout(() => {
       actTimer = null;
       if (mode !== 'auto') return;
-      settleAndSleep();
+      goSleep();
     }, rnd(4200, 6400));
   };
 
@@ -1180,17 +1388,12 @@
     if (hidden || reduce() || mode !== 'auto' || stepRaf) return;
     if (mood === 'sleep' || mood === 'settle') { wakeUp(); return; }
 
-    // ★ 第十三版：窝里醒来**七成先回朋友们旁边** ✓ —— 「三小只不要离太远」✓。
-    //   窝还留着 ✓（偶尔去睡一觉 ✓），但不再"睡了醒、醒了接着睡"赖在屏右 ✗。
-    if (spot === 'bed' && Math.random() < 0.7) {
-      walkTo(Math.random() < 0.5 ? 'mid1' : 'mid2', arrive);
-      return;
-    }
-
+    // ★ 第十四版：**地毯就是它的床** ✓ —— 醒来不必马上离开 ✓
+    //   （它爱睡多久睡多久 ✓；想动的时候 `pickSpot` 自然会挑到别处 ✓）。
     if (Math.random() < 0.4) {
       const target = pickSpot();
-      // 从窝里出发：一半先伸个懒腰 ✓（真猫下床的样子 ✓）
-      if (spot === 'bed' && Math.random() < 0.5) {
+      // 从地毯上起身：一半先伸个懒腰 ✓（真猫下床的样子 ✓）
+      if (spot === 'rug' && Math.random() < 0.5) {
         setMood('stretch');
         actTimer = clearT(actTimer);
         actTimer = setTimeout(() => {
@@ -1292,6 +1495,12 @@
     freeze();
     measureScene();               // ★ 第八 / 九版：玩具的中心 + 猫半宽 跟着屏宽重量 ✓
     frMeasure();                  // ★ 第十版：两只"没位移时的站位"也量一次 ✓
+    // ★ 第十四版：窝和"名字中间"都是按屏宽 / 窝的位置算的 ✓ → 转屏后重站 ✓
+    //   （正在半路的不打断 ✓，让它把这一步走完 ✓）
+    fr.forEach((f) => {
+      if (f.raf) return;
+      frSetX(f, zoneTarget(f, f.zone));
+    });
     setX(xFor(spot));
   };
   if (window.ResizeObserver) new ResizeObserver(replace).observe(stage);
