@@ -810,6 +810,8 @@
       <div id="cat" data-mood="sleep" data-dir="r" role="img" aria-label="猫猫仔在窝里打盹">
         <span class="cat-think" aria-hidden="true"><i></i><i></i><i></i></span>
         <span class="cat-zzz" aria-hidden="true"><i>z</i><i>z</i><i>z</i></span>
+        <!-- ★ 第十二版：蹭猪猪时冒的爱心 ✓（`data-mood="snug"` 才显 ✓，见 app.css） -->
+        <span class="cat-love" aria-hidden="true"><i>♥</i><i>♥</i><i>♥</i></span>
         <span class="cat-rig">
           <span class="cat-breathe">
             <svg class="cat-art" viewBox="0 0 100 92" aria-hidden="true" focusable="false">
@@ -944,6 +946,13 @@
             </svg>
           </span>
         </span>
+      </div>
+      <!-- ★ 第十二版：三只凑一起时地上那圈暖光 ✓（JS 给 `#catStage` 挂 `data-trio` ✓）
+           · `cuddle`：贴着蹭蹭 → 光淡一点 ✓（爱心由猫和两只自己冒 ✓，见 `#cat .cat-love`）
+           · `nap`：一起午睡 → 光最亮、慢慢呼吸 ✓
+           ⚠️ 纯装饰 ✓、不接手指 ✓、垫在三只下面 ✓（z-index 0）。 -->
+      <div class="cat-trio" aria-hidden="true">
+        <span class="trio-glow"></span>
       </div>
     </div>
   </header>

@@ -617,6 +617,27 @@
       --fr-tilt:0deg; --fr-droop:2px; }
   #catStage .cat-friend[data-mood="sleep"] .fr-blink {
       animation:none; transform:scaleY(.12); }
+  /* —— ★ 第十二版：跟猫贴在一起的两种亲密 ✓（都是 JS 认「猫在旁边」才给的 ✓）——
+     · `cuddle` 猫已经靠过来了：身子往猫那边倾，眼睛半闭，慢慢晃 ✓
+     · `nuzzle` 先动手的那只：自己主动往猫那边蹭两下 ✓（会冒爱心 ✓）
+     ⚠️ 倾斜走 `.fr-hop` 的 `transform` ✓（它才是整只的位移层 ✓）；
+        `.fr-body` 只做呼吸 —— 两层各管各的，别把 transform 写到同一个元素上 ✓。 */
+  #catStage .cat-friend[data-mood="cuddle"] .fr-hop,
+  #catStage .cat-friend[data-mood="nuzzle"] .fr-hop {
+      transform:translateY(.9px) scaleY(.955); }
+  #catStage .cat-friend[data-mood="cuddle"] .fr-body {
+      animation:frCuddle 3.4s ease-in-out infinite; }
+  #catStage .cat-friend[data-mood="nuzzle"] .fr-body {
+      animation:frNuzzle 2.4s ease-in-out infinite; }
+  #catStage .cat-friend[data-mood="cuddle"].happy .fr-hop {
+      animation:none; }
+  #catStage .cat-friend[data-mood="cuddle"] .fr-blink,
+  #catStage .cat-friend[data-mood="nuzzle"] .fr-blink {
+      animation:none; transform:scaleY(.3); }
+  #catStage .cat-friend[data-mood="cuddle"] .fr-head,
+  #catStage .cat-friend[data-mood="nuzzle"] .fr-head { --fr-droop:1px; }
+  #catStage .cat-friend[data-mood="nuzzle"] .fr-love {
+      animation:frLove 2.2s ease-out infinite; }
   /* z z z ✓（睡着才有 ✓；字比猫的小一号 ✓，别飘出顶栏 ✓） */
   #catStage .cat-friend .fr-zzz { position:absolute; left:8px; top:-7px;
       width:12px; height:10px; opacity:0; transition:opacity .4s ease;
@@ -643,6 +664,14 @@
                        70% { transform:rotate(3deg) translateY(0); } }
   @keyframes frSleep { 0%, 100% { transform:scale(1.015,.985); }
                        50% { transform:scale(1.04,.95); } }
+  /* 靠着猫慢慢晃 ✓ / 蹭两下 ✓（幅度都很小：28px 的小东西，大了就假 ✓） */
+  @keyframes frCuddle { 0%, 100% { transform:rotate(-1.4deg) scale(1); }
+                        50% { transform:rotate(.8deg) scale(1.012,.988); } }
+  /* 蹭的方向跟着 `--fr-gaze` 的符号走 ✓（猫在哪边就往哪边蹭 ✓） */
+  @keyframes frNuzzle { 0%, 100% { transform:rotate(-1deg) translateX(0); }
+                        22% { transform:rotate(-3.4deg) translateX(calc(var(--fr-gaze, 2.6px) * .42)); }
+                        46% { transform:rotate(-.6deg) translateX(0); }
+                        70% { transform:rotate(-2.8deg) translateX(calc(var(--fr-gaze, 2.6px) * .34)); } }
   @keyframes frZ { 0% { opacity:0; transform:translate(0, 2px) scale(.7); }
                    20%, 58% { opacity:.9; }
                    84% { opacity:0; transform:translate(-3px, -3px) scale(1); }
@@ -711,6 +740,15 @@
   #cat[data-mood="perk"] .cat-head-pose {
     transform:translate(50px,37px) scale(1.1) translate(-48.5px,-56.1px); }
 
+  /* —— ★ 第十二版：蹭猪猪 ✓（朋友们永远在猫的左边 ✓）——
+     头往左歪、落到跟猪猪差不多高 ✓；身子也往那边倾一点点 ✓；
+     眼睛闭着（`catSnugHead` 那点小幅度的来回 = 拿脑袋蹭 ✓，不是"睡着不动" ✓）。 */
+  #cat[data-mood="snug"] .cat-head-pose {
+    transform:translate(49.2px,45.2px) scale(1.08) rotate(-7deg) translate(-48.5px,-56.1px); }
+  #cat[data-mood="snug"] .cat-body-pose {
+    transform:translateY(.9px) scale(1.02,.985) rotate(-1.8deg); }
+  #cat[data-mood="snug"] .cat-shadow { transform:scale(1.04,.97); }
+
   /* 走路：身子站直一点 ✓（腿还是踩在地上 ✓） */
   #cat[data-mood="walk"] .cat-head-pose {
     transform:translate(50px,38.4px) scale(1.1) translate(-48.5px,-56.1px); }
@@ -723,16 +761,19 @@
   #cat[data-mood="settle"] .cat-eyes-open,
   #cat[data-mood="groom"] .cat-eyes-open,
   #cat[data-mood="knead"] .cat-eyes-open,
-  #cat[data-mood="yawn"] .cat-eyes-open { opacity:0; }
+  #cat[data-mood="yawn"] .cat-eyes-open,
+  #cat[data-mood="snug"] .cat-eyes-open { opacity:0; }
   #cat[data-mood="sleep"] .cat-eyes-closed,
   #cat[data-mood="settle"] .cat-eyes-closed,
   #cat[data-mood="groom"] .cat-eyes-closed,
   #cat[data-mood="knead"] .cat-eyes-closed,
-  #cat[data-mood="yawn"] .cat-eyes-closed { opacity:1; }
+  #cat[data-mood="yawn"] .cat-eyes-closed,
+  #cat[data-mood="snug"] .cat-eyes-closed { opacity:1; }
   #cat .cat-blink { transform-box:fill-box; transform-origin:50% 60%;
                     animation:catBlink 6.4s ease-in-out infinite; }
   #cat[data-mood="sleep"] .cat-blink,
-  #cat[data-mood="settle"] .cat-blink { animation:none; }
+  #cat[data-mood="settle"] .cat-blink,
+  #cat[data-mood="snug"] .cat-blink { animation:none; }
   /* 想事情：眼睛往左上瞟一点 ✓；走路：往前进的方向瞟一点 ✓ */
   #cat[data-mood="think"] .cat-eyes-open { transform:translate(-1.3px,-1.1px); }
   #cat[data-mood="walk"][data-dir="l"] .cat-eyes-open { transform:translate(-1.1px,.4px); }
@@ -750,6 +791,7 @@
   #cat[data-mood="walk"]    .cat-head { animation:catStepHead var(--step-ms,720ms) ease-in-out infinite; }
   #cat[data-mood="stretch"] .cat-head { animation:catStretchHead 1.9s cubic-bezier(.3,.8,.3,1) both; }
   #cat[data-mood="groom"]   .cat-head { animation:catGroomHead 3.6s ease-in-out both; }
+  #cat[data-mood="snug"]    .cat-head { animation:catSnugHead 2.6s ease-in-out infinite; }
   #cat[data-mood="knead"]   .cat-head { animation:catKneadHead 1.1s ease-in-out infinite; }
   #cat[data-mood="yawn"]    .cat-head { animation:catYawnHead 2s ease-in-out both; }
   /* 抽耳朵：睡觉 / 发呆时每隔十来秒抽一下 ✓（叠在 `.cat-head` 外面 ✓） */
@@ -765,6 +807,8 @@
   #cat[data-mood="perk"]   .cat-body { animation:catBreathe 4s ease-in-out infinite; }
   #cat[data-mood="groom"]  .cat-body { animation:catBreathe 4.6s ease-in-out infinite; }
   #cat[data-mood="knead"]  .cat-body { animation:catKneadBody 1.1s ease-in-out infinite; }
+  /* 蹭着的时候呼吸快一点 ✓（就是呼噜 ✓，3.1s 比平时的 5.6s 急促 ✓） */
+  #cat[data-mood="snug"]   .cat-body { animation:catBreathe 3.1s ease-in-out infinite; }
 
   /* —— 尾巴：站着一条 / 趴着一条 ✓ 换姿势时淡入淡出 ✓ —— */
   #cat .cat-tail { transform-box:view-box; }
@@ -783,6 +827,7 @@
   #cat[data-mood="eat"]    .cat-tail-up,
   #cat[data-mood="drink"]  .cat-tail-up { animation:catTailSlow 3.6s ease-in-out infinite; }
   #cat[data-mood="groom"]  .cat-tail-up { animation:catTailSlow 4.4s ease-in-out infinite; }
+  #cat[data-mood="snug"]   .cat-tail-up { animation:catTailSlow 2.8s ease-in-out infinite; }
   #cat[data-mood="knead"]  .cat-tail-up { animation:catTailSlow 5s ease-in-out infinite; }
   #cat[data-mood="stretch"] .cat-tail-up { animation:catStretchTail 1.9s cubic-bezier(.3,.8,.3,1) both; }
 
@@ -839,6 +884,47 @@
   #cat .cat-zzz i:nth-child(2) { left:5px; bottom:2px; font-size:7px; animation-delay:1.3s; }
   #cat .cat-zzz i:nth-child(3) { left:10px; bottom:4px; font-size:8px; animation-delay:2.4s; }
 
+  /* —— ★ 第十二版：`snug` 时猫脑袋边冒的爱心 ✓（只在蹭的时候有 ✓）——
+     ⚠️ 位置**别用负 top** ✗：地板顶离群名只剩 2px ✓，冒到名字上就脏了 ✓。
+        这里让它在 0–14px 里往上浮 ✓，正好落在猫头顶那片墙面上 ✓。 */
+  #cat .cat-love { position:absolute; left:-3px; top:0; width:22px; height:14px;
+                   opacity:0; transition:opacity .35s ease; pointer-events:none; }
+  #cat[data-mood="snug"] .cat-love { opacity:1; }
+  #cat .cat-love i { position:absolute; bottom:0; font:600 7px/1 Georgia, serif;
+                     font-style:normal; color:#ef8fa3; opacity:0;
+                     animation:catSnugLove 2.4s ease-out infinite; }
+  [data-theme="dark"] #cat .cat-love i,
+  [data-theme="forest"] #cat .cat-love i { color:#f2a6b5; }
+  #cat .cat-love i:nth-child(1) { left:0; font-size:5px; animation-delay:.2s; }
+  #cat .cat-love i:nth-child(2) { left:7px; bottom:2px; font-size:7px; animation-delay:1.1s; }
+  #cat .cat-love i:nth-child(3) { left:14px; bottom:1px; font-size:6px; animation-delay:1.9s; }
+  @keyframes catSnugLove {
+    0%   { opacity:0; transform:translate(0, 1px) scale(.55); }
+    22%  { opacity:.95; }
+    62%  { opacity:.75; }
+    100% { opacity:0; transform:translate(1.5px, -8px) scale(1); } }
+
+  /* —— ★ 第十二版：三只凑到一起时地上的那团暖光 ✓ ——
+     `#catStage[data-trio]` 由 JS 写 ✓（`cuddle` 贴着时淡一点 ✓ / `nap` 一起睡时最亮 ✓）。
+     ⚠️ 它是 `#catStage` 里的一层、**z-index 0** ✓ —— 光垫在三只下面 ✓
+        （猪猪 / 鸭鸭 z1、猫 z2 ✓），不能糊在猫脸上 ✓。 */
+  #catStage .cat-trio { position:absolute; inset:0; z-index:0; pointer-events:none; }
+  /* ⚠️ 光要**冒到脑袋上方**才看得见 ✓（窝在三只身后只剩 1px 边 ✓ = 白做 ✓）；
+     所以 `top:-9px` ✓ —— 上面那 9px 是墙 ✓，不是群名 ✓（群名从 x≈100 才开始 ✓）。 */
+  #catStage .trio-glow { position:absolute; left:0; top:-9px; width:104px; height:40px;
+                         border-radius:50%; opacity:0; transition:opacity .6s ease;
+                         background:radial-gradient(closest-side,
+                           rgba(255,196,120,.66), rgba(255,196,120,0)); }
+  #catStage[data-trio="cuddle"] .trio-glow {
+      opacity:.62; animation:trioGlow 3.6s ease-in-out infinite; }
+  #catStage[data-trio="nap"] .trio-glow {
+      opacity:1; animation:trioGlow 5.4s ease-in-out infinite; }
+  @keyframes trioGlow { 0%, 100% { transform:scale(.94); opacity:.55; }
+                        50% { transform:scale(1.06); opacity:.95; } }
+  [data-theme="dark"] #catStage .trio-glow {
+      background:radial-gradient(closest-side,
+        rgba(255,186,104,.52), rgba(255,186,104,0)); }
+
   /* —— 思考泡泡 ✓ —— */
   #cat .cat-think {
     position:absolute; left:50%; top:-4px; display:flex; gap:2px; align-items:center;
@@ -884,6 +970,10 @@
                              50% { transform:scale(1.018, .985); } }
   @keyframes catDoze { 0%, 100% { transform:rotate(-1.6deg) translateY(.6px); }
                        50% { transform:rotate(-4.2deg) translateY(1.8px); } }
+  /* 脑袋轻轻蹭过去、再蹭回来 ✓（幅度很小 —— 头已经歪着了 ✓，这里只加"动" ✓） */
+  @keyframes catSnugHead { 0%, 100% { transform:rotate(0) translateY(0); }
+                           34% { transform:rotate(-2.2deg) translate(-.4px,.5px); }
+                           68% { transform:rotate(.8deg) translateY(-.3px); } }
   @keyframes catSettleHead { 0% { transform:rotate(0) translateY(0); }
                              60% { transform:rotate(-1deg) translateY(1.6px); }
                              100% { transform:rotate(-2deg) translateY(2.4px); } }
@@ -996,9 +1086,10 @@
         不呼吸、不眨眼、不蹦、不冒爱心 ✓（`.happy` 也一起停 ✓）。 */
   @media (prefers-reduced-motion: reduce) {
     #cat *, #catStage svg *, #catStage .cat-friend svg,
-    #catStage .cat-friend .fr-zzz i {
+    #catStage .cat-friend .fr-zzz i, #catStage .cat-trio .trio-glow {
       animation:none !important; transition:none !important; }
-    #cat .cat-think, #cat .cat-zzz { transition:none !important; }
+    #cat .cat-think, #cat .cat-zzz, #catStage .cat-trio .trio-glow {
+      transition:none !important; }
   }
   .icon-btn { width:40px;height:40px;display:flex;align-items:center;justify-content:center;
               color:var(--muted); flex-shrink:0; font-size:20px; }

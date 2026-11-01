@@ -1,5 +1,25 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   顶栏那只猫猫仔（2026-11-01 · 第十一版：猪猪 / 鸭鸭重新建模 + 动作不再硬）
+   顶栏那只猫猫仔（2026-11-01 · 第十二版：三小只真正凑到一起过日子）
+
+   第十二版用户原话：
+     「三小只的互动太少，猪猪和鸭鸭挨在一起，猫猫孤零零，
+       他们三个需要多一些亲密互动感」
+   → 三件事：
+     ① **猫更常去左边** ✓ —— `friends` 站的权重 2.6 → 3.6，距离惩罚也放宽 ✓；
+        另外有个「贴贴」定时器（`scheduleTrio` ✓）到点主动走过去 ✓。
+     ② **凑近是贴在一起** ✓ —— 以前猫站在「猪猪箱子右沿 +2」✓，
+        可猫 33px 的盒子里画只占中间 ~18px ✓ → 两只之间实际空了 14px ✗，
+        看着就是孤零零地坐在旁边 ✓。现在按**画面**让猫的左沿压到猪猪身右沿 ✓
+        （`xFor('friends')` 的 −10 ✓），头挨着头 ✓。
+     ③ **多了三种亲密动作** ✓：
+        · `snug`（猫蹭蹭 ✓）+ 头顶爱心 ✓ —— 到了就贴着猪猪眯眼蹭 ✓；
+        · `cuddle`（猪猪 / 鸭鸭靠过来 ✓）+ 爱心 ✓；
+        · `nuzzle`（小伙伴自己蹭猫 ✓）—— 猫醒着待在旁边时，隔一会儿就有
+          一只歪头贴上去 ✓；
+        · **三只一起午睡** ✓（`settleWithFriends` ✓）—— 猫在左边趴下，
+          两只跟着趴下 ✓，底下有一圈暖光 ✓（`#catStage[data-trio]` ✓），
+          猫醒 **它们才醒** ✓（`friendsWake` ✓）。
+     前提没变 ✓：用户一开口，三只都停 ✓；页面藏起来 / 减弱动效 → 不动 ✓。
 
    第十一版用户原话：
      「你不觉得猫猫建模很精致，猪猪鸭鸭很粗糙吗，而且个头还没有保持一致。
@@ -113,11 +133,13 @@
     think:   '猫猫仔在琢磨',
     walk:    '猫猫仔在走动',
     stretch: '猫猫仔伸了个懒腰',
+    snug:    '猫猫仔在跟小伙伴们贴贴',
   };
 
   const WALK_V = 30;        // px/s ✓（猫慢慢溜达 ✓；旧版 58px/s = 小跑 ✗）
   const STEP_MS = 720;      // 一步的时间 ✓（慢 ✓；走路时写进 --step-ms ✓）
   const SLEEP_MS = [26000, 74000];   // 睡一觉多久 ✓
+  const TRIO_SLEEP_MS = [34000, 70000]; // ★ 第十二版：三只一起午睡，睡久一点 ✓
 
   let spot = 'bed';        // 站在哪个站 ✓
   let mood = 'sleep';      // 现在什么心情 ✓（CSS 只认这一个 ✓）
@@ -149,11 +171,15 @@
     const sw = stage.clientWidth || 320;
     let px;
     if (name === 'friends') {
-      // 第九版：坐在**猪猪右手边** ✓ —— 猫的左沿离它 2px ✓
-      // （第十一版：猪猪 30–58、猫 33 宽 → 60–93 ✓ —— 让位还是 58px ✓）。
-      // 320px 下名字左沿 ≈81 ✓，会压住一点点 ✓ —— 和走过去时一样 ✓，
-      // 猫本来就压在名字前面 ✓（用户要的 ✓，别调回去 ✗）。
-      px = pigEl ? rectIn(pigEl).right + 2 : sw * 0.15;
+      // ★ 第十二版：坐到**猪猪真身旁边** ✓，不是坐它盒子的右边 ✓。
+      //   · 猫盒 33px，但画面只占中间 ≈7–25 ✓（`viewBox` 两边是空的 ✓）；
+      //     猪猪盒 28px，画面 ≈5–23 ✓。以前「盒子右沿 +2」→ 画面之间
+      //     实际空了 14px ✗ —— 用户说的「猫猫孤零零」一半是这个 ✓。
+      //   · 现在猫盒左沿 = 猪猪盒右沿 − 10 → 猫脸左边正好贴到猪猪脸右边 ✓
+      //     （头挨着头 ✓，猫在 z2、压在前面 ✓，不是在穿模 ✓）。
+      //   ⚠️ 不卡 58px 那条线 ✓ —— 三只并排本来就该比让位宽一点 ✓；
+      //     猫本来就压在名字前面 ✓（用户要的 ✓，别调回去 ✗）。
+      px = pigEl ? rectIn(pigEl).right - 10 : sw * 0.15;
     } else if (name === 'bed') {
       px = rectIn(bedEl).mid - w * 0.5;
     } else if (name === 'mid1') {
@@ -291,6 +317,14 @@
   const pigF = fr.find((f) => f.key === 'pig');
   let frMeeting = false, frMeetTimer = null, frMeetStep = null;
 
+  // ★ 第十二版：三只凑一起 ✓
+  //   frSnugging = 猫正在蹭它们 ✓（这会儿两只只负责靠过去眯眼 ✓，不许自己溜达 ✗）
+  //   trioTimer  = 下一次主动走过去贴贴 ✓
+  //   trioRest   = 刚从「一起午睡」醒来 → 别马上又回去 ✓（时间戳 ✓）
+  let frSnugging = false;
+  let trioTimer = null, trioRest = 0;
+  const TRIO_COOL = 40000;   // 一起睡完至少隔 40s 再主动去 ✓（真要睡它会自己挑 ✓）
+
   /** 量一次"没位移时的左边" ✓（resize 重来 ✓）—— 逐帧别再读布局 ✗。 */
   const frMeasure = () => {
     if (!fr.length) return;
@@ -323,6 +357,8 @@
     if (!fr.length || frMeeting || reduce()) return;
     const cc = x + catHalf;
     fr.forEach((f) => {
+      // ★ 第十二版：贴贴 / 蹭蹭时歪头角度是 JS 专门给的 ✓，别被"看猫"覆盖 ✗
+      if (f.mood === 'cuddle' || f.mood === 'nuzzle') return;
       const dx = cc - frCenter(f);
       const near = Math.abs(dx) < 92;
       const g = near ? Math.max(-2.6, Math.min(2.6, dx / 13)) : 0;
@@ -353,9 +389,83 @@
     }, ms || FRIEND_HAPPY_MS);
   };
 
+  // ── ★ 第十二版：三小只的亲密动作 ─────────────────────────────────────
+  /** 猫贴过来 ✓：两只都**靠向猫** ✓（歪头 + 眯眼 + 冒爱心 ✓，CSS 在 app.css ✓）。
+   *  ⚠️ 这时候两只的作息全部暂停 ✓（`frSnugging` ✓），免得一边贴贴一边溜达 ✗。 */
+  const frCuddleAll = () => {
+    frMeeting = false;
+    frMeetStep = clearT(frMeetStep);
+    fr.forEach((f) => {
+      f.timer = clearT(f.timer);
+      f.happyT = clearT(f.happyT);
+      frStopWalk(f);
+      f.el.classList.remove('happy', 'nuzzle');
+      frMood(f, 'cuddle');
+      const dx = (x + catHalf) - frCenter(f);
+      frTilt(f, dx >= 0 ? 8 : -8);
+      f.el.style.setProperty('--fr-gaze', dx >= 0 ? 2.6 : -2.6);
+      frHappy(f, 1700);          // 就软软地蹦一下 + 一轮爱心 ✓（不连蹦 ✗）
+    });
+  };
+
+  /** 猫蹭完了 / 要去睡了 → 两只回到自己的日子 ✓。 */
+  const frRelease = () => {
+    fr.forEach((f) => {
+      f.happyT = clearT(f.happyT);
+      f.el.classList.remove('happy', 'nuzzle');
+      frTilt(f, 0);
+      f.el.style.setProperty('--fr-gaze', '0');
+      if (f.mood === 'cuddle' || f.mood === 'nuzzle') frMood(f, 'awake');
+      frSchedule(f, rnd(1800, 4200));
+    });
+  };
+
+  /** 小伙伴**自己**蹭猫 ✓（猫醒着待在旁边时偶尔来一下 ✓）。
+   *  · 歪头朝猫那边 ✓ + 眯眼 ✓ + 冒一颗爱心 ✓（`data-mood="nuzzle"`，CSS ✓）。
+   *  · 2.2–3s 后自己松开 ✓（不是一直贴着不动 ✓）。 */
+  const frNuzzle = (f) => {
+    if (!f || f.mood === 'sleep' || f.mood === 'settle') return;
+    f.timer = clearT(f.timer);
+    f.happyT = clearT(f.happyT);
+    frStopWalk(f);
+    f.el.classList.remove('happy', 'nuzzle');
+    const dx = (x + catHalf) - frCenter(f);
+    frMood(f, 'nuzzle');
+    frTilt(f, dx >= 0 ? 9 : -9);
+    f.el.style.setProperty('--fr-gaze', dx >= 0 ? 2.6 : -2.6);
+    f.timer = setTimeout(() => {
+      f.timer = null;
+      if (!frCanAct()) {
+        frTilt(f, 0);
+        if (f.mood === 'nuzzle') frMood(f, 'awake');
+        return;
+      }
+      frTilt(f, 0);
+      f.el.style.setProperty('--fr-gaze', '0');
+      if (f.mood === 'nuzzle') frMood(f, 'awake');
+      frSchedule(f, rnd(3200, 6800));
+    }, rnd(2200, 3000));
+  };
+
+  /** 一起午睡醒来 ✓：两只跟着醒（有时先伸个懒腰 ✓）→ 回到自己的日子 ✓。 */
+  const friendsWake = () => {
+    setTrio(null);
+    fr.forEach((f) => {
+      f.happyT = clearT(f.happyT);
+      f.el.classList.remove('happy', 'nuzzle');
+      frTilt(f, 0);
+      f.el.style.setProperty('--fr-gaze', '0');
+      if (f.mood === 'sleep' || f.mood === 'settle') {
+        f.timer = clearT(f.timer);
+        frWake(f);
+      }
+    });
+  };
+
   /** 挪到 `to` ✓（慢起慢收 ✓；就十几像素，中段也不会快到"跑"✓）。 */
   const frWalk = (f, to, done) => {
     frStopWalk(f);
+    f.el.classList.remove('nuzzle');
     const from = f.off;
     const dist = Math.abs(to - from);
     if (reduce() || dist < 0.6) {
@@ -377,7 +487,7 @@
     f.raf = requestAnimationFrame(tick);
   };
 
-  const frCanAct = () => !hidden && !reduce() && mode === 'auto' && !frMeeting;
+  const frCanAct = () => !hidden && !reduce() && mode === 'auto' && !frMeeting && !frSnugging;
   const frSchedule = (f, ms) => {
     f.timer = clearT(f.timer);
     f.timer = setTimeout(() => { f.timer = null; frAct(f); }, ms);
@@ -415,6 +525,15 @@
   const frAct = (f) => {
     if (!frCanAct()) { frSchedule(f, 2200); return; }
     if (f.mood === 'sleep') { frWake(f); return; }
+
+    // ★ 第十二版：猫醒着待在旁边 → 偶尔**主动蹭过去** ✓（这就是"亲密"✓）。
+    //   只认猫醒着的三种状态 ✓：猫睡了就别弄醒它 ✓（要一起睡有专门那套 ✓）。
+    const catNear = Math.abs((x + catHalf) - frCenter(f)) < 58;
+    if (catNear && (mood === 'awake' || mood === 'look' || mood === 'groom') &&
+        f.mood !== 'cuddle' && f.mood !== 'nuzzle' && Math.random() < 0.34) {
+      frNuzzle(f);
+      return;
+    }
 
     const r = Math.random();
     if (r < 0.30) {                                   // 挪两步 ✓
@@ -542,22 +661,27 @@
   /** 猫开口了 / 页面藏起来了 → 两只停下待着 ✓（睡觉的照睡 ✓）。 */
   const frHold = () => {
     frMeeting = false;
+    frSnugging = false;
     frMeetTimer = clearT(frMeetTimer);
     frMeetStep = clearT(frMeetStep);
+    trioTimer = clearT(trioTimer);   // 用户的事优先 ✓；办完 frResume 会重排 ✓
     fr.forEach((f) => {
       f.timer = clearT(f.timer);
       f.happyT = clearT(f.happyT);
       frStopWalk(f);
-      f.el.classList.remove('happy');
+      f.el.classList.remove('happy', 'nuzzle');
       frTilt(f, 0);
       f.el.style.setProperty('--fr-gaze', '0');
       // ★ 第十一版：半截状态要收口 ✓ —— settle 收成 sleep ✓
       //   （不然计时器被收掉、它还半蹲着闭着眼 ✓，一直定在那儿 ✓）
       if (f.mood === 'settle') { frMood(f, 'sleep'); return; }
-      if (f.mood === 'meet' || f.mood === 'walk' || f.mood === 'stretch') {
+      if (f.mood === 'meet' || f.mood === 'walk' || f.mood === 'stretch' ||
+          f.mood === 'cuddle' || f.mood === 'nuzzle') {
         frMood(f, 'awake');
       }
     });
+    // 两只还睡着 = 三只午睡中 ✓（暖光留着 ✓）；都醒着 = 贴贴被打断 → 收掉 ✓
+    if (!fr.some((f) => f.mood === 'sleep' || f.mood === 'settle')) setTrio(null);
   };
 
   /** 猫的事办完了 → 接着自己过日子 ✓ */
@@ -567,6 +691,125 @@
       if (!f.timer) frSchedule(f, f.mood === 'sleep' ? rnd(8000, 16000) : rnd(2000, 6000));
     });
     scheduleMeet(rnd(20000, 42000));
+    if (!trioTimer) scheduleTrio(rnd(24000, 48000));
+  };
+
+  // ── ★ 第十二版：三只凑一起 ✓ ─────────────────────────────────────────
+  /** 画面状态 ✓：cuddle = 贴着蹭蹭（冒爱心 ✓）/ nap = 一起午睡（一圈暖光 ✓）。
+   *  CSS 只认 `#catStage[data-trio]` ✓（见 app.css ✓）。 */
+  const setTrio = (s) => {
+    if (s) {
+      if (stage.dataset.trio !== s) stage.dataset.trio = s;
+    } else if (stage.dataset.trio) {
+      delete stage.dataset.trio;
+    }
+  };
+
+  /** 猫在左边趴下 → 猪猪 / 鸭鸭跟着趴下 ✓ → **三只一起午睡** ✓。
+   *  · 底下那圈暖光由 `data-trio="nap"` 点亮 ✓（慢慢呼吸 ✓）。
+   *  · 猫先 `settle` 0.9s 再真正闭眼 ✓；两只同一条路 ✓（各走各的 ✓）。
+   *  · 猫醒 → `friendsWake()` 把它们俩也叫起来 ✓（见 wakeUp ✓）。 */
+  const settleWithFriends = () => {
+    if (mode !== 'auto') return;
+    actTimer = clearT(actTimer);
+    idleTimer = clearT(idleTimer);
+    spot = 'friends';
+    frSnugging = false;
+    setMood('settle');
+    setTrio('nap');
+    fr.forEach((f) => {
+      f.happyT = clearT(f.happyT);
+      f.el.classList.remove('happy', 'nuzzle');
+      frTilt(f, 0);
+      f.el.style.setProperty('--fr-gaze', '0');
+      if (f.mood !== 'sleep' && f.mood !== 'settle') frSettle(f);
+    });
+    actTimer = setTimeout(() => {
+      actTimer = null;
+      if (mode !== 'auto') return;
+      setMood('sleep');
+      scheduleSleep(rnd(TRIO_SLEEP_MS[0], TRIO_SLEEP_MS[1]));
+    }, 900);
+  };
+
+  /** 走到朋友们旁边之后：先坐下看看 ✓ → 贴上去蹭蹭 ✓（两只靠过来冒爱心 ✓）
+   *  → 多半干脆**一起趴下睡** ✓；不然再坐一会儿，然后回中间 ✓。 */
+  const cozyAtFriends = () => {
+    if (mode !== 'auto') return;
+    stopWalk();
+    frMeeting = false;
+    frSnugging = false;
+    frMeetTimer = clearT(frMeetTimer);
+    frMeetStep = clearT(frMeetStep);
+    spot = 'friends';
+    setMood('awake');
+    fr.forEach((f) => {
+      f.timer = clearT(f.timer);
+      f.happyT = clearT(f.happyT);
+      frStopWalk(f);
+      f.el.classList.remove('nuzzle');
+      if (f.mood === 'walk' || f.mood === 'meet' || f.mood === 'preen') {
+        frMood(f, 'awake');
+      }
+      const dx = (x + catHalf) - frCenter(f);
+      f.el.style.setProperty('--fr-gaze', dx >= 0 ? 2.6 : -2.6);
+    });
+
+    actTimer = clearT(actTimer);
+    actTimer = setTimeout(() => {
+      actTimer = null;
+      if (mode !== 'auto') return;
+      // ① 贴上去蹭蹭 ✓
+      setMood('snug');
+      frSnugging = true;
+      setTrio('cuddle');
+      frCuddleAll();
+      actTimer = setTimeout(() => {
+        actTimer = null;
+        frSnugging = false;
+        setTrio(null);
+        if (mode !== 'auto') return;
+        // ② 多半就地一起午睡 ✓（这才是"陪着"✓）；不然再坐一会儿 ✓
+        if (Math.random() < 0.68) { settleWithFriends(); return; }
+        frRelease();
+        setMood('look');
+        actTimer = setTimeout(() => {
+          actTimer = null;
+          if (mode !== 'auto') return;
+          walkTo(Math.random() < 0.5 ? 'mid1' : 'mid2', arrive);
+        }, rnd(3400, 5400));
+      }, rnd(3000, 4200));
+    }, rnd(900, 1600));
+  };
+
+  const scheduleTrio = (ms) => {
+    trioTimer = clearT(trioTimer);
+    trioTimer = setTimeout(tryTrio, ms == null ? rnd(32000, 56000) : ms);
+  };
+
+  /** 到点了：猫**自己**走过去找它们 ✓（用户要的"亲密互动"✓）。
+   *  ⚠️ 只叫醒着（awake / look）的猫 ✓ —— 睡着的、正洗脸的、想事情的都别打断 ✗，
+   *     它醒来挑地方时 `pickSpot` 本来就更偏 `friends` ✓（见下面 ✓）。 */
+  const tryTrio = () => {
+    trioTimer = null;
+    if (!pigF || hidden) return;
+    if (reduce() || mode !== 'auto' || frMeeting || frSnugging) {
+      scheduleTrio(rnd(9000, 16000));
+      return;
+    }
+    if (stepRaf) { scheduleTrio(rnd(7000, 12000)); return; }
+    // 已经在一起了 ✓ → 过一会儿再看 ✓
+    if (Math.abs((x + catHalf) - frCenter(pigF)) < 56) {
+      scheduleTrio(rnd(22000, 42000));
+      return;
+    }
+    // 刚从三只午睡里醒来 → 先自己过一会儿 ✓（别一醒就往回跑 ✗）
+    const wait = trioRest - performance.now();
+    if (wait > 0) { scheduleTrio(wait + rnd(3000, 10000)); return; }
+    if (mood !== 'awake' && mood !== 'look') { scheduleTrio(rnd(7000, 13000)); return; }
+    clearAuto();
+    walkTo('friends', () => { if (mode === 'auto') cozyAtFriends(); });
+    scheduleTrio(rnd(80000, 130000));
   };
 
   const frInit = () => {
@@ -579,6 +822,7 @@
       frSchedule(f, rnd(4500, 9000));
     });
     scheduleMeet(rnd(22000, 42000));   // 头一次碰面别太早 ✓
+    scheduleTrio(rnd(20000, 34000));   // ★ 第十二版：头一次贴贴早一点 ✓
   };
 
   // ── 心情 ────────────────────────────────────────────────────────────
@@ -702,6 +946,13 @@
     if (hidden || reduce() || mode !== 'auto') return;
     if (mood !== 'sleep' && mood !== 'settle') { decide(); return; }
 
+    // ★ 第十二版：三只一起午睡 → 猫醒，**两只也跟着醒** ✓（有时各伸个懒腰 ✓）。
+    //   然后隔 40s 以上才考虑再去 ✓ —— 不然猫睡醒就往回跑，一天到晚黏在那儿 ✗。
+    if (spot === 'friends' && stage.dataset.trio === 'nap') {
+      friendsWake();
+      trioRest = performance.now() + TRIO_COOL + rnd(0, 40000);
+    }
+
     const r = Math.random();
     const m = r < 0.34 ? 'stretch' : r < 0.62 ? 'yawn' : 'perk';
     const t = m === 'stretch' ? 1900 : m === 'yawn' ? 2000 : 620;
@@ -742,13 +993,14 @@
   };
 
   /** 挑下一个地方 ✓：**近的更容易被挑中** ✓（懒 ✓）。
-   *  `friends` 给得比其它都重一点 ✓ —— 不然它老是睡在窝里 ✓，
-   *  左边那两位一整天都没猫陪 ✓（第九版加这个站就是为了"陪伴" ✓）。 */
+   *  ★ 第十二版：`friends` 权重 2.6 → 3.6 ✓，而且距离惩罚放宽到 210 ✓ ——
+   *  以前从窝里醒来时，左边那两位几乎永远排不上 ✓（这就是"猫猫孤零零"✓）。
+   *  现在它醒着的时候，左边是它最常去的地方 ✓。 */
   const pickSpot = () => {
     const pool = [
       { name: 'mid1',   w: 1.6 },
       { name: 'mid2',   w: 1.3 },
-      { name: 'friends', w: 2.6 },
+      { name: 'friends', w: 3.6, easy: 210 },
       { name: 'bed',    w: 1.1 },
     ].filter((t) => t.name !== spot && t.w > 0);
     if (!pool.length) return 'mid1';
@@ -756,7 +1008,7 @@
     let total = 0;
     const weights = pool.map((t) => {
       const d = Math.abs(xFor(t.name) - x);
-      const w = t.w / (1 + d / 120);
+      const w = t.w / (1 + d / (t.easy || 120));
       total += w;
       return w;
     });
@@ -773,20 +1025,9 @@
     if (mode !== 'auto') return;
 
     if (spot === 'friends') {
-      // 挨着猪猪 / 鸭鸭坐一会儿 ✓（发呆 → 望望风 ✓）→ 回中间趴下 ✓
-      setMood('awake');
-      actTimer = clearT(actTimer);
-      actTimer = setTimeout(() => {
-        actTimer = null;
-        if (mode !== 'auto') return;
-        setMood('look');
-        actTimer = setTimeout(() => {
-          actTimer = null;
-          if (mode !== 'auto') return;
-          const back = Math.random() < 0.7 ? 'mid1' : 'mid2';
-          walkTo(back, () => { if (mode === 'auto') settleAndSleep(); });
-        }, rnd(2400, 4200));
-      }, rnd(2200, 3600));
+      // ★ 第十二版：到了不是"坐一会儿就走" ✗ —— 贴上去蹭蹭 ✓，
+      //   多半干脆一起趴下睡 ✓（见 cozyAtFriends ✓）。
+      cozyAtFriends();
       return;
     }
 
@@ -877,8 +1118,10 @@
       if (mode !== 'user') return;
       mode = 'auto';
       frResume();             // ★ 第十版：猫的事完了，两只接着过日子 ✓
+      // ★ 第十二版：在朋友旁边就地趴下 ✓（三只继续一起睡 ✓）——
+      //   旧版会把它叫回中间 ✗，刚贴热乎就走 ✓。
       if (spot === 'friends') {
-        walkTo('mid1', () => { if (mode === 'auto') settleAndSleep(); });
+        settleWithFriends();
       } else {
         settleAndSleep();
       }
@@ -915,7 +1158,8 @@
     if (mode !== 'auto') return;
     frResume();                 // ★ 第十版：切回来接着过 ✓
     if (mood === 'walk' || mood === 'look' || mood === 'groom' ||
-        mood === 'knead' || mood === 'stretch' || mood === 'yawn') {
+        mood === 'knead' || mood === 'stretch' || mood === 'yawn' ||
+        mood === 'snug') {
       setMood('sleep');
     }
     scheduleSleep(mood === 'sleep' ? rnd(2500, 6500) : rnd(5000, 9000));
