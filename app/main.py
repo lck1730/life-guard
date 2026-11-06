@@ -831,6 +831,74 @@ async def component_render(
 #    库里那几个老的 `state='live'` 也不用去洗 ✓ —— 没人再读它了 ✓。
 
 
+# ── 记账面板：改 / 删（2026-11-06）──────────────────────────────────────
+#
+# 组件跑在 `sandbox="allow-scripts"` 的 iframe 里 ✓（不透明源 ✓）——
+# 它自己拿不到 Cookie、也发不了 API 请求 ✓。所以面板上的「编辑」是**两跳**：
+#
+#   组件 --postMessage--> 壳（06-workshop.js） --带 Cookie 的 fetch--> 这里
+#
+# 壳只转发金额 / 分类 / 日期三个字段 ✓；真正的校验仍然走 `records.update`
+# （传进来的字段先和旧记录合并，再按 bookkeeping 的 schema 校验 ✓）。
+# ⚠️ 这里**必须限定 kind** ✗：同一个接口如果能改别的记录类型，
+#    一个被改坏的组件就能拿记账的字段去动别的数据 ✓。
+
+
+class RecordEditIn(BaseModel):
+    group_id: int
+    record_id: int
+    amount: float
+    category: str = Field(default="", max_length=40)
+    spent_at: int
+
+
+class RecordDeleteIn(BaseModel):
+    group_id: int
+    record_id: int
+
+
+async def _bookkeeping_row(group_id: int, record_id: int) -> dict:
+    row = await fetch_one(
+        "SELECT id, kind FROM records WHERE id = ? AND group_id = ?",
+        (record_id, group_id))
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "没有这条记录")
+    if row["kind"] != "bookkeeping":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "这条不是记账")
+    return row
+
+
+@app.post("/api/records/edit")
+async def records_edit(body: RecordEditIn, user: dict = Depends(current_user)) -> dict:
+    """改一笔记账。**金额的符号表示收支** ✓（正=支出、负=收入 ✓）。"""
+    await require_member(body.group_id, user["id"])
+    await _bookkeeping_row(body.group_id, body.record_id)
+    if not (0 < abs(body.amount) <= 1_000_000_000):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "金额不对")
+    ts = int(body.spent_at)
+    if not (946684800 <= ts <= 4102444800):      # 2000-01-01 ~ 2100-01-01
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "日期不对")
+    cat = (body.category or "").strip()[:40] or "其他"
+    row, err = await rec.update(
+        body.group_id, body.record_id,
+        {"amount": body.amount, "category": cat, "spent_at": ts})
+    if err:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, err)
+    return {"ok": True, "id": row["id"], "fields": row["fields"]}
+
+
+@app.post("/api/records/delete")
+async def records_delete_user(body: RecordDeleteIn,
+                              user: dict = Depends(current_user)) -> dict:
+    """删一笔记账。底层是**软删除** ✓（行还在、可恢复 ✓），和管家那条路一致 ✓。"""
+    await require_member(body.group_id, user["id"])
+    await _bookkeeping_row(body.group_id, body.record_id)
+    row, err = await rec.delete(body.group_id, body.record_id)
+    if err:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, err)
+    return {"ok": True, "id": body.record_id}
+
+
 
 class ComponentSpotsIn(BaseModel):
     #: 组件短名的**完整顺序** ✓（一次全交过来 ✓，不是"谁挪到哪"✗）——

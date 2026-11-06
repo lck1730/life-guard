@@ -1237,6 +1237,8 @@
   const openComp = async (slug, title, tint) => {
     const wrap = $('#compWrap');
     wrap.innerHTML = '';
+    // 上一次那条消息桥跟着旧 iframe 一起作废 ✓（见下面 closeComp ✓）。
+    if (compMsg) { window.removeEventListener('message', compMsg); compMsg = null; }
     // ★ 立刻把这一屏的底色刷成**你点的那一格的颜色** ✗→✓（2026-10-11）——
     //   `#compView` 是 `.screen`（`background:var(--bg)` ✓ = 近黑 ✓），
     //   而下面那趟网络**还没回来**时屏里是**空的** ✓ → 滑进来的就是**一整屏黑** ✓。
@@ -1271,6 +1273,53 @@
     ifr.setAttribute('referrerpolicy', 'no-referrer');
     ifr.srcdoc = inject + (d.html || '');
     wrap.appendChild(ifr);
+
+    // ── 组件 → 外面的消息桥（2026-11-06，记账面板的改 / 删）──────────────
+    //
+    // 组件是**不透明源** ✓（`allow-scripts`、没有 `allow-same-origin` ✓），
+    // 拿不到 Cookie、也发不了 API 请求 ✓。所以它只能把"我要改这条 / 删这条"
+    // 用 postMessage 递出来 ✓，由**这一页**（带着登录态 ✓）去调接口 ✓。
+    //
+    // ⚠️ 必须核对 `ev.source` ✗：别的 iframe / 窗口也能往这里发消息 ✓，
+    //    只认**当前这个组件的 contentWindow** 发来的 ✓。
+    // ⚠️ 回信用 `postMessage(..., '*')` ✓ —— 它的源是 `null`（不透明 ✓），
+    //    没法写一个具体的 targetOrigin ✓。
+    compMsg = async (ev) => {
+      if (ev.source !== ifr.contentWindow) return;
+      const m = ev.data;
+      if (!m || m.__lg !== 'ledger' || !m.reqId) return;
+      const reply = (ok, extra) => {
+        try {
+          ifr.contentWindow.postMessage(Object.assign(
+            { __lg: 'ledger-reply', reqId: m.reqId, ok: ok }, extra || {}), '*');
+        } catch (e) { /* iframe 已经没了 */ }
+      };
+      try {
+        if (m.op === 'update') {
+          const b = {
+            group_id: group.id,
+            record_id: Number(m.id),
+            amount: Number(m.amount),
+            category: String(m.category || ''),
+            spent_at: Number(m.spent_at),
+          };
+          if (!Number.isFinite(b.record_id) || !Number.isFinite(b.amount)
+              || !Number.isFinite(b.spent_at)) { reply(false, { error: '数字不对' }); return; }
+          const r = await api('/records/edit', { method: 'POST', body: JSON.stringify(b) });
+          reply(true, { id: r.id, fields: r.fields });
+        } else if (m.op === 'delete') {
+          const b = { group_id: group.id, record_id: Number(m.id) };
+          if (!Number.isFinite(b.record_id)) { reply(false, { error: '记录 id 不对' }); return; }
+          await api('/records/delete', { method: 'POST', body: JSON.stringify(b) });
+          reply(true, { id: b.record_id });
+        } else {
+          reply(false, { error: '不认识的操作' });
+        }
+      } catch (e) {
+        reply(false, { error: (e && e.message) || '没改成' });
+      }
+    };
+    window.addEventListener('message', compMsg);
     // ⚠️ 这里**必须立刻塞** ✗→✓（2026-10-11，试错一轮）——
     //   我先前把它挪到"动画走完之后"干（想的是"别让主线程在动画期间忙" ✓），
     //   用户当场看到的却是**更长的黑屏** ✓：「明显黑了一下，黑屏时间更长了」✓。
@@ -1294,9 +1343,12 @@
 
   //: 当前正在看的那个组件 ✓
   let compCur = null;
+  //: 组件 iframe 的消息桥 ✓（见 openComp ✓）；没有组件开着时是 null ✓。
+  let compMsg = null;
 
   const closeComp = () => {
     compCur = null;
+    if (compMsg) { window.removeEventListener('message', compMsg); compMsg = null; }
     popScreen('compView');
     setTimeout(_syncStatusBar, 220);
     // ⚠️ **退回工坊要重画一次** ✗→✓ —— 不然刚才改过的东西还挂在旧样子上 ✓，
