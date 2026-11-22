@@ -1911,7 +1911,7 @@
   const SW_EDGE = 24;      // 边缘留给系统 ✓
   const SW_MIN2 = 10;      // 超过它才判方向 ✓
   //: 横滑松手时走过这么多才算数 ✓（左开抽屉 / 右进设置 / 右退屏 ✓）。
-  const SW_TRIG = 96;
+  const SW_TRIG = 64;   // 2026-11-22：96 → 64，配合"甩"更快
   let pgSw = null;
   //: ★ 2026-10-29：灯箱（z 80）也算"盖着" ✓ —— 图开着的时候不该在下面滑动开抽屉 ✓。
   const _overlayOn = () =>
@@ -1943,15 +1943,16 @@
   //   2026-11-22 二次调整：从右侧滑入、水平居中；一行四个、不要标题
   //   · 群聊里**左滑** → 悬浮卡片从**右边**滑入并居中 ✓
   //   · 五个入口不变：账本 / 我们 / 相册 / 成就 / 规矩 ✓
-  //   · 点遮罩 / ✕ / 安卓返回 → 收起 ✓
+  //   · 点遮罩 / 右滑 / 安卓返回 → 收起 ✓
   //   · 仍沿用 `#drawer` 这个 id 和 `on` 类 ✓ →
   //     `_overlayOn` / `_whichScreen` / `tellTop` / `__goBack` 全都不用改 ✓
   const _drawer = $('#drawer'), _twScrim = $('#twScrim');
-  let drOpen = false, drPickTok = 0;
+  let drOpen = false, drPickTok = 0, drOpenedAt = 0;
 
   const openTools = () => {
     if (!_drawer || drOpen) return;
     drOpen = true;
+    drOpenedAt = performance.now();
     _drawer.classList.add('on');
     _drawer.setAttribute('aria-hidden', 'false');
     tellTop();
@@ -1966,7 +1967,48 @@
   window.__openTools = openTools;
   window.__closeTools = closeDrawer;
 
-  if (_twScrim) _twScrim.onclick = closeDrawer;
+  if (_twScrim) _twScrim.onclick = () => {
+    // 左滑/甩开的同一手可能补发一次 click，落在刚出现的遮罩上 → 别让它"开了马上关"。
+    if (performance.now() - drOpenedAt < 350) return;
+    closeDrawer();
+  };
+
+  // ★ 2026-11-22：工具窗打开时，**右滑也能收起**（原来只能点空白 / 返回键）。
+  let _twSw = null;
+  const _twStart = (ev) => {
+    _twSw = null;
+    if (!drOpen || !ev.touches || ev.touches.length !== 1) return;
+    const t = ev.touches[0];
+    _twSw = { x0: t.clientX, y0: t.clientY, tm: 0, xm: t.clientX, v: 0, dx: 0, dy: 0 };
+  };
+  const _twMove = (ev) => {
+    if (!_twSw) return;
+    const t = ev.touches && ev.touches[0];
+    if (!t) return;
+    const s = _twSw;
+    s.dx = t.clientX - s.x0; s.dy = t.clientY - s.y0;
+    if (Math.abs(s.dx) > 10 && Math.abs(s.dx) > Math.abs(s.dy) * 1.2) {
+      if (ev.cancelable) ev.preventDefault();   // 横向滑 → 别让它变成 tile 的点击
+    }
+    const now = performance.now();
+    if (s.tm && now > s.tm) {
+      const iv = (t.clientX - s.xm) / (now - s.tm);
+      s.v = s.v * 0.35 + iv * 0.65;
+    }
+    s.tm = now; s.xm = t.clientX;
+  };
+  const _twEnd = () => {
+    const s = _twSw; _twSw = null;
+    if (!s || !drOpen) return;
+    if (Math.abs(s.dy) > Math.abs(s.dx) * 1.2) return;
+    if (s.dx >= 40 || (s.dx >= 24 && s.v > 0.18)) closeDrawer();
+  };
+  if (_drawer) {
+    _drawer.addEventListener('touchstart', _twStart, { passive: true });
+    _drawer.addEventListener('touchmove', _twMove, { passive: false });
+    _drawer.addEventListener('touchend', _twEnd);
+    _drawer.addEventListener('touchcancel', () => { _twSw = null; });
+  }
 
   const _drAct = {
     ledger: () => openComp('bookkeeping-panel', '账本'),
@@ -2057,7 +2099,16 @@
     pgSw = null;
     if (!s) return;
     if (!s.dir) return;
-    const far = Math.abs(s.dx || 0) >= SW_TRIG;
+    // 2026-11-22：除了拖够 64px，**快速一甩**也算（最短 24px）——
+    //   设置页 / 小工具的手感主要差在这里。
+    const dist = Math.abs(s.dx || 0);
+    const vx = s.vx || 0;
+    const now = performance.now();
+    const avg = (s.dx || 0) / Math.max(1, now - (s.t0 || now));
+    // 松手前突然停住的一段速度会掉下来 → 再用整段平均速度兜一次。
+    const flick = (s.dir === 'R' && (vx > 0.14 || avg > 0.14))
+               || (s.dir === 'L' && (vx < -0.14 || avg < -0.14));
+    const far = dist >= SW_TRIG || (dist >= 24 && flick);
     if (!far) return;
     if (s.dir === 'R' && s.from === 'comp') { closeComp(); return; }
     if (s.dir === 'L' && s.from === 'settings') { closeSettings(); return; }

@@ -1585,8 +1585,8 @@
   @keyframes leftOut { from { transform:none; } to { transform:translateX(-100%); } }
   #settings.anim-in  { animation:pushIn  .24s cubic-bezier(.22,1,.36,1); }
   #settings.anim-out { animation:pushOut .18s cubic-bezier(.4,0,1,1) forwards; }
-  #settings.anim-left     { animation:leftIn  .26s cubic-bezier(.22,1,.36,1); }
-  #settings.anim-left-out { animation:leftOut .2s  cubic-bezier(.4,0,1,1) forwards; }
+  #settings.anim-left     { animation:leftIn  .30s cubic-bezier(.16,1,.3,1); }
+  #settings.anim-left-out { animation:leftOut .22s cubic-bezier(.4,0,.7,1) forwards; }
   /* ④ 首启那几屏（登录/初始化/主群聊）—— `show()` 加 `fade` 用它 ✓ */
   .screen.anim-fade  { animation:fadeIn .22s ease both; }
 
@@ -1613,8 +1613,8 @@
   .ascreen.anim-corner     { animation:cornerIn  .26s cubic-bezier(.22,1,.36,1); }
   .ascreen.anim-corner-out { animation:cornerOut .2s  cubic-bezier(.4,0,1,1) forwards; }
   /* 左边来的那一屏（目前只有设置页 ✓，但做成通用的 ✓ —— 以后别的屏要从左进也一样 ✓）*/
-  .ascreen.anim-left     { animation:leftIn  .26s cubic-bezier(.22,1,.36,1); }
-  .ascreen.anim-left-out { animation:leftOut .2s  cubic-bezier(.4,0,1,1) forwards; }
+  .ascreen.anim-left     { animation:leftIn  .30s cubic-bezier(.16,1,.3,1); }
+  .ascreen.anim-left-out { animation:leftOut .22s cubic-bezier(.4,0,.7,1) forwards; }
 
   /* ── 空间（群聊左滑进去的那一屏）───────────────────────────────
      两屏：空间（#workshop，**只罗列组件**）+ 组件页（#compView，压在上面）。
@@ -4682,6 +4682,78 @@
   #petBar #catStage {
     position:absolute; left:0; right:0; bottom:0; height:40px; z-index:1;
   }
+  /* 温馨小窝：暖光 + 地毯 + 小窝 + 几颗小星（都在三小只后面） */
+  #petDen { position:absolute; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+  .den-glow {
+    position:absolute; right:-16px; bottom:-18px; width:170px; height:80px;
+    background:radial-gradient(closest-side, rgba(255,183,120,.22), transparent 72%);
+  }
+  .den-rug {
+    position:absolute; left:70%; bottom:1px; width:72px; height:9px;
+    transform:translateX(-50%); border-radius:50%;
+    background:linear-gradient(180deg,#d59a86,#b87465);
+    border:1px solid rgba(255,225,200,.22);
+    box-shadow:0 1px 2px rgba(20,8,6,.18), inset 0 1px 0 rgba(255,236,214,.35);
+  }
+  .den-rug::after {
+    content:''; position:absolute; inset:2px 5px; border-radius:50%;
+    border:1px dashed rgba(255,238,218,.35);
+  }
+  .den-nest {
+    position:absolute; right:-2px; bottom:0; width:66px; height:18px;
+    border-radius:50% 50% 46% 46% / 68% 68% 42% 42%;
+    background:linear-gradient(180deg,#d3a476,#a86e49);
+    border:1px solid rgba(255,228,198,.24);
+    box-shadow:inset 0 -3px 5px rgba(74,38,18,.24), 0 1px 2px rgba(0,0,0,.2);
+  }
+  .den-nest::before {
+    content:''; position:absolute; left:7px; right:7px; top:3px; height:6px;
+    border-radius:50%; background:linear-gradient(180deg,#f9e0c8,#edc4a4);
+    opacity:.9;
+  }
+  .den-nest::after {
+    content:''; position:absolute; left:9px; right:9px; top:10px; height:2px;
+    background:repeating-linear-gradient(90deg, rgba(100,55,30,.32) 0 2px, transparent 2px 5px);
+  }
+  .den-star {
+    position:absolute; width:4px; height:4px; border-radius:50%;
+    background:#ffd7a3; box-shadow:0 0 7px 2px rgba(255,190,120,.35);
+    animation:denTwinkle 4.2s ease-in-out infinite;
+  }
+  .den-star.s1 { left:22px; top:9px; animation-delay:-.8s; }
+  .den-star.s2 { left:36px; top:17px; width:2px; height:2px; animation-delay:-2.3s; }
+  .den-star.s4 { right:104px; top:10px; width:2px; height:2px; animation-delay:-1.6s; }
+  .den-star.s3 { right:76px; top:7px; width:2px; height:2px; animation-delay:-3.4s; }
+  .den-plant { position:absolute; left:12px; bottom:1px; width:18px; height:22px; }
+  .den-plant::before {
+    content:''; position:absolute; left:3px; bottom:0; width:12px; height:10px;
+    border-radius:2px 2px 5px 5px;
+    background:linear-gradient(180deg,#d9a079,#b87855);
+    border:1px solid rgba(90,50,30,.35);
+    box-shadow:inset 0 1px 0 rgba(255,230,205,.3);
+  }
+  .den-plant i {
+    position:absolute; left:5px; bottom:9px; width:7px; height:12px;
+    border-radius:50% 50% 45% 45%;
+    background:linear-gradient(180deg,#a8c895,#6f9b70);
+    border:1px solid rgba(50,80,50,.35);
+    transform-origin:50% 100%;
+  }
+  .den-plant .p1 { transform:rotate(-20deg); }
+  .den-plant .p2 { left:7px; bottom:11px; width:6px; height:14px; transform:rotate(3deg); }
+  .den-plant .p3 { left:9px; transform:rotate(20deg) scale(.9); }
+  .den-heart {
+    position:absolute; right:34px; top:0; font-size:8px; line-height:1;
+    color:#f2a3a0; opacity:.8; animation:denFloat 5.6s ease-in-out infinite;
+  }
+  @keyframes denFloat {
+    0%,100% { transform:translateY(1px) rotate(-5deg); opacity:.55; }
+    50%     { transform:translateY(-2px) rotate(5deg); opacity:.9; }
+  }
+  @keyframes denTwinkle {
+    0%,100% { opacity:.25; transform:scale(.8); }
+    50%     { opacity:.95; transform:scale(1.15); }
+  }
   #petBar #catStage::after { display:none; }
   #petBar .cat-bed, #petBar .cat-trio { display:none; }
   #petBar .pet-bed {
@@ -4711,7 +4783,7 @@
     box-shadow:0 18px 48px rgba(10,5,8,.34), 0 2px 8px rgba(10,5,8,.12);
     transform:translate(calc(-50% + 120vw), -50%);
     opacity:0; pointer-events:none;
-    transition:transform .28s cubic-bezier(.22,1,.36,1), opacity .2s ease;
+    transition:transform .32s cubic-bezier(.16,1.05,.3,1), opacity .18s ease;
   }
   #drawer.on .tw-card { transform:translate(-50%, -50%); opacity:1; pointer-events:auto; }
   [data-theme="cream"] #drawer .tw-card,
@@ -4728,7 +4800,7 @@
   #drawer .tw-item {
     flex:0 0 calc((100% - 16px) / 3);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:7px; padding:12px 4px 11px;
+    gap:8px; padding:13px 4px 12px;
     border:0; border-radius:14px;
     background:var(--panel2); color:var(--text); text-align:center;
     -webkit-tap-highlight-color:transparent;
@@ -4736,12 +4808,14 @@
   }
   #drawer .tw-item:active { transform:scale(.96); background:var(--line); }
   #drawer .tw-ico {
-    width:36px; height:36px; border-radius:12px;
+    width:42px; height:42px; border-radius:13px;
     display:grid; place-items:center;
     color:var(--wi, var(--accent));
   }
-  #drawer .tw-nm { font:600 12px/1.2 var(--mono); }
+  #drawer .tw-ico svg { width:24px; height:24px; }
+  #drawer .tw-nm { font:600 13.5px/1.2 var(--mono); }
 
   @media (prefers-reduced-motion: reduce) {
     #drawer .tw-scrim, #drawer .tw-card { transition:none !important; }
+    .den-star, .den-heart { animation:none !important; }
   }

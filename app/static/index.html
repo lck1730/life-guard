@@ -152,7 +152,15 @@
   </div>
   <header class="top">
   <div id="petBar" aria-hidden="true">
-<div id="catStage" aria-hidden="true" data-mood="sleep">
+<div id="petDen" aria-hidden="true">
+        <span class="den-glow"></span>
+        <span class="den-plant"><i class="p1"></i><i class="p2"></i><i class="p3"></i></span>
+        <span class="den-rug"></span>
+        <span class="den-nest"></span>
+        <span class="den-heart">♥</span>
+        <span class="den-star s1"></span><span class="den-star s2"></span><span class="den-star s3"></span><span class="den-star s4"></span>
+      </div>
+      <div id="catStage" aria-hidden="true" data-mood="sleep">
       <!-- 右边：猫窝 ✓（在猫后面 ✓ —— 猫趴进去就是躺在窝里 ✓）
            ★ 2026-10-31 第六版：不再是"一只椭圆垫子" ✗ ——
              编织篮身 + 后沿卷边（当靠背 ✓）+ 缝线垫子 + 小枕头 + 盖毯 +
@@ -449,7 +457,21 @@
                     fill="none" stroke="#f0b6ba" stroke-width="1.6"
                     stroke-linecap="round" opacity=".7"/>
             </g>
-            <g class="fr-head">
+            <g class="fr-hand fr-hand-l">
+                <path d="M27 64 C22 66 20 72 22 78 C23 82 27.5 83.5 30 80 C32 77 31.5 70 29.5 66 Z"
+                      fill="#f9b8bd" stroke="#b25a62" stroke-width="2.8" stroke-linejoin="round"/>
+                <path d="M24.6 78.6 v-1.5 M27 79.4 v-1.5" fill="none" stroke="#b25a62"
+                      stroke-width="1.2" stroke-linecap="round" opacity=".45"/>
+              </g>
+              <g class="fr-hand fr-hand-r">
+                <g transform="translate(100,0) scale(-1,1)">
+                  <path d="M27 64 C22 66 20 72 22 78 C23 82 27.5 83.5 30 80 C32 77 31.5 70 29.5 66 Z"
+                        fill="#f9b8bd" stroke="#b25a62" stroke-width="2.8" stroke-linejoin="round"/>
+                  <path d="M24.6 78.6 v-1.5 M27 79.4 v-1.5" fill="none" stroke="#b25a62"
+                        stroke-width="1.2" stroke-linecap="round" opacity=".45"/>
+                </g>
+              </g>
+              <g class="fr-head">
               <!-- 双层耳 ✓（外耳 + 内耳 + 高光；耳根被脸压住 ✓）
                    ⚠️ 镜像在里层 `<g>` 上 ✓ —— 外层 `.fr-ear` 的 transform 留给
                       CSS 动画（frEar）✓，写在同层会被压掉 ✓（老坑 ✓）。 -->
@@ -551,33 +573,27 @@
               <!-- 身子：两团屁股 + 胸膛 + 胸口软毛 + 肚皮 ✓ -->
               <g class="cat-body-pose">
                 <g class="cat-body">
-                  <ellipse cx="32.4" cy="83.4" rx="9.4" ry="7.8" fill="#f8e7d2"
-                           stroke="#a8845a" stroke-width="2.3"/>
-                  <ellipse cx="67.6" cy="83.4" rx="9.4" ry="7.8" fill="#f8e7d2"
-                           stroke="#a8845a" stroke-width="2.3"/>
-                  <path d="M33 90 C30.4 74.4 35 62.4 50 62.4 C65 62.4 69.6 74.4 67 90 Z"
-                        fill="#fffdf8" stroke="#a8845a" stroke-width="2.5"
-                        stroke-linejoin="round"/>
-                  <path d="M42.6 69 q2.7 3.3 5.4 .3 q2.4 3 5 .2 q2 2.4 4 -.4"
-                        fill="none" stroke="#e8d3b6" stroke-width="1.3"
-                        stroke-linecap="round" opacity=".9"/>
-                  <path d="M42.6 89.7 C40.8 79.2 44.4 71.6 50 71.6 C55.6 71.6 59.2 79.2 57.4 89.7 Z"
-                        fill="#fdf1de" opacity=".92"/>
+                  <ellipse cx="50" cy="78" rx="18" ry="13" fill="#fffdf8"
+                           stroke="#a8845a" stroke-width="2.5"/>
+                  <ellipse cx="50" cy="84.2" rx="10" ry="5.8" fill="#fdf1de" opacity=".88"/>
+                  <path d="M44 70.5 q2.4 2.6 4.8 .2 q2.2 2.2 4.2 0"
+                        fill="none" stroke="#e8d3b6" stroke-width="1.2"
+                        stroke-linecap="round" opacity=".8"/>
                 </g>
               </g>
               <!-- 后脚：坐在屁股两边 ✓（画在身子**前面** → 屁股再大也盖不住 ✓） -->
               <g class="cat-hind-pose">
                 <g class="cat-hind cat-hind-l">
-                  <ellipse cx="31" cy="87.6" rx="5.4" ry="3" fill="#fdf1de"
-                           stroke="#a8845a" stroke-width="2.1"/>
-                  <path d="M29 89.4 v-1.1 M31.2 89.6 v-1.3 M33.4 89.4 v-1.1"
+                  <ellipse cx="37" cy="89" rx="5.2" ry="2.6" fill="#fffdf8"
+                           stroke="#a8845a" stroke-width="2"/>
+                  <path d="M35 90.2 v-1 M37 90.5 v-1.2 M39 90.2 v-1"
                         fill="none" stroke="#c9ae8b" stroke-width=".9"
                         stroke-linecap="round" opacity=".75"/>
                 </g>
                 <g class="cat-hind cat-hind-r">
-                  <ellipse cx="69" cy="87.6" rx="5.4" ry="3" fill="#fdf1de"
-                           stroke="#a8845a" stroke-width="2.1"/>
-                  <path d="M71 89.4 v-1.1 M68.8 89.6 v-1.3 M66.6 89.4 v-1.1"
+                  <ellipse cx="63" cy="89" rx="5.2" ry="2.6" fill="#fffdf8"
+                           stroke="#a8845a" stroke-width="2"/>
+                  <path d="M61 90.2 v-1 M63 90.5 v-1.2 M65 90.2 v-1"
                         fill="none" stroke="#c9ae8b" stroke-width=".9"
                         stroke-linecap="round" opacity=".75"/>
                 </g>
@@ -645,23 +661,27 @@
               <!-- 两只前腿（画在最上面 ✓ → 洗脸抬爪时能贴到脸 ✓；趴下时收起 ✓） -->
               <g class="cat-paw-pose">
                 <g class="cat-paw cat-paw-l">
-                  <path d="M42 74.5 C40.8 79 40.6 84.4 41.4 88.6 C43.4 90.4 46.2 90.2 47.4 88.2 C47.2 82.4 47 77.6 46.6 74.5 Z"
-                        fill="#fffdf8" stroke="#a8845a" stroke-width="2.3"
+                  <path d="M33 72 C28.5 73 26 77 26.2 81.5 C26.4 85.5 29.8 87.5 33 85.8
+                           C35.5 84.4 36.6 79.6 35.8 75.2 Z"
+                        fill="#fffdf8" stroke="#a8845a" stroke-width="2.2"
                         stroke-linejoin="round"/>
-                  <path d="M43.6 88.6 v-1.4 M45.8 89 v-1.4"
-                        fill="none" stroke="#c9ae8b" stroke-width="1"
+                  <ellipse cx="30.6" cy="82.2" rx="1.7" ry="1.3" fill="#f8b8b4" opacity=".9"/>
+                  <path d="M28.4 84.6 v-1.2 M30.8 85.2 v-1.2"
+                        fill="none" stroke="#c9ae8b" stroke-width=".9"
                         stroke-linecap="round" opacity=".7"/>
                 </g>
                 <g class="cat-paw cat-paw-r">
-                  <path d="M58 74.5 C59.2 79 59.4 84.4 58.6 88.6 C56.6 90.4 53.8 90.2 52.6 88.2 C52.8 82.4 53 77.6 53.4 74.5 Z"
-                        fill="#fffdf8" stroke="#a8845a" stroke-width="2.3"
+                  <path d="M67 72 C71.5 73 74 77 73.8 81.5 C73.6 85.5 70.2 87.5 67 85.8
+                           C64.5 84.4 63.4 79.6 64.2 75.2 Z"
+                        fill="#fffdf8" stroke="#a8845a" stroke-width="2.2"
                         stroke-linejoin="round"/>
-                  <path d="M56.4 88.6 v-1.4 M54.2 89 v-1.4"
-                        fill="none" stroke="#c9ae8b" stroke-width="1"
+                  <ellipse cx="69.4" cy="82.2" rx="1.7" ry="1.3" fill="#f8b8b4" opacity=".9"/>
+                  <path d="M71.6 84.6 v-1.2 M69.2 85.2 v-1.2"
+                        fill="none" stroke="#c9ae8b" stroke-width=".9"
                         stroke-linecap="round" opacity=".7"/>
                 </g>
               </g>
-            </svg>
+              </svg>
           </span>
         </span>
       </div>
