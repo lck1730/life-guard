@@ -147,7 +147,7 @@
 (() => {
   'use strict';
 
-  // ★ 2026-11-22：三小只从顶栏搬进聊天框上方（#petBar）。场景（墙 / 地板 / 窝 /
+  // ★ 2026-11-22：三小只从顶栏搬进聊天输入区域（#petBar）。场景（墙 / 地板 / 窝 /
   //   地毯 / 挂着的玩具）不再保留 —— 只留下它们自己的交互逻辑。
   const _stage0 = document.getElementById('catStage');
   const _petBar = document.getElementById('petBar');
