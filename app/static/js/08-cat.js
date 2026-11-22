@@ -147,21 +147,32 @@
 (() => {
   'use strict';
 
+  // ★ 2026-11-22：三小只从顶栏搬进聊天框上方（#petBar）。场景（墙 / 地板 / 窝 /
+  //   地毯 / 挂着的玩具）不再保留 —— 只留下它们自己的交互逻辑。
+  const _stage0 = document.getElementById('catStage');
+  const _petBar = document.getElementById('petBar');
+  if (_stage0 && _petBar) _petBar.appendChild(_stage0);
+
   const el = document.getElementById('cat');
   const stage = document.getElementById('catStage');
   if (!el || !stage) return;
 
-  const bedEl = stage.querySelector('.cat-bed');
-  // ★ 第十四版：**地毯归猫猫睡** ✓ —— 它住在 #catWall 里（和 stage 一样 inset:0 ✓），
-  //   量中心照样能用 stage 的 rect 减 ✓（见下面 rectIn ✓）。
-  const rugEl = document.querySelector('#catWall .cw-rug');
-  // ★ 第九版：左边那两只伙伴 ✓（水碗 / 饭盆拿掉以后站在这儿 ✓）
-  //   猫走过去挨着坐时，它俩蹦一下 + 冒爱心 ✓（见下面 maybeFriends ✓）
+  // 两个**看不见的定位锚**：原来的「回窝睡 / 在地毯上睡」算法还要量位置，
+  // 但不能把窝和地毯画出来 —— 只留 56px / 64px 的空锚点（见 app.css）。
+  const _anchor = (cls) => {
+    const n = document.createElement('span');
+    n.className = cls;
+    n.setAttribute('aria-hidden', 'true');
+    stage.appendChild(n);
+    return n;
+  };
+  const bedEl = stage.querySelector('.pet-bed') || _anchor('pet-bed');
+  const rugEl = stage.querySelector('.pet-rug') || _anchor('pet-rug');
+  // ★ 第九版：左边那两只伙伴 ✓
   const friendEls = [stage.querySelector('.cat-pig'), stage.querySelector('.cat-duck')];
   const pigEl = friendEls[0];
-  // ★ 第八版：墙上那只挂着的猫猫玩具 ✓（住在 #catWall 里 ✓，不是 stage 里 ✓）
-  //   —— 猫从底下过时，给它挂一个 `.swish` 让它荡一下 ✓（见下面 maybeToy）
-  const toyEl = document.querySelector('#catWall .cw-toy');
+  // 挂着的玩具不再保留（场景下线）→ 这个分支自然变成空操作。
+  const toyEl = null;
 
   const reduce = () => !!(window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches);

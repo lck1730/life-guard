@@ -4658,3 +4658,99 @@
     .rl-bar i, .rl-csheet, .rl-cmask, .rl-fab,
     .rl-seg button, .rl-icon, .rl-op { transition:none !important; }
   }
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   ★★ 2026-11-22：顶栏回归简约 + 三小只搬进聊天框 + 左滑工具悬浮窗
+   ══════════════════════════════════════════════════════════════════════ */
+
+  /* ── 顶栏：只留群名，正常字体 ─────────────────────────────────── */
+  #chat header.top {
+    padding:calc(var(--inset-top) + 12px) 16px 12px;
+  }
+  #chat header.top .info { padding:0; line-height:24px; }
+  #chat header.top .gname {
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;
+    font-weight:600; font-size:17px; line-height:24px; letter-spacing:.01em;
+    color:var(--text); transform:none;
+  }
+  /* JS 不再拆字了；这条只给「万一还有旧 span」兜底，别再上渐变 / 抖动 */
+  #chat header.top .gname span {
+    display:inline; background:none; -webkit-text-fill-color:currentColor;
+    color:inherit; filter:none; animation:none; transform:none;
+  }
+
+  /* ── 三小只：聊天气泡上方的一小条空地 ─────────────────────────
+     场景全部不画（墙 / 地板 / 窝 / 地毯 / 玩具），只留它们自己走动。
+     `#catStage` 仍由 08-cat.js 驱动，位置和消失的地毯 / 窝用两个空锚点保留。 */
+  #petBar {
+    position:relative; z-index:1; height:46px; flex:0 0 46px;
+    margin:0 10px; pointer-events:none;
+  }
+  #petBar #catStage {
+    position:absolute; left:0; right:0; bottom:0; height:46px; z-index:1;
+  }
+  #petBar #catStage::after { display:none; }
+  #petBar .cat-bed, #petBar .cat-trio { display:none; }
+  #petBar .pet-bed {
+    position:absolute; right:3px; bottom:0; width:56px; height:2px;
+    opacity:0; pointer-events:none;
+  }
+  #petBar .pet-rug {
+    position:absolute; left:70%; bottom:0; width:64px; height:2px;
+    transform:translateX(-50%); opacity:0; pointer-events:none;
+  }
+
+  /* ── 左滑工具悬浮窗（沿用 #drawer 的层级 / 返回键约定）────────── */
+  #drawer .tw-scrim {
+    position:absolute; inset:0; opacity:0; pointer-events:none;
+    background:rgba(18,10,12,.30);
+    -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
+    transition:opacity .2s ease;
+  }
+  #drawer.on .tw-scrim { opacity:1; pointer-events:auto; }
+
+  #drawer .tw-card {
+    position:absolute; left:14px; top:46%;
+    width:min(270px, calc(100vw - 52px));
+    padding:10px;
+    border:1px solid var(--line); border-radius:20px;
+    background:var(--panel);
+    box-shadow:0 18px 48px rgba(10,5,8,.34), 0 2px 8px rgba(10,5,8,.12);
+    transform:translate(-118%, -50%); opacity:0; pointer-events:none;
+    transition:transform .24s cubic-bezier(.22,1,.36,1), opacity .18s ease;
+  }
+  #drawer.on .tw-card { transform:translate(0, -50%); opacity:1; pointer-events:auto; }
+  [data-theme="cream"] #drawer .tw-card,
+  [data-theme="light"] #drawer .tw-card {
+    box-shadow:0 18px 48px rgba(108,68,40,.20), 0 2px 8px rgba(108,68,40,.08);
+  }
+
+  #drawer .tw-head { display:flex; align-items:center; padding:2px 4px 8px; }
+  #drawer .tw-title {
+    flex:1; color:var(--muted); font:600 11px/1 var(--mono); letter-spacing:.10em;
+  }
+  #drawer .tw-close {
+    width:28px; height:28px; flex:none; border-radius:50%;
+    border:1px solid var(--line); background:var(--panel2);
+    color:var(--muted); font:13px/1 var(--mono);
+  }
+  #drawer .tw-list { display:flex; flex-direction:column; gap:4px; }
+  #drawer .tw-item {
+    display:flex; align-items:center; gap:11px; width:100%;
+    padding:9px 9px; border:0; border-radius:13px;
+    background:transparent; color:var(--text); text-align:left;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #drawer .tw-item:active { background:var(--panel2); }
+  #drawer .tw-ico {
+    flex:none; width:34px; height:34px; border-radius:11px;
+    display:grid; place-items:center;
+    background:var(--panel2); color:var(--wi, var(--accent));
+  }
+  #drawer .tw-nm { flex:1; font:600 14px/1.2 var(--mono); }
+  #drawer .tw-chev { flex:none; color:var(--muted); font:16px/1 var(--mono); opacity:.7; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #drawer .tw-scrim, #drawer .tw-card { transition:none !important; }
+  }

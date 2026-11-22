@@ -641,43 +641,16 @@
   //      再靠 ResizeObserver 等它真有宽度时补量一次 ✓。
   //   ⚠️ 字体是异步到的 ✓ —— 先用回退字体量、字到了再量一次 ✓；
   //      否则 ZCOOL 比系统字宽/窄时，省略号会早一步或晚一步 ✓。
-  const GN_FONT = '24px "ZCOOL KuaiLe"';
   let gnameRO = null, gnameFitRaf = 0;
 
+  // ★ 2026-11-22：顶栏回归简约 —— 正常字体、整行文本。
+  //   不再拆字（站酷快乐体的逐字起落也一起下线），不再等字体加载再量。
   const fitGname = () => {
     const el = $('#gname');
     if (!el) return;
     const text = (group && group.name) || '—';
-    el.setAttribute('aria-label', text);      // 删过字之后读屏仍是全名 ✓
-    el.textContent = '';
-    const spans = [];
-    Array.from(text).forEach((ch, i) => {
-      const s = document.createElement('span');
-      s.textContent = ch === ' ' ? ' ' : ch;   // 空格也要占位 ✓
-      s.style.setProperty('--i', i);
-      el.appendChild(s);
-      spans.push(s);
-    });
-    // 藏起来的屏宽度是 0 → 只画不量 ✓（等 ResizeObserver 叫我们回来 ✓）
-    if (el.clientWidth > 0) {
-      let cut = spans.length;
-      let dots = null;
-      while (cut > 0 && el.scrollWidth > el.clientWidth) {
-        spans[--cut].remove();
-        if (!dots) {
-          dots = document.createElement('span');
-          dots.className = 'gn-cut';
-          dots.textContent = '…';
-          el.appendChild(dots);
-        }
-      }
-    }
-    // 字体还没到 → 到齐之后再量一遍 ✓（`check` 为 true 时不再排队 ✓，不会自己转圈 ✓）
-    if (document.fonts && !document.fonts.check(GN_FONT, text)) {
-      document.fonts.load(GN_FONT, text)
-        .then(() => { if (((group && group.name) || '—') === text) fitGname(); })
-        .catch(() => {});
-    }
+    el.textContent = text;
+    el.setAttribute('aria-label', text);
   };
 
   const queueGnameFit = () => {
