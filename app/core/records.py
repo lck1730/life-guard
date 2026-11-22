@@ -66,7 +66,7 @@ BUILTIN_KINDS: dict[str, dict[str, Any]] = {
             },
             "category": {
                 "type": "string",
-                "desc": "分类：餐饮/交通/购物/居家/医疗/娱乐/其他",
+                "desc": "分类：餐饮/购物/出行/居住/通讯/衣服/人情/计生/零食/水果/运动/收入/其他；新分类可直接写",
             },
             "note": {"type": "string", "desc": "备注，如「买菜」"},
             "spent_at": {
