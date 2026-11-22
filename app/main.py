@@ -852,6 +852,7 @@ class RecordEditIn(BaseModel):
     record_id: int
     amount: float
     category: str = Field(default="", max_length=40)
+    note: str | None = Field(default=None, max_length=200)
     spent_at: int
 
 
@@ -882,9 +883,12 @@ async def records_edit(body: RecordEditIn, user: dict = Depends(current_user)) -
     if not (946684800 <= ts <= 4102444800):      # 2000-01-01 ~ 2100-01-01
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "日期不对")
     cat = (body.category or "").strip()[:40] or "其他"
-    row, err = await rec.update(
-        body.group_id, body.record_id,
-        {"amount": body.amount, "category": cat, "spent_at": ts})
+    fields = {"amount": body.amount, "category": cat, "spent_at": ts}
+    # 备注：不传 = 不动；传空串 = 清掉（和 records.update 的 null 语义一致）
+    if body.note is not None:
+        note = (body.note or "").strip()[:200]
+        fields["note"] = note or None
+    row, err = await rec.update(body.group_id, body.record_id, fields)
     if err:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, err)
     return {"ok": True, "id": row["id"], "fields": row["fields"]}

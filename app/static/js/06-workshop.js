@@ -1303,6 +1303,7 @@
             category: String(m.category || ''),
             spent_at: Number(m.spent_at),
           };
+          if (m.note !== undefined) b.note = String(m.note);
           if (!Number.isFinite(b.record_id) || !Number.isFinite(b.amount)
               || !Number.isFinite(b.spent_at)) { reply(false, { error: '数字不对' }); return; }
           const r = await api('/records/edit', { method: 'POST', body: JSON.stringify(b) });

@@ -66,9 +66,9 @@ BUILTIN_KINDS: dict[str, dict[str, Any]] = {
             },
             "category": {
                 "type": "string",
-                "desc": "分类：餐饮/电子/日用/形象/出行/居住/通讯/衣服/人情/计生/零食/水果/运动/收入/其他；新分类可直接写",
+                "desc": "分类：饮食/电子/日用/形象/出行/居住/通讯/衣服/人情/计生/运动/收入/其他；新分类可直接写",
             },
-            "note": {"type": "string", "desc": "备注，如「买菜」"},
+            "note": {"type": "string", "desc": "备注；饮食类写细项（如水果 / 奶茶 / 火锅），可被搜索"},
             "spent_at": {
                 "type": "time",
                 "desc": "这笔账发生的时间（unix 秒或 YYYY-MM-DD）。不传=现在",
