@@ -641,29 +641,8 @@
   //      再靠 ResizeObserver 等它真有宽度时补量一次 ✓。
   //   ⚠️ 字体是异步到的 ✓ —— 先用回退字体量、字到了再量一次 ✓；
   //      否则 ZCOOL 比系统字宽/窄时，省略号会早一步或晚一步 ✓。
-  let gnameRO = null, gnameFitRaf = 0;
-
-  // ★ 2026-11-22：顶栏回归简约 —— 正常字体、整行文本。
-  //   不再拆字（站酷快乐体的逐字起落也一起下线），不再等字体加载再量。
-  const fitGname = () => {
-    const el = $('#gname');
-    if (!el) return;
-    const text = (group && group.name) || '—';
-    el.textContent = text;
-    el.setAttribute('aria-label', text);
-  };
-
-  const queueGnameFit = () => {
-    if (gnameFitRaf) return;
-    gnameFitRaf = requestAnimationFrame(() => { gnameFitRaf = 0; fitGname(); });
-  };
-
+  // ★ 2026-11-22：顶栏不再显示空间名（用户决定去掉）→ 群名渲染代码整体下线。
   const renderHeader = () => {
-    fitGname();
-    if (!gnameRO && 'ResizeObserver' in window) {
-      const el = $('#gname');
-      if (el) { gnameRO = new ResizeObserver(queueGnameFit); gnameRO.observe(el); }
-    }
     setStatus(curStatus);
     ensureChatBackground();
   };

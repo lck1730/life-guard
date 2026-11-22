@@ -1265,7 +1265,6 @@
 
   const renderSettings = () => {
     paintSettingsIcons();
-    const eGname = $('#vGname'); if (eGname) eGname.textContent = group?.name || '';
     // 「聊天背景」右边：只说有没有 ✓ —— 缩略图不塞进这一行 ✓（行太窄 ✓）。
     const eBg = $('#vBg');
     if (eBg) eBg.textContent = (group && group.background) ? '已设置' : '默认';
@@ -1387,22 +1386,6 @@
    *    他要的就是"点了只有一格名字 + 保存" ✓（格子里本来就写着现在的名字 ✓，
    *    再顶上写一句「空间名字」是废话 ✓，底下那句"顶栏也会跟着变"也是废话 ✓）。
    */
-  const renameSpace = () => {
-    promptText('', (group && group.name) || '', '',
-      async (v) => {
-        try {
-          await api('/workspaces/rename', { method: 'POST', body: JSON.stringify({ name: v }) });
-          // ⚠️ 群聊顶栏那个名字也要跟着变 ✓（不然退回去还是旧的 ✓，用户会以为没保存 ✓）
-          try {
-            const b = await api('/groups/bootstrap?limit=1');
-            if (b.group) group = b.group;
-          } catch (e) { /* 刷不到就算了：下次开页会重新拉 ✓ */ }
-          renderHeader(); renderSettings();
-          toast('已保存');
-        } catch (e) { toast((e && e.message) || '没保存上'); }
-      });
-  };
-
   /** 点「邀请码」= 复制 ✓ —— 满员时说人话，别的啥也不做 ✓。 */
   const inviteCodeNow = async () => {
     // ⚠️ **现问一次** ✗→✓（不吃缓存 ✓）—— 缓存里的 `full` 可能已经过时 ✓，
@@ -1467,10 +1450,9 @@
   $$('.item[data-act]').forEach(el => {
     el.onclick = () => {
       const act = el.dataset.act;
-      // ★ **点「空间」只改名** ✗→✓（2026-10-09 用户定的 ✓ —— 原来它推开 `#space` ✓）
-      if (act === 'gname') renameSpace();
+      // ★ 2026-11-22：设置里不再有「空间」入口（用户决定去掉空间名）。
       // ★ 2026-10-19：「聊天背景」—— 推开这一屏 ✓（上传 / 移除都在它里面 ✓）
-      else if (act === 'bg') openBgSet();
+      if (act === 'bg') openBgSet();
       // ★ 2026-10-19：「主题」—— 夜阑 / 奶霜 / 林深 ✓（只影响这台设备 ✓）
       else if (act === 'theme') openThemeSet();
       // ⚠️ 「气泡」**不在设置页**了 ✓（2026-10-27 用户纠正：它跟着人走 ✓，

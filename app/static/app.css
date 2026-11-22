@@ -4664,34 +4664,23 @@
    ★★ 2026-11-22：顶栏回归简约 + 三小只搬进聊天框 + 左滑工具悬浮窗
    ══════════════════════════════════════════════════════════════════════ */
 
-  /* ── 顶栏：只留群名，正常字体 ─────────────────────────────────── */
+  /* ── 顶栏：只放三小只（空间名已去掉，也不画任何装饰）───────── */
   #chat header.top {
-    padding:calc(var(--inset-top) + 12px) 16px 12px;
-  }
-  #chat header.top .info { padding:0; line-height:24px; }
-  #chat header.top .gname {
-    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;
-    font-weight:600; font-size:17px; line-height:24px; letter-spacing:.01em;
-    color:var(--text); transform:none;
-  }
-  /* JS 不再拆字了；这条只给「万一还有旧 span」兜底，别再上渐变 / 抖动 */
-  #chat header.top .gname span {
-    display:inline; background:none; -webkit-text-fill-color:currentColor;
-    color:inherit; filter:none; animation:none; transform:none;
+    padding:calc(var(--inset-top) + 4px) 0 0;
   }
 
   /* ── 三小只：聊天输入区域里的一小条空地 ─────────────────────────
      场景全部不画（墙 / 地板 / 窝 / 地毯 / 玩具），只留它们自己走动。
      `#catStage` 仍由 08-cat.js 驱动，位置和消失的地毯 / 窝用两个空锚点保留。 */
-  /* 2026-11-22 三次调整：透明区再压薄；输入区顶部那条实线也去掉 */
+  /* 2026-11-22 最终：三小只回到**顶部区域**，不画墙/地板/窝/地毯等装饰。 */
   #composer::before { display:none; }
-  #composer { padding-top:2px; }
+  #composer { padding-top:10px; }
   #petBar {
-    position:relative; z-index:1; height:34px;
-    margin:0 2px; pointer-events:none;
+    position:relative; z-index:1; flex:1 1 auto; height:40px;
+    margin:0 10px; pointer-events:none;
   }
   #petBar #catStage {
-    position:absolute; left:0; right:0; bottom:0; height:34px; z-index:1;
+    position:absolute; left:0; right:0; bottom:0; height:40px; z-index:1;
   }
   #petBar #catStage::after { display:none; }
   #petBar .cat-bed, #petBar .cat-trio { display:none; }
@@ -4715,7 +4704,7 @@
 
   #drawer .tw-card {
     position:absolute; left:50%; top:44%;
-    width:min(348px, calc(100vw - 32px));
+    width:min(276px, calc(100vw - 56px));
     padding:14px 12px;
     border:1px solid var(--line); border-radius:20px;
     background:var(--panel);
@@ -4732,9 +4721,9 @@
 
   /* 没有标题栏，也没有关闭钮 —— 点遮罩 / 安卓返回收起。 */
 
-  /* 一行三个；剩下的两个在第二行居中 */
+  /* 一行三个；剩下的两个在第二行，**左对齐** */
   #drawer .tw-list {
-    display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+    display:flex; flex-wrap:wrap; justify-content:flex-start; gap:8px;
   }
   #drawer .tw-item {
     flex:0 0 calc((100% - 16px) / 3);

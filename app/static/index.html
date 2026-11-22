@@ -151,23 +151,6 @@
     <b class="m4"></b><b class="m5"></b><b class="m6"></b>
   </div>
   <header class="top">
-    <div class="info"><div class="gname" id="gname">—</div></div>
-  </header>
-  <!-- 下拉刷新时从顶栏底下冒出来的小药丸 ✓ —— 平时 `opacity:0` 且不接事件 ✓，
-       只在手指拽着的时候由 JS 摆位置 ✓。 -->
-  <div id="pull" aria-hidden="true">
-    <span class="pull-ico">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
-           stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="23 4 23 10 17 10" />
-        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-      </svg>
-    </span>
-    <span class="pull-txt" id="pullTxt">下拉刷新</span>
-  </div>
-  <div id="msgs"></div>
-  <div id="composer">
   <div id="petBar" aria-hidden="true">
 <div id="catStage" aria-hidden="true" data-mood="sleep">
       <!-- 右边：猫窝 ✓（在猫后面 ✓ —— 猫趴进去就是躺在窝里 ✓）
@@ -691,7 +674,23 @@
       </div>
     </div>
   </div>
-    <div id="atMenu"></div>
+  </header>
+  <!-- 下拉刷新时从顶栏底下冒出来的小药丸 ✓ —— 平时 `opacity:0` 且不接事件 ✓，
+       只在手指拽着的时候由 JS 摆位置 ✓。 -->
+  <div id="pull" aria-hidden="true">
+    <span class="pull-ico">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10" />
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+      </svg>
+    </span>
+    <span class="pull-txt" id="pullTxt">下拉刷新</span>
+  </div>
+  <div id="msgs"></div>
+  <div id="composer">
+<div id="atMenu"></div>
     <!-- 引用条：长按气泡选了「引用」之后出现在这里，发完自动消失。
          微信也是这个样子——引用是**输入状态**的一部分，不是消息的一部分。 -->
     <!-- 待发附件：`+` 里选的图和文件先停在这儿 ✓，发出去之前一直留着 ✓ -->
@@ -875,13 +874,13 @@
     <h2>设置</h2>
   </header>
   <div class="body">
-    <!-- ★★ **行序 2026-11-22 起**：空间 / 主题 / 背景 / 模型 / 邀请码 / 检查更新 ✓。
+    <!-- ★★ **行序 2026-11-22 起**：主题 / 背景 / 模型 / 邀请码 / 检查更新 ✓。
          「我的」「管家」两行**已删** ✓ —— 两个都能点头像进入，不在设置里重复留入口 ✓。
+         「空间」一行也删了 ✓ —— 用户决定不要空间名 ✓。
          退出两行仍单独一张卡 ✓。顺序以这里为准 ✓。 -->
 
     <div class="sec-g">
       <div class="grp gcard">
-    <div class="item" data-act="gname"><span class="ico" data-ico="space"></span><span class="k">空间</span><span class="v" id="vGname"></span><span class="chev" data-chev></span></div>
     <!-- ★ 主题（2026-10-19）：三套可选（夜阑 / 奶霜 / 林深 ✓），选完立即生效 ✓。
          ⚠️ 只存这台设备、按用户 id 分开 ✓，不进服务端、不给空间里的别人 ✓。 -->
     <div class="item" data-act="theme"><span class="ico" data-ico="palette"></span><span class="k">主题</span><span class="v" id="vTheme"></span><span class="chev" data-chev></span></div>
