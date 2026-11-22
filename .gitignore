@@ -1,7 +1,14 @@
 data/
 keys/
 releases/
-provision/
+# ★ 2026-11-22：`lifeguard-tools` 的源码**只剩服务器这一份** ✗→✓ ——
+#   原来整个 `provision/` 都不进仓 ✓，于是每日推 GitHub 里**没有插件** ✗，
+#   服务器一丢、这些工具就没了 ✓（本地旧仓库已弃用、没有第二份 ✓）。
+#   只放行这一个目录 ✓；`config.env`（内部票）**仍然不进仓** ✓。
+provision/*
+!provision/lifeguard-tools/
+provision/lifeguard-tools/config.env
+provision/lifeguard-tools/__pycache__/
 # ★ 2026-10-07：`var/` 是**用户的东西**（创意工坊的组件、子代理的暂存文件）✗→✓ ——
 #   不排除的话它们会被这个仓库跟踪 ✓，而 App 管家那套"存档/回滚"会去提交它们 ✗
 #   （`routes_internal.py` 的自动提交是无差别的 ✓）。

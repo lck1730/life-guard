@@ -476,6 +476,12 @@
     //   ⚠️ 它**不报屏名** ✓：收掉它就回到群聊 ✓（顶栏一直是 chat ✓）。
     if ($('#drawer').classList.contains('on')) { closeDrawer(); return; }
     if ($('#sheet').classList.contains('on')) { closeSheet(); return; }
+    // ★ 2026-11-22：**「规矩」**（`#rules`，z-index 34 ✓）—— 和 `#us` 同一层 ✓。
+    //    立/改规矩的纸片住在这一屏里面 ✓ → 照"从上往下"先收纸，再退屏 ✓。
+    if ($('#rlComposer') && $('#rlComposer').classList.contains('on')) {
+      rlCloseComposer(); return;
+    }
+    if ($('#rules').classList.contains('on')) { closeRules(); return; }
     // ★ 2026-11-01：**「我们」**（`#us`，z-index 34 ✓）—— 它现在是屏里最高的一层 ✓。
     //    写这一刻的那张纸住在这一屏里面 ✓ → 照"从上往下"先收纸 ✓，再按一次才退屏 ✓。
     if ($('#usComposer') && $('#usComposer').classList.contains('on')) {

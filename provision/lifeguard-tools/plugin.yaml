@@ -1,0 +1,41 @@
+name: lifeguard-tools
+version: 0.4.0
+description: "生活管家的自定义工具：结构化记录、主动发言、提醒、定稿前查新消息。"
+author: lifeguard
+kind: standalone
+platforms:
+  - linux
+# ⚠️ 必须和 __init__.py 的 _TOOLS 保持一致。
+#
+# 这里曾经是 `lg_probe`——最早的集成探针工具名，早删了，而真正的工具换过两轮
+# 都没跟着改。因为 `tools.tool_search.enabled: off`，该字段一直不生效所以没暴露；
+# 一旦打开 tool_search，**没被列在这里的工具会被塞进"延迟池"**，模型得先
+# tool_search 才能用——症状是报 "not a known tool name"，或者把工具调用
+# 当纯文本吐出来。
+provides_tools:
+  - record_add
+  - record_query
+  - record_update
+  - record_delete
+  - record_restore
+  - record_kinds
+  - record_define
+  - group_say
+  - look_at_image
+  - send_photo
+  - send_sticker
+  - component_confirm
+  - component_save
+  - component_list
+  - component_note
+  - wall_style_set
+  - wall_clear
+  - reminder_add
+  - reminder_list
+  - reminder_cancel
+  - rule_list
+  - rule_add
+  - rule_log
+  - rule_undo
+  - rule_update
+  - rule_remove

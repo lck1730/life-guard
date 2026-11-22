@@ -311,6 +311,43 @@ CREATE TABLE IF NOT EXISTS us_moments (
 CREATE INDEX IF NOT EXISTS idx_us_moments_group
     ON us_moments(group_id, deleted_at, happened_at DESC, id DESC);
 
+-- ★ 2026-11-22：**规矩** —— 每周的约定（放纵餐几次 / 奶茶几杯 / 要做到什么）。
+--
+--   `rules` 是**规矩本身** ✓：一个群可以立好几条 ✓，删掉是软删 ✓。
+--     · `kind = 'limit'`（不超过 N 次）或 `'task'`（至少 N 次）✓
+--     · `period` 目前只有 `'week'` ✓ —— 留着是为了以后要月规矩时不用改表 ✓
+--   `rule_events` 是**一次一次的记录** ✓：按 `happened_at` 归周 ✓。
+--     ⚠️ 这里**不是**账 —— 不记金额、不关联 ledger ✓，就是"这一次" ✓。
+--     ⚠️ 软删 ✓：点错了能撤回来 ✓。
+CREATE TABLE IF NOT EXISTS rules (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    title      TEXT    NOT NULL,
+    kind       TEXT    NOT NULL DEFAULT 'limit',   -- limit / task
+    target     INTEGER NOT NULL DEFAULT 1,         -- 每周次数
+    period     TEXT    NOT NULL DEFAULT 'week',
+    icon       TEXT,
+    note       TEXT    NOT NULL DEFAULT '',
+    created_by INTEGER,
+    created_at INTEGER NOT NULL,
+    deleted_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_rules_group
+    ON rules(group_id, deleted_at, id);
+
+CREATE TABLE IF NOT EXISTS rule_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_id     INTEGER NOT NULL REFERENCES rules(id) ON DELETE CASCADE,
+    group_id    INTEGER NOT NULL,
+    user_id     INTEGER,
+    happened_at INTEGER NOT NULL,
+    note        TEXT    NOT NULL DEFAULT '',
+    created_at  INTEGER NOT NULL,
+    deleted_at  INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_rule_events_week
+    ON rule_events(group_id, rule_id, happened_at DESC, id DESC);
+
 -- `agent_state` 已删除（2026-10-04）。它装的是冷却时刻、当日发言预算、
 -- 提问回执窗口、沉默计数、活跃度档位——**判断闸撤掉之后这些全没了消费者**。
 -- 它从来没存过有价值的东西，所以是干净地删掉，不像 ledger_entries / group_memory

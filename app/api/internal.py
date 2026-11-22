@@ -41,6 +41,7 @@ from pydantic import BaseModel, Field
 from ..config import settings
 from ..core import records as rec
 from ..core import reminders as rem
+from ..core import rules as rules_core
 from ..core.idle import is_idle_turn, note_idle_write_blocked
 from ..core.hub import hub
 from ..db import execute, fetch_all, fetch_one, now
@@ -221,6 +222,152 @@ async def records_define(body: KindDefineIn) -> dict:
     #   回显一遍没有半点信息量 ✓，却给了它一句"我建了个什么"可以复述 ✓
     #   （用户原话：「说创建了"××"类型的记录，这个按理也不该说」✓）。
     return {"ok": True}
+
+
+# ── 规矩（每周上限 / 每周任务）────────────────────────────────────────
+#
+# 管家主要通过**系统提示里的进度**感知规矩 ✓（见 `rules.prompt_section`），
+# 这里只放**操作** ✓。
+#
+# ⚠️ 回给模型的规矩**不带 id** ✗ —— 理由和 records 那边一样（见 records_add 的
+#    注释 ✓）：id 一旦递过去，它就有可能念给用户听 ✓。它按**名字**操作就够了 ✓
+#    （`rules_core` 会先找全等、再找包含 ✓）。
+#
+# ⚠️ 写操作照样过 `_idle_write_block` ✓ —— 空闲闲聊轮不许补记规矩 ✓。
+
+def _rule_public(rule: dict) -> dict:
+    return {
+        "title": rule["title"],
+        "kind": rule["kind"],
+        "target": rule["target"],
+        "count": rule["count"],
+        "remaining": rule["remaining"],
+        "over": rule["over"],
+        "status": rule["status"],
+        "note": rule["note"],
+    }
+
+
+class RuleGroupIn(BaseModel):
+    group_id: int
+
+
+@router.post("/rules/list", dependencies=[Depends(require_internal_token)])
+async def rules_list(body: RuleGroupIn) -> dict:
+    await _assert_group(body.group_id)
+    data = await rules_core.list_for_group(body.group_id)
+    return {
+        "ok": True,
+        "week": data["week_label"],
+        "rules": [_rule_public(r) for r in data["rules"]],
+    }
+
+
+class RuleAddIn(BaseModel):
+    group_id: int
+    title: str
+    kind: str = "limit"
+    target: int = 1
+    icon: str = "star"
+    note: str = ""
+
+
+@router.post("/rules/add", dependencies=[Depends(require_internal_token)])
+async def rules_add(body: RuleAddIn) -> dict:
+    await _assert_group(body.group_id)
+    blocked = _idle_write_block(body.group_id)
+    if blocked:
+        return blocked
+    rule, err = await rules_core.create(
+        body.group_id, body.title, kind=body.kind, target=body.target,
+        icon=body.icon, note=body.note,
+    )
+    if not rule:
+        return {"ok": False, "error": err}
+    return {"ok": True, "rule": _rule_public(rule)}
+
+
+class RuleRefIn(BaseModel):
+    group_id: int
+    title: str
+
+
+class RuleLogIn(BaseModel):
+    group_id: int
+    title: str
+    count: int = Field(default=1, ge=1, le=20)
+    note: str = ""
+
+
+@router.post("/rules/log", dependencies=[Depends(require_internal_token)])
+async def rules_log(body: RuleLogIn) -> dict:
+    await _assert_group(body.group_id)
+    blocked = _idle_write_block(body.group_id)
+    if blocked:
+        return blocked
+    rule, err = await rules_core.log_event(
+        body.group_id, title=body.title, count=body.count, note=body.note
+    )
+    if not rule:
+        return {"ok": False, "error": err}
+    return {"ok": True, "rule": _rule_public(rule)}
+
+
+class RuleUndoIn(BaseModel):
+    group_id: int
+    title: str
+    count: int = Field(default=1, ge=1, le=20)
+
+
+@router.post("/rules/undo", dependencies=[Depends(require_internal_token)])
+async def rules_undo(body: RuleUndoIn) -> dict:
+    await _assert_group(body.group_id)
+    blocked = _idle_write_block(body.group_id)
+    if blocked:
+        return blocked
+    rule, err = await rules_core.undo_event(
+        body.group_id, title=body.title, count=body.count
+    )
+    if not rule:
+        return {"ok": False, "error": err}
+    return {"ok": True, "rule": _rule_public(rule)}
+
+
+class RuleUpdateIn(BaseModel):
+    group_id: int
+    title: str
+    new_title: str | None = None
+    kind: str | None = None
+    target: int | None = Field(default=None, ge=1, le=99)
+    icon: str | None = None
+    note: str | None = None
+
+
+@router.post("/rules/update", dependencies=[Depends(require_internal_token)])
+async def rules_update(body: RuleUpdateIn) -> dict:
+    await _assert_group(body.group_id)
+    blocked = _idle_write_block(body.group_id)
+    if blocked:
+        return blocked
+    rule, err = await rules_core.update(
+        body.group_id, title=body.title, new_title=body.new_title,
+        kind=body.kind, target=body.target, icon=body.icon, note=body.note,
+    )
+    if not rule:
+        return {"ok": False, "error": err}
+    return {"ok": True, "rule": _rule_public(rule)}
+
+
+@router.post("/rules/remove", dependencies=[Depends(require_internal_token)])
+async def rules_remove(body: RuleRefIn) -> dict:
+    await _assert_group(body.group_id)
+    blocked = _idle_write_block(body.group_id)
+    if blocked:
+        return blocked
+    title, err = await rules_core.remove(body.group_id, title=body.title)
+    if not title:
+        return {"ok": False, "error": err}
+    return {"ok": True, "title": title}
 
 
 # ── 主动往群里说话 ────────────────────────────────────────────────────

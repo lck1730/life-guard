@@ -1055,7 +1055,7 @@
        成就，后续再添加，色调图案不要照搬，要求温馨」✓。
        · 一根暖色小绳从**顶栏右下角**垂下来 ✓；往下拉，一块**暖布帘**从顶栏底下展开 ✓。
        · 收着时只露一根绳 + 一颗木珠 ✓（不占地方、不挡字 ✓）。
-       · 四个键**排成一行** ✓（以后加第五个自动换行 ✓，不用改 JS ✓）。
+       · 五个键**排成一行** ✓（2026-11-22 加了「规矩」✓；网格改成五列 ✓）。
        ⚠️ 它住在 `#chat` **里面** ✓ —— 群聊一关就跟着不见 ✓。
           `#chat` 因此有 `z-index:0`（见 app.css 末尾「第十二版」），
           所以设置页（10）/ 组件页（26）仍然压得住它 ✓。
@@ -1115,6 +1115,21 @@
               </svg>
             </span>
             <span class="dt-nm">成就</span>
+          </button>
+          <!-- ★ 2026-11-22：第五格「规矩」✓ —— 每周上限 / 每周任务，管家立、管家督 ✓。 -->
+          <button class="dt-key" type="button" role="menuitem"
+                  data-act="rules" aria-label="规矩">
+            <span class="dt-ico" style="--wi:var(--dr-we)">
+              <svg viewBox="0 0 24 24" width="23" height="23" fill="none"
+                   stroke="currentColor" stroke-width="1.7"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8.5 4.5h7A2.5 2.5 0 0 1 18 7v12.5H8.5A2.5 2.5 0 0 1 6 17z"/>
+                <path d="M6 17a2.5 2.5 0 0 1 2.5-2.5H18"/>
+                <path d="M9.2 8.5l1.3 1.3 2.6-2.7"/>
+                <path d="M9.2 13.2l1.3 1.3 2.6-2.7"/>
+              </svg>
+            </span>
+            <span class="dt-nm">规矩</span>
           </button>
         </div>
       </div>
@@ -1350,6 +1365,76 @@
         </button>
         <button class="us-csave" id="usSave" type="button">收进回忆</button>
       </div>
+    </div>
+  </div>
+</div>
+<!-- ★ 2026-11-22：**规矩** —— 抽屉第五格 ✓。
+     每周上限（放纵餐 / 奶茶…最多几次）+ 每周任务（要做到几次）✓。
+     主要由管家立、管家督促；这里让他一眼看见进度，也能自己加减 ✓。
+     ⚠️ 和其它整屏子页一样 → `_OTHER_SCREENS` 里要有 `#rules` ✓、
+        `__goBack` 里要有一支 ✓（见 `android-back-key-only-knows-settings` ✓）。
+     ⚠️ **一句功能介绍都不写** ✗ —— 每个字都是规矩本身或进度 ✓。 -->
+<div class="screen ascreen rules" id="rules">
+  <header class="sub rl-bar">
+    <button class="icon-btn back" id="rlBack" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 4.5 8.5 12 15 19.5" />
+      </svg>
+    </button>
+    <h2>规矩</h2>
+    <div class="spacer"></div>
+  </header>
+
+  <div class="abody rl-body" id="rlBody">
+    <section class="rl-week" aria-label="本周">
+      <span class="rl-week-glow" aria-hidden="true"></span>
+      <div class="rl-week-top">
+        <span class="rl-week-cap">本周</span>
+        <span class="rl-range" id="rlRange"></span>
+      </div>
+      <div class="rl-days" id="rlDays" aria-hidden="true"></div>
+      <div class="rl-sum" id="rlSum" aria-live="polite"></div>
+    </section>
+
+    <div class="rl-list" id="rlList"></div>
+  </div>
+
+  <button class="rl-fab" id="rlFab" type="button" aria-label="立一条规矩">
+    <svg viewBox="0 0 24 24" width="23" height="23" fill="none"
+         stroke="currentColor" stroke-width="2.1" stroke-linecap="round">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  </button>
+
+  <div class="rl-composer" id="rlComposer" aria-hidden="true">
+    <div class="rl-cmask" id="rlCMask"></div>
+    <div class="rl-csheet" role="dialog" aria-modal="true" aria-label="立一条规矩">
+      <div class="rl-cgrip" aria-hidden="true"></div>
+      <div class="rl-ctop">
+        <b id="rlCTitle">立一条规矩</b>
+      </div>
+      <label class="rl-field">
+        <span>规矩</span>
+        <input id="rlName" type="text" maxlength="40" autocomplete="off"
+               placeholder="奶茶、放纵餐、跑步……" aria-label="规矩的名字">
+      </label>
+      <div class="rl-seg" id="rlSeg" role="group" aria-label="规矩类型">
+        <button type="button" data-kind="limit" class="on">不超过</button>
+        <button type="button" data-kind="task">要做到</button>
+      </div>
+      <div class="rl-step">
+        <span class="rl-step-l">每周</span>
+        <button type="button" id="rlMinus" aria-label="少一次">−</button>
+        <b id="rlNum">2</b>
+        <button type="button" id="rlPlus" aria-label="多一次">+</button>
+        <span class="rl-step-r">次</span>
+      </div>
+      <div class="rl-icons" id="rlIcons" role="group" aria-label="选个图标"></div>
+      <button class="rl-save" id="rlSave" type="button">立下这条</button>
+      <button class="rl-del" id="rlDel" type="button" hidden>结束这条规矩</button>
     </div>
   </div>
 </div>

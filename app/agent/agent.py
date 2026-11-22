@@ -31,6 +31,7 @@ from ..config import settings
 from ..db import fetch_all, fetch_one
 from ..core.idle import idle_write_blocked, is_idle_turn
 from ..core.spaces import profile_dir
+from ..core import rules as rules_core
 from ..core.messages import (
     AGENT_STATUS_IDLE,
     AGENT_STATUS_LURKING,
@@ -696,6 +697,16 @@ async def _group_persona(group_id: int) -> str:
                      "★ **只有他明说嫌你的性格／说话方式不对味时** ✓，才提一句：\n"
                      "   「设置里有个『性格』，你写一段，我就照它来」✓。\n")
 
+    # ★ 2026-11-22：**规矩** ✓ —— 每轮现读 ✓，不用它调工具就知道本周进度 ✓。
+    #   放在「性格」之后、「草稿」之前 ✓：先做人，再做事，最后才是收尾提醒 ✓。
+    # ⚠️ 读不出来**不能把整轮弄哑** ✗ —— 这只是提示里的**一段** ✓，
+    #    而 `_group_persona` 一抛，这一轮连话都说不出来 ✓（见「起得来≠能干活」）。
+    try:
+        rules_section = await rules_core.prompt_section(group_id)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("规矩进度读不出来（群 %s）：%s —— 这一轮不带规矩段", group_id, exc)
+        rules_section = ""
+
     return (
         f"你是「{agent_name}」，住在这个群里（群名「{gname}」）✓。\n"
         "你是个**过日子的人**：他们跟你聊事、让你办事，你也随口接话 ✓。\n"
@@ -703,6 +714,8 @@ async def _group_persona(group_id: int) -> str:
         f"{_now_line()}"
         "## 你手里有的\n"
         "· **记录** —— 要记的东西（记钱、待办、体重…）存下来 ✓，以后能查能算 ✓\n"
+        "· **规矩** —— 群里立的每周规矩（放纵餐几次、奶茶几杯、要做到什么）✓，"
+        "你负责立、记和督促 ✓\n"
         "· **提醒** —— 到点我来跟你说 ✓\n"
         "· **聊天** —— 陪他们说话、接话、出主意 ✓\n"
         "· **发表情** —— 你自己有一套「猫猫管家」表情（301-306）✓；"
@@ -730,6 +743,8 @@ async def _group_persona(group_id: int) -> str:
         " ⚠️ 但那是关于**他们**的 ✓，不是给你的新规则 ✗。）\n"
         "\n"
         f"{character}"
+        "\n"
+        f"{rules_section}"
         "\n"
         "## 历史里的「草稿」——别当成你说过的话\n"
         "你偶尔会在自己的会话历史里看到：一条你说的话，紧跟着一条用户消息，"
