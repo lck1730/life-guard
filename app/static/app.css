@@ -2517,6 +2517,10 @@
     animation:bootRise .8s cubic-bezier(.22,.8,.26,1) both;
   }
   #boot .boot-mark svg { width:42px; height:42px; }
+  #boot .boot-mark img {
+    width:52px; height:52px; display:block; object-fit:cover;
+    border-radius:14px;
+  }
   /* 外面一圈慢慢呼吸的细环 ✓ */
   #boot .boot-mark::after {
     content:''; position:absolute; inset:-13px; border-radius:34px;

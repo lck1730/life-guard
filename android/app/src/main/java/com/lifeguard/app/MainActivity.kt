@@ -208,7 +208,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
 
         box.addView(TextView(this).apply {
-            text = "生活管家"; textSize = 24f; setTextColor(FG)
+            text = "猪之家"; textSize = 24f; setTextColor(FG)
         })
 
         // ★ 2026-10-07 深夜用户定的：**这一页只给一句人话，别的什么都不展示** ✗→✓ ——
@@ -883,7 +883,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         prefs.edit().putBoolean(KEY_BATTERY_ASKED, true).apply()
         AlertDialog.Builder(this)
             .setTitle("让提醒能在后台活着")
-            .setMessage("系统默认会限制后台运行。允许生活管家不受电池优化限制之后，" +
+            .setMessage("系统默认会限制后台运行。允许猪之家不受电池优化限制之后，" +
                     "人不在 App 里时才更容易收到「管家回了」。")
             .setPositiveButton("去允许") { _, _ ->
                 try {
@@ -1104,7 +1104,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         pendingApk = f
         // Android 8+：装别的来源要先授权一次。没授就带他去授权，回来接着装。
         if (android.os.Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
-            toast("要允许「生活管家」安装应用，授权后会自动继续")
+            toast("要允许「猪之家」安装应用，授权后会自动继续")
             startActivityForResult(
                 Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                        Uri.parse("package:$packageName")), REQ_INSTALL_SRC)

@@ -17,8 +17,8 @@ android {
         targetSdk = 35
         // 应用内更新靠这两个数字比大小（服务端 releases/latest.json 里也有一份）。
         // **每发一版都要往上加**，否则手机端会认为"没有新版"。
-        versionCode = 17
-        versionName = "0.7.0"
+        versionCode = 18
+        versionName = "0.8.0"
     }
 
     // ★ 固定签名（2026-10-06 起）。
