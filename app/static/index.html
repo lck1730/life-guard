@@ -784,7 +784,6 @@
   <div id="drawer" aria-hidden="true">
     <div class="tw-scrim" id="twScrim"></div>
     <div class="tw-card" role="dialog" aria-label="快捷入口">
-      <button class="tw-close" id="twClose" type="button" aria-label="关闭">✕</button>
       <div class="tw-list">
         <button class="tw-item" id="drLedger" type="button" data-act="ledger">
           <span class="tw-ico" style="--wi:var(--dr-wa)">
@@ -876,15 +875,12 @@
     <h2>设置</h2>
   </header>
   <div class="body">
-    <!-- ★★ **行序 2026-10-24 用户定的**（原话：「顺序：我的，管家，空间，主题，背景，
-         模型，邀请码，检查更新」✓）—— 八行**一张卡** ✓，退出两行仍单独一张卡 ✓。
-         ⚠️ 这条注释取代之前所有"行序"老注释 ✓（2026-10-06 / 10-08 / 10-09 那几条 ✓）——
-            顺序以**这里**为准 ✓，再改就改这里 ✓。 -->
+    <!-- ★★ **行序 2026-11-22 起**：空间 / 主题 / 背景 / 模型 / 邀请码 / 检查更新 ✓。
+         「我的」「管家」两行**已删** ✓ —— 两个都能点头像进入，不在设置里重复留入口 ✓。
+         退出两行仍单独一张卡 ✓。顺序以这里为准 ✓。 -->
 
     <div class="sec-g">
       <div class="grp gcard">
-    <div class="item" data-act="shell"><span class="ico" data-ico="user"></span><span class="k">我的</span><span class="v" id="vMe"></span><span class="chev" data-chev></span></div>
-    <div class="item" data-act="agentprofile"><span class="ico" data-ico="bot"></span><span class="k">管家</span><span class="v" id="vAname"></span><span class="chev" data-chev></span></div>
     <div class="item" data-act="gname"><span class="ico" data-ico="space"></span><span class="k">空间</span><span class="v" id="vGname"></span><span class="chev" data-chev></span></div>
     <!-- ★ 主题（2026-10-19）：三套可选（夜阑 / 奶霜 / 林深 ✓），选完立即生效 ✓。
          ⚠️ 只存这台设备、按用户 id 分开 ✓，不进服务端、不给空间里的别人 ✓。 -->

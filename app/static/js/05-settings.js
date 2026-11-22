@@ -1281,15 +1281,10 @@
     //   ⚠️ 只留"那一屏开着就跟着重画" ✓：群更新广播回来时（别人改了管家的 ✓）
     //      正开着的气泡面板要换「使用中」✓。
     if ($('#bubbleSet').classList.contains('on')) renderBubbleSet();
-    const eAname = $('#vAname'); if (eAname) eAname.textContent = agentName();
     // ⚠️ 这里原来还给「群昵称」那一行填值 ✓（`#vMy` ✓）——
     //    **那一行和这个 DOM 都删了** ✗→✓（2026-10-08：一个人的名字只有一个 ✓）。
     //    留着这段代码不会报错（`if (eMy)` 兜着 ✓），但它会让人以为
     //    "界面上还有那一行、只是没显示" ✗ —— 死代码比没有更坏 ✓。
-    // 「我的」右边写昵称 —— 这一行点进去就是"我"那一页，
-    // 写着名字才像"我的"。
-    const eMe = $('#vMe');
-    if (eMe) eMe.textContent = (me && (me.nickname || me.username)) || '';
     // 「邀请码」右边 = **码本身** ✓ / 满员了 = 「空间已满」✓
     // ★ **这一格是异步填的** ✗→✓（2026-10-09）—— "满没满"要问服务端算的
     //   `full` ✓（`bootstrap` 的 `group` 里没有它 ✗），所以这里**发一趟就走** ✓，
@@ -1484,19 +1479,11 @@
       else if (act === 'invite') inviteCodeNow();
       // ★ **退出当前空间**（红字居中，就在「退出登录」上面 ✓）—— 二次确认在它里面 ✓
       else if (act === 'leave') confirmLeaveSpace();
-      else if (act === 'agentprofile') {
-        // ★ 2026-10-06：打开**这一屏自己的**管家设置 ✓。
-        //   原来调的是 `window.openAgentPanel` ✗ —— 那个函数属于一个
-        //   **没部署上来的扩展** ✓（`ui/` 目录是空的 ✓），
-        //   于是这一行一直是"点不动的按钮"✗（还不报错 ✓）。
-        openAgentSettings();
-      }
       else if (act === 'aname') promptText('管家昵称', agentName(), '改完它自己也会用这个名字', v => saveGroup({ agent_name: v }));
       else if (act === 'update') {
         if (window.LifeGuardNative && LifeGuardNative.checkUpdate) LifeGuardNative.checkUpdate();
         else toast('浏览器里没有这一项——回 App 里点');
       }
-      else if (act === 'shell') openMe();
       // ★ 2026-10-11：「模型」—— 只对管理员显示 ✓（那一行在 renderSettings 里控制 ✓）
       else if (act === 'models') openModels();
       // ⚠️ 原来这里有一条 `act === 'plugins' → openComponents()` ✗→✓ ——
@@ -1998,8 +1985,6 @@
   window.__closeTools = closeDrawer;
 
   if (_twScrim) _twScrim.onclick = closeDrawer;
-  const _twClose = $('#twClose');
-  if (_twClose) _twClose.onclick = closeDrawer;
 
   const _drAct = {
     ledger: () => openComp('bookkeeping-panel', '账本'),
